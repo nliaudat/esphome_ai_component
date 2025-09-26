@@ -1,0 +1,17 @@
+switch:      
+  - platform: template
+    name: "Pause AI processing"
+    id: pause_ai_processing
+    icon: "mdi:pause"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - lambda: |-
+          if (id(meter_reader) != nullptr) {
+            id(meter_reader).set_pause_processing(true);
+          }
+    turn_off_action:
+      - lambda: |-
+          if (id(meter_reader) != nullptr) {
+            id(meter_reader).set_pause_processing(false);
+          }

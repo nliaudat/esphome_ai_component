@@ -53,45 +53,11 @@ safe_mode:
 # network:
     # enable_ipv6: false
     
-  
-globals:
-  - id: crop_zones
-    type: std::string
-    restore_value: true
-    # initial_value: "\"[]\""
-    initial_value: '"[[80, 233, 116, 307], [144, 235, 180, 307]]"'
-    # Note: The outer quotes are escaped with single quotes + double quotes ("...")
-    # "[[80, 233, 116, 307], [144, 235, 180, 307], [202, 234, 238, 308], [265, 233, 304, 306], [328, 232, 367, 311], [393, 231, 433, 310], [460, 235, 499, 311], [520, 235, 559, 342]]"
-
-
-text_sensor:
-  - platform: template
-    name: "Crop Zones"  # Exposed to HA
-    id: crop_zones_sensor
-    #Update ESPHome when changed from HA
-    on_value:
-      then:
-        - lambda: |-
-            ESP_LOGI("crop_zones", "Received crop zones: %s", x.c_str());
-            id(crop_zones) = x;  //Store in global var
-            id(meter_reader).set_crop_zones(x);
 
 api:
-  services:
-    - service: set_crop_zones
-      variables:
-        zones: string
-      then:
-        - text_sensor.template.publish:
-            id: crop_zones_sensor
-            state: !lambda 'return zones;'
-        - lambda: |-
-            id(crop_zones) = zones;  // Update global var
-            id(meter_reader).set_crop_zones(zones);
   reboot_timeout: 0s # do not reboot if hassio connection is lost.
             
-            
-      
+     
   
 meter_reader_tflite:
   id: meter_reader
@@ -100,54 +66,43 @@ meter_reader_tflite:
   confidence_threshold: 0.7
   # tensor_arena_size: "512KB" # OPTIONAL, set in model_config.h | check_tflite_model.py gives : Total Arena Size: 415.08 KB (Approx. RAM needed for inference)
   update_interval: 60s
-  debug: false
-  debug_image: false # static embedded image
+  debug: true
+  debug_image: true # static embedded image (debug.jpg)
   debug_image_out_serial: false
   crop_zones_global: crop_zones  # Reference the global variables
   
-# Define sensors separately using template sensors
-sensor:
-  - platform: template
-    name: "Meter Reading"
-    id: meter_value
-    unit_of_measurement: "units"
-    accuracy_decimals: 0
-    icon: "mdi:counter"
-    update_interval: 30s
-    lambda: |-
-      auto reader = id(meter_reader);
-      if (reader != nullptr) {
-        return reader->get_last_reading();
-      }
-      return 0.0;
 
-  - platform: template
-    name: "Meter Reading Confidence"
-    id: meter_confidence
-    unit_of_measurement: "%"
-    accuracy_decimals: 0
-    icon: "mdi:percent"
-    update_interval: 30s
-    lambda: |-
-      auto reader = id(meter_reader);
-      if (reader != nullptr) {
-        return reader->get_last_confidence() * 100.0; // Convert to percentage
-      }
-      return 0.0;
 
 packages:
+
+  # board choice
   board: !include board_freenove_esp32-s3-n8r8.yaml
   # board: !include board_AI-On-The-Edge-Cam_Esp32-S3.yaml
   # board: !include board_Seeed_Studio_XIAO_ESP32-S3_sense.yaml
-  logger: !include logger.yaml 
-  wifi: !include wifi.yaml
-  # lan: !include lan.yaml # only for AI-On-The-Edge-Cam_Esp32-S3.yaml + wifi must be disabled
-  time: !include time.yaml
-  switch_others: !include switch_others.yaml
-  sensor_others: !include sensor_others.yaml
+  
+  # AI components
+  switch_AI_component: !include switch_AI_component.yaml
+  sensor_AI_component: !include sensor_AI_component.yaml
+  globals_AI_component: !include globals_AI_component.yaml
+  text_sensor_AI_component: !include text_sensor_AI_component.yaml
+  api_AI_component: !include api_AI_component.yaml
+  
+  # camera configs
   camera_options: !include camera_options.yaml
   esp32_camera: !include esp32_camera.yaml
   camera_webserver: !include camera_webserver.yaml
+  
+  # network choice
+  wifi: !include wifi.yaml
+  # lan: !include lan.yaml # only for AI-On-The-Edge-Cam_Esp32-S3.yaml + wifi must be disabled
+  
+  # others
   globals: !include globals.yaml
+  switch_others: !include switch_others.yaml
+  sensor_others: !include sensor_others.yaml
+  logger: !include logger.yaml 
+  time: !include time.yaml
+
+
 
 
