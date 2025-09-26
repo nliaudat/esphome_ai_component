@@ -233,46 +233,46 @@ switch:
       # ref: refs/pull/26/head  # Specific reference to PR #26
     # components: [sd_mmc_card]
 
-sd_mmc_card:
-  id: sdcard
-  mode_1bit: true  # Required for SPI mode
-  clk_pin: ${sdcard_clk_pin} #SD_SCLK
-  cmd_pin: ${sdcard_cmd_pin}  #SD_MOSI
-  data0_pin: ${sdcard_d0_pin}  #SD_MISO
-  data3_pin: ${sdcard_d3_pin} #SD_CS, CD/DAT3
+# sd_mmc_card:
+  # id: sdcard
+  # mode_1bit: true  # Required for SPI mode
+  # clk_pin: ${sdcard_clk_pin} #SD_SCLK
+  # cmd_pin: ${sdcard_cmd_pin}  #SD_MOSI
+  # data0_pin: ${sdcard_d0_pin}  #SD_MISO
+  # data3_pin: ${sdcard_d3_pin} #SD_CS, CD/DAT3
 
   
-sensor:
-  - platform: sd_mmc_card
-    type: used_space
-    unit_of_measurement: Mb
-    name: "SD card used space"
-    filters:
-      - lambda: return sd_mmc_card::convertBytes(x, sd_mmc_card::MemoryUnits::MegaByte);
-
-  - platform: sd_mmc_card
-    type: total_space
-    name: "SD card total space"
-    unit_of_measurement: Gb
-    filters:
-      - lambda: return sd_mmc_card::convertBytes(x, sd_mmc_card::MemoryUnits::GigaByte);
-
-  - platform: sd_mmc_card
-    type: free_space
-    name: "SD card free space"
-    unit_of_measurement: Gb
-    filters:
-      - lambda: return sd_mmc_card::convertBytes(x, sd_mmc_card::MemoryUnits::GigaByte);
+# sensor:
+  # - platform: sd_mmc_card
+    # type: used_space
+    # unit_of_measurement: Mb
+    # name: "SD card used space"
+    # filters:
+      # - lambda: return sd_mmc_card::convertBytes(x, sd_mmc_card::MemoryUnits::MegaByte);
 
   # - platform: sd_mmc_card
-    # type: file_size
-    # name: "text.txt size"
-    # unit_of_measurement: Kb
-    # path: "/test.txt"
+    # type: total_space
+    # name: "SD card total space"
+    # unit_of_measurement: Gb
     # filters:
-      # - lambda: return sd_mmc_card::convertBytes(x, sd_mmc_card::MemoryUnits::KiloByte);
+      # - lambda: return sd_mmc_card::convertBytes(x, sd_mmc_card::MemoryUnits::GigaByte);
 
-text_sensor:
-  - platform: sd_mmc_card
-    sd_card_type:
-      name: "SD card type"
+  # - platform: sd_mmc_card
+    # type: free_space
+    # name: "SD card free space"
+    # unit_of_measurement: Gb
+    # filters:
+      # - lambda: return sd_mmc_card::convertBytes(x, sd_mmc_card::MemoryUnits::GigaByte);
+
+  # # - platform: sd_mmc_card
+    # # type: file_size
+    # # name: "text.txt size"
+    # # unit_of_measurement: Kb
+    # # path: "/test.txt"
+    # # filters:
+      # # - lambda: return sd_mmc_card::convertBytes(x, sd_mmc_card::MemoryUnits::KiloByte);
+
+# text_sensor:
+  # - platform: sd_mmc_card
+    # sd_card_type:
+      # name: "SD card type"

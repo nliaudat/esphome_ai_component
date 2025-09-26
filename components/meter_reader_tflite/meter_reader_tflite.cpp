@@ -155,6 +155,13 @@ void MeterReaderTFLite::process_available_frame() {
 void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> frame) {
     DURATION_START();
     
+    // Check if processing is paused
+    if (pause_processing_) {
+        ESP_LOGI(TAG, "AI processing paused - skipping frame processing");
+        DURATION_END("process_full_image (paused)");
+        return;
+    }
+    
     // Validate input frame
     if (!frame || !frame->get_data_buffer() || frame->get_data_length() == 0) {
         ESP_LOGE(TAG, "Invalid frame received for processing");
@@ -529,6 +536,7 @@ void MeterReaderTFLite::test_with_debug_image() {
         
         ESP_LOGI(TAG, "Processing debug image with static crop zones...");
         process_full_image(debug_image_);
+        set_pause_processing(true);
         
     } else {
         ESP_LOGE(TAG, "No debug image set to process.");

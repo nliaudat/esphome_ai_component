@@ -1,0 +1,12 @@
+api:
+  services:
+    - service: set_crop_zones
+      variables:
+        zones: string
+      then:
+        - text_sensor.template.publish:
+            id: crop_zones_sensor
+            state: !lambda 'return zones;'
+        - lambda: |-
+            id(crop_zones) = zones;  // Update global var
+            id(meter_reader).set_crop_zones(zones);

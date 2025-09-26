@@ -50,6 +50,16 @@ substitutions:
   framework: esp-idf
   
   #Pin definition
+  
+  # SD Card Configuration
+  #https://wiki.seeedstudio.com/xiao_esp32s3_sense_filesystem/
+  sdcard_clk_pin: GPIO07 #SD_SCLK
+  sdcard_cmd_pin: GPIO09 #SD_MOSI
+  sdcard_d0_pin: GPIO08 #SD_MISO
+  sdcard_d3_pin: GPIO21 #SD_CS, CD/DAT3
+  
+  # Camera Pins 
+  #https://esphome.io/components/esp32_camera/
   external_clock_pin: GPIO10
   external_clock_frequency: 20MHz
   i2c_pins_sda: GPIO40
@@ -58,12 +68,12 @@ substitutions:
   vsync_pin: GPIO38
   href_pin: GPIO47
   pixel_clock_pin: GPIO13
-  # power_down_pin: GPIO21
+  
+  # LED Pins
   status_led_pin: GPIO21
   flash_led_pin: GPIO4
-
-
-
+  
+ 
 esp32:
   board: ${board} 
   # variant: esp32s3 
@@ -125,7 +135,32 @@ psram:
   mode: octal
   speed: 80MHz
     
+# sensor:
+  # - platform: sd_mmc_card
+    # type: used_space
+    # unit_of_measurement: Mb
+    # name: "SD card used space"
+    # filters:
+      # - lambda: return sd_mmc_card::convertBytes(x, sd_mmc_card::MemoryUnits::MegaByte);
 
+  # - platform: sd_mmc_card
+    # type: total_space
+    # name: "SD card total space"
+    # unit_of_measurement: Gb
+    # filters:
+      # - lambda: return sd_mmc_card::convertBytes(x, sd_mmc_card::MemoryUnits::GigaByte);
+
+  # - platform: sd_mmc_card
+    # type: free_space
+    # name: "SD card free space"
+    # unit_of_measurement: Gb
+    # filters:
+      # - lambda: return sd_mmc_card::convertBytes(x, sd_mmc_card::MemoryUnits::GigaByte);
+
+# text_sensor:
+  # - platform: sd_mmc_card
+    # sd_card_type:
+      # name: "SD card type"
   
 # light:
   # - platform: esp32_rmt_led_strip
