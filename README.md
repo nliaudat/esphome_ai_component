@@ -29,7 +29,7 @@ Add this to your ESPHome configuration:
 external_components:
   - source: 
       type: git
-      url: https://github.com/nliaudat/meter-reader
+      url: https://github.com/nliaudat/esphome_ai_component
       ref: main
     components: [meter_reader_tflite]
 ```
