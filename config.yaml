@@ -137,7 +137,8 @@ sensor:
 
 packages:
   board: !include board_freenove_esp32-s3-n8r8.yaml
-  # board: !include AI-On-The-Edge-Cam_Esp32-S3.yaml
+  # board: !include board_AI-On-The-Edge-Cam_Esp32-S3.yaml
+  # board: !include board_Seeed_Studio_XIAO_ESP32-S3_sense.yaml
   logger: !include logger.yaml 
   wifi: !include wifi.yaml
   # lan: !include lan.yaml # only for AI-On-The-Edge-Cam_Esp32-S3.yaml + wifi must be disabled
