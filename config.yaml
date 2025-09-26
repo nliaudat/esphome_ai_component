@@ -2,18 +2,18 @@
 # for flashing : press boot button for 2-3 seconds before the serial connection initialize
 # After OTA update, the EN (reset) button must be pressed to run firmware
       
-external_components:
-  - source: 
-      type: git
-      url: https://github.com/nliaudat/esphome_ai_component
-      ref: main
-    components: [meter_reader_tflite]
+# external_components:
+  # - source: 
+      # type: git
+      # url: https://github.com/nliaudat/esphome_ai_component
+      # ref: main
+    # components: [meter_reader_tflite]
       
-# external_components:    
-  # - source:
-      # type: local
-      # path: components 
-    # components: [meter_reader_tflite] 
+external_components:    
+  - source:
+      type: local
+      path: components 
+    components: [meter_reader_tflite] 
       
 
 

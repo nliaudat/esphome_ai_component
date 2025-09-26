@@ -264,21 +264,6 @@ void MeterReaderTFLite::set_camera_image_format(int width, int height, const std
     ESP_LOGD(TAG, "Camera format set: %dx%d, %s", width, height, pixel_format.c_str());
 }
 
-/* float MeterReaderTFLite::combine_readings(const std::vector<float> &readings) {
-    float combined_value = 0.0f;
-    float multiplier = 1.0f;
-    
-    //combined_value += (*it) * multiplier;  // 0.9*1 + 1.8*10 + 2.9*100 + 3.9*1000 + 4.9*10000 + 5.9*100000 + 6.8*1000000 + 3.2*10000000
-= 11134561
-    
-    // Combine digits from least significant to most significant
-    for (auto it = readings.rbegin(); it != readings.rend(); ++it) {
-        combined_value += (*it) * multiplier;
-        multiplier *= 10.0f;
-    }
-    
-    return combined_value;
-} */
 
 float MeterReaderTFLite::combine_readings(const std::vector<float> &readings) {
     std::string digit_string;
@@ -495,16 +480,6 @@ bool MeterReaderTFLite::allocate_tensor_arena() {
             tensor_arena_allocation_.actual_size);
     return true;
 }
-
-// size_t MeterReaderTFLite::get_arena_peak_bytes() const {
-    // return model_handler_.get_arena_peak_bytes();
-// }
-
-
-// void MeterReaderTFLite::set_crop_zones_global(GlobalVarComponent<std::string> *crop_zones_global) {
-    // crop_zones_global_ = crop_zones_global;
-    // ESP_LOGI(TAG, "Crop zones global variable set");
-// }
 
 
 #ifdef DEBUG_METER_READER_TFLITE
