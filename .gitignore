@@ -7,7 +7,6 @@
 **/lib/
 **/src/
 **/platformio.ini
-**/secrets.yaml
+/secrets.yaml
 compile.bat
 secrets.yaml
-
