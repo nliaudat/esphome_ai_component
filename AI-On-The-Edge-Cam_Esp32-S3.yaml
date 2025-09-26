@@ -1,0 +1,278 @@
+# https://www.tindie.com/products/allexok/ai-on-the-edge-cam-esp32-s3-with-poe-sd-camera/
+# https://github.com/jomjol/AI-on-the-edge-device/discussions/2963
+
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  min_version: 2025.8.0
+  name_add_mac_suffix: False # this appends to 'name' NOT 'friendly_name'      
+  on_loop:
+    - lambda: |-
+          if (id(${id_prefix}espcam_update)) {
+            id(${id_prefix}espcam).update_camera_parameters();
+            if(id(${id_prefix}debug)) { id(${id_prefix}espcam).dump_config(); }
+            id(${id_prefix}espcam_update) = false;
+          }
+          
+          
+# << if use_wifi == "true" >>
+  # on_boot:
+    # priority: 600
+    # then:
+      # - output.turn_off: eth_power
+      # - logger.log: "WiFi is enabled - disabling Ethernet power"
+# << else >>
+  # on_boot:
+    # priority: 600
+    # then:
+      # - output.turn_on: eth_power
+      # - logger.log: "WiFi is disabled - enabling Ethernet power"
+# << endif >>
+
+  project:
+    name: "Prokyber.AI-On-The-Edge-Cam"
+    version: "${revision}.dev"
+  platformio_options:
+    board_build.f_cpu: 240000000L
+    board_build.f_flash: 80000000L
+    board_build.flash_size: 16MB
+    board_build.arduino.memory_type: opi_opi
+    board_build.flash_mode: dio # opi
+    board_build.psram_type: opi
+    board_upload.maximum_size: 16777216
+    board_build.extra_flags: 
+    - -DBOARD_HAS_PSRAM 
+    - -DTF_LITE_STATIC_MEMORY # for tflite micro
+    - -DTF_LITE_DISABLE_X86_NEON #for tflite micro
+    - -DESP_NN  #use hardware acceleration : https://github.com/espressif/esp-nn (only if using tflite)
+    board_name: AI-On-The-Edge-Cam Esp32-S3 (N16R8) #https://www.tindie.com/products/allexok/ai-on-the-edge-cam-esp32-s3-with-poe-sd-camera/
+
+
+substitutions:
+  #board and compilation
+  board: esp32-s3-devkitc-1
+  framework: esp-idf 
+
+
+  # Power control pins
+  eth_enable_pin: GPIO45
+  per_enable_pin: GPIO46
+  
+  # Ethernet SPI Configuration
+  # need lan.yaml to be activated in config.yaml
+  eth_mosi_pin: GPIO1
+  eth_miso_pin: GPIO14
+  eth_clk_pin: GPIO21
+  eth_cs_pin: GPIO39
+  eth_int_pin: GPIO38
+  
+  # SD Card Configuration
+  sdcard_clk_pin: GPIO40 #SD_SCLK
+  sdcard_cmd_pin: GPIO42 #SD_MOSI
+  sdcard_d0_pin: GPIO41 #SD_MISO
+  sdcard_d3_pin: GPIO3 #SD_CS, CD/DAT3
+  
+  # Camera Pins 
+  external_clock_pin: GPIO15
+  external_clock_frequency: 20MHz
+  i2c_pins_sda: GPIO4
+  i2c_pins_scl: GPIO5
+  data_pins:
+    - GPIO11  # CAM_D0
+    - GPIO9   # CAM_D1
+    - GPIO8   # CAM_D2
+    - GPIO10  # CAM_D3
+    - GPIO47  # CAM_D4
+    - GPIO18  # CAM_D5
+    - GPIO17  # CAM_D6
+    - GPIO16  # CAM_D7
+  vsync_pin: GPIO6
+  href_pin: GPIO7
+  pixel_clock_pin: GPIO13
+  
+  # LED Pins
+  status_led_pin: GPIO48
+  flash_led_pin: GPIO12
+  
+  
+
+esp32:
+  board: ${board} 
+  variant: esp32s3 
+  flash_size: 16MB
+  framework:
+    type: ${framework} 
+    version: recommended
+    # components:
+      # - name: espressif/esp-tflite-micro
+        # ref: "1.3.3~1"
+        # source: espressif/esp-tflite-micro
+    sdkconfig_options:
+      # CONFIG_COMPILER_OPTIMIZATION_SIZE: y
+      CONFIG_COMPILER_OPTIMIZATION_PERF: y
+      CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: "y"
+      CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
+      CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
+      CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB: "y"
+      CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY: "y"
+      CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP: "y"
+      CONFIG_BT_ALLOCATION_FROM_SPIRAM_FIRST: "y"
+      CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
+      CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: "y"
+      CONFIG_MBEDTLS_SSL_PROTO_TLS1_3: "y"
+      CONFIG_FATFS_LFN_STACK: "y" # to support long file name in sdcard
+      CONFIG_TASK_WDT: "y" # prevents watchdog timeouts
+      CONFIG_TASK_WDT_TIMEOUT_S: "30" # prevents watchdog timeouts
+      CONFIG_TASK_WDT_CHECK_IDLE_TASK_CPU0: "n" # prevents watchdog timeouts
+      ### needed by new jpeg camera : https://github.com/esphome/esphome/pull/9496
+      CONFIG_SPIRAM_SUPPORT: y
+      CONFIG_SPIRAM_USE_CAPS_ALLOC: y
+      CONFIG_SPIRAM_USE_MALLOC: y
+      CONFIG_LOG_DEFAULT_LEVEL: "0" # prevents "ESP-IDF" Guru Meditation Error
+      #CONFIG_LOG_DEFAULT_LEVEL: 0 # prevents "ESP-IDF" Guru Meditation Error
+      # CONFIG_CAMERA_TASK_STACK_SIZE: "4096"
+      CONFIG_CAMERA_TASK_STACK_SIZE: "8192"
+      #### testing 
+      CONFIG_ESP32_DEFAULT_CPU_FREQ_240: y
+      # CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: y
+      CONFIG_FREERTOS_HZ: "1000"
+      CONFIG_ESP32S3_SPIRAM_SUPPORT: y
+      CONFIG_SPIRAM_SPEED_80M: y
+
+psram:
+  mode: octal
+  speed: 80MHz
+    
+######## LIGHTS
+  
+light:
+  - platform: esp32_rmt_led_strip
+    rgb_order: GRB
+    pin: ${flash_led_pin} 
+    num_leds: 4
+    # rmt_channel: 0 # only for arduino framework
+    chipset: ws2812
+    name: "flash"
+    id: ${id_prefix}flash
+    effects:
+      - addressable_scan:
+          name: "Scan Effect"
+          move_interval: 100ms
+          scan_width: 1
+      - addressable_rainbow:
+          name: "Rainbow Effect"
+          speed: 10
+          width: 50
+      - pulse:
+          name: "Slow Pulse"
+          transition_length: 500ms
+          update_interval: 2s
+  - platform: status_led
+    name: "${name} Status LED"
+    id: ${id_prefix}light
+    icon: "mdi:alarm-light"
+    restore_mode: ALWAYS_OFF
+    pin: ${status_led_pin}
+    
+
+    
+######## Power management (wifi or ethernet)
+output:
+  - platform: gpio
+    pin: ${eth_enable_pin}
+    id: eth_power
+    inverted: true
+  - platform: gpio
+    pin: ${per_enable_pin}
+    id: periph_power
+    inverted: true
+    
+switch:
+  - platform: template
+    name: "Ethernet Power"
+    id: eth_power_switch
+    icon: "mdi:ethernet"
+    turn_on_action:
+      - output.turn_on: eth_power
+      - delay: 500ms
+    turn_off_action:
+      - output.turn_off: eth_power
+
+  - platform: template
+    name: "Peripheral Power"
+    id: periph_power_switch
+    icon: "mdi:camera"
+    turn_on_action:
+      - output.turn_on: periph_power
+      - delay: 1000ms
+    turn_off_action:
+      - output.turn_off: periph_power
+
+## only if wifi.yaml is enabled
+  # - platform: template
+    # name: "WiFi Power"
+    # id: wifi_power_switch
+    # icon: "mdi:wifi"
+    # lambda: |-
+      # return id(${id_prefix}wifi_component).is_connected();  // Use the id set in wifi.yaml
+    # turn_on_action:
+      # - delay: 100ms  
+    # turn_off_action:
+      # - delay: 100ms
+
+          
+          
+######## SD Card Configuration
+
+## need external_components in config.yaml
+## as of 23.07.2025, the PR #26 must be called as it fixes changes in esphome 2025.7
+  # - source:
+      # type: git
+      # url: https://github.com/n-serrette/esphome_sd_card
+      # ref: refs/pull/26/head  # Specific reference to PR #26
+    # components: [sd_mmc_card]
+
+sd_mmc_card:
+  id: sdcard
+  mode_1bit: true  # Required for SPI mode
+  clk_pin: ${sdcard_clk_pin} #SD_SCLK
+  cmd_pin: ${sdcard_cmd_pin}  #SD_MOSI
+  data0_pin: ${sdcard_d0_pin}  #SD_MISO
+  data3_pin: ${sdcard_d3_pin} #SD_CS, CD/DAT3
+
+  
+sensor:
+  - platform: sd_mmc_card
+    type: used_space
+    unit_of_measurement: Mb
+    name: "SD card used space"
+    filters:
+      - lambda: return sd_mmc_card::convertBytes(x, sd_mmc_card::MemoryUnits::MegaByte);
+
+  - platform: sd_mmc_card
+    type: total_space
+    name: "SD card total space"
+    unit_of_measurement: Gb
+    filters:
+      - lambda: return sd_mmc_card::convertBytes(x, sd_mmc_card::MemoryUnits::GigaByte);
+
+  - platform: sd_mmc_card
+    type: free_space
+    name: "SD card free space"
+    unit_of_measurement: Gb
+    filters:
+      - lambda: return sd_mmc_card::convertBytes(x, sd_mmc_card::MemoryUnits::GigaByte);
+
+  # - platform: sd_mmc_card
+    # type: file_size
+    # name: "text.txt size"
+    # unit_of_measurement: Kb
+    # path: "/test.txt"
+    # filters:
+      # - lambda: return sd_mmc_card::convertBytes(x, sd_mmc_card::MemoryUnits::KiloByte);
+
+text_sensor:
+  - platform: sd_mmc_card
+    sd_card_type:
+      name: "SD card type"

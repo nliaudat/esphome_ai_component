@@ -1,0 +1,34 @@
+# Enable logging
+logger:
+  # level: ERROR #NONE# ERROR #INFO #DEBUG  #VERBOSE
+  level: DEBUG #NONE# ERROR #INFO #DEBUG  #VERBOSE
+  # baud_rate: 0 #to disable logging via UART
+  # logs:
+    # adc: NONE
+    # sensor: ERROR
+    # binary_sensor: INFO
+    # cover: INFO
+    # switch: INFO
+    # climate: INFO
+    # endstop : INFO
+    # text_sensor : ERROR
+    # homeassistant.sensor: ERROR
+    # gpio : NONE
+    # esp-idf : NONE
+    # status_led : NONE
+    # dallas.temp.sensor: ERROR
+    # gpio.one_wire: INFO
+    # esp32.preferences: NONE
+    # safe_mode: NONE
+    # esp32_camera: ERROR #DEBUG
+    # esp32_camera_web_server: ERROR #DEBUG
+    # web_server_idf: ERROR #DEBUG
+    # esp_psram: DEBUG
+    # meter_reader_tflite: DEBUG
+    # ModelHandler: DEBUG
+    # ImageProcessor: DEBUG
+    # MemoryManager: DEBUG
+    # CropZoneHandler: DEBUG
+    
+    
+    

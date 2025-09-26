@@ -1,0 +1,8 @@
+# https://esphome.io/components/esp32_camera_web_server.html
+
+# if you want to stream images use this and add a picture card using this devices IP:Port for the image_url
+esp32_camera_web_server:
+  - port: 8080
+    mode: stream
+  # - port: 8081
+    # mode: snapshot

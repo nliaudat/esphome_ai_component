@@ -1,0 +1,79 @@
+# https://esphome.io/components/esp32_camera.html
+
+i2c:
+  sda: ${i2c_pins_sda}
+  scl: ${i2c_pins_scl}
+  id: bus_camera
+
+esp32_camera: 
+  id: ${id_prefix}espcam 
+  name: ${friendly_name}_camera 
+  external_clock:
+    pin: ${external_clock_pin}
+    frequency: ${external_clock_frequency}
+  i2c_id: bus_camera
+  data_pins: ${data_pins} 
+  vsync_pin: ${vsync_pin} 
+  href_pin: ${href_pin} 
+  pixel_clock_pin: ${pixel_clock_pin} 
+  
+
+  
+  #reset_pin: no value for my card
+  #power_pin: no value for my card
+  # Image Settings
+  # - these first 5 parameters can only be set by recompiling the code and uploading it to the esp32
+  # - this is NOT a limitation of the esp32_camera component.
+  #   These parameters are used to define the frame_buffer that captures the images.
+  #      And the frame_buffer can't be changed after the setup() function has run.
+  # 2024-12-20: setup() calls esp_camera_init(), which is defined in
+  #   https://github.com/espressif/esp32-camera/blob/4335c93ec462a379aa2a3d655b8834972d725190/driver/include/esp_camera.h
+  #   the comments at the start of this function's definition clearly state that:
+  #     - it can only be called once
+  #     - it setups the framebuffer (which uses these first 5 parameters)
+  #     - and it cannot be de-initialized once it is set
+  #   Therefore, changing these parameters on the fly will have no effect
+  #   Perhaps this will get changed at some point
+  #resolution: 800x600 
+  resolution: ${camera_resolution} #${camera_width}X${camera_height}    #320X240 # for testing, quicker screen reactions
+  jpeg_quality: ${camera_jpeg_quality} #10 #40 #12
+  # Frame Settings
+  # max_framerate: 10fps
+  # idle_framerate: 0.1fps # 10sec
+  max_framerate: ${camera_max_framerate} #1fps
+  idle_framerate: ${camera_idle_framerate} #0.1fps # 10sec
+  # frame_buffer_count: 2  # Double buffering at driver level
+  frame_buffer_location: PSRAM # DRAM # available in the release 2025.8.0
+  
+  ## new with https://github.com/esphome/esphome/pull/9496
+  # pixel_format: ${camera_pixel_format} # only if new camera component
+  # frame_buffer_location: PSRAM # only if new camera component
+  
+  # task_stack_size: 8192
+  # frame_size: 8  # Reduced from default 16
+
+  # The following parameters can be changed on the fly after the camera is started
+  #  by calling update_camera_parameters() in lambda
+  vertical_flip: false
+  horizontal_mirror: false
+  # contrast, brightness, & saturation seem to have little to no effect when called using update_camera_parameters()
+  #  at least for my camera - esp32-s3-wroom-1 N8R8 from Freenove
+  contrast: 0
+  brightness: 0
+  saturation: 0
+  special_effect: NONE
+  # exposure settings
+  aec_mode: AUTO
+  aec2: True
+  ae_level: 0
+  aec_value: 580
+  # gain settings
+  agc_mode: AUTO
+  agc_gain_ceiling: 2X
+  agc_value: 0
+  # white balance setting
+  wb_mode: AUTO
+  # test pattern
+  test_pattern: False
+  
+ 

@@ -1,0 +1,23 @@
+## https://esphome.io/components/ethernet.html
+
+### since esphome 2025.8.0 https://github.com/esphome/esphome/pull/9456
+# if ethernet is enabled, it do not compile any wifi components.
+
+# Ethernet Configuration
+ethernet:
+  type: W5500
+  clk_pin: ${eth_clk_pin}
+  mosi_pin: ${eth_mosi_pin}
+  miso_pin: ${eth_miso_pin}
+  cs_pin: ${eth_cs_pin}
+  interrupt_pin: ${eth_int_pin}
+  reset_pin: GPIO0
+  
+  # Optional manual IP
+  # manual_ip:
+    # static_ip: 192.168.1.164
+    # gateway: 192.168.1.2
+    # subnet: 255.255.255.0
+  
+
+  

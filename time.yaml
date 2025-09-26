@@ -1,0 +1,17 @@
+
+time:
+- platform: sntp
+  timezone : ${TZ}
+  servers: [0.pool.ntp.org, 1.pool.ntp.org , 2.pool.ntp.org]
+  on_time:
+  - seconds: ${reboot_seconds}
+    minutes: ${reboot_minutes}
+    hours: ${reboot_hours}
+    days_of_week: ${reboot_days_of_week} 
+    then:
+      - switch.toggle: ${id_prefix}ctrl_reboot
+
+# interval:
+  # - interval: ${maintenance_interval}
+    # then:
+      # - script.execute: maintenance

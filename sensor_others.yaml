@@ -1,0 +1,40 @@
+
+sensor:
+    
+  - platform: uptime
+    name: "${friendly_name} Uptime"    
+    id: ${id_prefix}uptime_sensor
+    update_interval: 5min
+    internal: true
+    on_raw_value:
+      then:
+        - text_sensor.template.publish:
+            id: ${id_prefix}uptime_human
+            state: !lambda |-
+              int seconds = round(id(${id_prefix}uptime_sensor).raw_state);
+              int days = seconds / (24 * 3600);
+              seconds = seconds % (24 * 3600);
+              int hours = seconds / 3600;
+              seconds = seconds % 3600;
+              int minutes = seconds /  60;
+              seconds = seconds % 60;
+              return (
+                (days ? to_string(days) + "d " : "") +
+                (hours ? to_string(hours) + "h " : "") +
+                (minutes ? to_string(minutes) + "m " : "") +
+                (to_string(seconds) + "s")
+              ).c_str();      
+    # web_server:
+      # sorting_group_id: sorting_group_sensors
+              
+
+  # - platform: internal_temperature
+    # name: "${friendly_name} Internal Temperature"
+
+text_sensor:  
+  - platform: template
+    name: "${friendly_name} uptime"
+    id: ${id_prefix}uptime_human
+    icon: mdi:clock-start  
+    # web_server:
+      # sorting_group_id: sorting_group_sensors

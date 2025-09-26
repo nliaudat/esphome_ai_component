@@ -1,0 +1,34 @@
+
+wifi:
+  id: ${id_prefix}wifi_component
+  #use_address: floor-heating-controller-v2.local  #use if you want to change device name once.
+  networks:
+  - ssid: !secret wifi_ssid_1
+    #hidden: true
+    password: !secret wifi_password_1
+    priority : 1
+  # - ssid: !secret wifi_ssid_2
+    # hidden: true
+    # password: !secret wifi_password_2
+    # priority : 2
+  # - ssid: !secret wifi_ssid_3
+    # password: !secret wifi_password_3
+    # priority : 3
+#  use_address: floor_heating_controller.local
+
+# Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "${name} Flbck"
+    password: !secret fallback_hotspot_password
+    
+captive_portal:
+
+sensor:
+  - platform: wifi_signal
+    name: "${friendly_name} WiFi Signal"
+    update_interval: 60s
+    entity_category: "diagnostic"
+    id: ${id_prefix}wifi_signal_db
+    # web_server:
+      # sorting_group_id: sorting_group_sensors
+

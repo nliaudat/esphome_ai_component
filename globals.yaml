@@ -1,0 +1,11 @@
+globals:
+# the debug parameter determines whether a config dump is done after making changes
+# this is helpful when doing initial setup, but once everything is working, I turn it off
+  - id: ${id_prefix}debug
+    type: bool
+    initial_value: 'false'
+# value to track if camera parameters have been changed
+#   used to trigger the loop() code inserted in 'esphome' section above
+  - id: ${id_prefix}espcam_update
+    type: bool
+    initial_value: 'false'
