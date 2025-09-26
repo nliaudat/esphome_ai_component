@@ -258,9 +258,9 @@ esp32_camera:
 
 ```yaml
 meter_reader_tflite:
-  debug: true
-  debug_image: true # static embedded image
-  debug_image_out_serial: true
+  debug: true # the tflite model operators are set manually (model_handler.cpp)
+  debug_image: true # static embedded image debug.jpg
+  debug_image_out_serial: true #output image to serial console, can be reconstructed with tools/analyze_serial_output.py
 ```
 
 Debug output includes:

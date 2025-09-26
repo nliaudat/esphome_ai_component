@@ -10,3 +10,4 @@
 /secrets.yaml
 compile.bat
 secrets.yaml
+/components/meter_reader_tflite/__pycache__

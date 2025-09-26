@@ -23,10 +23,7 @@ static const char *const TAG = "ModelHandler";
 bool ModelHandler::load_model(const uint8_t *model_data, size_t model_size,
                             uint8_t* tensor_arena, size_t tensor_arena_size,
                             const ModelConfig &config) {
-// bool ModelHandler::load_model(const uint8_t *model_data, size_t model_size,
-                            // uint8_t* tensor_arena, size_t tensor_arena_size,
-                            // const ModelConfig &config) {
-                                
+
                                 
   ESP_LOGD(TAG, "Loading model with config:");
   ESP_LOGD(TAG, "  Description: %s", config.description.c_str());
@@ -34,7 +31,7 @@ bool ModelHandler::load_model(const uint8_t *model_data, size_t model_size,
   ESP_LOGD(TAG, "Model data validation:");
   ESP_LOGD(TAG, "  Model data pointer: %p", model_data);
   ESP_LOGD(TAG, "  Model data size: %zu bytes", model_size);
-  // ESP_LOGD(TAG, "  Expected size from header: %u bytes", model_data_len);
+
   
   if (model_data == nullptr) {
     ESP_LOGE(TAG, "Model data pointer is NULL!");
@@ -953,12 +950,4 @@ uint32_t crc32_runtime(const uint8_t* data, size_t length) {
 #endif
 
 }  // namespace meter_reader_tflite
-
-
-// #ifdef DEBUG_METER_READER_TFLITE
-    // namespace {
-
-    // } // anonymous namespace
-// #endif
-
 }  // namespace esphome
