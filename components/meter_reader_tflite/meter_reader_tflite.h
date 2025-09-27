@@ -174,12 +174,12 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   int get_model_input_channels() const { return model_handler_.get_input_channels(); } 
   
     void set_pause_processing(bool pause) { 
-        pause_processing_ = pause; 
+        pause_processing_.store(pause); 
         ESP_LOGI(TAG, "AI processing %s", pause ? "PAUSED" : "RESUMED");
     }
 
     bool get_pause_processing() const { 
-        return pause_processing_; 
+        return pause_processing_.load(); 
     }
   
 #ifdef DEBUG_METER_READER_TFLITE
@@ -267,7 +267,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   uint32_t last_frame_received_{0};             ///< Timestamp of last received frame
   uint32_t last_request_time_{0};               ///< Timestamp of last frame request
   // GlobalVarComponent<std::string> *crop_zones_global_{nullptr};
-  bool pause_processing_{false};
+  std::atomic<bool> pause_processing_{false};
   
   /**
    * @brief Process the next available frame in the buffer.
