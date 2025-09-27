@@ -139,6 +139,7 @@ void MeterReaderTFLite::loop() {
         ESP_LOGW(TAG, "Frame request timeout - no frame received in 10 seconds");
         frame_requested_.store(false);
         frames_skipped_++;
+        this->disable_flash_light();
     }
 }
 
@@ -503,17 +504,36 @@ bool MeterReaderTFLite::allocate_tensor_arena() {
 // Add the flash light control methods
 void MeterReaderTFLite::enable_flash_light() {
     if (flash_light_ && flash_light_enabled_) {
-        ESP_LOGI(TAG, "Enabling flash light");
+        ESP_LOGI(TAG, "Enabling flash light (auto-controlled)");
+        flash_auto_controlled_.store(true);
         auto call = flash_light_->turn_on();
         call.set_brightness(1.0f); // Full brightness
+        call.set_transition_length(0);
         call.perform();
     }
 }
 
+bool MeterReaderTFLite::is_flash_forced_on() const {
+    if (!flash_light_ || !flash_light_enabled_) {
+        return false;
+    }
+    
+    // If flash is on but not marked as auto-controlled, it's forced on
+    bool is_currently_on = flash_light_->current_values.is_on();
+    if (is_currently_on && !flash_auto_controlled_.load()) {
+        return true;
+    }
+    
+    return false;
+}
+
 void MeterReaderTFLite::disable_flash_light() {
-    if (flash_light_ && flash_light_enabled_) {
-        ESP_LOGI(TAG, "Disabling flash light");
-        flash_light_->turn_off().perform();
+    if (flash_light_ && flash_light_enabled_ && flash_auto_controlled_.load()) {
+        ESP_LOGI(TAG, "Disabling auto-controlled flash light");
+        flash_auto_controlled_.store(false);
+        auto call = flash_light_->turn_off();
+        call.set_transition_length(0);
+        call.perform();
     }
 }
 

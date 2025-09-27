@@ -287,6 +287,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   light::LightState* flash_light_{nullptr};  ///< Flash light component
   bool flash_light_enabled_{false};          ///< Whether flash light is enabled
   uint32_t flash_duration_{200};             ///< Flash duration in milliseconds
+  std::atomic<bool> flash_auto_controlled_{false};
   
   /**
    * @brief Process the next available frame in the buffer.
@@ -297,6 +298,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   * @brief Control flash light around image capture
   */
   void enable_flash_light();
+  bool is_flash_forced_on() const;
   void disable_flash_light();
   
   /**
