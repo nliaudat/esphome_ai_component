@@ -138,7 +138,7 @@ light:
     chipset: ws2812
     name: "${name} Flash LED"
     id: ${id_prefix}flash
-    default_transition_length : 0s
+    default_transition_length: 0s
     effects:
       - addressable_scan:
           name: "Scan Effect"
@@ -150,7 +150,7 @@ light:
           width: 50
       - pulse:
           name: "Slow Pulse"
-          transition_length: 0ms
+          transition_length: 500ms
           update_interval: 2s
   - platform: status_led
     name: "${name} Status LED"

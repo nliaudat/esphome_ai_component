@@ -11,7 +11,7 @@
 #include "debug_utils.h"
 #include "model_config.h"
 #include <numeric>
-#include "esphome/components/light/light_state.h"
+// #include "esphome/components/light/light_state.h"
 
 namespace esphome {
 namespace meter_reader_tflite {
@@ -41,6 +41,13 @@ void MeterReaderTFLite::setup() {
     camera_->add_image_callback([this](std::shared_ptr<camera::CameraImage> image) {
         // Only accept frames if requested and not currently processing
         if (frame_requested_.load() && !processing_frame_.load()) {
+            // Disable flash immediately after capture
+            if (flash_light_ && flash_light_enabled_) {
+                this->set_timeout(10, [this]() {
+                    this->disable_flash_light();
+                });
+            }
+            
             pending_frame_ = image;
             frame_available_.store(true);
             frame_requested_.store(false);
@@ -107,17 +114,17 @@ void MeterReaderTFLite::update() {
     
     // Request new frame if none available or pending
     if (!frame_available_.load() && !frame_requested_.load()) {
-        // Schedule flash light operations before requesting frame
-        schedule_flash_light_operations();
-        
-        frame_requested_.store(true);
-        last_request_time_ = millis();
-        ESP_LOGD(TAG, "Requesting new frame with flash light: %s", 
-                 flash_light_enabled_ ? "enabled" : "disabled");
-    } else if (frame_available_.load()) {
-        // Process existing frame immediately
-        ESP_LOGD(TAG, "Processing available frame");
-        process_available_frame();
+        if (flash_light_ && flash_light_enabled_) {
+            // Enable flash and request frame after short delay
+            this->enable_flash_light();
+            this->set_timeout(50, [this]() {  // 50ms for flash to stabilize
+                frame_requested_.store(true);
+                last_request_time_ = millis();
+            });
+        } else {
+            frame_requested_.store(true);
+            last_request_time_ = millis();
+        }
     }
 }
 
