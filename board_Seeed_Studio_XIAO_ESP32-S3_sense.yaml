@@ -162,30 +162,18 @@ psram:
     # sd_card_type:
       # name: "SD card type"
   
-# light:
-  # - platform: esp32_rmt_led_strip
-    # rgb_order: GRB
-    # pin: ${flash_led_pin} #GPIO48
-    # num_leds: 1
-    # chipset: ws2812
-    # name: "flash"
-    # id: ${id_prefix}flash
-    # effects:
-      # - addressable_scan:
-          # name: "Scan Effect"
-          # move_interval: 100ms
-          # scan_width: 1
-      # - addressable_rainbow:
-          # name: "Rainbow Effect"
-          # speed: 10
-          # width: 50
-      # - pulse:
-          # name: "Slow Pulse"
-          # transition_length: 500ms
-          # update_interval: 2s
-  # - platform: status_led
-    # name: "${name} Status LED"
-    # id: ${id_prefix}status_led
-    # icon: "mdi:alarm-light"
-    # restore_mode: ALWAYS_OFF
-    # pin: ${status_led_pin}
+light:
+  - platform: status_led
+    name: "${name} Flash LED"
+    id: ${id_prefix}flash
+    default_transition_length : 0s
+    icon: "mdi:alarm-light"
+    restore_mode: ALWAYS_OFF
+    pin: ${flash_led_pin}
+    
+  - platform: status_led
+    name: "${name} Status LED"
+    id: ${id_prefix}status_led
+    icon: "mdi:alarm-light"
+    restore_mode: ALWAYS_OFF
+    pin: ${status_led_pin}

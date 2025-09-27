@@ -151,10 +151,10 @@ light:
     rgb_order: GRB
     pin: ${flash_led_pin} 
     num_leds: 4
-    # rmt_channel: 0 # only for arduino framework
     chipset: ws2812
-    name: "flash"
+    name: "${name} Flash LED"
     id: ${id_prefix}flash
+    default_transition_length : 0s
     effects:
       - addressable_scan:
           name: "Scan Effect"
@@ -166,7 +166,7 @@ light:
           width: 50
       - pulse:
           name: "Slow Pulse"
-          transition_length: 500ms
+          transition_length: 0ms
           update_interval: 2s
   - platform: status_led
     name: "${name} Status LED"

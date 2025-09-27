@@ -9,6 +9,7 @@ from esphome.components import esp32, sensor
 import esphome.components.esp32_camera as esp32_camera
 from esphome.cpp_generator import RawExpression
 from esphome.components import globals
+from esphome.components import light
 
 CODEOWNERS = ["@nl"]
 DEPENDENCIES = ['esp32', 'camera']
@@ -22,6 +23,8 @@ CONF_DEBUG = 'debug'
 CONF_DEBUG_IMAGE = 'debug_image'
 CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL = 'debug_image_out_serial'
 CONF_MODEL_TYPE = 'model_type'  # New configuration option for model type
+CONF_FLASH_LIGHT = 'flash_light'
+CONF_FLASH_DURATION = 'flash_duration'  # Optional: for duration control
 
 meter_reader_tflite_ns = cg.esphome_ns.namespace('meter_reader_tflite')
 MeterReaderTFLite = meter_reader_tflite_ns.class_('MeterReaderTFLite', cg.PollingComponent)
@@ -58,6 +61,8 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_DEBUG, default=False): cv.boolean, 
     cv.Optional(CONF_DEBUG_IMAGE, default=False): cv.boolean, 
     cv.Optional(CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL, default=False): cv.boolean,
+    cv.Optional(CONF_FLASH_LIGHT): cv.use_id(light.LightState), 
+    cv.Optional(CONF_FLASH_DURATION, default=2200): cv.positive_int, 
     cv.Optional('crop_zones_global'): cv.use_id(globals.GlobalsComponent),
 }).extend(cv.polling_component_schema('60s'))
 
@@ -176,3 +181,12 @@ async def to_code(config):
     if 'crop_zones_global' in config:
         crop_global = await cg.get_variable(config['crop_zones_global'])
         cg.add(var.set_crop_zones_global_string(crop_global.value()))
+        
+    # Set flash light if configured
+    if CONF_FLASH_LIGHT in config:
+        flash_light = await cg.get_variable(config[CONF_FLASH_LIGHT])
+        cg.add(var.set_flash_light(flash_light))
+        
+        # Set flash duration if specified
+        if CONF_FLASH_DURATION in config:
+            cg.add(var.set_flash_duration(config[CONF_FLASH_DURATION]))
