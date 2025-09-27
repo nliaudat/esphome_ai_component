@@ -13,6 +13,8 @@
 #include "esphome/components/esp32_camera/esp32_camera.h"
 #include "esphome/components/camera/camera.h"
 #include "esphome/components/globals/globals_component.h"
+// #include "esphome/components/light/light.h"
+#include "esphome/components/light/light_state.h"
 #include "model_handler.h"
 #include "memory_manager.h"
 #include "image_processor.h"
@@ -174,12 +176,12 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   int get_model_input_channels() const { return model_handler_.get_input_channels(); } 
   
     void set_pause_processing(bool pause) { 
-        pause_processing_ = pause; 
+        pause_processing_.store(pause); 
         ESP_LOGI(TAG, "AI processing %s", pause ? "PAUSED" : "RESUMED");
     }
 
     bool get_pause_processing() const { 
-        return pause_processing_; 
+        return pause_processing_.load(); 
     }
   
 #ifdef DEBUG_METER_READER_TFLITE
@@ -190,6 +192,20 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void debug_test_with_pattern();
 #endif
 
+    /**
+     * @brief Set the flash light component for illumination during capture.
+     * @param flash_light Pointer to the light state component
+     */
+    void set_flash_light(light::LightState* flash_light);
+
+    /**
+     * @brief Set the flash duration in milliseconds.
+     * @param duration_ms Flash duration in milliseconds
+     */
+    void set_flash_duration(uint32_t duration_ms);
+      
+
+/** ########### PROTECTED ############# **/
  protected:
   // sensor::Sensor *confidence_sensor_{nullptr};  ///< Sensor for confidence values
   uint32_t frames_processed_{0};                ///< Counter for successfully processed frames
@@ -226,8 +242,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
    * @return true if processing successful, false otherwise
    */
   bool process_model_result(const ImageProcessor::ProcessResult& result, float* value, float* confidence);
-  
-  
+   
 
   // Configuration parameters
   int camera_width_{0};                      ///< Camera image width in pixels
@@ -259,6 +274,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   CropZoneHandler crop_zone_handler_;        ///< Crop zone management
   MemoryManager::AllocationResult tensor_arena_allocation_;  ///< Tensor arena allocation result
 
+/** ########### PRIVATE ############# **/
  private:
   std::shared_ptr<camera::CameraImage> pending_frame_{nullptr};  ///< Single frame buffer
   std::atomic<bool> frame_available_{false};    ///< Flag indicating frame available for processing
@@ -267,12 +283,26 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   uint32_t last_frame_received_{0};             ///< Timestamp of last received frame
   uint32_t last_request_time_{0};               ///< Timestamp of last frame request
   // GlobalVarComponent<std::string> *crop_zones_global_{nullptr};
-  bool pause_processing_{false};
+  std::atomic<bool> pause_processing_{false};
+  light::LightState* flash_light_{nullptr};  ///< Flash light component
+  bool flash_light_enabled_{false};          ///< Whether flash light is enabled
+  uint32_t flash_duration_{200};             ///< Flash duration in milliseconds
   
   /**
    * @brief Process the next available frame in the buffer.
    */
   void process_available_frame();
+  
+  /**
+  * @brief Control flash light around image capture
+  */
+  void enable_flash_light();
+  void disable_flash_light();
+  
+  /**
+   * @brief Schedule flash light operations around frame capture
+   */
+  void schedule_flash_light_operations();
 };
 
 }  // namespace meter_reader_tflite

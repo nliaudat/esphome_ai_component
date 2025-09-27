@@ -11,6 +11,7 @@
 #include "debug_utils.h"
 #include "model_config.h"
 #include <numeric>
+#include "esphome/components/light/light_state.h"
 
 namespace esphome {
 namespace meter_reader_tflite {
@@ -106,9 +107,13 @@ void MeterReaderTFLite::update() {
     
     // Request new frame if none available or pending
     if (!frame_available_.load() && !frame_requested_.load()) {
+        // Schedule flash light operations before requesting frame
+        schedule_flash_light_operations();
+        
         frame_requested_.store(true);
         last_request_time_ = millis();
-        ESP_LOGD(TAG, "Requesting new frame");
+        ESP_LOGD(TAG, "Requesting new frame with flash light: %s", 
+                 flash_light_enabled_ ? "enabled" : "disabled");
     } else if (frame_available_.load()) {
         // Process existing frame immediately
         ESP_LOGD(TAG, "Processing available frame");
@@ -486,6 +491,52 @@ bool MeterReaderTFLite::allocate_tensor_arena() {
     ESP_LOGI(TAG, "Tensor arena allocated successfully: %zu bytes", 
             tensor_arena_allocation_.actual_size);
     return true;
+}
+
+// Add the flash light control methods
+void MeterReaderTFLite::enable_flash_light() {
+    if (flash_light_ && flash_light_enabled_) {
+        ESP_LOGI(TAG, "Enabling flash light");
+        auto call = flash_light_->turn_on();
+        call.set_brightness(1.0f); // Full brightness
+        call.perform();
+    }
+}
+
+void MeterReaderTFLite::disable_flash_light() {
+    if (flash_light_ && flash_light_enabled_) {
+        ESP_LOGI(TAG, "Disabling flash light");
+        flash_light_->turn_off().perform();
+    }
+}
+
+void MeterReaderTFLite::schedule_flash_light_operations() {
+    if (!flash_light_ || !flash_light_enabled_) {
+        return;
+    }
+    
+    // Enable flash light with a small delay to ensure it's on before capture
+    this->set_timeout(50, [this]() {
+        this->enable_flash_light();
+        
+        // Schedule flash disable after capture (flash_duration_ milliseconds)
+        this->set_timeout(flash_duration_, [this]() {
+            this->disable_flash_light();
+        });
+    });
+}
+
+// Setter method for the flash light
+void MeterReaderTFLite::set_flash_light(light::LightState* flash_light) {
+    flash_light_ = flash_light;
+    flash_light_enabled_ = (flash_light_ != nullptr);
+    ESP_LOGI(TAG, "Flash light %s", flash_light_enabled_ ? "configured" : "disabled");
+}
+
+// set flash duration
+void MeterReaderTFLite::set_flash_duration(uint32_t duration_ms) {
+    flash_duration_ = duration_ms;
+    ESP_LOGI(TAG, "Flash duration set to %ums", duration_ms);
 }
 
 
