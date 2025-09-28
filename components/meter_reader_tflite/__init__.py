@@ -25,6 +25,7 @@ CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL = 'debug_image_out_serial'
 CONF_MODEL_TYPE = 'model_type'  # New configuration option for model type
 CONF_FLASH_LIGHT = 'flash_light'
 CONF_FLASH_DURATION = 'flash_duration'  # Optional: for duration control
+CONF_CROP_ZONES = 'crop_zones_global'
 
 meter_reader_tflite_ns = cg.esphome_ns.namespace('meter_reader_tflite')
 MeterReaderTFLite = meter_reader_tflite_ns.class_('MeterReaderTFLite', cg.PollingComponent)
@@ -63,7 +64,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL, default=False): cv.boolean,
     cv.Optional(CONF_FLASH_LIGHT): cv.use_id(light.LightState), 
     cv.Optional(CONF_FLASH_DURATION, default=2200): cv.positive_int, 
-    cv.Optional('crop_zones_global'): cv.use_id(globals.GlobalsComponent),
+    cv.Optional(CONF_CROP_ZONES): cv.use_id(globals.GlobalsComponent),
 }).extend(cv.polling_component_schema('60s'))
 
 async def to_code(config):
@@ -178,9 +179,14 @@ async def to_code(config):
     if config.get(CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL, False):
         cg.add_define("DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL")
 
-    if 'crop_zones_global' in config:
-        crop_global = await cg.get_variable(config['crop_zones_global'])
-        cg.add(var.set_crop_zones_global_string(crop_global.value()))
+    # if 'crop_zones_global' in config: 
+        # crop_global = await cg.get_variable(config['crop_zones_global'])
+        # cg.add(var.set_crop_zones_global(crop_global))
+    if CONF_CROP_ZONES in config:
+        crop_global = await cg.get_variable(config[CONF_CROP_ZONES])
+        cg.add(var.set_crop_zones_global(crop_global))    
+
+
         
     # Set flash light if configured
     if CONF_FLASH_LIGHT in config:

@@ -11,7 +11,8 @@
 #include "debug_utils.h"
 #include "model_config.h"
 #include <numeric>
-#include "esphome/components/light/light_state.h"
+
+
 
 namespace esphome {
 namespace meter_reader_tflite {
@@ -34,9 +35,21 @@ void MeterReaderTFLite::setup() {
         return;
     }
     
-    // Apply crop zones from global variable if available
-    crop_zone_handler_.apply_global_zones();
-
+    // Setup crop zones - the handler will manage everything
+    // Note: crop_zones_global_ is passed via set_crop_zones_global() from the YAML config
+    // If we have a global variable, apply its initial value
+    if (crop_zone_handler_.get_crop_zones_global()) {
+        ESP_LOGI(TAG, "Crop zones global variable registered, applying initial value");
+        crop_zone_handler_.apply_global_zones();
+    }
+    
+    // If no zones were set from global, use default
+    if (crop_zone_handler_.get_zones().empty()) {
+        ESP_LOGI(TAG, "No crop zones configured, using default zone");
+        crop_zone_handler_.set_default_zone(camera_width_, camera_height_);
+    }
+    
+    
     // Setup camera callback with frame buffer management
     camera_->add_image_callback([this](std::shared_ptr<camera::CameraImage> image) {
         // Only accept frames if requested and not currently processing
@@ -50,6 +63,7 @@ void MeterReaderTFLite::setup() {
             frames_skipped_++;
         }
     });
+
 
     // Delay model loading to allow system stabilization
     ESP_LOGI(TAG, "Model loading will begin in 30 seconds...");
@@ -96,6 +110,13 @@ void MeterReaderTFLite::setup() {
 }
 
 void MeterReaderTFLite::update() {
+    
+    // Check for updated crop zones from global variable using the handler
+    if (crop_zone_handler_.has_global_zones_changed()) {
+        ESP_LOGI(TAG, "Crop zones global variable changed, updating...");
+        crop_zone_handler_.apply_global_zones();
+    }
+        
     // Skip update if system not ready
     if (!model_loaded_ || !camera_) {
         ESP_LOGW(TAG, "Update skipped - system not ready");
@@ -107,19 +128,22 @@ void MeterReaderTFLite::update() {
     
     // Request new frame if none available or pending
     if (!frame_available_.load() && !frame_requested_.load()) {
-        // Schedule flash light operations before requesting frame
-        schedule_flash_light_operations();
-        
         frame_requested_.store(true);
         last_request_time_ = millis();
-        ESP_LOGD(TAG, "Requesting new frame with flash light: %s", 
-                 flash_light_enabled_ ? "enabled" : "disabled");
+        ESP_LOGD(TAG, "Requesting new frame");
+        
+        // If using flash, enable it now (the continuous camera will capture with flash)
+        if (flash_light_ && flash_light_enabled_) {
+            this->enable_flash_light();
+            // Flash will stay on until we disable it after processing
+        }
     } else if (frame_available_.load()) {
         // Process existing frame immediately
         ESP_LOGD(TAG, "Processing available frame");
         process_available_frame();
     }
 }
+
 
 void MeterReaderTFLite::loop() {
     // Process available frame if update() has triggered processing
@@ -132,6 +156,7 @@ void MeterReaderTFLite::loop() {
         ESP_LOGW(TAG, "Frame request timeout - no frame received in 10 seconds");
         frame_requested_.store(false);
         frames_skipped_++;
+        this->disable_flash_light();
     }
 }
 
@@ -150,6 +175,11 @@ void MeterReaderTFLite::process_available_frame() {
         ESP_LOGD(TAG, "Processing frame (%zu bytes)", frame->get_data_length());
         process_full_image(frame);
         frames_processed_++;
+        
+        // Disable flash after processing if it was enabled for this frame
+        if (flash_light_ && flash_light_enabled_) {
+            this->disable_flash_light();
+        }
     } else {
         ESP_LOGE(TAG, "Invalid frame available for processing");
     }
@@ -467,14 +497,9 @@ bool MeterReaderTFLite::load_model() {
 }
 
 void MeterReaderTFLite::set_crop_zones(const std::string &zones_json) {
-    ESP_LOGI(TAG, "Setting crop zones from JSON");
-    crop_zone_handler_.parse_zones(zones_json);
     
-    // Set default zone if none parsed
-    if (crop_zone_handler_.get_zones().empty()) {
-        ESP_LOGI(TAG, "No zones found in JSON, setting default zone");
-        crop_zone_handler_.set_default_zone(camera_width_, camera_height_);
-    }
+    ESP_LOGI(TAG, "Setting crop zones from JSON");
+    crop_zone_handler_.update_zones(zones_json); // This now updates both internal state AND global variable
     
     ESP_LOGI(TAG, "Configured %d crop zones", crop_zone_handler_.get_zones().size());
 }
@@ -496,17 +521,36 @@ bool MeterReaderTFLite::allocate_tensor_arena() {
 // Add the flash light control methods
 void MeterReaderTFLite::enable_flash_light() {
     if (flash_light_ && flash_light_enabled_) {
-        ESP_LOGI(TAG, "Enabling flash light");
+        ESP_LOGI(TAG, "Enabling flash light (auto-controlled)");
+        flash_auto_controlled_.store(true);
         auto call = flash_light_->turn_on();
         call.set_brightness(1.0f); // Full brightness
+        call.set_transition_length(0);
         call.perform();
     }
 }
 
+bool MeterReaderTFLite::is_flash_forced_on() const {
+    if (!flash_light_ || !flash_light_enabled_) {
+        return false;
+    }
+    
+    // If flash is on but not marked as auto-controlled, it's forced on
+    bool is_currently_on = flash_light_->current_values.is_on();
+    if (is_currently_on && !flash_auto_controlled_.load()) {
+        return true;
+    }
+    
+    return false;
+}
+
 void MeterReaderTFLite::disable_flash_light() {
-    if (flash_light_ && flash_light_enabled_) {
-        ESP_LOGI(TAG, "Disabling flash light");
-        flash_light_->turn_off().perform();
+    if (flash_light_ && flash_light_enabled_ && flash_auto_controlled_.load()) {
+        ESP_LOGI(TAG, "Disabling auto-controlled flash light");
+        flash_auto_controlled_.store(false);
+        auto call = flash_light_->turn_off();
+        call.set_transition_length(0);
+        call.perform();
     }
 }
 

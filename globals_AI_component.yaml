@@ -1,8 +1,9 @@
 globals:
   - id: crop_zones
     type: std::string
-    restore_value: true
+    # restore_value: true 
+    max_restore_data_length: 254 
     # initial_value: "\"[]\""
-    initial_value: '"[[80, 233, 116, 307], [144, 235, 180, 307]]"'
+    initial_value: '"[[375, 200, 392, 227], [396, 201, 412, 226], [418, 200, 434, 226]]"'
     # Note: The outer quotes are escaped with single quotes + double quotes ("...")
     # "[[80, 233, 116, 307], [144, 235, 180, 307], [202, 234, 238, 308], [265, 233, 304, 306], [328, 232, 367, 311], [393, 231, 433, 310], [460, 235, 499, 311], [520, 235, 559, 342]]"

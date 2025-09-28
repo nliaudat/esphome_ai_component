@@ -69,17 +69,17 @@ meter_reader_tflite:
   debug: false
   debug_image: false # static embedded image (debug.jpg)
   debug_image_out_serial: false
-  crop_zones_global: crop_zones  # Reference the global variables
+  crop_zones_global: crop_zones  # Reference the global variables set in globals_AI_component.yaml | To update, use http://[hassio]/developer-tools/action >esphome.[s3cam_tflite]_set_crop_zones
   flash_light : ${id_prefix}flash # optional : flash light at taking image
-  flash_duration: 2200  # Optional: flash duration in ms (default: 2200ms)
+  # flash_duration: 2200  # Optional: flash duration in ms (default: 2200ms)
   
 
 
 packages:
 
   # board choice
-  board: !include board_freenove_esp32-s3-n8r8.yaml
-  # board: !include board_AI-On-The-Edge-Cam_Esp32-S3.yaml
+  # board: !include board_freenove_esp32-s3-n8r8.yaml
+  board: !include board_AI-On-The-Edge-Cam_Esp32-S3.yaml
   # board: !include board_Seeed_Studio_XIAO_ESP32-S3_sense.yaml
   
   # AI components
@@ -92,7 +92,7 @@ packages:
   # camera configs
   camera_options: !include camera_options.yaml
   esp32_camera: !include esp32_camera.yaml
-  camera_webserver: !include camera_webserver.yaml
+  # camera_webserver: !include camera_webserver.yaml
   
   # network choice
   wifi: !include wifi.yaml

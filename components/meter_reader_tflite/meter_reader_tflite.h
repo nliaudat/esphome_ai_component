@@ -13,7 +13,6 @@
 #include "esphome/components/esp32_camera/esp32_camera.h"
 #include "esphome/components/camera/camera.h"
 #include "esphome/components/globals/globals_component.h"
-// #include "esphome/components/light/light.h"
 #include "esphome/components/light/light_state.h"
 #include "model_handler.h"
 #include "memory_manager.h"
@@ -27,6 +26,7 @@
 
 // #include <mutex> // needs CONFIG_FREERTOS_SUPPORT_STATIC_ALLOCATION=y # for frame_mutex_ in meter_reader_tflite.*
 // #include <numeric> // for std::accumulate
+
 
 #define DEBUG_DURATION  ///< Enable duration debugging macros
 
@@ -47,7 +47,17 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
    */
   void setup() override;
   
-  // void set_crop_zones_global(GlobalVarComponent<std::string> *crop_zones_global);
+    // void set_crop_zones_global(globals::GlobalVarComponentBase<std::string> *crop_zones_global) {
+        // crop_zones_global_ = crop_zones_global;
+    // }
+    
+    // void set_crop_zones_global(globals::RestoringGlobalStringComponent<std::string, 64> *crop_zones_global) {
+        // crop_zones_global_ = crop_zones_global;
+    // }
+    
+    void set_crop_zones_global(globals::GlobalsComponent<std::string> *global_var) {
+        crop_zone_handler_.set_crop_zones_global(global_var);
+    }
   
   /**
    * @brief Periodic update called based on configured interval.
@@ -104,9 +114,9 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
    * @brief Set crop zones from global string variable.
    * @param zones_str String containing crop zones configuration
    */
-  void set_crop_zones_global_string(const std::string &zones_str) {
-    crop_zone_handler_.set_global_zones_string(zones_str);
-  }
+  // void set_crop_zones_global_string(const std::string &zones_str) {
+    // crop_zone_handler_.set_global_zones_string(zones_str);
+  // }
 
   /**
    * @brief Print debug information about component state and memory usage.
@@ -273,6 +283,8 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   std::unique_ptr<ImageProcessor> image_processor_;  ///< Image processing utilities
   CropZoneHandler crop_zone_handler_;        ///< Crop zone management
   MemoryManager::AllocationResult tensor_arena_allocation_;  ///< Tensor arena allocation result
+  
+  // globals::GlobalVarComponent<std::string> *crop_zones_global_{nullptr};
 
 /** ########### PRIVATE ############# **/
  private:
@@ -282,11 +294,15 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   std::atomic<bool> frame_requested_{false};    ///< Flag indicating frame request pending
   uint32_t last_frame_received_{0};             ///< Timestamp of last received frame
   uint32_t last_request_time_{0};               ///< Timestamp of last frame request
-  // GlobalVarComponent<std::string> *crop_zones_global_{nullptr};
   std::atomic<bool> pause_processing_{false};
   light::LightState* flash_light_{nullptr};  ///< Flash light component
   bool flash_light_enabled_{false};          ///< Whether flash light is enabled
   uint32_t flash_duration_{200};             ///< Flash duration in milliseconds
+  std::atomic<bool> flash_auto_controlled_{false};
+  // globals::GlobalVarComponentBase<std::string> *crop_zones_global_{nullptr};
+  // globals::RestoringGlobalStringComponent<std::string, 255> *crop_zones_global_{nullptr};
+  // globals::GlobalsComponent<std::string> *crop_zones_global_{nullptr};
+  // globals::RestoringGlobalStringComponent<std::string, 255> *crop_zones_global_{nullptr};
   
   /**
    * @brief Process the next available frame in the buffer.
@@ -297,6 +313,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   * @brief Control flash light around image capture
   */
   void enable_flash_light();
+  bool is_flash_forced_on() const;
   void disable_flash_light();
   
   /**
