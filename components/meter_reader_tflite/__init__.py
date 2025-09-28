@@ -180,7 +180,8 @@ async def to_code(config):
 
     if 'crop_zones_global' in config:
         crop_global = await cg.get_variable(config['crop_zones_global'])
-        cg.add(var.set_crop_zones_global_string(crop_global.value()))
+        cg.add(var.set_crop_zones_global(crop_global))
+
         
     # Set flash light if configured
     if CONF_FLASH_LIGHT in config:

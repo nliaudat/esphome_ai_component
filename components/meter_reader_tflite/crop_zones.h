@@ -29,10 +29,24 @@ class CropZoneHandler {
   
   // Check and apply global variable if available
   void apply_global_zones();
+  
+  // callback support for dynamic updates
+  void set_on_zones_changed_callback(std::function<void()> callback) {
+    on_zones_changed_ = callback;
+  }
+  
+  // Method to update zones and notify
+  void update_zones(const std::string &zones_json) {
+    parse_zones(zones_json);
+    if (on_zones_changed_) {
+      on_zones_changed_();
+    }
+  }
 
  protected:
   std::vector<CropZone> zones_;
   std::string global_zones_string_;
+  std::function<void()> on_zones_changed_; 
 };
 
 }  // namespace meter_reader_tflite

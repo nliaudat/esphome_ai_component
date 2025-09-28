@@ -11,7 +11,8 @@
 #include "debug_utils.h"
 #include "model_config.h"
 #include <numeric>
-// #include "esphome/components/light/light_state.h"
+
+
 
 namespace esphome {
 namespace meter_reader_tflite {
@@ -34,20 +35,24 @@ void MeterReaderTFLite::setup() {
         return;
     }
     
+    if (crop_zones_global_) {
+        ESP_LOGI(TAG, "Crop zones global variable component registered");
+        
+        // Use value() not get()
+        std::string initial_value = crop_zones_global_->value();
+        if (!initial_value.empty()) {
+            ESP_LOGI(TAG, "Applying initial crop zones from global variable");
+            crop_zone_handler_.update_zones(initial_value);
+        }
+    }
+    
     // Apply crop zones from global variable if available
     crop_zone_handler_.apply_global_zones();
-
+    
     // Setup camera callback with frame buffer management
     camera_->add_image_callback([this](std::shared_ptr<camera::CameraImage> image) {
         // Only accept frames if requested and not currently processing
         if (frame_requested_.load() && !processing_frame_.load()) {
-            // Disable flash immediately after capture
-            if (flash_light_ && flash_light_enabled_) {
-                this->set_timeout(10, [this]() {
-                    this->disable_flash_light();
-                });
-            }
-            
             pending_frame_ = image;
             frame_available_.store(true);
             frame_requested_.store(false);
@@ -57,6 +62,7 @@ void MeterReaderTFLite::setup() {
             frames_skipped_++;
         }
     });
+
 
     // Delay model loading to allow system stabilization
     ESP_LOGI(TAG, "Model loading will begin in 30 seconds...");
@@ -103,6 +109,18 @@ void MeterReaderTFLite::setup() {
 }
 
 void MeterReaderTFLite::update() {
+    // Check for updated crop zones from global variable
+    if (crop_zones_global_) {
+        static std::string last_zones_value;
+        std::string current_value = crop_zones_global_->value();
+        
+        if (current_value != last_zones_value) {
+            ESP_LOGI(TAG, "Crop zones global variable changed, updating...");
+            crop_zone_handler_.update_zones(current_value);
+            last_zones_value = current_value;
+        }
+    }
+        
     // Skip update if system not ready
     if (!model_loaded_ || !camera_) {
         ESP_LOGW(TAG, "Update skipped - system not ready");
@@ -114,19 +132,22 @@ void MeterReaderTFLite::update() {
     
     // Request new frame if none available or pending
     if (!frame_available_.load() && !frame_requested_.load()) {
+        frame_requested_.store(true);
+        last_request_time_ = millis();
+        ESP_LOGD(TAG, "Requesting new frame");
+        
+        // If using flash, enable it now (the continuous camera will capture with flash)
         if (flash_light_ && flash_light_enabled_) {
-            // Enable flash and request frame after short delay
             this->enable_flash_light();
-            this->set_timeout(50, [this]() {  // 50ms for flash to stabilize
-                frame_requested_.store(true);
-                last_request_time_ = millis();
-            });
-        } else {
-            frame_requested_.store(true);
-            last_request_time_ = millis();
+            // Flash will stay on until we disable it after processing
         }
+    } else if (frame_available_.load()) {
+        // Process existing frame immediately
+        ESP_LOGD(TAG, "Processing available frame");
+        process_available_frame();
     }
 }
+
 
 void MeterReaderTFLite::loop() {
     // Process available frame if update() has triggered processing
@@ -158,6 +179,11 @@ void MeterReaderTFLite::process_available_frame() {
         ESP_LOGD(TAG, "Processing frame (%zu bytes)", frame->get_data_length());
         process_full_image(frame);
         frames_processed_++;
+        
+        // Disable flash after processing if it was enabled for this frame
+        if (flash_light_ && flash_light_enabled_) {
+            this->disable_flash_light();
+        }
     } else {
         ESP_LOGE(TAG, "Invalid frame available for processing");
     }
