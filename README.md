@@ -11,8 +11,8 @@ A general-purpose ESPHome component for running TensorFlow Lite Micro models on 
 
 ## ✨ Key Features
 
-- **🤖 TensorFlow Lite Micro**: Full TFLite Micro runtime support
-- **📷 Camera Integration**: Seamless ESP32 camera integration
+- **🤖 TensorFlow Lite Micro**: Full TFLite Micro runtime support (with operators detection and auto loading)
+- **📷 Camera Integration**: Seamless ESP32 camera integration with TrackedBuffer for better memory management
 - **🖼️ Image Preprocessing**: Automatic cropping, scaling, and format conversion
 - **⚡ Optimized Performance**: ESP-NN accelerated operations
 - **🎯 Multi-Zone Processing**: Process multiple regions of interest

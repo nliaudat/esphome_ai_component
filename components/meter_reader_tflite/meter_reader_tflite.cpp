@@ -49,6 +49,16 @@ void MeterReaderTFLite::setup() {
         crop_zone_handler_.set_default_zone(camera_width_, camera_height_);
     }
     
+    // Apply camera window if configured (after camera is ready)
+    if (camera_ && camera_supports_window()) {
+        // Check if we should set camera window from crop zones
+        auto zones = crop_zone_handler_.get_zones();
+        if (!zones.empty()) {
+            ESP_LOGI(TAG, "Automatically setting camera window from %d crop zones", zones.size());
+            set_camera_window_from_crop_zones();
+        }
+    }
+    
     
     // Setup camera callback with frame buffer management
     camera_->add_image_callback([this](std::shared_ptr<camera::CameraImage> image) {
@@ -753,6 +763,90 @@ void MeterReaderTFLite::set_debug_mode(bool debug_mode) {
     ESP_LOGI(TAG, "Debug mode %s", debug_mode ? "enabled" : "disabled");
 }
 #endif
+
+
+bool MeterReaderTFLite::set_camera_window(int offset_x, int offset_y, int width, int height) {
+  bool success = camera_window_control_.set_window(camera_, offset_x, offset_y, width, height);
+  
+  if (success) {
+    // Update dimensions
+    auto new_dims = camera_window_control_.update_dimensions_after_window(
+        camera_, 
+        camera_control::CameraWindowControl::WindowConfig{offset_x, offset_y, width, height, true},
+        camera_width_, camera_height_);
+    
+    camera_width_ = new_dims.first;
+    camera_height_ = new_dims.second;
+    
+    // Reinitialize image processor if needed
+    if (image_processor_) {
+      image_processor_ = std::make_unique<ImageProcessor>(
+          ImageProcessorConfig{camera_width_, camera_height_, pixel_format_},
+          &model_handler_
+      );
+    }
+  }
+  
+  return success;
+}
+
+bool MeterReaderTFLite::set_camera_window_from_crop_zones() {
+  auto zones = crop_zone_handler_.get_zones();
+  bool success = camera_window_control_.set_window_from_crop_zones(
+      camera_, zones, camera_width_, camera_height_);
+  
+  if (success) {
+    // Update dimensions based on the calculated window
+    auto config = camera_control::CameraWindowControl::calculate_window_from_zones(
+        zones, camera_width_, camera_height_);
+    
+    auto new_dims = camera_window_control_.update_dimensions_after_window(
+        camera_, config, camera_width_, camera_height_);
+    
+    camera_width_ = new_dims.first;
+    camera_height_ = new_dims.second;
+    
+    // Reinitialize image processor if needed
+    if (image_processor_) {
+      image_processor_ = std::make_unique<ImageProcessor>(
+          ImageProcessorConfig{camera_width_, camera_height_, pixel_format_},
+          &model_handler_
+      );
+    }
+  }
+  
+  return success;
+}
+
+// ###### camera parameters
+
+bool MeterReaderTFLite::reset_camera_window() {
+  bool success = camera_window_control_.reset_to_full_frame(camera_);
+  
+  if (success) {
+    // Reset to original dimensions
+    camera_width_ = 800;  // Your original width
+    camera_height_ = 600; // Your original height
+    
+    // Reinitialize image processor
+    if (image_processor_) {
+      image_processor_ = std::make_unique<ImageProcessor>(
+          ImageProcessorConfig{camera_width_, camera_height_, pixel_format_},
+          &model_handler_
+      );
+    }
+  }
+  
+  return success;
+}
+
+bool MeterReaderTFLite::camera_supports_window() const {
+  return camera_window_control_.supports_window(camera_);
+}
+
+std::string MeterReaderTFLite::get_camera_sensor_info() const {
+  return camera_window_control_.get_sensor_info(camera_);
+}
 
 }  // namespace meter_reader_tflite
 }  // namespace esphome

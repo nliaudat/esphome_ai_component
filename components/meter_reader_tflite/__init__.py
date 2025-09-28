@@ -28,6 +28,8 @@ CONF_FLASH_LIGHT = 'flash_light'
 CONF_FLASH_PRE_TIME = 'flash_pre_time'
 CONF_FLASH_POST_TIME = 'flash_post_time'
 CONF_CROP_ZONES = 'crop_zones_global'
+CONF_CAMERA_WINDOW = 'camera_window'
+CONF_AUTO_CAMERA_WINDOW = 'auto_camera_window'
 
 meter_reader_tflite_ns = cg.esphome_ns.namespace('meter_reader_tflite')
 MeterReaderTFLite = meter_reader_tflite_ns.class_('MeterReaderTFLite', cg.PollingComponent)
@@ -69,6 +71,16 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_FLASH_POST_TIME, default=2000): cv.positive_int,
     # cv.Optional(CONF_FLASH_DURATION, default=2200): cv.positive_int, 
     cv.Optional(CONF_CROP_ZONES): cv.use_id(globals.GlobalsComponent),
+    cv.Optional(CONF_CAMERA_WINDOW): cv.Any(
+    cv.boolean,  # Simple enable/disable
+    cv.Schema({  # Or detailed configuration
+        cv.Optional('offset_x', default=0): cv.int_,
+        cv.Optional('offset_y', default=0): cv.int_,
+        cv.Optional('width'): cv.int_,
+        cv.Optional('height'): cv.int_,
+        })
+    ),
+    cv.Optional(CONF_AUTO_CAMERA_WINDOW, default=False): cv.boolean,
 }).extend(cv.polling_component_schema('60s'))
 
 async def to_code(config):
@@ -201,6 +213,24 @@ async def to_code(config):
         cg.add(var.set_flash_post_time(config[CONF_FLASH_POST_TIME]))
     
         
-        # Set flash duration if specified
-        # if CONF_FLASH_DURATION in config:
-            # cg.add(var.set_flash_duration(config[CONF_FLASH_DURATION]))
+    # Handle optional camera window configuration
+    if CONF_CAMERA_WINDOW in config:
+        window_config = config[CONF_CAMERA_WINDOW]
+        
+        if isinstance(window_config, bool):
+            if window_config:
+                # Enable auto window from crop zones
+                cg.add(var.set_camera_window_from_crop_zones())
+        else:
+            # Manual window configuration
+            if 'width' in window_config and 'height' in window_config:
+                cg.add(var.set_camera_window(
+                    window_config.get('offset_x', 0),
+                    window_config.get('offset_y', 0),
+                    window_config['width'],
+                    window_config['height']
+                ))
+    
+    # Auto camera window from crop zones
+    if config.get(CONF_AUTO_CAMERA_WINDOW):
+        cg.add(var.set_camera_window_from_crop_zones())

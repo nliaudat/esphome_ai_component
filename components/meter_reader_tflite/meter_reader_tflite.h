@@ -19,6 +19,7 @@
 #include "image_processor.h"
 #include "crop_zones.h"
 #include "model_config.h"
+#include "camera_control.h"
 #include <memory>
 #include <vector>
 #include <string>
@@ -216,6 +217,13 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
      * @param duration_ms Flash duration in milliseconds
      */
     // void set_flash_duration(uint32_t duration_ms);
+    
+  // Camera window control (optional feature)
+  bool set_camera_window(int offset_x, int offset_y, int width, int height);
+  bool set_camera_window_from_crop_zones();
+  bool reset_camera_window();
+  bool camera_supports_window() const;
+  std::string get_camera_sensor_info() const;
       
 
 /** ########### PROTECTED ############# **/
@@ -317,6 +325,8 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void enable_flash_light();
   bool is_flash_forced_on() const;
   void disable_flash_light();
+  
+  camera_control::CameraWindowControl camera_window_control_;
   
   /**
    * @brief Schedule flash light operations around frame capture
