@@ -207,12 +207,15 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
      * @param flash_light Pointer to the light state component
      */
     void set_flash_light(light::LightState* flash_light);
+    
+    void set_flash_pre_time(uint32_t pre_time) { flash_pre_time_ = pre_time; }
+    void set_flash_post_time(uint32_t post_time) { flash_post_time_ = post_time; }
 
     /**
      * @brief Set the flash duration in milliseconds.
      * @param duration_ms Flash duration in milliseconds
      */
-    void set_flash_duration(uint32_t duration_ms);
+    // void set_flash_duration(uint32_t duration_ms);
       
 
 /** ########### PROTECTED ############# **/
@@ -299,10 +302,9 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   bool flash_light_enabled_{false};          ///< Whether flash light is enabled
   uint32_t flash_duration_{200};             ///< Flash duration in milliseconds
   std::atomic<bool> flash_auto_controlled_{false};
-  // globals::GlobalVarComponentBase<std::string> *crop_zones_global_{nullptr};
-  // globals::RestoringGlobalStringComponent<std::string, 255> *crop_zones_global_{nullptr};
-  // globals::GlobalsComponent<std::string> *crop_zones_global_{nullptr};
-  // globals::RestoringGlobalStringComponent<std::string, 255> *crop_zones_global_{nullptr};
+  uint32_t flash_pre_time_{5000};    // 5 seconds before update
+  uint32_t flash_post_time_{2000};   // 2 seconds after update
+  bool flash_scheduled_{false};      // Track if flash is scheduled
   
   /**
    * @brief Process the next available frame in the buffer.
@@ -319,7 +321,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   /**
    * @brief Schedule flash light operations around frame capture
    */
-  void schedule_flash_light_operations();
+  // void schedule_flash_light_operations();
 };
 
 }  // namespace meter_reader_tflite
