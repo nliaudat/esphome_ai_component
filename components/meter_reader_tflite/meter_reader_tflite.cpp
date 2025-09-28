@@ -501,6 +501,12 @@ void MeterReaderTFLite::set_crop_zones(const std::string &zones_json) {
     ESP_LOGI(TAG, "Setting crop zones from JSON");
     crop_zone_handler_.update_zones(zones_json); // This now updates both internal state AND global variable
     
+    // Set default zone if none parsed
+    if (crop_zone_handler_.get_zones().empty()) {
+        ESP_LOGI(TAG, "No zones found in JSON, setting default zone");
+        crop_zone_handler_.set_default_zone(camera_width_, camera_height_);
+    }
+    
     ESP_LOGI(TAG, "Configured %d crop zones", crop_zone_handler_.get_zones().size());
 }
 

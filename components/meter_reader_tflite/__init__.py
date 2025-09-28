@@ -179,9 +179,6 @@ async def to_code(config):
     if config.get(CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL, False):
         cg.add_define("DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL")
 
-    # if 'crop_zones_global' in config: 
-        # crop_global = await cg.get_variable(config['crop_zones_global'])
-        # cg.add(var.set_crop_zones_global(crop_global))
     if CONF_CROP_ZONES in config:
         crop_global = await cg.get_variable(config[CONF_CROP_ZONES])
         cg.add(var.set_crop_zones_global(crop_global))    
