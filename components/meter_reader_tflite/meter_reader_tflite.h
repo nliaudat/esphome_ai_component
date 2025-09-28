@@ -56,7 +56,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
     // }
     
     void set_crop_zones_global(globals::GlobalsComponent<std::string> *global_var) {
-        crop_zones_global_ = global_var;
+        crop_zone_handler_.set_crop_zones_global(global_var);
     }
   
   /**
@@ -301,7 +301,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   std::atomic<bool> flash_auto_controlled_{false};
   // globals::GlobalVarComponentBase<std::string> *crop_zones_global_{nullptr};
   // globals::RestoringGlobalStringComponent<std::string, 255> *crop_zones_global_{nullptr};
-  globals::GlobalsComponent<std::string> *crop_zones_global_{nullptr};
+  // globals::GlobalsComponent<std::string> *crop_zones_global_{nullptr};
   // globals::RestoringGlobalStringComponent<std::string, 255> *crop_zones_global_{nullptr};
   
   /**

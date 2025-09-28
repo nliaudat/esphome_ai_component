@@ -35,22 +35,17 @@ void MeterReaderTFLite::setup() {
         return;
     }
     
-    // Setup crop zones - check global variable if available
-    if (crop_zones_global_) {
-        ESP_LOGI(TAG, "Crop zones global variable component registered");
-        
-        // Apply initial value using .value() method
-        std::string initial_value = crop_zones_global_->value();
-        if (!initial_value.empty() && initial_value != "[]") {
-            ESP_LOGI(TAG, "Applying initial crop zones from global variable");
-            crop_zone_handler_.update_zones(initial_value);
-        } else {
-            ESP_LOGI(TAG, "No initial crop zones found, using default");
-            crop_zone_handler_.set_default_zone(camera_width_, camera_height_);
-        }
-    } else {
-        // No global variable configured, set default zone
-        ESP_LOGI(TAG, "No crop zones global configured, using default zone");
+    // Setup crop zones - the handler will manage everything
+    // Note: crop_zones_global_ is passed via set_crop_zones_global() from the YAML config
+    // If we have a global variable, apply its initial value
+    if (crop_zone_handler_.get_crop_zones_global()) {
+        ESP_LOGI(TAG, "Crop zones global variable registered, applying initial value");
+        crop_zone_handler_.apply_global_zones();
+    }
+    
+    // If no zones were set from global, use default
+    if (crop_zone_handler_.get_zones().empty()) {
+        ESP_LOGI(TAG, "No crop zones configured, using default zone");
         crop_zone_handler_.set_default_zone(camera_width_, camera_height_);
     }
     
@@ -116,16 +111,10 @@ void MeterReaderTFLite::setup() {
 
 void MeterReaderTFLite::update() {
     
-    // Check for updated crop zones from global variable (polling approach)
-    if (crop_zones_global_) {
-        static std::string last_zones_value;
-        std::string current_value = crop_zones_global_->value();
-        
-        if (current_value != last_zones_value) {
-            ESP_LOGI(TAG, "Crop zones global variable changed, updating...");
-            crop_zone_handler_.update_zones(current_value);
-            last_zones_value = current_value;
-        }
+    // Check for updated crop zones from global variable using the handler
+    if (crop_zone_handler_.has_global_zones_changed()) {
+        ESP_LOGI(TAG, "Crop zones global variable changed, updating...");
+        crop_zone_handler_.apply_global_zones();
     }
         
     // Skip update if system not ready
@@ -508,14 +497,9 @@ bool MeterReaderTFLite::load_model() {
 }
 
 void MeterReaderTFLite::set_crop_zones(const std::string &zones_json) {
-    ESP_LOGI(TAG, "Setting crop zones from JSON");
-    crop_zone_handler_.parse_zones(zones_json);
     
-    // Set default zone if none parsed
-    if (crop_zone_handler_.get_zones().empty()) {
-        ESP_LOGI(TAG, "No zones found in JSON, setting default zone");
-        crop_zone_handler_.set_default_zone(camera_width_, camera_height_);
-    }
+    ESP_LOGI(TAG, "Setting crop zones from JSON");
+    crop_zone_handler_.update_zones(zones_json); // This now updates both internal state AND global variable
     
     ESP_LOGI(TAG, "Configured %d crop zones", crop_zone_handler_.get_zones().size());
 }

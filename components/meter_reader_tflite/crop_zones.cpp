@@ -7,7 +7,8 @@
 namespace esphome {
 namespace meter_reader_tflite {
 
-static const char *const TAG = "CropZoneHandler";
+// static const char *const TAG = "CropZoneHandler";
+const char *const CropZoneHandler::TAG = "CropZoneHandler";
 
 // void CropZoneHandler::apply_global_zones() {
   // if (!global_zones_string_.empty()) {
@@ -121,9 +122,9 @@ void CropZoneHandler::set_default_zone(int width, int height) {
     zones_.clear();
     zones_.push_back({
         static_cast<int>(width * 0.1f),    // x1 - 10% from left
-        static_cast<int>(height * 0.2f),   // y1 - 20% from top
+        static_cast<int>(height * 0.1f),   // y1 - 10% from top
         static_cast<int>(width * 0.9f),    // x2 - 10% from right
-        static_cast<int>(height * 0.8f)    // y2 - 20% from bottom
+        static_cast<int>(height * 0.9f)    // y2 - 10% from bottom
     });
     ESP_LOGI(TAG, "Set default crop zone: [%d,%d,%d,%d]", 
              zones_[0].x1, zones_[0].y1, zones_[0].x2, zones_[0].y2);
