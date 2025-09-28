@@ -93,9 +93,17 @@ class CameraWindowControl {
   // Sensor detection and specific implementations
   std::string get_sensor_name(sensor_t* sensor) const;
   bool is_sensor_supported(sensor_t* sensor) const;
+  
+  // Main window setting function
+  bool set_sensor_window(sensor_t* sensor, const WindowConfig& config);
+  
+  // Sensor-specific implementations
   bool set_ov2640_window(sensor_t* sensor, const WindowConfig& config);
   bool set_ov3660_window(sensor_t* sensor, const WindowConfig& config);
   bool set_ov5640_window(sensor_t* sensor, const WindowConfig& config);
+  
+  // Helper function to get framesize from dimensions
+  framesize_t get_framesize_from_dimensions(int width, int height);
 };
 
 }  // namespace camera_control
