@@ -73,7 +73,13 @@ meter_reader_tflite:
   flash_light: ${id_prefix}flash # optional : flash light at taking image
   flash_pre_time: 7000    # 7 seconds before update (time to stabilize)
   flash_post_time: 2000   # 2 seconds after update
-  # flash_duration: 2200  # Optional: flash duration in ms (default: 2200ms)
+  # auto_camera_window: true # auto zoom for OV2640, OV3660, OV5640, SC101IOT, SC030IOT from crop zones (explicit)
+  # camera_window: true  # Auto-calculate from crop zones
+  # camera_window: 
+    # offset_x: 928 # multiple of 8
+    # offset_y: 480 # multiple of 8
+    # width: 448 # multiple of 8 and 4:3 proportions with height
+    # height: 336 # multiple of 8 and 4:3 proportions with width
   
 
 
