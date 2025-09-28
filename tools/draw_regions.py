@@ -103,14 +103,14 @@ def main():
         # Wait for key press
         key = cv2.waitKey(1) & 0xFF
         if key == ord("q"):  # Quit
-            if regions:
-                # Prompt the user to save before quitting
-                save = input("Do you want to save the regions before quitting? (y/n): ").strip().lower()
-                if save == "y":
-                    # Save regions as JSON
-                    with open("regions.json", "w") as f:
-                        json.dump(regions, f)
-                    print("Regions saved to regions.json")
+            # if regions:
+                # # Prompt the user to save before quitting
+                # save = input("Do you want to save the regions before quitting? (y/n): ").strip().lower()
+                # if save == "y":
+                    # # Save regions as JSON
+                    # with open("regions.json", "w") as f:
+                        # json.dump(regions, f)
+                    # print("Regions saved to regions.json")
             break
         elif key == ord("s"):  # Save regions
             if regions:

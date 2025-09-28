@@ -49,8 +49,14 @@ meter_reader_tflite:
   id: tflite_processor
   model: "model.tflite"  # Your TensorFlow Lite model
   camera_id: my_camera
-  # tensor_arena_size: "512KB" # OPTIONAL, set in model_config.h
   update_interval: 60s
+  debug: false
+  debug_image: false # static embedded image (debug.jpg)
+  debug_image_out_serial: false
+  crop_zones_global: crop_zones  # Reference the global variables set in globals_AI_component.yaml | To update, use http://[hassio]/developer-tools/action >esphome.[s3cam_tflite]_set_crop_zones | to get, use the tools>draw_regions.py
+  flash_light : ${id_prefix}flash # optional : flash light at taking image
+  flash_pre_time: 7000    # 7 seconds before update (time to stabilize)
+  flash_post_time: 2000   # 2 seconds after update
 ```
 
 ### 3. Add Your Model
@@ -97,7 +103,6 @@ meter_reader_tflite:
   id: image_classifier
   model: "dig-class100-0180-s2-q.tflite"  # Must be in same directory as YAML
   camera_id: my_camera
-  tensor_arena_size: 512KB
   update_interval: 60s
   
   # Custom sensor for classification results
@@ -143,7 +148,6 @@ meter_reader_tflite:
   id: multi_zone_detector
   model: "detection_model.tflite"
   camera_id: my_camera
-  tensor_arena_size: 512KB
   crop_zones_global: globals.detection_zones
 ```
 

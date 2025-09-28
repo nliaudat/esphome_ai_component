@@ -123,6 +123,46 @@ void MeterReaderTFLite::update() {
         return;
     }
 
+    // Schedule flash to turn on 5 seconds before next update
+    if (flash_light_ && flash_light_enabled_ && !flash_scheduled_ && !pause_processing_.load()) {
+        // get_update_interval() already returns milliseconds!
+        uint32_t update_interval_ms = get_update_interval();
+        uint32_t schedule_time = update_interval_ms - flash_pre_time_;
+        
+        ESP_LOGI(TAG, "Flash scheduling: interval=%ums, pre_time=%ums, schedule_time=%ums", 
+                update_interval_ms, flash_pre_time_, schedule_time);
+        
+        if (schedule_time > 0 && schedule_time < update_interval_ms) {
+            // Calculate disable time here so it's in scope
+            uint32_t disable_time = flash_pre_time_ + flash_post_time_;
+            
+            ESP_LOGI(TAG, "Flash scheduled: ON in %ums, OFF in %ums", 
+                    schedule_time, disable_time);
+            
+            // Capture disable_time in the lambda
+            this->set_timeout(schedule_time, [this, disable_time]() {
+                ESP_LOGI(TAG, "Enabling flash as scheduled");
+                this->enable_flash_light();
+                
+                // Schedule flash disable 2 seconds after update would normally complete
+                this->set_timeout(disable_time, [this]() {
+                    ESP_LOGI(TAG, "Disabling flash as scheduled");
+                    this->disable_flash_light();
+                    flash_scheduled_ = false;
+                });
+            });
+            flash_scheduled_ = true;
+        } else {
+            ESP_LOGW(TAG, "Invalid schedule time: %ums (interval: %ums)", 
+                    schedule_time, update_interval_ms);
+        }
+    } else {
+        ESP_LOGD(TAG, "Flash not scheduled - enabled:%s scheduled:%s paused:%s", 
+                flash_light_enabled_ ? "Y" : "N",
+                flash_scheduled_ ? "Y" : "N",
+                pause_processing_.load() ? "Y" : "N");
+    }
+
     // Reset processing state for new update cycle
     processing_frame_.store(false);
     
@@ -131,12 +171,6 @@ void MeterReaderTFLite::update() {
         frame_requested_.store(true);
         last_request_time_ = millis();
         ESP_LOGD(TAG, "Requesting new frame");
-        
-        // If using flash, enable it now (the continuous camera will capture with flash)
-        if (flash_light_ && flash_light_enabled_) {
-            this->enable_flash_light();
-            // Flash will stay on until we disable it after processing
-        }
     } else if (frame_available_.load()) {
         // Process existing frame immediately
         ESP_LOGD(TAG, "Processing available frame");
@@ -161,6 +195,7 @@ void MeterReaderTFLite::loop() {
 }
 
 void MeterReaderTFLite::process_available_frame() {
+
     processing_frame_.store(true);
     
     std::shared_ptr<camera::CameraImage> frame;
@@ -176,10 +211,6 @@ void MeterReaderTFLite::process_available_frame() {
         process_full_image(frame);
         frames_processed_++;
         
-        // Disable flash after processing if it was enabled for this frame
-        if (flash_light_ && flash_light_enabled_) {
-            this->disable_flash_light();
-        }
     } else {
         ESP_LOGE(TAG, "Invalid frame available for processing");
     }
@@ -501,6 +532,12 @@ void MeterReaderTFLite::set_crop_zones(const std::string &zones_json) {
     ESP_LOGI(TAG, "Setting crop zones from JSON");
     crop_zone_handler_.update_zones(zones_json); // This now updates both internal state AND global variable
     
+    // Set default zone if none parsed
+    if (crop_zone_handler_.get_zones().empty()) {
+        ESP_LOGI(TAG, "No zones found in JSON, setting default zone");
+        crop_zone_handler_.set_default_zone(camera_width_, camera_height_);
+    }
+    
     ESP_LOGI(TAG, "Configured %d crop zones", crop_zone_handler_.get_zones().size());
 }
 
@@ -518,15 +555,16 @@ bool MeterReaderTFLite::allocate_tensor_arena() {
     return true;
 }
 
-// Add the flash light control methods
 void MeterReaderTFLite::enable_flash_light() {
-    if (flash_light_ && flash_light_enabled_) {
-        ESP_LOGI(TAG, "Enabling flash light (auto-controlled)");
+    if (flash_light_) {
+        ESP_LOGI(TAG, "Enabling flash light");
         flash_auto_controlled_.store(true);
         auto call = flash_light_->turn_on();
-        call.set_brightness(1.0f); // Full brightness
+        // call.set_brightness(1.0f); // Full brightness
         call.set_transition_length(0);
         call.perform();
+    } else {
+        ESP_LOGW(TAG, "Flash light is null - cannot enable");
     }
 }
 
@@ -545,16 +583,18 @@ bool MeterReaderTFLite::is_flash_forced_on() const {
 }
 
 void MeterReaderTFLite::disable_flash_light() {
-    if (flash_light_ && flash_light_enabled_ && flash_auto_controlled_.load()) {
-        ESP_LOGI(TAG, "Disabling auto-controlled flash light");
+    if (flash_light_ && flash_auto_controlled_.load()) {
+        ESP_LOGI(TAG, "Disabling flash light");
         flash_auto_controlled_.store(false);
         auto call = flash_light_->turn_off();
         call.set_transition_length(0);
         call.perform();
+    } else {
+        ESP_LOGD(TAG, "Flash not auto-controlled or null - skip disable");
     }
 }
 
-void MeterReaderTFLite::schedule_flash_light_operations() {
+/* void MeterReaderTFLite::schedule_flash_light_operations() {
     if (!flash_light_ || !flash_light_enabled_) {
         return;
     }
@@ -568,7 +608,7 @@ void MeterReaderTFLite::schedule_flash_light_operations() {
             this->disable_flash_light();
         });
     });
-}
+} */
 
 // Setter method for the flash light
 void MeterReaderTFLite::set_flash_light(light::LightState* flash_light) {
@@ -578,10 +618,10 @@ void MeterReaderTFLite::set_flash_light(light::LightState* flash_light) {
 }
 
 // set flash duration
-void MeterReaderTFLite::set_flash_duration(uint32_t duration_ms) {
-    flash_duration_ = duration_ms;
-    ESP_LOGI(TAG, "Flash duration set to %ums", duration_ms);
-}
+// void MeterReaderTFLite::set_flash_duration(uint32_t duration_ms) {
+    // flash_duration_ = duration_ms;
+    // ESP_LOGI(TAG, "Flash duration set to %ums", duration_ms);
+// }
 
 
 #ifdef DEBUG_METER_READER_TFLITE

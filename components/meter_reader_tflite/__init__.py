@@ -24,7 +24,9 @@ CONF_DEBUG_IMAGE = 'debug_image'
 CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL = 'debug_image_out_serial'
 CONF_MODEL_TYPE = 'model_type'  # New configuration option for model type
 CONF_FLASH_LIGHT = 'flash_light'
-CONF_FLASH_DURATION = 'flash_duration'  # Optional: for duration control
+# CONF_FLASH_DURATION = 'flash_duration'  # Optional: for duration control
+CONF_FLASH_PRE_TIME = 'flash_pre_time'
+CONF_FLASH_POST_TIME = 'flash_post_time'
 CONF_CROP_ZONES = 'crop_zones_global'
 
 meter_reader_tflite_ns = cg.esphome_ns.namespace('meter_reader_tflite')
@@ -63,7 +65,9 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_DEBUG_IMAGE, default=False): cv.boolean, 
     cv.Optional(CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL, default=False): cv.boolean,
     cv.Optional(CONF_FLASH_LIGHT): cv.use_id(light.LightState), 
-    cv.Optional(CONF_FLASH_DURATION, default=2200): cv.positive_int, 
+    cv.Optional(CONF_FLASH_PRE_TIME, default=5000): cv.positive_int,
+    cv.Optional(CONF_FLASH_POST_TIME, default=2000): cv.positive_int,
+    # cv.Optional(CONF_FLASH_DURATION, default=2200): cv.positive_int, 
     cv.Optional(CONF_CROP_ZONES): cv.use_id(globals.GlobalsComponent),
 }).extend(cv.polling_component_schema('60s'))
 
@@ -179,9 +183,6 @@ async def to_code(config):
     if config.get(CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL, False):
         cg.add_define("DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL")
 
-    # if 'crop_zones_global' in config: 
-        # crop_global = await cg.get_variable(config['crop_zones_global'])
-        # cg.add(var.set_crop_zones_global(crop_global))
     if CONF_CROP_ZONES in config:
         crop_global = await cg.get_variable(config[CONF_CROP_ZONES])
         cg.add(var.set_crop_zones_global(crop_global))    
@@ -193,6 +194,13 @@ async def to_code(config):
         flash_light = await cg.get_variable(config[CONF_FLASH_LIGHT])
         cg.add(var.set_flash_light(flash_light))
         
+    if CONF_FLASH_PRE_TIME in config:
+        cg.add(var.set_flash_pre_time(config[CONF_FLASH_PRE_TIME]))
+    
+    if CONF_FLASH_POST_TIME in config:
+        cg.add(var.set_flash_post_time(config[CONF_FLASH_POST_TIME]))
+    
+        
         # Set flash duration if specified
-        if CONF_FLASH_DURATION in config:
-            cg.add(var.set_flash_duration(config[CONF_FLASH_DURATION]))
+        # if CONF_FLASH_DURATION in config:
+            # cg.add(var.set_flash_duration(config[CONF_FLASH_DURATION]))
