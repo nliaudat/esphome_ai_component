@@ -51,8 +51,12 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
         // crop_zones_global_ = crop_zones_global;
     // }
     
-    void set_crop_zones_global(globals::RestoringGlobalStringComponent<std::string, 64> *crop_zones_global) {
-        crop_zones_global_ = crop_zones_global;
+    // void set_crop_zones_global(globals::RestoringGlobalStringComponent<std::string, 64> *crop_zones_global) {
+        // crop_zones_global_ = crop_zones_global;
+    // }
+    
+    void set_crop_zones_global(globals::GlobalsComponent<std::string> *global_var) {
+        crop_zones_global_ = global_var;
     }
   
   /**
@@ -110,9 +114,9 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
    * @brief Set crop zones from global string variable.
    * @param zones_str String containing crop zones configuration
    */
-  void set_crop_zones_global_string(const std::string &zones_str) {
-    crop_zone_handler_.set_global_zones_string(zones_str);
-  }
+  // void set_crop_zones_global_string(const std::string &zones_str) {
+    // crop_zone_handler_.set_global_zones_string(zones_str);
+  // }
 
   /**
    * @brief Print debug information about component state and memory usage.
@@ -296,7 +300,9 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   uint32_t flash_duration_{200};             ///< Flash duration in milliseconds
   std::atomic<bool> flash_auto_controlled_{false};
   // globals::GlobalVarComponentBase<std::string> *crop_zones_global_{nullptr};
-  globals::RestoringGlobalStringComponent<std::string, 255> *crop_zones_global_{nullptr};
+  // globals::RestoringGlobalStringComponent<std::string, 255> *crop_zones_global_{nullptr};
+  globals::GlobalsComponent<std::string> *crop_zones_global_{nullptr};
+  // globals::RestoringGlobalStringComponent<std::string, 255> *crop_zones_global_{nullptr};
   
   /**
    * @brief Process the next available frame in the buffer.

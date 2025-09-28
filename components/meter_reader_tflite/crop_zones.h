@@ -23,16 +23,20 @@ class CropZoneHandler {
   void set_debug_zones();
   
   // Simple method to set the global string
-  void set_global_zones_string(const std::string &zones_str) {
-    global_zones_string_ = zones_str;
-  }
+  // void set_global_zones_string(const std::string &zones_str) {
+    // global_zones_string_ = zones_str;
+  // }
   
   // Check and apply global variable if available
-  void apply_global_zones();
+  // void apply_global_zones();
   
   // callback support for dynamic updates
   void set_on_zones_changed_callback(std::function<void()> callback) {
     on_zones_changed_ = callback;
+  }
+  
+  void set_crop_zones_global(globals::GlobalsComponent<std::string> *global_var) {
+      crop_zones_global_ = global_var;
   }
   
   // Method to update zones and notify
@@ -43,9 +47,12 @@ class CropZoneHandler {
     }
   }
 
+ private:
+  globals::GlobalsComponent<std::string> *crop_zones_global_{nullptr};
+
  protected:
   std::vector<CropZone> zones_;
-  std::string global_zones_string_;
+  // std::string global_zones_string_;
   std::function<void()> on_zones_changed_; 
 };
 

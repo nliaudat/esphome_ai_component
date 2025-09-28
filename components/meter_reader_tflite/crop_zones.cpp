@@ -9,14 +9,15 @@ namespace meter_reader_tflite {
 
 static const char *const TAG = "CropZoneHandler";
 
-void CropZoneHandler::apply_global_zones() {
-  if (!global_zones_string_.empty()) {
-    ESP_LOGI(TAG, "Applying crop zones from global string");
-    parse_zones(global_zones_string_);
-  } else {
-    ESP_LOGD(TAG, "No global crop zones string available");
-  }
-}
+// void CropZoneHandler::apply_global_zones() {
+  // if (!global_zones_string_.empty()) {
+    // ESP_LOGI(TAG, "Applying crop zones from global string");
+    // parse_zones(global_zones_string_);
+  // } else {
+    // ESP_LOGD(TAG, "No global crop zones string available");
+  // }
+// }
+
 
 void CropZoneHandler::parse_zones(const std::string &zones_json) {
   ESP_LOGD(TAG, "Parsing crop zones JSON: %s", zones_json.c_str());
