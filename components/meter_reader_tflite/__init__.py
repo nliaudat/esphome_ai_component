@@ -214,23 +214,19 @@ async def to_code(config):
     
         
     # Handle optional camera window configuration
-    if CONF_CAMERA_WINDOW in config:
-        window_config = config[CONF_CAMERA_WINDOW]
-        
-        if isinstance(window_config, bool):
-            if window_config:
-                # Enable auto window from crop zones
-                cg.add(var.set_camera_window_from_crop_zones())
-        else:
-            # Manual window configuration
-            if 'width' in window_config and 'height' in window_config:
-                cg.add(var.set_camera_window(
-                    window_config.get('offset_x', 0),
-                    window_config.get('offset_y', 0),
-                    window_config['width'],
-                    window_config['height']
-                ))
-    
-    # Auto camera window from crop zones
     if config.get(CONF_AUTO_CAMERA_WINDOW):
         cg.add(var.set_camera_window_from_crop_zones())
+    elif CONF_CAMERA_WINDOW in config:
+        window_config = config[CONF_CAMERA_WINDOW]
+        if isinstance(window_config, bool):
+            if window_config:
+                # camera_window: true is an alias for auto_camera_window: true
+                cg.add(var.set_camera_window_from_crop_zones())
+        elif 'width' in window_config and 'height' in window_config:
+            # Manual window configuration
+            cg.add(var.set_camera_window(
+                window_config.get('offset_x', 0),
+                window_config.get('offset_y', 0),
+                window_config['width'],
+                window_config['height']
+            ))

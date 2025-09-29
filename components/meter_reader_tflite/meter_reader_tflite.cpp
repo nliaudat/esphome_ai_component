@@ -35,6 +35,14 @@ void MeterReaderTFLite::setup() {
         return;
     }
     
+    // Store original camera dimensions and format
+    original_camera_width_ = camera_width_;
+    original_camera_height_ = camera_height_;
+    original_pixel_format_ = pixel_format_;
+    
+    ESP_LOGI(TAG, "Stored original camera dimensions: %dx%d, format: %s", 
+             original_camera_width_, original_camera_height_, original_pixel_format_.c_str());
+    
     // Setup crop zones - the handler will manage everything
     // Note: crop_zones_global_ is passed via set_crop_zones_global() from the YAML config
     // If we have a global variable, apply its initial value
@@ -341,10 +349,24 @@ void MeterReaderTFLite::set_model(const uint8_t *model, size_t length) {
 }
 
 void MeterReaderTFLite::set_camera_image_format(int width, int height, const std::string &pixel_format) {
-    camera_width_ = width;
-    camera_height_ = height;
-    pixel_format_ = pixel_format;
-    ESP_LOGD(TAG, "Camera format set: %dx%d, %s", width, height, pixel_format.c_str());
+  camera_width_ = width;
+  camera_height_ = height;
+  pixel_format_ = pixel_format;
+  
+  // Store as original dimensions if not already set
+  if (original_camera_width_ == 0) {
+    original_camera_width_ = width;
+  }
+  if (original_camera_height_ == 0) {
+    original_camera_height_ = height;
+  }
+  if (original_pixel_format_.empty()) {
+    original_pixel_format_ = pixel_format;
+  }
+  
+  ESP_LOGD(TAG, "Camera format set: %dx%d, %s (original: %dx%d, %s)", 
+           width, height, pixel_format.c_str(),
+           original_camera_width_, original_camera_height_, original_pixel_format_.c_str());
 }
 
 
@@ -764,88 +786,63 @@ void MeterReaderTFLite::set_debug_mode(bool debug_mode) {
 }
 #endif
 
+// ###### camera parameters
 
 bool MeterReaderTFLite::set_camera_window(int offset_x, int offset_y, int width, int height) {
-  bool success = camera_window_control_.set_window(camera_, offset_x, offset_y, width, height);
-  
-  if (success) {
-    // Update dimensions
-    auto new_dims = camera_window_control_.update_dimensions_after_window(
-        camera_, 
-        camera_control::CameraWindowControl::WindowConfig{offset_x, offset_y, width, height, true},
-        camera_width_, camera_height_);
+    bool success = camera_window_control_.set_window_with_dimensions(
+        camera_, offset_x, offset_y, width, height, camera_width_, camera_height_);
     
-    camera_width_ = new_dims.first;
-    camera_height_ = new_dims.second;
-    
-    // Reinitialize image processor if needed
-    if (image_processor_) {
-      image_processor_ = std::make_unique<ImageProcessor>(
-          ImageProcessorConfig{camera_width_, camera_height_, pixel_format_},
-          &model_handler_
-      );
+    if (success) {
+        reinitialize_image_processor();
     }
-  }
-  
-  return success;
+    
+    return success;
 }
 
 bool MeterReaderTFLite::set_camera_window_from_crop_zones() {
-  auto zones = crop_zone_handler_.get_zones();
-  bool success = camera_window_control_.set_window_from_crop_zones(
-      camera_, zones, camera_width_, camera_height_);
-  
-  if (success) {
-    // Update dimensions based on the calculated window
-    auto config = camera_control::CameraWindowControl::calculate_window_from_zones(
-        zones, camera_width_, camera_height_);
+    auto zones = crop_zone_handler_.get_zones();
+    bool success = camera_window_control_.set_window_from_crop_zones_with_dimensions(
+        camera_, zones, camera_width_, camera_height_);
     
-    auto new_dims = camera_window_control_.update_dimensions_after_window(
-        camera_, config, camera_width_, camera_height_);
-    
-    camera_width_ = new_dims.first;
-    camera_height_ = new_dims.second;
-    
-    // Reinitialize image processor if needed
-    if (image_processor_) {
-      image_processor_ = std::make_unique<ImageProcessor>(
-          ImageProcessorConfig{camera_width_, camera_height_, pixel_format_},
-          &model_handler_
-      );
+    if (success) {
+        reinitialize_image_processor();
     }
-  }
-  
-  return success;
+    
+    return success;
 }
 
-// ###### camera parameters
-
 bool MeterReaderTFLite::reset_camera_window() {
-  bool success = camera_window_control_.reset_to_full_frame(camera_);
-  
-  if (success) {
-    // Reset to original dimensions
-    camera_width_ = 800;  // Your original width
-    camera_height_ = 600; // Your original height
+    bool success = camera_window_control_.reset_to_full_frame_with_dimensions(
+        camera_, original_camera_width_, original_camera_height_, 
+        camera_width_, camera_height_);
     
-    // Reinitialize image processor
-    if (image_processor_) {
-      image_processor_ = std::make_unique<ImageProcessor>(
-          ImageProcessorConfig{camera_width_, camera_height_, pixel_format_},
-          &model_handler_
-      );
+    if (success) {
+        pixel_format_ = original_pixel_format_;
+        reinitialize_image_processor();
+        ESP_LOGI(TAG, "Camera window reset to original: %dx%d, format: %s", 
+                 camera_width_, camera_height_, pixel_format_.c_str());
+    } else {
+        ESP_LOGE(TAG, "Failed to reset camera window");
     }
-  }
-  
-  return success;
+    
+    return success;
 }
 
 bool MeterReaderTFLite::camera_supports_window() const {
-  return camera_window_control_.supports_window(camera_);
+    return camera_window_control_.supports_window(camera_);
 }
 
-std::string MeterReaderTFLite::get_camera_sensor_info() const {
-  return camera_window_control_.get_sensor_info(camera_);
+void MeterReaderTFLite::reinitialize_image_processor() {
+    if (image_processor_) {
+        image_processor_ = std::make_unique<ImageProcessor>(
+            ImageProcessorConfig{camera_width_, camera_height_, pixel_format_},
+            &model_handler_
+        );
+        ESP_LOGI(TAG, "ImageProcessor reinitialized with dimensions: %dx%d, format: %s",
+                 camera_width_, camera_height_, pixel_format_.c_str());
+    } else {
+        ESP_LOGW(TAG, "ImageProcessor not available for reinitialization");
+    }
 }
 
 }  // namespace meter_reader_tflite

@@ -48,17 +48,9 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
    */
   void setup() override;
   
-    // void set_crop_zones_global(globals::GlobalVarComponentBase<std::string> *crop_zones_global) {
-        // crop_zones_global_ = crop_zones_global;
-    // }
-    
-    // void set_crop_zones_global(globals::RestoringGlobalStringComponent<std::string, 64> *crop_zones_global) {
-        // crop_zones_global_ = crop_zones_global;
-    // }
-    
-    void set_crop_zones_global(globals::GlobalsComponent<std::string> *global_var) {
-        crop_zone_handler_.set_crop_zones_global(global_var);
-    }
+  void set_crop_zones_global(globals::GlobalsComponent<std::string> *global_var) {
+      crop_zone_handler_.set_crop_zones_global(global_var);
+  }
   
   /**
    * @brief Periodic update called based on configured interval.
@@ -112,14 +104,6 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_model_config(const std::string &model_type);
   
   /**
-   * @brief Set crop zones from global string variable.
-   * @param zones_str String containing crop zones configuration
-   */
-  // void set_crop_zones_global_string(const std::string &zones_str) {
-    // crop_zone_handler_.set_global_zones_string(zones_str);
-  // }
-
-  /**
    * @brief Print debug information about component state and memory usage.
    */
   void print_debug_info();
@@ -128,12 +112,6 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
    * @brief Report current memory status and usage statistics.
    */
   void report_memory_status();
-  
-  /**
-   * @brief Get peak memory usage from tensor arena.
-   * @return Peak memory usage in bytes
-   */
-  // size_t get_arena_peak_bytes() const;
   
   /**
    * @brief Get the number of frames processed.
@@ -186,14 +164,14 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   int get_model_input_height() const { return model_handler_.get_input_height(); }
   int get_model_input_channels() const { return model_handler_.get_input_channels(); } 
   
-    void set_pause_processing(bool pause) { 
-        pause_processing_.store(pause); 
-        ESP_LOGI(TAG, "AI processing %s", pause ? "PAUSED" : "RESUMED");
-    }
+  void set_pause_processing(bool pause) { 
+      pause_processing_.store(pause); 
+      ESP_LOGI(TAG, "AI processing %s", pause ? "PAUSED" : "RESUMED");
+  }
 
-    bool get_pause_processing() const { 
-        return pause_processing_.load(); 
-    }
+  bool get_pause_processing() const { 
+      return pause_processing_.load(); 
+  }
   
 #ifdef DEBUG_METER_READER_TFLITE
   void set_debug_image(const uint8_t* data, size_t size);
@@ -203,22 +181,16 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void debug_test_with_pattern();
 #endif
 
-    /**
-     * @brief Set the flash light component for illumination during capture.
-     * @param flash_light Pointer to the light state component
-     */
-    void set_flash_light(light::LightState* flash_light);
-    
-    void set_flash_pre_time(uint32_t pre_time) { flash_pre_time_ = pre_time; }
-    void set_flash_post_time(uint32_t post_time) { flash_post_time_ = post_time; }
+  /**
+   * @brief Set the flash light component for illumination during capture.
+   * @param flash_light Pointer to the light state component
+   */
+  void set_flash_light(light::LightState* flash_light);
+  
+  void set_flash_pre_time(uint32_t pre_time) { flash_pre_time_ = pre_time; }
+  void set_flash_post_time(uint32_t post_time) { flash_post_time_ = post_time; }
 
-    /**
-     * @brief Set the flash duration in milliseconds.
-     * @param duration_ms Flash duration in milliseconds
-     */
-    // void set_flash_duration(uint32_t duration_ms);
-    
-  // Camera window control (optional feature)
+  // Camera window control methods (simplified interface)
   bool set_camera_window(int offset_x, int offset_y, int width, int height);
   bool set_camera_window_from_crop_zones();
   bool reset_camera_window();
@@ -314,6 +286,11 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   uint32_t flash_post_time_{2000};   // 2 seconds after update
   bool flash_scheduled_{false};      // Track if flash is scheduled
   
+  // Original camera configuration storage
+  int original_camera_width_{0};      ///< Original camera width before any window changes
+  int original_camera_height_{0};     ///< Original camera height before any window changes
+  std::string original_pixel_format_; ///< Original pixel format before any changes
+  
   /**
    * @brief Process the next available frame in the buffer.
    */
@@ -329,9 +306,9 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   camera_control::CameraWindowControl camera_window_control_;
   
   /**
-   * @brief Schedule flash light operations around frame capture
+   * @brief Reinitialize the ImageProcessor with current camera dimensions and format
    */
-  // void schedule_flash_light_operations();
+  void reinitialize_image_processor();
 };
 
 }  // namespace meter_reader_tflite
