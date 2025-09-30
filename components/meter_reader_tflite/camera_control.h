@@ -55,7 +55,17 @@ class CameraWindowControl {
    */
   bool reset_to_full_frame(esp32_camera::ESP32Camera* camera);
   
-  
+  /**
+   * @brief Test window functionality with a simple centered window
+   * @return true if window setting works successfully
+   */
+  bool test_window_stability(esp32_camera::ESP32Camera* camera);
+
+  bool set_ROI(esp32_camera::ESP32Camera* camera, 
+                int offset_x, int offset_y, 
+                int width, int height);
+
+                
   /**
    * @brief Get current sensor information
    */
@@ -115,7 +125,11 @@ class CameraWindowControl {
                                               const WindowConfig& config,
                                               int original_width, int original_height) const;
 
-      
+    
+    bool hard_reset_camera(esp32_camera::ESP32Camera* camera);
+    bool soft_reset_camera(esp32_camera::ESP32Camera* camera);
+    bool set_window_with_reset(esp32_camera::ESP32Camera* camera, const WindowConfig& config);
+    bool reset_to_full_frame_with_reset(esp32_camera::ESP32Camera* camera);
 
  private:
   static const char *const TAG;

@@ -78,8 +78,8 @@ meter_reader_tflite:
   # camera_window:  # can be set in http://[hassio]/developer-tools/action > esphome.[s3cam_tflite]_set_camera_window
     # offset_x: 928 # multiple of 4
     # offset_y: 480 # multiple of 4
-    # width: 448 # multiple of 4 and 4:3 proportions with height
-    # height: 336 # multiple of 4 and 4:3 proportions with width
+    # width: 448 # multiple of 4 and 4:3 proportions with height for best quality
+    # height: 88 #  multiple of 4 and 4:3 proportions with width for best quality
   
 
 

@@ -57,7 +57,7 @@ void MeterReaderTFLite::setup() {
         crop_zone_handler_.set_default_zone(camera_width_, camera_height_);
     }
     
-    // Apply camera window if configured (after camera is ready)
+/*     // Apply camera window if configured (after camera is ready)
     if (camera_ && camera_supports_window()) {
         // Check if we should set camera window from crop zones
         auto zones = crop_zone_handler_.get_zones();
@@ -65,7 +65,7 @@ void MeterReaderTFLite::setup() {
             ESP_LOGI(TAG, "Automatically setting camera window from %d crop zones", zones.size());
             set_camera_window_from_crop_zones();
         }
-    }
+    } */
     
     
     // Setup camera callback with frame buffer management
