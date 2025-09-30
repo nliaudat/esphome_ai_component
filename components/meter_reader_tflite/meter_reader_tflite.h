@@ -192,10 +192,12 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
   // Camera window control methods (simplified interface)
   bool set_camera_window(int offset_x, int offset_y, int width, int height);
-  bool set_camera_window_from_crop_zones();
+  // bool set_camera_window_from_crop_zones();
   bool reset_camera_window();
   bool camera_supports_window() const;
   std::string get_camera_sensor_info() const;
+  bool test_camera_after_reset();
+  void basic_camera_recovery();
       
 
 /** ########### PROTECTED ############# **/
