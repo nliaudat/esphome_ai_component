@@ -283,33 +283,40 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
         }
 
         // Publish results if successful
-    if (processing_success && !readings.empty()) {
-        float final_reading = combine_readings(readings);
-        float avg_confidence = std::accumulate(confidences.begin(), 
-                                             confidences.end(), 0.0f) / confidences.size();
-        
-        // Store the values for template sensors
-        last_reading_ = final_reading;
-        last_confidence_ = avg_confidence;
-        
-        ESP_LOGI(TAG, "Final reading: %.1f (avg confidence: %.2f)", 
-                final_reading, avg_confidence);
+        if (processing_success && !readings.empty()) {
+            float final_reading = combine_readings(readings);
+            float avg_confidence = std::accumulate(confidences.begin(), 
+                                                 confidences.end(), 0.0f) / confidences.size();
+            
+            // Store the values for template sensors (regardless of threshold)
+            last_reading_ = final_reading;
+            last_confidence_ = avg_confidence;
+            
+            ESP_LOGI(TAG, "Final reading: %.1f (avg confidence: %.2f, threshold: %.2f)", 
+                    final_reading, avg_confidence, confidence_threshold_);
 
-        // Your existing publish_state calls (keep these if you want both methods)
-        if (value_sensor_) {
-            value_sensor_->publish_state(final_reading);
+            // Only publish to sensors if confidence meets threshold
+            if (avg_confidence >= confidence_threshold_) {
+                if (value_sensor_) {
+                    value_sensor_->publish_state(final_reading);
+                }
+                
+                if (confidence_sensor_ != nullptr) {
+                    confidence_sensor_->publish_state(avg_confidence);
+                }
+                
+                ESP_LOGI(TAG, "Reading published - confidence threshold met");
+            } else {
+                ESP_LOGW(TAG, "Reading NOT published - confidence %.2f below threshold %.2f", 
+                        avg_confidence, confidence_threshold_);
+            }
+            
+            if (debug_mode_) {
+                this->print_debug_info();
+            }
+        } else {
+            ESP_LOGE(TAG, "Frame processing failed");
         }
-        
-        if (confidence_sensor_ != nullptr) {
-            confidence_sensor_->publish_state(avg_confidence);
-        }
-        
-        if (debug_mode_) {
-            this->print_debug_info();
-        }
-    } else {
-        ESP_LOGE(TAG, "Frame processing failed");
-    }
     
     DURATION_END("process_full_image");
 }
