@@ -11,6 +11,10 @@ drawing = False
 ix, iy = -1, -1
 normalize_mode = False
 
+# Zoom variables
+zoom_level = 1.0
+original_image = None
+
 def show_help():
     """Display help information."""
     help_text = """
@@ -29,10 +33,13 @@ Description:
   will have their width and height automatically adjusted to be multiples of 8
   for compatibility with various image processing algorithms.
 
-  When --normalize is used:
-    - All regions will have the same size (based on the first region drawn)
-    - Regions are aligned to the top boundary
-    - Size is adjusted to multiples of 8
+  Interactive controls:
+    - Mouse wheel: Zoom in/out (centered on mouse position)
+    - Left mouse drag: Draw regions
+    - 'r': Reset regions (clear all)
+    - 'f': Reset zoom to full size
+    - 's': Save regions
+    - 'q': Quit
 
 Instructions:
   1. Click and drag to draw a rectangle
@@ -48,13 +55,47 @@ Examples:
 """
     print(help_text)
 
+def get_display_image():
+    """Get the zoomed display image."""
+    global original_image, zoom_level
+    
+    if original_image is None:
+        return None
+    
+    if zoom_level == 1.0:
+        return original_image.copy()
+    
+    img_height, img_width = original_image.shape[:2]
+    
+    # Calculate new dimensions
+    new_width = int(img_width * zoom_level)
+    new_height = int(img_height * zoom_level)
+    
+    # Resize the image
+    display_image = cv2.resize(original_image, (new_width, new_height), interpolation=cv2.INTER_LINEAR)
+    
+    return display_image
+
+def screen_to_image_coords(sx, sy):
+    """Convert screen coordinates to original image coordinates."""
+    global zoom_level
+    
+    if zoom_level == 1.0:
+        return sx, sy
+    
+    # Apply inverse of zoom transformation
+    img_x = int(sx / zoom_level)
+    img_y = int(sy / zoom_level)
+    
+    return img_x, img_y
+
 def normalize_region(x1, y1, x2, y2, reference_size=None):
     """
     Normalize a region to ensure (x1, y1) is the top-left corner and (x2, y2) is the bottom-right corner.
     Also adjust coordinates to be multiples of 8.
     
     Args:
-        x1, y1, x2, y2: Coordinates of the region.
+        x1, y1, x2, y2: Coordinates of the region (in image coordinates).
         reference_size: If provided, use this size for normalization (width, height)
         
     Returns:
@@ -94,18 +135,25 @@ def normalize_region(x1, y1, x2, y2, reference_size=None):
 
 def draw_rectangle(event, x, y, flags, param):
     """Callback function to draw rectangles on the image."""
-    global regions, drawing, ix, iy, img, normalize_mode
+    global regions, drawing, ix, iy, normalize_mode, zoom_level
+
+    # Convert screen coordinates to image coordinates
+    img_x, img_y = screen_to_image_coords(x, y)
 
     if event == cv2.EVENT_LBUTTONDOWN:
         # Start drawing
         drawing = True
-        ix, iy = x, y
+        ix, iy = img_x, img_y
 
     elif event == cv2.EVENT_MOUSEMOVE:
-        # Update the rectangle while dragging
         if drawing:
-            # Create a copy of the image to draw on
-            display_image = img.copy()
+            # Update the rectangle while dragging
+            display_image = get_display_image()
+            if display_image is None:
+                return
+            
+            # Create a copy of the display image to draw on
+            temp_image = display_image.copy()
             
             # Determine reference size for normalization
             reference_size = None
@@ -116,31 +164,30 @@ def draw_rectangle(event, x, y, flags, param):
                 ref_height = first_region[3] - first_region[1]
                 reference_size = (ref_width, ref_height)
             
-            # Normalize the coordinates
-            x1, y1, x2, y2 = normalize_region(ix, iy, x, y, reference_size)
+            # Normalize the coordinates (in image coordinates)
+            x1_img, y1_img, x2_img, y2_img = normalize_region(ix, iy, img_x, img_y, reference_size)
+            
+            # Convert back to screen coordinates for display
+            if zoom_level != 1.0:
+                x1_scr = int(x1_img * zoom_level)
+                y1_scr = int(y1_img * zoom_level)
+                x2_scr = int(x2_img * zoom_level)
+                y2_scr = int(y2_img * zoom_level)
+            else:
+                x1_scr, y1_scr, x2_scr, y2_scr = x1_img, y1_img, x2_img, y2_img
             
             # Draw the rectangle
-            cv2.rectangle(display_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv2.rectangle(temp_image, (x1_scr, y1_scr), (x2_scr, y2_scr), (0, 255, 0), 2)
             
             # Display dimensions information
-            width = x2 - x1
-            height = y2 - y1
-            cv2.putText(display_image, f"Size: {width}x{height}", (x1, y1-10), 
+            width = x2_img - x1_img
+            height = y2_img - y1_img
+            cv2.putText(temp_image, f"Size: {width}x{height}", (x1_scr, max(y1_scr-10, 10)), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
             
-            # Show normalization mode indicator
-            if normalize_mode:
-                if regions:
-                    cv2.putText(display_image, f"NORMALIZED (Ref: {width}x{height})", 
-                               (10, img.shape[0] - 20), cv2.FONT_HERSHEY_SIMPLEX, 
-                               0.6, (0, 255, 255), 2)
-                else:
-                    cv2.putText(display_image, "NORMALIZED (Draw first region)", 
-                               (10, img.shape[0] - 20), cv2.FONT_HERSHEY_SIMPLEX, 
-                               0.6, (0, 255, 255), 2)
-            
             # Show the updated image
-            cv2.imshow("Draw Regions", display_image)
+            show_instructions(temp_image)
+            cv2.imshow("Draw Regions", temp_image)
 
     elif event == cv2.EVENT_LBUTTONUP:
         # Finish drawing
@@ -155,27 +202,92 @@ def draw_rectangle(event, x, y, flags, param):
             ref_height = first_region[3] - first_region[1]
             reference_size = (ref_width, ref_height)
         
-        # Normalize the coordinates
-        x1, y1, x2, y2 = normalize_region(ix, iy, x, y, reference_size)
+        # Normalize the coordinates (in image coordinates)
+        x1_img, y1_img, x2_img, y2_img = normalize_region(ix, iy, img_x, img_y, reference_size)
         
         # Get final dimensions
-        width = x2 - x1
-        height = y2 - y1
+        width = x2_img - x1_img
+        height = y2_img - y1_img
         
-        # Save the region (x1, y1, x2, y2)
-        regions.append([x1, y1, x2, y2])
+        # Save the region in original image coordinates
+        regions.append([x1_img, y1_img, x2_img, y2_img])
         
-        # Draw the final rectangle on the original image
-        cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        # Redraw the main image to show all regions
+        redraw_image()
         
-        # Add dimension text to the final image
-        cv2.putText(img, f"{width}x{height}", (x1, y1-10), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+        mode_info = " (Normalized)" if normalize_mode and len(regions) > 1 else ""
+        print(f"Region added: {[x1_img, y1_img, x2_img, y2_img]} (Size: {width}x{height}){mode_info}")
         
-        cv2.imshow("Draw Regions", img)
+    elif event == cv2.EVENT_MOUSEWHEEL:
+        # Zoom with mouse wheel
+        zoom_speed = 1.2
+        if flags > 0:  # Zoom in
+            zoom_level *= zoom_speed
+            zoom_level = min(zoom_level, 10.0)  # Max 10x zoom
+        else:  # Zoom out
+            zoom_level /= zoom_speed
+            zoom_level = max(zoom_level, 0.1)   # Min 0.1x zoom
         
-        mode_info = " (Normalized)" if normalize_mode and regions else ""
-        print(f"Region added: {[x1, y1, x2, y2]} (Size: {width}x{height}){mode_info}")
+        redraw_image()
+
+def redraw_image():
+    """Redraw the main image with all regions."""
+    global original_image, regions, zoom_level
+    
+    if original_image is None:
+        return
+    
+    # Get display image
+    display_image = get_display_image()
+    if display_image is None:
+        return
+    
+    temp_image = display_image.copy()
+    
+    # Draw all regions
+    for region in regions:
+        x1_img, y1_img, x2_img, y2_img = region
+        
+        # Convert to screen coordinates
+        if zoom_level != 1.0:
+            x1_scr = int(x1_img * zoom_level)
+            y1_scr = int(y1_img * zoom_level)
+            x2_scr = int(x2_img * zoom_level)
+            y2_scr = int(y2_img * zoom_level)
+        else:
+            x1_scr, y1_scr, x2_scr, y2_scr = x1_img, y1_img, x2_img, y2_img
+        
+        # Only draw if region is visible in viewport
+        if (x1_scr < display_image.shape[1] and x2_scr > 0 and 
+            y1_scr < display_image.shape[0] and y2_scr > 0):
+            
+            # Draw rectangle
+            cv2.rectangle(temp_image, (x1_scr, y1_scr), (x2_scr, y2_scr), (0, 255, 0), 2)
+            
+            # Add dimension text
+            width = x2_img - x1_img
+            height = y2_img - y1_img
+            cv2.putText(temp_image, f"{width}x{height}", (x1_scr, max(y1_scr-10, 10)), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+    
+    # Show instructions and info
+    show_instructions(temp_image)
+    
+    # Show zoom info
+    if zoom_level != 1.0:
+        info_text = f"Zoom: {zoom_level:.1f}x | Regions: {len(regions)} | Press 'f' for full size"
+        cv2.putText(temp_image, info_text, (10, temp_image.shape[0] - 30), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+    else:
+        info_text = f"Full size | Regions: {len(regions)}"
+        cv2.putText(temp_image, info_text, (10, temp_image.shape[0] - 30), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+    
+    if normalize_mode:
+        cv2.putText(temp_image, "NORMALIZE MODE", (10, temp_image.shape[0] - 10), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+    
+    cv2.imshow("Draw Regions", temp_image)
 
 def show_instructions(image):
     """
@@ -186,14 +298,13 @@ def show_instructions(image):
     """
     instructions = [
         "Instructions:",
-        "1. Click and drag to draw a rectangle.",
-        "2. Regions auto-adjusted to multiples of 8",
-        "3. Press 's' to save regions after last draw",
-        "4. Press 'q' to quit and save."
+        "Left drag: Draw region",
+        "Wheel: Zoom  r: Reset regions",
+        "f: Full size  s: Save  q: Quit"
     ]
     
     if normalize_mode:
-        instructions.insert(2, "NORMALIZE MODE: All regions same size")
+        instructions.append("NORMALIZE: All regions same size")
     
     y_offset = 30
     for line in instructions:
@@ -257,7 +368,7 @@ def parse_arguments():
     return parser.parse_args()
 
 def main():
-    global img, normalize_mode
+    global original_image, normalize_mode, zoom_level, regions
 
     # Parse command line arguments
     args = parse_arguments()
@@ -278,8 +389,8 @@ def main():
         return
 
     # Load the image
-    img = cv2.imread(args.image_path)
-    if img is None:
+    original_image = cv2.imread(args.image_path)
+    if original_image is None:
         print(f"Error: Unable to load image from {args.image_path}.")
         return
 
@@ -292,33 +403,28 @@ def main():
     print(f"Input image: {args.image_path}")
     print(f"Output file: {args.output}")
     print(f"Normalize mode: {'ON' if normalize_mode else 'OFF'}")
-    print(f"Image dimensions: {img.shape[1]}x{img.shape[0]}")
-    print("\nInstructions:")
-    print("1. Click and drag to draw a rectangle.")
-    print("2. Regions will be automatically adjusted to have width and height as multiples of 8.")
-    
-    if normalize_mode:
-        print("3. NORMALIZE MODE: All regions will have the same size (based on first region)")
-        print("4. Press 's' to save regions.")
-        print("5. Press 'q' to quit.")
-    else:
-        print("3. Press 's' to save regions.")
-        print("4. Press 'q' to quit.")
-    
+    print(f"Image dimensions: {original_image.shape[1]}x{original_image.shape[0]} pixels")
+    print("\nInteractive Controls:")
+    print("  Mouse wheel: Zoom in/out")
+    print("  Left mouse drag: Draw regions")
+    print("  r: Reset regions (clear all)")
+    print("  f: Reset zoom to full size")
+    print("  s: Save regions")
+    print("  q: Quit")
     print("-" * 40)
 
     output_file = args.output
 
-    while True:
-        # Display the image with regions and instructions
-        display_image = img.copy()
-        show_instructions(display_image)
-        cv2.imshow("Draw Regions", display_image)
+    # Initial display
+    redraw_image()
 
+    while True:
         # Wait for key press
-        key = cv2.waitKey(1) & 0xFF
+        key = cv2.waitKey(0) & 0xFF
+        
         if key == ord("q"):  # Quit
             break
+            
         elif key == ord("s"):  # Save regions
             if regions:
                 # Validate regions before saving
@@ -333,11 +439,21 @@ def main():
                         first_region = regions[0]
                         ref_width = first_region[2] - first_region[0]
                         ref_height = first_region[3] - first_region[1]
-                        print(f"All regions normalized to: {ref_width}x{ref_height}")
+                        print(f"All regions normalized to: {ref_width}x{ref_height} pixels")
                 else:
                     print("Warning: Some regions have invalid dimensions. Save cancelled.")
             else:
                 print("No regions to save.")
+                
+        elif key == ord("r"):  # Reset regions (clear all)
+            regions.clear()
+            redraw_image()
+            print("All regions cleared")
+            
+        elif key == ord("f"):  # Reset zoom to full size
+            zoom_level = 1.0
+            redraw_image()
+            print("Zoom reset to full size")
 
     # Clean up
     cv2.destroyAllWindows()
