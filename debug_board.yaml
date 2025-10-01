@@ -28,8 +28,8 @@ sensor:
 
   # CPU Temperature
   - platform: internal_temperature
-    name: "${device_name} CPU Temperature"
-    id: cpu_temperature
+    name: "${id_prefix} CPU Temperature"
+    id: ${id_prefix}_cpu_temperature
     unit_of_measurement: "°C"
     accuracy_decimals: 1
     device_class: temperature
@@ -39,8 +39,8 @@ sensor:
 
   # Memory sensors using correct ESP-IDF functions
   - platform: template
-    name: "${device_name} Free RAM"
-    id: free_ram
+    name: "${id_prefix} Free RAM"
+    id: ${id_prefix}_free_ram
     unit_of_measurement: "B"
     device_class: data_size
     state_class: measurement
@@ -50,8 +50,8 @@ sensor:
       return heap_caps_get_free_size(MALLOC_CAP_8BIT);
 
   - platform: template
-    name: "${device_name} Total RAM"
-    id: total_ram
+    name: "${id_prefix} Total RAM"
+    id: t${id_prefix}_otal_ram
     unit_of_measurement: "B"
     device_class: data_size
     state_class: measurement
@@ -61,8 +61,8 @@ sensor:
       return heap_caps_get_total_size(MALLOC_CAP_8BIT);
 
   - platform: template
-    name: "${device_name} Used RAM"
-    id: used_ram
+    name: "${id_prefix} Used RAM"
+    id: ${id_prefix}_used_ram
     unit_of_measurement: "B"
     device_class: data_size
     state_class: measurement
@@ -72,8 +72,8 @@ sensor:
       return heap_caps_get_total_size(MALLOC_CAP_8BIT) - heap_caps_get_free_size(MALLOC_CAP_8BIT);
 
   - platform: template
-    name: "${device_name} Free RAM Percentage"
-    id: free_ram_percentage
+    name: "${id_prefix} Free RAM Percentage"
+    id: ${id_prefix}_free_ram_percentage
     unit_of_measurement: "%"
     device_class: battery
     state_class: measurement
@@ -89,8 +89,8 @@ sensor:
 
   # SPIRAM sensors
   - platform: template
-    name: "${device_name} Free SPIRAM"
-    id: free_psram
+    name: "${id_prefix} Free SPIRAM"
+    id: ${id_prefix}_free_psram
     unit_of_measurement: "B"
     device_class: data_size
     state_class: measurement
@@ -104,8 +104,8 @@ sensor:
       #endif
 
   - platform: template
-    name: "${device_name} Total SPIRAM"
-    id: total_psram
+    name: "${id_prefix} Total SPIRAM"
+    id: ${id_prefix}_total_psram
     unit_of_measurement: "B"
     device_class: data_size
     state_class: measurement
@@ -119,8 +119,8 @@ sensor:
       #endif
 
   - platform: template
-    name: "${device_name} Used SPIRAM"
-    id: used_psram
+    name: "${id_prefix} Used SPIRAM"
+    id: ${id_prefix}_used_psram
     unit_of_measurement: "B"
     device_class: data_size
     state_class: measurement
@@ -134,8 +134,8 @@ sensor:
       #endif
 
   - platform: template
-    name: "${device_name} Free SPIRAM Percentage"
-    id: free_psram_percentage
+    name: "${id_prefix} Free SPIRAM Percentage"
+    id: ${id_prefix}_free_psram_percentage
     unit_of_measurement: "%"
     device_class: battery
     state_class: measurement
