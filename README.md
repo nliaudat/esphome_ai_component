@@ -59,6 +59,15 @@ meter_reader_tflite:
   flash_light : ${id_prefix}flash # optional : flash light at taking image
   flash_pre_time: 7000    # 7 seconds before update (time to stabilize)
   flash_post_time: 2000   # 2 seconds after update
+  # ### zoom availale for OV2640, OV3660, OV5640, SC101IOT, SC030IOT from crop zones (explicit)
+  # camera_window:  # can be set in http://[hassio]/developer-tools/action > esphome.[s3cam_tflite]_set_camera_window
+  #  offset_x: 928 # multiple of 4
+  #  offset_y: 480 # multiple of 4
+  #  width: 448 # multiple of 4 and 4:3 proportions with height for best quality
+  #  height: 88 #  multiple of 4 and 4:3 proportions with width for best quality
+  # ### Enhanced validation parameters
+  allow_negative_rates: false    # Prevent meter rollbacks
+  max_absolute_diff: 300         # Maximum allowed absolute difference
 ```
 
 ### 3. Add Your Model
