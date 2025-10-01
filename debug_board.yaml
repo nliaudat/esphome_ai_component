@@ -51,7 +51,7 @@ sensor:
 
   - platform: template
     name: "${id_prefix} Total RAM"
-    id: t${id_prefix}_otal_ram
+    id: ${id_prefix}_total_ram
     unit_of_measurement: "B"
     device_class: data_size
     state_class: measurement
