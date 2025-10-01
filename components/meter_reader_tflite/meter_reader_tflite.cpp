@@ -174,7 +174,7 @@ void MeterReaderTFLite::update() {
         return;
     }
 
-    // Schedule flash to turn on 5 seconds before next update
+    // Schedule flash first, then request frame after flash turns on
     if (flash_light_ && flash_light_enabled_ && !flash_scheduled_ && !pause_processing_.load()) {
         // get_update_interval() already returns milliseconds!
         uint32_t update_interval_ms = get_update_interval();
@@ -195,7 +195,18 @@ void MeterReaderTFLite::update() {
                 ESP_LOGI(TAG, "Enabling flash as scheduled");
                 this->enable_flash_light();
                 
-                // Schedule flash disable 2 seconds after update would normally complete
+                // Request frame AFTER flash turns on (with your 7-second stabilization time)
+                // Wait most of the pre_time for stabilization, then capture
+                uint32_t capture_delay = flash_pre_time_ - 500; // Capture 500ms before update
+                this->set_timeout(capture_delay, [this, disable_time]() {
+                    ESP_LOGI(TAG, "Requesting frame after flash stabilization");
+                    if (!frame_available_.load() && !frame_requested_.load()) {
+                        frame_requested_.store(true);
+                        last_request_time_ = millis();
+                    }
+                });
+                
+                // Schedule flash disable
                 this->set_timeout(disable_time, [this]() {
                     ESP_LOGI(TAG, "Disabling flash as scheduled");
                     this->disable_flash_light();
@@ -203,6 +214,10 @@ void MeterReaderTFLite::update() {
                 });
             });
             flash_scheduled_ = true;
+            
+            // Don't request frame here - wait for flash to turn on and stabilize first
+            ESP_LOGI(TAG, "Flash scheduled, frame will be requested after stabilization");
+            return; // Exit update early, frame will be requested after flash turns on and stabilizes
         } else {
             ESP_LOGW(TAG, "Invalid schedule time: %ums (interval: %ums)", 
                     schedule_time, update_interval_ms);
@@ -214,6 +229,7 @@ void MeterReaderTFLite::update() {
                 pause_processing_.load() ? "Y" : "N");
     }
 
+    // If flash is not enabled or not scheduled, request frame normally
     // Reset processing state for new update cycle
     processing_frame_.store(false);
     
@@ -221,7 +237,7 @@ void MeterReaderTFLite::update() {
     if (!frame_available_.load() && !frame_requested_.load()) {
         frame_requested_.store(true);
         last_request_time_ = millis();
-        ESP_LOGD(TAG, "Requesting new frame");
+        ESP_LOGD(TAG, "Requesting new frame (no flash)");
     } else if (frame_available_.load()) {
         // Process existing frame immediately
         ESP_LOGD(TAG, "Processing available frame");
