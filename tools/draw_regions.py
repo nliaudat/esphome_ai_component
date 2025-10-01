@@ -9,6 +9,7 @@ import argparse
 regions = []
 drawing = False
 ix, iy = -1, -1
+normalize_mode = False
 
 def show_help():
     """Display help information."""
@@ -21,11 +22,17 @@ Usage:
 Options:
   -h, --help          Show this help message and exit
   -o, --output FILE   Specify output JSON file (default: regions.json)
+  -n, --normalize     Normalize regions to common size and top alignment
 
 Description:
   This tool allows you to draw rectangular regions on an image. All regions
   will have their width and height automatically adjusted to be multiples of 8
   for compatibility with various image processing algorithms.
+
+  When --normalize is used:
+    - All regions will have the same size (based on the first region drawn)
+    - Regions are aligned to the top boundary
+    - Size is adjusted to multiples of 8
 
 Instructions:
   1. Click and drag to draw a rectangle
@@ -36,17 +43,19 @@ Instructions:
 Examples:
   python draw_regions.py image.jpg
   python draw_regions.py photo.png -o my_regions.json
+  python draw_regions.py image.jpg --normalize
   python draw_regions.py --help
 """
     print(help_text)
 
-def normalize_region(x1, y1, x2, y2):
+def normalize_region(x1, y1, x2, y2, reference_size=None):
     """
     Normalize a region to ensure (x1, y1) is the top-left corner and (x2, y2) is the bottom-right corner.
     Also adjust coordinates to be multiples of 8.
     
     Args:
         x1, y1, x2, y2: Coordinates of the region.
+        reference_size: If provided, use this size for normalization (width, height)
         
     Returns:
         tuple: Normalized region (x1, y1, x2, y2) with dimensions as multiples of 8.
@@ -56,29 +65,36 @@ def normalize_region(x1, y1, x2, y2):
     if y1 > y2:
         y1, y2 = y2, y1  # Swap y1 and y2 if y1 > y2
     
-    # Calculate width and height
-    width = x2 - x1
-    height = y2 - y1
-    
-    # Adjust width to be multiple of 8
-    adjusted_width = (width // 8) * 8
-    if adjusted_width == 0 and width > 0:
-        adjusted_width = 8  # Minimum width of 8 pixels
-    
-    # Adjust height to be multiple of 8
-    adjusted_height = (height // 8) * 8
-    if adjusted_height == 0 and height > 0:
-        adjusted_height = 8  # Minimum height of 8 pixels
-    
-    # Calculate new coordinates
-    x2 = x1 + adjusted_width
-    y2 = y1 + adjusted_height
+    if reference_size and normalize_mode:
+        # Use reference size for normalization
+        ref_width, ref_height = reference_size
+        # Keep original x1 position, use reference width and height
+        x2 = x1 + ref_width
+        y2 = y1 + ref_height
+    else:
+        # Calculate width and height from current selection
+        width = x2 - x1
+        height = y2 - y1
+        
+        # Adjust width to be multiple of 8
+        adjusted_width = (width // 8) * 8
+        if adjusted_width == 0 and width > 0:
+            adjusted_width = 8  # Minimum width of 8 pixels
+        
+        # Adjust height to be multiple of 8
+        adjusted_height = (height // 8) * 8
+        if adjusted_height == 0 and height > 0:
+            adjusted_height = 8  # Minimum height of 8 pixels
+        
+        # Calculate new coordinates
+        x2 = x1 + adjusted_width
+        y2 = y1 + adjusted_height
     
     return (x1, y1, x2, y2)
 
 def draw_rectangle(event, x, y, flags, param):
     """Callback function to draw rectangles on the image."""
-    global regions, drawing, ix, iy, img
+    global regions, drawing, ix, iy, img, normalize_mode
 
     if event == cv2.EVENT_LBUTTONDOWN:
         # Start drawing
@@ -90,8 +106,19 @@ def draw_rectangle(event, x, y, flags, param):
         if drawing:
             # Create a copy of the image to draw on
             display_image = img.copy()
-            # Normalize the coordinates to ensure the rectangle is drawn correctly
-            x1, y1, x2, y2 = normalize_region(ix, iy, x, y)
+            
+            # Determine reference size for normalization
+            reference_size = None
+            if normalize_mode and regions:
+                # Use the size of the first region as reference
+                first_region = regions[0]
+                ref_width = first_region[2] - first_region[0]
+                ref_height = first_region[3] - first_region[1]
+                reference_size = (ref_width, ref_height)
+            
+            # Normalize the coordinates
+            x1, y1, x2, y2 = normalize_region(ix, iy, x, y, reference_size)
+            
             # Draw the rectangle
             cv2.rectangle(display_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
             
@@ -101,14 +128,35 @@ def draw_rectangle(event, x, y, flags, param):
             cv2.putText(display_image, f"Size: {width}x{height}", (x1, y1-10), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
             
+            # Show normalization mode indicator
+            if normalize_mode:
+                if regions:
+                    cv2.putText(display_image, f"NORMALIZED (Ref: {width}x{height})", 
+                               (10, img.shape[0] - 20), cv2.FONT_HERSHEY_SIMPLEX, 
+                               0.6, (0, 255, 255), 2)
+                else:
+                    cv2.putText(display_image, "NORMALIZED (Draw first region)", 
+                               (10, img.shape[0] - 20), cv2.FONT_HERSHEY_SIMPLEX, 
+                               0.6, (0, 255, 255), 2)
+            
             # Show the updated image
             cv2.imshow("Draw Regions", display_image)
 
     elif event == cv2.EVENT_LBUTTONUP:
         # Finish drawing
         drawing = False
-        # Normalize the coordinates to ensure the region is stored correctly
-        x1, y1, x2, y2 = normalize_region(ix, iy, x, y)
+        
+        # Determine reference size for normalization
+        reference_size = None
+        if normalize_mode and regions:
+            # Use the size of the first region as reference
+            first_region = regions[0]
+            ref_width = first_region[2] - first_region[0]
+            ref_height = first_region[3] - first_region[1]
+            reference_size = (ref_width, ref_height)
+        
+        # Normalize the coordinates
+        x1, y1, x2, y2 = normalize_region(ix, iy, x, y, reference_size)
         
         # Get final dimensions
         width = x2 - x1
@@ -116,6 +164,7 @@ def draw_rectangle(event, x, y, flags, param):
         
         # Save the region (x1, y1, x2, y2)
         regions.append([x1, y1, x2, y2])
+        
         # Draw the final rectangle on the original image
         cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
         
@@ -124,7 +173,9 @@ def draw_rectangle(event, x, y, flags, param):
                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
         
         cv2.imshow("Draw Regions", img)
-        print(f"Region added: {[x1, y1, x2, y2]} (Size: {width}x{height})")
+        
+        mode_info = " (Normalized)" if normalize_mode and regions else ""
+        print(f"Region added: {[x1, y1, x2, y2]} (Size: {width}x{height}){mode_info}")
 
 def show_instructions(image):
     """
@@ -140,6 +191,10 @@ def show_instructions(image):
         "3. Press 's' to save regions after last draw",
         "4. Press 'q' to quit and save."
     ]
+    
+    if normalize_mode:
+        instructions.insert(2, "NORMALIZE MODE: All regions same size")
+    
     y_offset = 30
     for line in instructions:
         cv2.putText(image, line, (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
@@ -158,7 +213,17 @@ def validate_regions():
             print(f"Warning: Region {i} has invalid dimensions {width}x{height}")
             return False
     
-    print("All regions validated: dimensions are multiples of 8")
+    # Additional validation for normalize mode
+    if normalize_mode and len(regions) > 1:
+        first_size = (regions[0][2] - regions[0][0], regions[0][3] - regions[0][1])
+        for i, region in enumerate(regions[1:], 1):
+            current_size = (region[2] - region[0], region[3] - region[1])
+            if current_size != first_size:
+                print(f"Warning: Region {i} size {current_size} doesn't match reference size {first_size}")
+                return False
+    
+    print("All regions validated: dimensions are multiples of 8" + 
+          (" and consistent" if normalize_mode else ""))
     return True
 
 def parse_arguments():
@@ -179,6 +244,11 @@ def parse_arguments():
         help='Output JSON file for regions (default: regions.json)'
     )
     parser.add_argument(
+        '-n', '--normalize',
+        action='store_true',
+        help='Normalize all regions to same size (based on first region)'
+    )
+    parser.add_argument(
         '-h', '--help',
         action='store_true',
         help='Show this help message and exit'
@@ -187,7 +257,7 @@ def parse_arguments():
     return parser.parse_args()
 
 def main():
-    global img
+    global img, normalize_mode
 
     # Parse command line arguments
     args = parse_arguments()
@@ -196,6 +266,9 @@ def main():
     if args.help:
         show_help()
         return
+    
+    # Set normalize mode
+    normalize_mode = args.normalize
     
     # Check if file exists
     if not os.path.exists(args.image_path):
@@ -218,12 +291,20 @@ def main():
     print("=== Draw Regions Tool ===")
     print(f"Input image: {args.image_path}")
     print(f"Output file: {args.output}")
+    print(f"Normalize mode: {'ON' if normalize_mode else 'OFF'}")
     print(f"Image dimensions: {img.shape[1]}x{img.shape[0]}")
     print("\nInstructions:")
     print("1. Click and drag to draw a rectangle.")
     print("2. Regions will be automatically adjusted to have width and height as multiples of 8.")
-    print("3. Press 's' to save regions.")
-    print("4. Press 'q' to quit.")
+    
+    if normalize_mode:
+        print("3. NORMALIZE MODE: All regions will have the same size (based on first region)")
+        print("4. Press 's' to save regions.")
+        print("5. Press 'q' to quit.")
+    else:
+        print("3. Press 's' to save regions.")
+        print("4. Press 'q' to quit.")
+    
     print("-" * 40)
 
     output_file = args.output
@@ -246,6 +327,13 @@ def main():
                     with open(output_file, "w") as f:
                         json.dump(regions, f)
                     print(f"Regions saved to {output_file}")
+                    
+                    # Show summary
+                    if normalize_mode and len(regions) > 0:
+                        first_region = regions[0]
+                        ref_width = first_region[2] - first_region[0]
+                        ref_height = first_region[3] - first_region[1]
+                        print(f"All regions normalized to: {ref_width}x{ref_height}")
                 else:
                     print("Warning: Some regions have invalid dimensions. Save cancelled.")
             else:
