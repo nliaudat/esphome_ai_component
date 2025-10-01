@@ -43,6 +43,9 @@ void MeterReaderTFLite::setup() {
     ESP_LOGI(TAG, "Stored original camera dimensions: %dx%d, format: %s", 
              original_camera_width_, original_camera_height_, original_pixel_format_.c_str());
     
+    // Setup output validation
+    setup_output_validation();
+    
     // Setup crop zones - the handler will manage everything
     // Note: crop_zones_global_ is passed via set_crop_zones_global() from the YAML config
     // If we have a global variable, apply its initial value
@@ -55,6 +58,19 @@ void MeterReaderTFLite::setup() {
     if (crop_zone_handler_.get_zones().empty()) {
         ESP_LOGI(TAG, "No crop zones configured, using default zone");
         crop_zone_handler_.set_default_zone(camera_width_, camera_height_);
+    }
+    
+    // Apply camera window configuration if provided 
+    if (camera_window_configured_) {
+        ESP_LOGI(TAG, "Camera window configuration found, will apply after camera setup");
+        // Schedule camera window setup after a delay to ensure camera is ready
+        this->set_timeout(3000, [this]() {
+            ESP_LOGI(TAG, "Applying YAML camera window configuration");
+            if (!this->set_camera_window(camera_window_offset_x_, camera_window_offset_y_, 
+                                       camera_window_width_, camera_window_height_)) {
+                ESP_LOGE(TAG, "Failed to apply camera window from YAML configuration");
+            }
+        });
     }
     
     // Setup camera callback with frame buffer management
@@ -114,6 +130,34 @@ void MeterReaderTFLite::setup() {
         
         
     });
+}
+
+void MeterReaderTFLite::setup_output_validation() {
+    OutputValidator::ValidationConfig validation_config;
+    validation_config.allow_negative_rates = allow_negative_rates_;
+    validation_config.max_absolute_diff = max_absolute_diff_;
+    validation_config.max_rate_change = 0.15f; // 15% maximum change per reading
+    validation_config.enable_smart_validation = true;
+    validation_config.smart_validation_window = 5;
+    
+    output_validator_.set_config(validation_config);
+    output_validator_.setup();
+    
+    ESP_LOGI(TAG, "Output validation configured - AllowNegativeRates: %s, MaxAbsoluteDiff: %d",
+             allow_negative_rates_ ? "true" : "false", max_absolute_diff_);
+}
+
+bool MeterReaderTFLite::validate_and_update_reading(float raw_reading, float confidence, float& validated_reading) {
+    // Convert to integer for precise validation
+    int int_reading = static_cast<int>(raw_reading);
+    int validated_int_reading = int_reading;
+    
+    bool is_valid = output_validator_.validate_reading(int_reading, confidence, validated_int_reading);
+    
+    // Convert back to float for sensor publishing
+    validated_reading = static_cast<float>(validated_int_reading);
+    
+    return is_valid;
 }
 
 void MeterReaderTFLite::update() {
@@ -288,27 +332,32 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
             float avg_confidence = std::accumulate(confidences.begin(), 
                                                  confidences.end(), 0.0f) / confidences.size();
             
-            // Store the values for template sensors (regardless of threshold)
-            last_reading_ = final_reading;
+            // Validate the reading using output validator
+            float validated_reading = final_reading;
+            bool is_valid = validate_and_update_reading(final_reading, avg_confidence, validated_reading);
+            
+            // Store the values for template sensors
+            last_reading_ = validated_reading;
             last_confidence_ = avg_confidence;
             
-            ESP_LOGI(TAG, "Final reading: %.1f (avg confidence: %.2f, threshold: %.2f)", 
-                    final_reading, avg_confidence, confidence_threshold_);
+            ESP_LOGI(TAG, "Reading: %.1f -> %.1f (valid: %s, confidence: %.2f, threshold: %.2f)", 
+                    final_reading, validated_reading, is_valid ? "yes" : "no", 
+                    avg_confidence, confidence_threshold_);
 
-            // Only publish to sensors if confidence meets threshold
-            if (avg_confidence >= confidence_threshold_) {
+            // Only publish to sensors if confidence meets threshold AND reading is valid
+            if (avg_confidence >= confidence_threshold_ && is_valid) {
                 if (value_sensor_) {
-                    value_sensor_->publish_state(final_reading);
+                    value_sensor_->publish_state(validated_reading);
                 }
                 
                 if (confidence_sensor_ != nullptr) {
                     confidence_sensor_->publish_state(avg_confidence);
                 }
                 
-                ESP_LOGI(TAG, "Reading published - confidence threshold met");
+                ESP_LOGI(TAG, "Reading published - valid and confidence threshold met");
             } else {
-                ESP_LOGW(TAG, "Reading NOT published - confidence %.2f below threshold %.2f", 
-                        avg_confidence, confidence_threshold_);
+                ESP_LOGW(TAG, "Reading NOT published - %s", 
+                        !is_valid ? "validation failed" : "confidence below threshold");
             }
             
             if (debug_mode_) {
@@ -661,7 +710,7 @@ public:
     uint8_t* get_data_buffer() override { return data_.data(); }
     size_t get_data_length() override { return data_.size(); }
     bool was_requested_by(camera::CameraRequester requester) const override { 
-        return false;  // Debug image isn’t tied to requester
+        return false;  // Debug image isn't tied to requester
     }
 
     int get_width() const { return width_; }

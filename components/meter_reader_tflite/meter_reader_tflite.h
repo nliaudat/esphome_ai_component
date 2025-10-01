@@ -20,6 +20,7 @@
 #include "crop_zones.h"
 #include "model_config.h"
 #include "camera_control.h"
+#include "output_validation.h"
 #include <memory>
 #include <vector>
 #include <string>
@@ -173,6 +174,10 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
       return pause_processing_.load(); 
   }
   
+  // Output validation configuration
+  void set_allow_negative_rates(bool allow) { allow_negative_rates_ = allow; }
+  void set_max_absolute_diff(int max_diff) { max_absolute_diff_ = max_diff; }
+  
 #ifdef DEBUG_METER_READER_TFLITE
   void set_debug_image(const uint8_t* data, size_t size);
   void test_with_debug_image();
@@ -198,7 +203,16 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   std::string get_camera_sensor_info() const;
   bool test_camera_after_reset();
   void basic_camera_recovery();
-      
+  
+  
+  // Camera window configuration setters
+  void set_camera_window_offset_x(int offset_x) { camera_window_offset_x_ = offset_x; }
+  void set_camera_window_offset_y(int offset_y) { camera_window_offset_y_ = offset_y; }
+  void set_camera_window_width(int width) { camera_window_width_ = width; }
+  void set_camera_window_height(int height) { camera_window_height_ = height; }
+  void set_camera_window_configured(bool configured) { camera_window_configured_ = configured;
+ 
+ } // end of public   
 
 /** ########### PROTECTED ############# **/
  protected:
@@ -238,6 +252,19 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
    */
   bool process_model_result(const ImageProcessor::ProcessResult& result, float* value, float* confidence);
    
+  /**
+   * @brief Setup output validation with configured parameters
+   */
+  void setup_output_validation();
+  
+  /**
+   * @brief Validate reading using output validator
+   * @param raw_reading The raw reading from model inference
+   * @param confidence The confidence score for the reading
+   * @param validated_reading Output parameter for validated reading
+   * @return true if reading is valid, false otherwise
+   */
+  bool validate_and_update_reading(float raw_reading, float confidence, float& validated_reading);
 
   // Configuration parameters
   int camera_width_{0};                      ///< Camera image width in pixels
@@ -246,6 +273,8 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   float confidence_threshold_{0.7f};         ///< Minimum confidence threshold for valid readings
   size_t tensor_arena_size_requested_{50 * 1024};  ///< Requested tensor arena size
   std::string model_type_{"default"};        ///< Model type identifier
+  bool allow_negative_rates_{false};         ///< Whether to allow negative rate changes
+  int max_absolute_diff_{100};               ///< Maximum absolute difference allowed between readings
 
   // State variables
   size_t tensor_arena_size_actual_{0};       ///< Actual allocated tensor arena size
@@ -267,9 +296,15 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   ModelHandler model_handler_;               ///< TFLite model handling
   std::unique_ptr<ImageProcessor> image_processor_;  ///< Image processing utilities
   CropZoneHandler crop_zone_handler_;        ///< Crop zone management
+  OutputValidator output_validator_;         ///< Output validation and historical data
   MemoryManager::AllocationResult tensor_arena_allocation_;  ///< Tensor arena allocation result
   
-  // globals::GlobalVarComponent<std::string> *crop_zones_global_{nullptr};
+  // Camera window configuration storage
+  int camera_window_offset_x_{0};
+  int camera_window_offset_y_{0};
+  int camera_window_width_{0};
+  int camera_window_height_{0};
+  bool camera_window_configured_{false};
 
 /** ########### PRIVATE ############# **/
  private:

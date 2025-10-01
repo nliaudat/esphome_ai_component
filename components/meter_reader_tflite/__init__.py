@@ -22,14 +22,18 @@ CONF_RAW_DATA_ID = 'raw_data_id'
 CONF_DEBUG = 'debug'
 CONF_DEBUG_IMAGE = 'debug_image'
 CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL = 'debug_image_out_serial'
-CONF_MODEL_TYPE = 'model_type'  # New configuration option for model type
+CONF_MODEL_TYPE = 'model_type' 
+
 CONF_FLASH_LIGHT = 'flash_light'
-# CONF_FLASH_DURATION = 'flash_duration'  # Optional: for duration control
 CONF_FLASH_PRE_TIME = 'flash_pre_time'
 CONF_FLASH_POST_TIME = 'flash_post_time'
+
 CONF_CROP_ZONES = 'crop_zones_global'
+
 CONF_CAMERA_WINDOW = 'camera_window'
-CONF_AUTO_CAMERA_WINDOW = 'auto_camera_window'
+
+CONF_ALLOW_NEGATIVE_RATES = 'allow_negative_rates'
+CONF_MAX_ABSOLUTE_DIFF = 'max_absolute_diff'
 
 meter_reader_tflite_ns = cg.esphome_ns.namespace('meter_reader_tflite')
 MeterReaderTFLite = meter_reader_tflite_ns.class_('MeterReaderTFLite', cg.PollingComponent)
@@ -72,7 +76,6 @@ CONFIG_SCHEMA = cv.Schema({
     # cv.Optional(CONF_FLASH_DURATION, default=2200): cv.positive_int, 
     cv.Optional(CONF_CROP_ZONES): cv.use_id(globals.GlobalsComponent),
     cv.Optional(CONF_CAMERA_WINDOW): cv.Any(
-    cv.boolean,  # Simple enable/disable
     cv.Schema({  # Or detailed configuration
         cv.Optional('offset_x', default=0): cv.int_,
         cv.Optional('offset_y', default=0): cv.int_,
@@ -80,12 +83,14 @@ CONFIG_SCHEMA = cv.Schema({
         cv.Optional('height'): cv.int_,
         })
     ),
-    cv.Optional(CONF_AUTO_CAMERA_WINDOW, default=False): cv.boolean,
+    # cv.Optional(CONF_AUTO_CAMERA_WINDOW, default=False): cv.boolean,
+    cv.Optional(CONF_ALLOW_NEGATIVE_RATES, default=False): cv.boolean,
+    cv.Optional(CONF_MAX_ABSOLUTE_DIFF, default=100): cv.positive_int,
 }).extend(cv.polling_component_schema('60s'))
 
 async def to_code(config):
     """Code generation for the component."""
-    # Add IDF component and build flags
+
     esp32.add_idf_component(
         name="espressif/esp-tflite-micro",
         ref="~1.3.4"
@@ -212,21 +217,24 @@ async def to_code(config):
     if CONF_FLASH_POST_TIME in config:
         cg.add(var.set_flash_post_time(config[CONF_FLASH_POST_TIME]))
     
-        
+
     # Handle optional camera window configuration
-    if config.get(CONF_AUTO_CAMERA_WINDOW):
-        cg.add(var.set_camera_window_from_crop_zones())
-    elif CONF_CAMERA_WINDOW in config:
+    if CONF_CAMERA_WINDOW in config:
         window_config = config[CONF_CAMERA_WINDOW]
-        if isinstance(window_config, bool):
-            if window_config:
-                # camera_window: true is an alias for auto_camera_window: true
-                cg.add(var.set_camera_window_from_crop_zones())
-        elif 'width' in window_config and 'height' in window_config:
-            # Manual window configuration
-            cg.add(var.set_camera_window(
-                window_config.get('offset_x', 0),
-                window_config.get('offset_y', 0),
-                window_config['width'],
-                window_config['height']
-            ))
+        if 'width' in window_config and 'height' in window_config:
+            offset_x = window_config.get('offset_x', 0)
+            offset_y = window_config.get('offset_y', 0)
+            width = window_config['width']
+            height = window_config['height']
+            
+            # Store window configuration as member variables
+            cg.add(var.set_camera_window_offset_x(offset_x))
+            cg.add(var.set_camera_window_offset_y(offset_y))
+            cg.add(var.set_camera_window_width(width))
+            cg.add(var.set_camera_window_height(height))
+            cg.add(var.set_camera_window_configured(True))
+
+
+    # Set validation parameters
+    cg.add(var.set_allow_negative_rates(config[CONF_ALLOW_NEGATIVE_RATES]))
+    cg.add(var.set_max_absolute_diff(config[CONF_MAX_ABSOLUTE_DIFF]))
