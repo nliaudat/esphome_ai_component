@@ -9,9 +9,8 @@
 - MaxRateValue
 - CheckDigitIncreaseConsistency
 
-### 2 : add OV2640 zoom
-- check [idf esp32camera](https://github.com/espressif/esp32-camera/blob/dfeaa71f0aa78e4ed0b82dd9a18aacee1d5a4ced/sensors/ov2640.c#L137)
-- check  [jomjol_controlcamera](https://github.com/jomjol/AI-on-the-edge-device/blob/f3e3ce504e363f104ce5342548383eb892bef132/code/components/jomjol_controlcamera/ClassControllCamera.cpp#L594)
+### 2 : make OV2640 zoom functionnal with non 4:3 images
+- change image processor routine
 
 ### 3 : add image rotation
 - For Jpeg, it's very cpu and memory intensive as the image must be full decoded and then rotated
@@ -20,3 +19,10 @@
 ### 4: Model enhancement
 - [Yolo26](https://docs.ultralytics.com/fr/models/yolo26/)
 - [esp-dl](https://github.com/espressif/esp-dl)
+
+
+## done : 
+
+### 2 : add OV2640 zoom
+- check [idf esp32camera](https://github.com/espressif/esp32-camera/blob/dfeaa71f0aa78e4ed0b82dd9a18aacee1d5a4ced/sensors/ov2640.c#L137)
+- check  [jomjol_controlcamera](https://github.com/jomjol/AI-on-the-edge-device/blob/f3e3ce504e363f104ce5342548383eb892bef132/code/components/jomjol_controlcamera/ClassControllCamera.cpp#L594)

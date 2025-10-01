@@ -23,10 +23,10 @@ api:
               id(meter_reader).set_camera_window(offset_x, offset_y, width, height);
             }
     
-    - service: auto_camera_window
-      then:
-        - lambda: |-
-            id(meter_reader).set_camera_window_from_crop_zones();
+    # - service: auto_camera_window
+      # then:
+        # - lambda: |-
+            # id(meter_reader).set_camera_window_from_crop_zones();
     
     - service: reset_camera_window
       then:

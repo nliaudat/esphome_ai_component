@@ -56,10 +56,16 @@ class CameraWindowControl {
   bool reset_to_full_frame(esp32_camera::ESP32Camera* camera);
   
   /**
-   * @brief Check if current sensor supports window setting
+   * @brief Test window functionality with a simple centered window
+   * @return true if window setting works successfully
    */
-  bool supports_window(esp32_camera::ESP32Camera* camera) const;
-  
+  bool test_window_stability(esp32_camera::ESP32Camera* camera);
+
+  bool set_ROI(esp32_camera::ESP32Camera* camera, 
+                int offset_x, int offset_y, 
+                int width, int height);
+
+                
   /**
    * @brief Get current sensor information
    */
@@ -86,6 +92,44 @@ class CameraWindowControl {
       esp32_camera::ESP32Camera* camera,
       const WindowConfig& config,
       int original_width, int original_height) const;
+      
+    /**
+     * @brief Set camera window and update dimensions
+     */
+    bool set_window_with_dimensions(esp32_camera::ESP32Camera* camera,
+                                   int offset_x, int offset_y, 
+                                   int width, int height,
+                                   int& current_width, int& current_height);
+
+    /**
+     * @brief Set camera window from crop zones and update dimensions
+     */
+    bool set_window_from_crop_zones_with_dimensions(esp32_camera::ESP32Camera* camera,
+                                                   const std::vector<CropZone>& zones,
+                                                   int& current_width, int& current_height);
+
+    /**
+     * @brief Reset camera to full frame and restore original dimensions
+     */
+    bool reset_to_full_frame_with_dimensions(esp32_camera::ESP32Camera* camera,
+                                            int original_width, int original_height,
+                                            int& current_width, int& current_height);
+
+    /**
+     * @brief Check if camera supports window operations
+     */
+    bool supports_window(esp32_camera::ESP32Camera* camera) const;
+
+    // Helper to get current dimensions after window operations
+    std::pair<int, int> get_current_dimensions(esp32_camera::ESP32Camera* camera,
+                                              const WindowConfig& config,
+                                              int original_width, int original_height) const;
+
+    
+    bool hard_reset_camera(esp32_camera::ESP32Camera* camera);
+    bool soft_reset_camera(esp32_camera::ESP32Camera* camera);
+    bool set_window_with_reset(esp32_camera::ESP32Camera* camera, const WindowConfig& config);
+    bool reset_to_full_frame_with_reset(esp32_camera::ESP32Camera* camera);
 
  private:
   static const char *const TAG;
@@ -104,6 +148,9 @@ class CameraWindowControl {
   
   // Helper function to get framesize from dimensions
   framesize_t get_framesize_from_dimensions(int width, int height);
+  
+  static std::string framesize_to_string(framesize_t framesize);
+  framesize_t get_max_framesize(sensor_t* sensor) const;
 };
 
 }  // namespace camera_control

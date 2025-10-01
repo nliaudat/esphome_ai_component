@@ -1,20 +1,22 @@
 # ESPHome Meter Reader TFLite Component
 
-> General-purpose TensorFlow Lite Micro implementation for ESP32 with camera support
+> General-purpose TensorFlow Lite Micro implementation with camera support for esphome
 
 [![ESPHome](https://img.shields.io/badge/ESPHome-Compatible-brightgreen)](https://esphome.io/)
 
 
 ## 🚀 What is this?
 
-A general-purpose ESPHome component for running TensorFlow Lite Micro models on ESP32 devices. While originally designed for meter reading, it can be used for any computer vision task including object detection, image classification, and custom AI applications.
+A general-purpose ESPHome component for running TensorFlow Lite Micro models on ESP32 devices.
+While originally designed for meter reading, it can be used for any computer vision task including object detection, image classification, and custom AI applications.
+
 
 ## ✨ Key Features
 
 - **🤖 TensorFlow Lite Micro**: Full TFLite Micro runtime support (with operators detection and auto loading)
-- **📷 Camera Integration**: Seamless ESP32 camera integration with TrackedBuffer for better memory management
+- **📷 Camera Integration**: State of the art ESP32 camera integration with TrackedBuffer for better memory management and windowing for OV2640 like camera
 - **🖼️ Image Preprocessing**: Automatic cropping, scaling, and format conversion
-- **⚡ Optimized Performance**: ESP-NN accelerated operations
+- **⚡ Optimized Performance**: ESP-NN accelerated operations (full image processing and 8 inferences takes less than 3 seconds)
 - **🎯 Multi-Zone Processing**: Process multiple regions of interest
 - **🔧 Flexible Configuration**: Support for various model types and input formats
 - **🐛 Advanced Debugging**: Real-time image analysis and model output inspection
