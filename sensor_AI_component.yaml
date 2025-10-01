@@ -10,9 +10,15 @@ sensor:
     lambda: |-
       auto reader = id(meter_reader);
       if (reader != nullptr) {
-        return reader->get_last_reading();
+        float reading = reader->get_last_reading();
+        float confidence = reader->get_last_confidence();
+        float threshold = reader->get_confidence_threshold();
+        // Only return readings that meet the component's confidence threshold
+        if (reading > 0.0 && confidence >= threshold) {
+          return reading;
+        }
       }
-      return 0.0;
+      return NAN;  // Will not update the sensor state
 
   - platform: template
     name: "Meter Reading Confidence"
@@ -24,6 +30,12 @@ sensor:
     lambda: |-
       auto reader = id(meter_reader);
       if (reader != nullptr) {
-        return reader->get_last_confidence() * 100.0; // Convert to percentage
+        float confidence = reader->get_last_confidence();
+        float reading = reader->get_last_reading();
+        float threshold = reader->get_confidence_threshold();
+        // Only return confidence for valid readings that meet threshold
+        if (reading > 0.0 && confidence >= threshold) {
+          return confidence * 100.0; // Convert to percentage
+        }
       }
-      return 0.0;
+      return NAN;  // Will not update the sensor state

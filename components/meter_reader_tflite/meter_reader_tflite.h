@@ -26,53 +26,21 @@
 #include <string>
 #include <atomic>
 
-// #include <mutex> // needs CONFIG_FREERTOS_SUPPORT_STATIC_ALLOCATION=y # for frame_mutex_ in meter_reader_tflite.*
-// #include <numeric> // for std::accumulate
-
-
-#define DEBUG_DURATION  ///< Enable duration debugging macros
-
 namespace esphome {
 namespace meter_reader_tflite {
 
-/**
- * @class MeterReaderTFLite
- * @brief Main component class for meter reading using TensorFlow Lite Micro.
- * 
- * This class handles image acquisition from ESP32 camera, preprocessing,
- * TFLite model inference, and result publication to sensors.
- */
 class MeterReaderTFLite : public PollingComponent, public camera::CameraImageReader {
  public:
-  /**
-   * @brief Initialize the component and setup camera callback.
-   */
   void setup() override;
   
   void set_crop_zones_global(globals::GlobalsComponent<std::string> *global_var) {
       crop_zone_handler_.set_crop_zones_global(global_var);
   }
   
-  /**
-   * @brief Periodic update called based on configured interval.
-   * Requests new frame processing if system is ready.
-   */
   void update() override;
-  
-  /**
-   * @brief Main processing loop. Handles frame processing and timeout management.
-   */
   void loop() override;
-  
-  /**
-   * @brief Component destructor. Cleans up resources.
-   */
   ~MeterReaderTFLite() override;
   
-  /**
-   * @brief Get the setup priority for this component.
-   * @return setup_priority::LATE to ensure camera is initialized first
-   */
   float get_setup_priority() const override { return setup_priority::LATE; }
 
   // CameraImageReader implementation
@@ -87,16 +55,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_tensor_arena_size(size_t size_bytes) { tensor_arena_size_requested_ = size_bytes; }
   void set_model(const uint8_t *model, size_t length);
   
-  /**
-   * @brief Set the value sensor for meter readings.
-   * @param sensor Pointer to the sensor component
-   */
   void set_value_sensor(sensor::Sensor *sensor) { value_sensor_ = sensor; }
-  
-  /**
-   * @brief Set the confidence sensor for reading confidence scores.
-   * @param sensor Pointer to the sensor component
-   */
   void set_confidence_sensor(sensor::Sensor *sensor) { confidence_sensor_ = sensor; }
   
   void set_crop_zones(const std::string &zones_json);
@@ -104,61 +63,22 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_camera(esp32_camera::ESP32Camera *camera) { camera_ = camera; }
   void set_model_config(const std::string &model_type);
   
-  /**
-   * @brief Print debug information about component state and memory usage.
-   */
   void print_debug_info();
-  
-  /**
-   * @brief Report current memory status and usage statistics.
-   */
   void report_memory_status();
   
-  /**
-   * @brief Get the number of frames processed.
-   * @return Number of frames processed
-   */
   uint32_t get_frames_processed() const { return frames_processed_; }
-  
-  /**
-   * @brief Get the number of frames skipped.
-   * @return Number of frames skipped
-   */
   uint32_t get_frames_skipped() const { return frames_skipped_; }
-  
-  /**
-   * @brief Get the tensor arena peak usage.
-   * @return Peak memory usage in bytes
-   */
   size_t get_arena_peak_bytes() const { return model_handler_.get_arena_peak_bytes(); }
   
-  /**
-   * @brief Register debug service for external debugging.
-   * @param comp Pointer to this component instance
-   */
   static void register_service(MeterReaderTFLite *comp) {
     comp->print_debug_info();
   }
   
-  /**
-   * @brief Combine individual digit readings into final value.
-   * @param readings Vector of individual digit readings
-   * @return Combined meter reading value
-   */
   float combine_readings(const std::vector<float> &readings);
-  
-  
-  /**
-   * @brief Get the last meter reading value.
-   * @return Last meter reading value
-   */
   float get_last_reading() const { return last_reading_; }
-  
-  /**
-   * @brief Get the last confidence value.
-   * @return Last confidence value (0.0 to 1.0)
-   */
   float get_last_confidence() const { return last_confidence_; }
+  
+  float get_confidence_threshold() const { return confidence_threshold_; }
   
   // Model information getters
   int get_model_input_width() const { return model_handler_.get_input_width(); }
@@ -186,33 +106,24 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void debug_test_with_pattern();
 #endif
 
-  /**
-   * @brief Set the flash light component for illumination during capture.
-   * @param flash_light Pointer to the light state component
-   */
   void set_flash_light(light::LightState* flash_light);
-  
   void set_flash_pre_time(uint32_t pre_time) { flash_pre_time_ = pre_time; }
   void set_flash_post_time(uint32_t post_time) { flash_post_time_ = post_time; }
 
-  // Camera window control methods (simplified interface)
+  // Camera window control methods
   bool set_camera_window(int offset_x, int offset_y, int width, int height);
-  // bool set_camera_window_from_crop_zones();
   bool reset_camera_window();
   bool camera_supports_window() const;
   std::string get_camera_sensor_info() const;
   bool test_camera_after_reset();
   void basic_camera_recovery();
   
-  
   // Camera window configuration setters
   void set_camera_window_offset_x(int offset_x) { camera_window_offset_x_ = offset_x; }
   void set_camera_window_offset_y(int offset_y) { camera_window_offset_y_ = offset_y; }
   void set_camera_window_width(int width) { camera_window_width_ = width; }
   void set_camera_window_height(int height) { camera_window_height_ = height; }
-  void set_camera_window_configured(bool configured) { camera_window_configured_ = configured;
- 
- } // end of public   
+  void set_camera_window_configured(bool configured) { camera_window_configured_ = configured; } 
 
 /** ########### PROTECTED ############# **/
  protected:
