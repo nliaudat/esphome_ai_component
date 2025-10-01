@@ -1,0 +1,152 @@
+debug:
+  update_interval: 5s
+
+text_sensor:
+  - platform: debug
+    device:
+      name: "Device Info"
+    reset_reason:
+      name: "Reset Reason"
+
+sensor:
+  - platform: debug
+    free:
+      name: "Heap Free"
+    # fragmentation:
+      # name: "Heap Fragmentation"
+    block:
+      name: "Heap Max Block"
+    loop_time:
+      name: "Loop Time"
+    psram:
+      name: "Free PSRAM"
+    cpu_frequency:
+      name: "CPU Frequency"
+
+
+
+
+  # CPU Temperature
+  - platform: internal_temperature
+    name: "${id_prefix} CPU Temperature"
+    id: ${id_prefix}_cpu_temperature
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+    device_class: temperature
+    state_class: measurement
+    icon: "mdi:thermometer"
+    update_interval: 5s
+
+  # Memory sensors using correct ESP-IDF functions
+  - platform: template
+    name: "${id_prefix} Free RAM"
+    id: ${id_prefix}_free_ram
+    unit_of_measurement: "B"
+    device_class: data_size
+    state_class: measurement
+    icon: "mdi:memory"
+    update_interval: 5s
+    lambda: |-
+      return heap_caps_get_free_size(MALLOC_CAP_8BIT);
+
+  - platform: template
+    name: "${id_prefix} Total RAM"
+    id: t${id_prefix}_otal_ram
+    unit_of_measurement: "B"
+    device_class: data_size
+    state_class: measurement
+    icon: "mdi:memory"
+    update_interval: 5s
+    lambda: |-
+      return heap_caps_get_total_size(MALLOC_CAP_8BIT);
+
+  - platform: template
+    name: "${id_prefix} Used RAM"
+    id: ${id_prefix}_used_ram
+    unit_of_measurement: "B"
+    device_class: data_size
+    state_class: measurement
+    icon: "mdi:memory"
+    update_interval: 5s
+    lambda: |-
+      return heap_caps_get_total_size(MALLOC_CAP_8BIT) - heap_caps_get_free_size(MALLOC_CAP_8BIT);
+
+  - platform: template
+    name: "${id_prefix} Free RAM Percentage"
+    id: ${id_prefix}_free_ram_percentage
+    unit_of_measurement: "%"
+    device_class: battery
+    state_class: measurement
+    icon: "mdi:memory"
+    update_interval: 5s
+    lambda: |-
+      size_t total = heap_caps_get_total_size(MALLOC_CAP_8BIT);
+      size_t free = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+      if (total > 0) {
+        return (free * 100.0) / total;
+      }
+      return 0;
+
+  # SPIRAM sensors
+  - platform: template
+    name: "${id_prefix} Free SPIRAM"
+    id: ${id_prefix}_free_psram
+    unit_of_measurement: "B"
+    device_class: data_size
+    state_class: measurement
+    icon: "mdi:memory"
+    update_interval: 5s
+    lambda: |-
+      #ifdef BOARD_HAS_PSRAM
+        return heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+      #else
+        return 0;
+      #endif
+
+  - platform: template
+    name: "${id_prefix} Total SPIRAM"
+    id: ${id_prefix}_total_psram
+    unit_of_measurement: "B"
+    device_class: data_size
+    state_class: measurement
+    icon: "mdi:memory"
+    update_interval: 5s
+    lambda: |-
+      #ifdef BOARD_HAS_PSRAM
+        return heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
+      #else
+        return 0;
+      #endif
+
+  - platform: template
+    name: "${id_prefix} Used SPIRAM"
+    id: ${id_prefix}_used_psram
+    unit_of_measurement: "B"
+    device_class: data_size
+    state_class: measurement
+    icon: "mdi:memory"
+    update_interval: 5s
+    lambda: |-
+      #ifdef BOARD_HAS_PSRAM
+        return heap_caps_get_total_size(MALLOC_CAP_SPIRAM) - heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+      #else
+        return 0;
+      #endif
+
+  - platform: template
+    name: "${id_prefix} Free SPIRAM Percentage"
+    id: ${id_prefix}_free_psram_percentage
+    unit_of_measurement: "%"
+    device_class: battery
+    state_class: measurement
+    icon: "mdi:memory"
+    update_interval: 5s
+    lambda: |-
+      #ifdef BOARD_HAS_PSRAM
+        size_t total = heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
+        size_t free = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+        if (total > 0) {
+          return (free * 100.0) / total;
+        }
+      #endif
+      return 0;
