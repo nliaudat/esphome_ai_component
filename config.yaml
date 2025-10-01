@@ -89,6 +89,7 @@ packages:
   # board: !include board_freenove_esp32-s3-n8r8.yaml
   board: !include board_AI-On-The-Edge-Cam_Esp32-S3.yaml
   # board: !include board_Seeed_Studio_XIAO_ESP32-S3_sense.yaml
+  debug: !include debug_board.yaml
   
   # AI components
   switch_AI_component: !include switch_AI_component.yaml
