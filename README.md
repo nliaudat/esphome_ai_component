@@ -25,6 +25,8 @@ While originally designed for meter reading, it can be used for any computer vis
 
 ### 1. Installation
 
+***A detailed procedure for setting up is available in [wiki/setup page](https://github.com/nliaudat/esphome_ai_component/wiki/Setup)*** 
+
 Add this to your ESPHome configuration:
 
 ```yaml
