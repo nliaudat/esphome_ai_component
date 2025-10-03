@@ -340,7 +340,7 @@ esp32_camera:
 
 - **TensorFlow Lite Version**: Micro 1.3.4
 - **ESP-NN Optimization**: Enabled by default
-- **Memory Usage**: 512KB tensor arena (configurable)
+- **Memory Usage**: 512KB tensor arena (auto detected by ./tools/check_tflite_model.py or configurable)
 - **Processing Speed**: 10-1000ms per inference (model-dependent)
 - **Supported Operations**: Conv2D, FullyConnected, Pooling, Activation functions, etc.
 - **Input Types**: float32, int8, uint8
@@ -360,7 +360,7 @@ This component is designed to be extensible for various TFLite applications. Con
 
 * Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC-BY-NC-SA)
 * No commercial use
-* The AI model from haverland is under Apache Licence
+* The AI models from [haverland](https://github.com/haverland/Tenth-of-step-of-a-meter-digit) is under Apache Licence
 
 
 ---
