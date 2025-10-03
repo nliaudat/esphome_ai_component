@@ -1,0 +1,134 @@
+# https://community.home-assistant.io/t/esp32-s3-cam-dev-board-on-aliexpress/731795/17
+# Connect to usb near EN/RST, not near BOOT
+
+
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  min_version: 2025.8.0
+  name_add_mac_suffix: False # this appends to 'name' NOT 'friendly_name'
+  # on_loop:
+    # - lambda: |-
+        # if(id(${id_prefix}wifi_component).is_connected()) {
+          # if (id(${id_prefix}espcam_update)) {
+            # id(${id_prefix}espcam).update_camera_parameters();
+            # if(id(${id_prefix}debug)) { id(${id_prefix}espcam).dump_config(); }
+            # id(${id_prefix}espcam_update) = false;
+          # }
+        # }
+
+  project:
+    name: "nliaudat.meter-reader"
+    version: "${revision}.dev"
+  platformio_options:
+    board_build.extra_flags: 
+    - -DBOARD_HAS_PSRAM 
+    - -DTF_LITE_STATIC_MEMORY # for tflite micro
+    - -DTF_LITE_DISABLE_X86_NEON #for tflite micro
+    - -DESP_NN  #use hardware acceleration : https://github.com/espressif/esp-nn (only if using tflite)
+    # build_flags: -DBOARD_HAS_PSRAM -DCORE_DEBUG_LEVEL=0
+    board_build.f_cpu: 240000000L
+    board_build.arduino.memory_type: qio_opi
+    board_build.f_flash: 80000000L
+    board_build.flash_mode: qio
+
+
+substitutions:
+  #board and compilation
+  board: esp32-s3-devkitc-1 
+  framework: esp-idf
+  
+  #Pin definition
+  external_clock_pin: GPIO15
+  external_clock_frequency: 20MHz
+  i2c_pins_sda: GPIO4
+  i2c_pins_scl: GPIO5
+  data_pins: [GPIO11, GPIO9, GPIO8, GPIO10, GPIO12, GPIO18, GPIO17, GPIO16] 
+  vsync_pin: GPIO6
+  href_pin: GPIO7
+  pixel_clock_pin: GPIO13
+  status_led_pin: GPIO02
+  flash_led_pin: GPIO48
+
+
+
+esp32:
+  board: ${board} 
+  # variant: esp32s3 
+  flash_size: 8MB
+  framework:
+    type: ${framework} 
+    version: recommended
+    sdkconfig_options:
+      # CONFIG_COMPILER_OPTIMIZATION_SIZE: y
+      CONFIG_COMPILER_OPTIMIZATION_PERF: y
+      CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: "y"
+      CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
+      CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
+      CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB: "y"
+      CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY: "y"
+      CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP: "y"
+      CONFIG_BT_ALLOCATION_FROM_SPIRAM_FIRST: "y"
+      CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
+      CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: "y"
+      CONFIG_MBEDTLS_SSL_PROTO_TLS1_3: "y"
+      CONFIG_TASK_WDT: "y" # prevents watchdog timeouts
+      CONFIG_TASK_WDT_TIMEOUT_S: "30" # prevents watchdog timeouts
+      CONFIG_TASK_WDT_CHECK_IDLE_TASK_CPU0: "n" # prevents watchdog timeouts
+      ### needed by new jpeg camera : https://github.com/esphome/esphome/pull/9496
+      CONFIG_SPIRAM_SUPPORT: y
+      CONFIG_SPIRAM_USE_CAPS_ALLOC: y
+      CONFIG_SPIRAM_USE_MALLOC: y
+      CONFIG_LOG_DEFAULT_LEVEL: "0" # prevents "ESP-IDF" Guru Meditation Error
+      #CONFIG_LOG_DEFAULT_LEVEL: 0 # prevents "ESP-IDF" Guru Meditation Error
+      # CONFIG_CAMERA_TASK_STACK_SIZE: "4096"
+      CONFIG_CAMERA_TASK_STACK_SIZE: "8192"
+      #### testing 
+      CONFIG_ESP32_DEFAULT_CPU_FREQ_240: y
+      # CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: y
+      CONFIG_FREERTOS_HZ: "1000"
+      CONFIG_ESP32S3_SPIRAM_SUPPORT: y
+      CONFIG_SPIRAM_SPEED_80M: y
+      
+      # https://github.com/espressif/esp32-camera/blob/master/examples/camera_example/sdkconfig.defaults
+    # CONFIG_ESP32_DEFAULT_CPU_FREQ_240=y
+    # CONFIG_ESP32S2_DEFAULT_CPU_FREQ_240=y
+    # CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240=y
+
+    # CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+    # CONFIG_PARTITION_TABLE_OFFSET=0x10000
+
+    # CONFIG_FREERTOS_HZ=1000
+    # CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+    # CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+
+    # CONFIG_SPIRAM_SUPPORT=y
+    # CONFIG_ESP32_SPIRAM_SUPPORT=y
+    # CONFIG_ESP32S2_SPIRAM_SUPPORT=y
+    # CONFIG_ESP32S3_SPIRAM_SUPPORT=y
+    # CONFIG_SPIRAM_SPEED_80M=y
+      
+    
+psram:
+  mode: octal
+  speed: 80MHz
+    
+
+  
+light:
+  - platform: fastled_clockless
+    rgb_order: GRB
+    pin: ${flash_led_pin} #GPIO48
+    num_leds: 1
+    chipset: ws2812
+    name: "${name} Flash LED"
+    id: ${id_prefix}flash
+          
+          
+  - platform: status_led
+    name: "${name} Status LED"
+    id: ${id_prefix}status_led
+    icon: "mdi:alarm-light"
+    restore_mode: ALWAYS_OFF
+    pin: ${status_led_pin}
