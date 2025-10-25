@@ -607,14 +607,6 @@ bool MeterReaderTFLite::load_model() {
         return false;
     }
 
-    // Load the model
-    if (!model_handler_.load_model(model_, model_length_, 
-                                 tensor_arena_allocation_.data.get(), 
-                                 tensor_arena_allocation_.actual_size,
-                                 config)) {
-        ESP_LOGE(TAG, "Failed to load model into interpreter");
-        return false;
-    }
 
     ESP_LOGI(TAG, "Model loaded successfully");
     ESP_LOGI(TAG, "Input dimensions: %dx%dx%d", 
