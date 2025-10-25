@@ -56,7 +56,7 @@ struct ConfigTestResult {
 
 // #endif
 
-constexpr size_t MAX_OPERATORS = 30;
+constexpr size_t MAX_OPERATORS = 100;
 
 class ModelHandler {
  public:

@@ -116,6 +116,8 @@ bool ModelHandler::load_model(const uint8_t *model_data, size_t model_size,
     ESP_LOGD(TAG, "Model subgraph operators: %d", subgraph->operators()->size());
 
 
+/*  
+  ## manual mode 
   static tflite::MicroMutableOpResolver<11> resolver;
 
   TfLiteStatus status = kTfLiteOk;
@@ -130,6 +132,7 @@ bool ModelHandler::load_model(const uint8_t *model_data, size_t model_size,
   if (resolver.AddRelu() != kTfLiteOk) status = kTfLiteError;
   if (resolver.AddSoftmax() != kTfLiteOk) status = kTfLiteError;
   if (resolver.AddLeakyRelu() != kTfLiteOk) status = kTfLiteError;
+  if (resolver.AddMean() != kTfLiteOk) status = kTfLiteError;
   
 
   if (status != kTfLiteOk) {
@@ -138,7 +141,32 @@ bool ModelHandler::load_model(const uint8_t *model_data, size_t model_size,
   }
 
   ESP_LOGD(TAG, "All operations registered successfully");
+ */
+ 
+    // Use dynamic operator registration for debug mode too
+    static tflite::MicroMutableOpResolver<MAX_OPERATORS> resolver;
+    
+    ESP_LOGD(TAG, "Operator codes found in model:");
+    for (size_t i = 0; i < tflite_model_->operator_codes()->size(); ++i) {
+      const auto *op_code = tflite_model_->operator_codes()->Get(i);
+      ESP_LOGD(TAG, "  [%d]: %d (%s)", i, op_code->builtin_code(),
+               tflite::EnumNameBuiltinOperator(op_code->builtin_code()));
+    }
+  
+    std::set<tflite::BuiltinOperator> required_ops;
+    
+    for (size_t i = 0; i < tflite_model_->operator_codes()->size(); ++i) {
+      const auto *op_code = tflite_model_->operator_codes()->Get(i);
+      required_ops.insert(op_code->builtin_code());
+    }
 
+    if (!OpResolverManager::RegisterOps<MAX_OPERATORS>(resolver, required_ops, TAG)) {
+      ESP_LOGE(TAG, "Failed to register operators");
+      return false;
+    }
+
+    ESP_LOGD(TAG, "All operations registered successfully");
+ 
 #else
   // Your existing dynamic registration
   static tflite::MicroMutableOpResolver<MAX_OPERATORS> resolver;
