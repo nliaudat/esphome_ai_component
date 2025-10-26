@@ -258,6 +258,23 @@ bool ModelHandler::validate_model_config() {
         ESP_LOGI(TAG, "    - dim[%d]: %d", i, input->dims->data[i]);
     }
     
+    ESP_LOGI(TAG, "=== QUANTIZATION DIAGNOSTIC ===");
+    ESP_LOGI(TAG, "INPUT: type=%d, scale=%.6f, zp=%d", 
+             input->type, input->params.scale, input->params.zero_point);
+    
+    TfLiteTensor* output = output_tensor();
+    if (output) {
+        ESP_LOGI(TAG, "OUTPUT: type=%d, scale=%.6f, zp=%d", 
+                 output->type, output->params.scale, output->params.zero_point);
+        
+        // Check if output needs dequantization
+        if (output->type == kTfLiteUInt8 || output->type == kTfLiteInt8) {
+            ESP_LOGI(TAG, "OUTPUT IS QUANTIZED - needs dequantization!");
+        } else {
+            ESP_LOGI(TAG, "OUTPUT IS FLOAT - already dequantized");
+        }
+    }
+    
     // Calculate expected size
     size_t expected_size = 1;
     for (int i = 1; i < input->dims->size; i++) {
@@ -270,7 +287,7 @@ bool ModelHandler::validate_model_config() {
         config_.input_size = {input->dims->data[1], input->dims->data[2]};
         config_.input_channels = input->dims->data[3];
     }
-    
+        
     return true;
 }
 
@@ -865,22 +882,34 @@ bool ModelHandler::invoke_model(const uint8_t* input_data, size_t input_size) {
 
     // Handle different input types
     if (input->type == kTfLiteUInt8) {
-        // Quantized model processing
-        const float input_scale = input->params.scale;
-        const int input_zero_point = input->params.zero_point;
-        
-        ESP_LOGD(TAG, "Quantized input - scale: %.6f, zero_point: %d",
-                input_scale, input_zero_point);
-        
+        // For uint8 quantized models, the input is typically the raw pixel values.
+        ESP_LOGD(TAG, "Quantized input (uint8) - scale: %.6f, zero_point: %d",
+                input->params.scale, input->params.zero_point);
         memcpy(input->data.uint8, input_data, input_size);
         
         // Debug log first 5 values
         ESP_LOGD(TAG, "First 5 quantized inputs:");
         for (int i = 0; i < 5 && i < input_size; i++) {
-            ESP_LOGD(TAG, "  [%d]: %u (%.4f)", i, input->data.uint8[i],
-                    (input->data.uint8[i] - input_zero_point) * input_scale);
+            ESP_LOGD(TAG, "  [%d]: %u (dequantized: %.4f)", i, input->data.uint8[i],
+                    (input->data.uint8[i] - input->params.zero_point) * input->params.scale);
         }
-    } 
+    }
+    else if (input->type == kTfLiteInt8) {
+        // For int8 quantized models, convert uint8 pixel values (0-255) to int8 (-128 to 127)
+        ESP_LOGD(TAG, "Quantized input (int8) - scale: %.6f, zero_point: %d",
+                input->params.scale, input->params.zero_point);
+        int8_t* dst = input->data.int8;
+        for (size_t i = 0; i < input_size; i++) {
+            dst[i] = (int8_t)((int)input_data[i] - 128);
+        }
+
+        // Debug log first 5 values
+        ESP_LOGD(TAG, "First 5 quantized inputs:");
+        for (int i = 0; i < 5 && i < input_size; i++) {
+            ESP_LOGD(TAG, "  [%d]: %d (from %u, dequantized: %.4f)", i, dst[i], input_data[i],
+                    (dst[i] - input->params.zero_point) * input->params.scale);
+        }
+    }
     else if (input->type == kTfLiteFloat32) {
         float* dst = input->data.f;
         
@@ -953,24 +982,38 @@ bool ModelHandler::invoke_model(const uint8_t* input_data, size_t input_size) {
     output_size_ = output->dims->data[1];
 
     // Handle quantized outputs
-    if (output->type == kTfLiteUInt8) {
+    if (output->type == kTfLiteUInt8 || output->type == kTfLiteInt8) {
         // Dequantize the outputs
         const float scale = output->params.scale;
         const int zero_point = output->params.zero_point;
         
-        ESP_LOGD(TAG, "Quantized output - scale: %.6f, zero_point: %d", scale, zero_point);
+        ESP_LOGD(TAG, "Quantized output (%s) - scale: %.6f, zero_point: %d",
+                 output->type == kTfLiteUInt8 ? "uint8" : "int8",
+                 scale, zero_point);
         
         // Prepare dequantized output buffer
         dequantized_output_.resize(output_size_);
         
-        for (int i = 0; i < output_size_; i++) {
-            dequantized_output_[i] = (output->data.uint8[i] - zero_point) * scale;
+        if (output->type == kTfLiteUInt8) {
+            for (int i = 0; i < output_size_; i++) {
+                dequantized_output_[i] = (static_cast<float>(output->data.uint8[i]) - zero_point) * scale;
+            }
+        } else { // kTfLiteInt8
+            for (int i = 0; i < output_size_; i++) {
+                dequantized_output_[i] = (static_cast<float>(output->data.int8[i]) - zero_point) * scale;
+            }
         }
         model_output_ = dequantized_output_.data();
         
         ESP_LOGD(TAG, "First 5 dequantized outputs:");
-        for (int i = 0; i < 5 && i < output_size_; i++) {
-            ESP_LOGD(TAG, "  [%d]: %u -> %.6f", i, output->data.uint8[i], dequantized_output_[i]);
+        if (output->type == kTfLiteUInt8) {
+            for (int i = 0; i < 5 && i < output_size_; i++) {
+                ESP_LOGD(TAG, "  [%d]: %u -> %.6f", i, output->data.uint8[i], dequantized_output_[i]);
+            }
+        } else {
+            for (int i = 0; i < 5 && i < output_size_; i++) {
+                ESP_LOGD(TAG, "  [%d]: %d -> %.6f", i, output->data.int8[i], dequantized_output_[i]);
+            }
         }
     } 
     else {
