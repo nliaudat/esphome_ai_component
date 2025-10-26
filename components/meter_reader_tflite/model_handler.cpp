@@ -366,7 +366,7 @@ void ModelHandler::debug_input_pattern() const {
     ESP_LOGD(TAG, "  Looks like -1 to 1 normalized: %s", looks_normalized_neg1_1 ? "YES" : "NO");
 }
 
-ProcessedOutput ModelHandler::process_output(const float* output_data) const {
+/* ProcessedOutput ModelHandler::process_output(const float* output_data) const {
   const int num_classes = output_size_;
   ProcessedOutput result = {0.0f, 0.0f};
   
@@ -549,6 +549,262 @@ ProcessedOutput ModelHandler::process_output(const float* output_data) const {
 
   return result;
 }
+ */
+
+ProcessedOutput ModelHandler::process_output(const float* output_data) const {
+  const int num_classes = output_size_;
+  ProcessedOutput result = {0.0f, 0.0f};
+  
+  if (num_classes <= 0) {
+    ESP_LOGE(TAG, "Invalid number of output classes: %d", num_classes);
+    return result;
+  }
+  
+#ifdef DEBUG_METER_READER_TFLITE
+  // RAW model output
+  ESP_LOGD(TAG, "Raw model outputs before any processing:");
+  for (int i = 0; i < num_classes; i++) {
+      ESP_LOGD(TAG, "  Class %d: %.6f", i, output_data[i]);
+  }
+#endif
+
+  // Debug: log output range
+  float min_val = *std::min_element(output_data, output_data + num_classes);
+  float max_val = *std::max_element(output_data, output_data + num_classes);
+  ESP_LOGD(TAG, "Output range: min=%.6f, max=%.6f", min_val, max_val);
+
+  // Find the max value and its index
+  int max_idx = 0;
+  float max_val_output = output_data[0];
+  for (int i = 1; i < num_classes; i++) {
+    if (output_data[i] > max_val_output) {
+      max_val_output = output_data[i];
+      max_idx = i;
+    }
+  }
+
+  // Process based on output processing method
+  if (config_.output_processing == "direct_class") {
+    result.value = static_cast<float>(max_idx);
+    result.confidence = max_val_output;
+    ESP_LOGD(TAG, "Direct class - Value: %.1f, Confidence: %.6f", 
+             result.value, result.confidence);
+  }
+  else if (config_.output_processing == "softmax") {
+    // Calculate softmax probabilities
+    float sum = 0.0f;
+    std::vector<float> exp_values(num_classes);
+    
+    // Subtract max value for numerical stability
+    float max_val = *std::max_element(output_data, output_data + num_classes);
+    for (int i = 0; i < num_classes; i++) {
+        exp_values[i] = expf(output_data[i] - max_val);
+        sum += exp_values[i];
+    }
+    
+    // Find the class with highest probability after softmax
+    int softmax_max_idx = 0;
+    float softmax_max_val = 0.0f;
+    for (int i = 0; i < num_classes; i++) {
+        float prob = exp_values[i] / sum;
+        if (prob > softmax_max_val) {
+            softmax_max_val = prob;
+            softmax_max_idx = i;
+        }
+    }
+    
+    result.value = static_cast<float>(softmax_max_idx) / config_.scale_factor;
+    result.confidence = softmax_max_val;
+    ESP_LOGD(TAG, "Softmax - Value: %.1f, Confidence: %.6f", 
+             result.value, result.confidence);
+  }
+  else if (config_.output_processing == "logits") { 
+    // Treat raw outputs as logits - just find maximum value
+    result.value = static_cast<float>(max_idx);
+    
+    // **FIXED: Better confidence calculation for logits**
+    // For dequantized QAT models, outputs are typically in reasonable ranges
+    if (min_val >= 0.0f && max_val <= 1.0f) {
+        // Outputs are already in 0-1 range (like probabilities)
+        result.confidence = max_val_output;
+    } else {
+        // True logits with wider range - normalize to 0-1
+        float confidence_range = max_val - min_val;
+        if (confidence_range > 0.001f) {
+            result.confidence = (max_val_output - min_val) / confidence_range;
+        } else {
+            result.confidence = 1.0f;
+        }
+        // Clamp to [0,1] range for safety
+        result.confidence = std::max(0.0f, std::min(1.0f, result.confidence));
+    }
+    
+    // Apply scale factor if configured
+    if (config_.scale_factor != 1.0f) {
+        result.value = result.value / config_.scale_factor;
+    }
+    
+    ESP_LOGD(TAG, "Logits - Value: %.1f, Raw Max: %.6f, Confidence: %.6f", 
+             result.value, max_val_output, result.confidence);
+  }
+  else if (config_.output_processing == "qat_quantized") {
+    // **NEW: Specialized processing for QAT quantized models**
+    // Direct classification with proper confidence handling for dequantized outputs
+    result.value = static_cast<float>(max_idx);
+    
+    // For QAT models after dequantization, outputs are typically in reasonable ranges
+    // Use min-max normalization for confidence with clamping
+    if (max_val > min_val) {
+        result.confidence = (max_val_output - min_val) / (max_val - min_val);
+    } else {
+        result.confidence = 1.0f;
+    }
+    
+    // Clamp to [0,1] range to match Python implementation
+    result.confidence = std::max(0.0f, std::min(1.0f, result.confidence));
+    
+    // Apply scale factor if configured
+    if (config_.scale_factor != 1.0f) {
+        result.value = result.value / config_.scale_factor;
+    }
+    
+    ESP_LOGD(TAG, "QAT Quantized - Value: %.1f, Confidence: %.6f (raw: %.6f)", 
+             result.value, result.confidence, max_val_output);
+  }
+  else if (config_.output_processing == "experimental_scale") {
+    // Experimental: try to handle very negative logits
+    // Scale the outputs to make them more reasonable for softmax
+    std::vector<float> scaled_outputs(num_classes);
+    float scale_factor = 0.1f; // Adjust this based on observed output range
+    
+    for (int i = 0; i < num_classes; i++) {
+      scaled_outputs[i] = output_data[i] * scale_factor;
+    }
+    
+    // Then apply softmax to the scaled values
+    float sum = 0.0f;
+    std::vector<float> exp_values(num_classes);
+    
+    float max_val = *std::max_element(scaled_outputs.begin(), scaled_outputs.end());
+    for (int i = 0; i < num_classes; i++) {
+      exp_values[i] = expf(scaled_outputs[i] - max_val);
+      sum += exp_values[i];
+    }
+    
+    // Find the class with highest probability after softmax
+    int softmax_max_idx = 0;
+    float softmax_max_val = 0.0f;
+    for (int i = 0; i < num_classes; i++) {
+      float prob = exp_values[i] / sum;
+      if (prob > softmax_max_val) {
+        softmax_max_val = prob;
+        softmax_max_idx = i;
+      }
+    }
+    
+    result.value = static_cast<float>(softmax_max_idx) / config_.scale_factor;
+    result.confidence = softmax_max_val;
+    ESP_LOGD(TAG, "Experimental scale - Value: %.1f, Confidence: %.6f", 
+             result.value, result.confidence);
+  }
+  else if (config_.output_processing == "logits_jomjol") {
+    // Exact replication of GetOutClassification() behavior
+    // Simply find the maximum value and return its index (scaled by 10)
+    result.value = static_cast<float>(max_idx) / config_.scale_factor;
+    
+    // For confidence, use the raw maximum value
+    // Original C++ code didn't calculate confidence, so we use raw value
+    result.confidence = max_val_output;
+    
+    ESP_LOGD(TAG, "Logits jomjol - Value: %.1f, Raw Max: %.6f", 
+             result.value, max_val_output);
+  }
+  else if (config_.output_processing == "softmax_jomjol") {
+    // Exact replication of Python script behavior
+    // Always apply softmax first, then find max probability
+    float sum = 0.0f;
+    std::vector<float> exp_values(num_classes);
+    
+    // Subtract max for numerical stability (like TensorFlow does)
+    float max_val = *std::max_element(output_data, output_data + num_classes);
+    for (int i = 0; i < num_classes; i++) {
+        exp_values[i] = expf(output_data[i] - max_val);
+        sum += exp_values[i];
+    }
+    
+    // Find the class with highest probability after softmax
+    int max_idx = 0;
+    float max_prob = 0.0f;
+    for (int i = 0; i < num_classes; i++) {
+        float prob = exp_values[i] / sum;
+        if (prob > max_prob) {
+            max_prob = prob;
+            max_idx = i;
+        }
+    }
+    
+    // Apply scaling (like Python script's default case)
+    result.value = static_cast<float>(max_idx) / config_.scale_factor;
+    result.confidence = max_prob;
+
+#ifdef DEBUG_METER_READER_TFLITE    
+    ESP_LOGD(TAG, "Softmax jomjol probabilities:");
+    for (int i = 0; i < num_classes; i++) {
+        float prob = exp_values[i] / sum;
+        ESP_LOGD(TAG, "  Class %d: %.6f", i, prob);
+    }
+#endif
+    
+    ESP_LOGD(TAG, "Softmax jomjol - Value: %.1f, Confidence: %.6f", 
+             result.value, result.confidence);
+  }
+  else if (config_.output_processing == "auto_detect") {
+    // **NEW: Auto-detect output type based on value ranges**
+    bool looks_like_probabilities = (min_val >= 0.0f && max_val <= 1.0f);
+    bool looks_like_logits = (max_val > 1.0f || min_val < 0.0f);
+    
+    if (looks_like_probabilities) {
+        // Treat as probabilities - use direct classification
+        result.value = static_cast<float>(max_idx);
+        result.confidence = max_val_output;
+        ESP_LOGD(TAG, "Auto-detected probabilities - Value: %.1f, Confidence: %.6f", 
+                 result.value, result.confidence);
+    } else if (looks_like_logits) {
+        // Treat as logits - use direct classification with normalized confidence
+        result.value = static_cast<float>(max_idx);
+        if (max_val > min_val) {
+            result.confidence = (max_val_output - min_val) / (max_val - min_val);
+        } else {
+            result.confidence = 1.0f;
+        }
+        result.confidence = std::max(0.0f, std::min(1.0f, result.confidence));
+        ESP_LOGD(TAG, "Auto-detected logits - Value: %.1f, Confidence: %.6f", 
+                 result.value, result.confidence);
+    } else {
+        // Fallback to direct classification
+        result.value = static_cast<float>(max_idx);
+        result.confidence = max_val_output;
+        ESP_LOGW(TAG, "Auto-detection failed, using direct class - Value: %.1f, Confidence: %.6f", 
+                 result.value, result.confidence);
+    }
+    
+    // Apply scale factor if configured
+    if (config_.scale_factor != 1.0f) {
+        result.value = result.value / config_.scale_factor;
+    }
+  }
+  else {
+    ESP_LOGE(TAG, "Unknown output processing method: %s", 
+             config_.output_processing.c_str());
+    // Default to direct classification
+    result.value = static_cast<float>(max_idx);
+    result.confidence = max_val_output;
+    ESP_LOGW(TAG, "Using default direct classification - Value: %.1f, Confidence: %.6f", 
+             result.value, result.confidence);
+  }
+
+  return result;
+}
 
 bool ModelHandler::invoke_model(const uint8_t* input_data, size_t input_size) {
     DURATION_START();
@@ -566,27 +822,42 @@ bool ModelHandler::invoke_model(const uint8_t* input_data, size_t input_size) {
         // Log more details for debugging
         ESP_LOGE(TAG, "Model input dimensions: %dx%dx%d", 
                  get_input_width(), get_input_height(), get_input_channels());
+        
+        // FIXED: Use correct element size for calculation
+        size_t element_size = (input->type == kTfLiteFloat32) ? sizeof(float) : sizeof(uint8_t);
         ESP_LOGE(TAG, "Expected elements: %zu, Actual elements: %zu", 
-                 static_cast<size_t>(input->bytes) / (input->type == kTfLiteFloat32 ? sizeof(float) : sizeof(uint8_t)),
-                 input_size / (input->type == kTfLiteFloat32 ? sizeof(float) : sizeof(uint8_t)));
+                 static_cast<size_t>(input->bytes) / element_size,
+                 input_size / element_size);
         return false;
     }
   
-  ESP_LOGD(TAG, "Model input dimensions: %dx%dx%d", 
-         get_input_width(), get_input_height(), get_input_channels());
-  ESP_LOGD(TAG, "Provided input size: %zu elements (%zu bytes)", 
-       input_size / sizeof(float), input_size);
-
-  if (input_size != get_input_width() * get_input_height() * get_input_channels() * sizeof(float)) {
-    ESP_LOGE(TAG, "Input dimension mismatch! Expected %d elements, got %zu", 
-         get_input_width() * get_input_height() * get_input_channels(),
-         input_size / sizeof(float));
-    return false;
-  }
+    // FIXED: Proper element count calculation
+    int expected_elements = get_input_width() * get_input_height() * get_input_channels();
+    size_t element_size = (input->type == kTfLiteFloat32) ? sizeof(float) : sizeof(uint8_t);
+    size_t expected_bytes = expected_elements * element_size;
+    
+    ESP_LOGD(TAG, "Input validation: %d elements, %zu bytes expected", expected_elements, expected_bytes);
+    
+    if (input_size != expected_bytes) {
+        // FIXED: Use correct element count in error message
+        size_t actual_elements = input_size / element_size;
+        ESP_LOGE(TAG, "Input dimension mismatch! Expected %d elements (%zu bytes), got %zu elements (%zu bytes)", 
+                 expected_elements, expected_bytes, actual_elements, input_size);
+        ESP_LOGE(TAG, "Model shape: %dx%dx%d, type: %s", 
+                 get_input_width(), get_input_height(), get_input_channels(),
+                 input->type == kTfLiteFloat32 ? "float32" : "uint8");
+        return false;
+    }
     
     // Check if input_data is valid
-    ESP_LOGD(TAG, "Input data info: pointer=%p, size=%zu, tensor bytes=%d", 
-             input_data, input_size, input->bytes);
+    ESP_LOGD(TAG, "Input data info: pointer=%p, size=%zu, tensor bytes=%d, type=%s", 
+             input_data, input_size, input->bytes,
+             input->type == kTfLiteFloat32 ? "float32" : "uint8");
+    
+    // FIXED: Correct element count for debug logging
+    size_t actual_elements = input_size / element_size;
+    ESP_LOGD(TAG, "Provided input size: %zu elements (%zu bytes)", actual_elements, input_size);
+    
     if (input_data == nullptr) {
         ESP_LOGE(TAG, "Input data is null!");
         return false;
@@ -610,21 +881,19 @@ bool ModelHandler::invoke_model(const uint8_t* input_data, size_t input_size) {
                     (input->data.uint8[i] - input_zero_point) * input_scale);
         }
     } 
-  else if (input->type == kTfLiteFloat32) {
-    
-    float* dst = input->data.f;
-    
-    // The loop is replaced with memcpy to fix a buffer overflow.
-    memcpy(dst, input_data, input_size);
+    else if (input->type == kTfLiteFloat32) {
+        float* dst = input->data.f;
+        
+        // The loop is replaced with memcpy to fix a buffer overflow.
+        memcpy(dst, input_data, input_size);
 
-    // Debug logging
-    ESP_LOGD(TAG, "First 5 float32 inputs:");
-    for (int i = 0; i < 5 && i < input_size; i++) {
-      ESP_LOGD(TAG, "  [%d]: %.4f", i, dst[i]);
-    }
+        // Debug logging
+        ESP_LOGD(TAG, "First 5 float32 inputs:");
+        for (int i = 0; i < 5 && i < input_size; i++) {
+            ESP_LOGD(TAG, "  [%d]: %.4f", i, dst[i]);
+        }
 
-    
-    // Add detailed input statistics
+        // Add detailed input statistics
         ESP_LOGD(TAG, "Input tensor statistics (float32, 0-255 range):");
         float sum = 0.0f;
         float min_val = std::numeric_limits<float>::max();
@@ -658,13 +927,13 @@ bool ModelHandler::invoke_model(const uint8_t* input_data, size_t input_size) {
 
         // Debug input pattern
         debug_input_pattern();
-  }
+    }
   
 #ifdef DEBUG_METER_READER_TFLITE
-  ESP_LOGD(TAG, "First 10 input values:");
-  for (int i = 0; i < 10 && i < input_size; i++) {
-    ESP_LOGD(TAG, "  [%d]: %u", i, input_data[i]);
-  }
+    ESP_LOGD(TAG, "First 10 input values:");
+    for (int i = 0; i < 10 && i < input_size; i++) {
+        ESP_LOGD(TAG, "  [%d]: %u", i, input_data[i]);
+    }
 #endif
   
     // Perform inference
@@ -683,27 +952,68 @@ bool ModelHandler::invoke_model(const uint8_t* input_data, size_t input_size) {
     // Set output size FIRST 
     output_size_ = output->dims->data[1];
 
+    // Handle quantized outputs
     if (output->type == kTfLiteUInt8) {
-        // Prepare dequantized output buffer
-        dequantized_output_.resize(output_size_);
+        // Dequantize the outputs
         const float scale = output->params.scale;
         const int zero_point = output->params.zero_point;
+        
+        ESP_LOGD(TAG, "Quantized output - scale: %.6f, zero_point: %d", scale, zero_point);
+        
+        // Prepare dequantized output buffer
+        dequantized_output_.resize(output_size_);
         
         for (int i = 0; i < output_size_; i++) {
             dequantized_output_[i] = (output->data.uint8[i] - zero_point) * scale;
         }
         model_output_ = dequantized_output_.data();
+        
+        ESP_LOGD(TAG, "First 5 dequantized outputs:");
+        for (int i = 0; i < 5 && i < output_size_; i++) {
+            ESP_LOGD(TAG, "  [%d]: %u -> %.6f", i, output->data.uint8[i], dequantized_output_[i]);
+        }
     } 
     else {
         model_output_ = output->data.f;
     }
 
 #ifdef DEBUG_METER_READER_TFLITE
-    //// Log raw output values for debugging
-    // ESP_LOGD(TAG, "Raw output values (%d classes):", output_size_);
-    // for (int i = 0; i < output_size_ && i < 15; i++) {
-        // ESP_LOGD(TAG, "  Output[%d]: %.6f", i, model_output_[i]);
-    // }
+    ESP_LOGD(TAG, "Raw outputs (%d classes):", output_size_);
+    for (int i = 0; i < output_size_ && i < 10; i++) {
+        if (output->type == kTfLiteUInt8) {
+            ESP_LOGD(TAG, "  [%d]: %u (dequantized: %.6f)", i, output->data.uint8[i], model_output_[i]);
+        } else {
+            ESP_LOGD(TAG, "  [%d]: %.6f", i, model_output_[i]);
+        }
+    }
+    
+    // **MOVED DEBUG CODE HERE - after model_output_ is set**
+    ESP_LOGI(TAG, "=== QAT MODEL DEBUG ===");
+    ESP_LOGI(TAG, "Output processing method: %s", config_.output_processing.c_str());
+    ESP_LOGI(TAG, "Scale factor: %.1f", config_.scale_factor);
+    ESP_LOGI(TAG, "Number of classes: %d", output_size_);
+
+    // Log all raw outputs
+    std::string raw_outputs;
+    for (int i = 0; i < output_size_; i++) {
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%.6f ", model_output_[i]);
+        raw_outputs += buf;
+    }
+    ESP_LOGI(TAG, "All outputs: [%s]", raw_outputs.c_str());
+
+    // Find top 3 predictions
+    std::vector<std::pair<float, int>> predictions;
+    for (int i = 0; i < output_size_; i++) {
+        predictions.push_back(std::make_pair(model_output_[i], i));
+    }
+    std::sort(predictions.rbegin(), predictions.rend());
+
+    ESP_LOGI(TAG, "Top 3 predictions:");
+    for (int i = 0; i < 3 && i < output_size_; i++) {
+        ESP_LOGI(TAG, "  %d: value=%d, score=%.6f", 
+                 i, predictions[i].second, predictions[i].first);
+    }
 #endif
     
     // Process the output to get both value and confidence
