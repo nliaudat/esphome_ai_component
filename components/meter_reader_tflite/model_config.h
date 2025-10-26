@@ -8,7 +8,7 @@ namespace esphome {
 namespace meter_reader_tflite {
 
 static const std::unordered_map<std::string, ModelConfig> MODEL_CONFIGS = {
-    {"class100-0180", 
+    {"dig-class100-0180-s2-q", 
         ModelConfig{
             .description = "dig-class100-0180",
             .tensor_arena_size = "512KB", //check_tflite_model.py reports : Total Arena Size: 415.08 KB
@@ -90,7 +90,7 @@ static const std::unordered_map<std::string, ModelConfig> MODEL_CONFIGS = {
     {"digit_recognizer_v4_10cls_RGB", 
         ModelConfig{
             .description = "digit_recognizer_v4_10cls_RGB",
-            .tensor_arena_size = "512KB", //"170KB", //check_tflite_model.py reports : Total Arena Size: 129.56 KB
+            .tensor_arena_size = "170KB", //check_tflite_model.py reports : Total Arena Size: 129.56 KB
             .output_processing = "auto_detect", //qat_quantized, auto_detect
             .scale_factor = 1.0f,
             .input_type = "uint8",  
@@ -129,7 +129,7 @@ static const std::unordered_map<std::string, ModelConfig> MODEL_CONFIGS = {
 };
 
 
-static const ModelConfig DEFAULT_MODEL_CONFIG = MODEL_CONFIGS.at("class100-0180");
+// static const ModelConfig DEFAULT_MODEL_CONFIG = MODEL_CONFIGS.at("dig-class100-0180-s2-q");
 
 }  // namespace meter_reader_tflite
 }  // namespace esphome

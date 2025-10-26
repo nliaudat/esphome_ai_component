@@ -833,6 +833,22 @@ bool ModelHandler::invoke_model(const uint8_t* input_data, size_t input_size) {
 
     TfLiteTensor* input = input_tensor();
     
+
+    
+#ifdef DEBUG_METER_READER_TFLITE
+
+    // Verify input quantization before inference
+    if (!verify_input_quantization(input_data, input_size)) {
+        ESP_LOGW(TAG, "Input quantization verification failed");
+    }
+    
+    // Detailed quantization analysis
+    debug_input_quantization_analysis(input_data, input_size, "pre_inference");
+    
+    // Also debug the input tensor details
+    debug_input_tensor_details();
+#endif
+    
     // Validate input size against the TFLite tensor's expected size in bytes
     if (input_size != static_cast<size_t>(input->bytes)) {
         ESP_LOGE(TAG, "Input size mismatch! Expected %d bytes, got %zu bytes", input->bytes, input_size);
@@ -880,19 +896,29 @@ bool ModelHandler::invoke_model(const uint8_t* input_data, size_t input_size) {
         return false;
     }
 
+#ifdef DEBUG_METER_READER_TFLITE
+    debug_tensor_types(); // Debug tensor types before processing
+    debug_input_data_stats(input_data, input_size); // Debug input data statistics
+#endif
+
     // Handle different input types
     if (input->type == kTfLiteUInt8) {
         // For uint8 quantized models, the input is typically the raw pixel values.
         ESP_LOGD(TAG, "Quantized input (uint8) - scale: %.6f, zero_point: %d",
                 input->params.scale, input->params.zero_point);
+        
+        // DIRECT COPY - no dequantization needed for input!
         memcpy(input->data.uint8, input_data, input_size);
         
         // Debug log first 5 values
         ESP_LOGD(TAG, "First 5 quantized inputs:");
         for (int i = 0; i < 5 && i < input_size; i++) {
-            ESP_LOGD(TAG, "  [%d]: %u (dequantized: %.4f)", i, input->data.uint8[i],
-                    (input->data.uint8[i] - input->params.zero_point) * input->params.scale);
+            ESP_LOGD(TAG, "  [%d]: %u", i, input->data.uint8[i]);
         }
+        
+#ifdef DEBUG_METER_READER_TFLITE
+        debug_quantized_input_details(input, input_size); // Detailed quantized input analysis
+#endif
     }
     else if (input->type == kTfLiteInt8) {
         // For int8 quantized models, convert uint8 pixel values (0-255) to int8 (-128 to 127)
@@ -906,9 +932,12 @@ bool ModelHandler::invoke_model(const uint8_t* input_data, size_t input_size) {
         // Debug log first 5 values
         ESP_LOGD(TAG, "First 5 quantized inputs:");
         for (int i = 0; i < 5 && i < input_size; i++) {
-            ESP_LOGD(TAG, "  [%d]: %d (from %u, dequantized: %.4f)", i, dst[i], input_data[i],
-                    (dst[i] - input->params.zero_point) * input->params.scale);
+            ESP_LOGD(TAG, "  [%d]: %d (from %u)", i, dst[i], input_data[i]);
         }
+        
+#ifdef DEBUG_METER_READER_TFLITE
+        debug_int8_conversion_details(input, input_data, input_size); // Detailed int8 conversion analysis
+#endif
     }
     else if (input->type == kTfLiteFloat32) {
         float* dst = input->data.f;
@@ -963,6 +992,8 @@ bool ModelHandler::invoke_model(const uint8_t* input_data, size_t input_size) {
     for (int i = 0; i < 10 && i < input_size; i++) {
         ESP_LOGD(TAG, "  [%d]: %u", i, input_data[i]);
     }
+    
+    debug_pre_inference_state(); // Debug state before inference
 #endif
   
     // Perform inference
@@ -980,6 +1011,10 @@ bool ModelHandler::invoke_model(const uint8_t* input_data, size_t input_size) {
 
     // Set output size FIRST 
     output_size_ = output->dims->data[1];
+
+#ifdef DEBUG_METER_READER_TFLITE
+    debug_output_tensor_details(output); // Debug output tensor details
+#endif
 
     // Handle quantized outputs
     if (output->type == kTfLiteUInt8 || output->type == kTfLiteInt8) {
@@ -1021,16 +1056,368 @@ bool ModelHandler::invoke_model(const uint8_t* input_data, size_t input_size) {
     }
 
 #ifdef DEBUG_METER_READER_TFLITE
-    ESP_LOGD(TAG, "Raw outputs (%d classes):", output_size_);
-    for (int i = 0; i < output_size_ && i < 10; i++) {
-        if (output->type == kTfLiteUInt8) {
-            ESP_LOGD(TAG, "  [%d]: %u (dequantized: %.6f)", i, output->data.uint8[i], model_output_[i]);
+    debug_raw_outputs(output); // Debug raw outputs before processing
+    debug_qat_model_output(); // QAT-specific debug output
+#endif
+    
+    // Process the output to get both value and confidence
+    processed_output_ = process_output(model_output_);
+    ESP_LOGD(TAG, "Processed output - Value: %.1f, Confidence: %.6f", 
+             processed_output_.value, processed_output_.confidence);
+    
+    DURATION_END("ModelHandler::invoke_model");
+    return true;
+}
+
+#ifdef DEBUG_METER_READER_TFLITE
+
+bool ModelHandler::verify_input_quantization(const uint8_t* input_data, size_t input_size) const {
+    TfLiteTensor* input = input_tensor();
+    if (!input || !input_data) return false;
+    
+    // Check if model expects quantized input
+    if (input->type == kTfLiteUInt8) {
+        // For quantized models, verify input data is in expected range
+        uint8_t min_val = 255;
+        uint8_t max_val = 0;
+        
+        for (size_t i = 0; i < input_size; i++) {
+            min_val = std::min(min_val, input_data[i]);
+            max_val = std::max(max_val, input_data[i]);
+        }
+        
+        ESP_LOGD(TAG, "Quantized input range: [%u, %u]", min_val, max_val);
+        
+        // Check if values are within uint8 range
+        if (max_val > 255) {
+            ESP_LOGW(TAG, "Input values exceed uint8 range");
+            return false;
+        }
+        
+        // Check if zero point is reasonable
+        int zero_point = input->params.zero_point;
+        if (zero_point < 0 || zero_point > 255) {
+            ESP_LOGW(TAG, "Suspicious zero point: %d", zero_point);
+        }
+        
+        return true;
+    }
+    else if (input->type == kTfLiteFloat32) {
+        // For float models, check if values are in reasonable range
+        const float* float_data = reinterpret_cast<const float*>(input_data);
+        size_t float_count = input_size / sizeof(float);
+        
+        float min_val = std::numeric_limits<float>::max();
+        float max_val = std::numeric_limits<float>::lowest();
+        
+        for (size_t i = 0; i < float_count; i++) {
+            min_val = std::min(min_val, float_data[i]);
+            max_val = std::max(max_val, float_data[i]);
+        }
+        
+        ESP_LOGD(TAG, "Float input range: [%.3f, %.3f]", min_val, max_val);
+        
+        // Check if values are normalized (0-1) or in pixel range (0-255)
+        if (max_val > 1.0f && max_val <= 255.0f) {
+            ESP_LOGD(TAG, "Input appears to be in pixel range [0,255]");
+        } else if (max_val <= 1.0f && min_val >= 0.0f) {
+            ESP_LOGD(TAG, "Input appears to be normalized [0,1]");
         } else {
-            ESP_LOGD(TAG, "  [%d]: %.6f", i, model_output_[i]);
+            ESP_LOGW(TAG, "Input range may be unexpected: [%.3f, %.3f]", min_val, max_val);
+        }
+        
+        return true;
+    }
+    
+    return true; // For other types, assume it's fine
+}
+
+void ModelHandler::debug_input_quantization_analysis(const uint8_t* input_data, 
+                                                   size_t input_size,
+                                                   const std::string& stage) const {
+    TfLiteTensor* input = input_tensor();
+    if (!input || !input_data || input_size == 0) return;
+    
+    ESP_LOGI(TAG, "=== INPUT QUANTIZATION ANALYSIS: %s ===", stage.c_str());
+    // ESP_LOGI(TAG, "Input tensor type: %s", tflite_type_to_string(input->type));
+    ESP_LOGI(TAG, "Input quantization: scale=%.6f, zp=%d", 
+             input->params.scale, input->params.zero_point);
+    ESP_LOGI(TAG, "Input size: %zu bytes (%zu elements)", 
+             input_size, input_size / (input->type == kTfLiteFloat32 ? sizeof(float) : 1));
+    
+    // Analyze input data statistics
+    if (input->type == kTfLiteUInt8) {
+        uint8_t min_val = 255;
+        uint8_t max_val = 0;
+        uint32_t sum = 0;
+        int zero_count = 0;
+        
+        for (size_t i = 0; i < input_size; i++) {
+            min_val = std::min(min_val, input_data[i]);
+            max_val = std::max(max_val, input_data[i]);
+            sum += input_data[i];
+            if (input_data[i] == 0) zero_count++;
+        }
+        
+        float mean = static_cast<float>(sum) / input_size;
+        ESP_LOGI(TAG, "Input data stats: min=%u, max=%u, mean=%.1f", min_val, max_val, mean);
+        ESP_LOGI(TAG, "Zero values: %d/%zu (%.1f%%)", zero_count, input_size, 
+                 (zero_count * 100.0f) / input_size);
+        
+        // Check against expected quantization
+        const float expected_scale = 0.003922f; // 1/255
+        const int expected_zp = 0;
+        
+        bool scale_match = fabs(input->params.scale - expected_scale) < 0.0001f;
+        bool zp_match = (input->params.zero_point == expected_zp);
+        
+        if (scale_match && zp_match) {
+            ESP_LOGI(TAG, "✓ Quantization matches expected (scale=1/255, zp=0)");
+        } else {
+            ESP_LOGW(TAG, "⚠️ Quantization differs from expected");
+            ESP_LOGW(TAG, "  Expected: scale=%.6f, zp=%d", expected_scale, expected_zp);
+            ESP_LOGW(TAG, "  Actual: scale=%.6f, zp=%d", input->params.scale, input->params.zero_point);
+        }
+        
+    } else if (input->type == kTfLiteFloat32) {
+        const float* float_data = reinterpret_cast<const float*>(input_data);
+        size_t float_count = input_size / sizeof(float);
+        
+        float min_val = std::numeric_limits<float>::max();
+        float max_val = std::numeric_limits<float>::lowest();
+        float sum = 0.0f;
+        int zero_count = 0;
+        
+        for (size_t i = 0; i < float_count; i++) {
+            min_val = std::min(min_val, float_data[i]);
+            max_val = std::max(max_val, float_data[i]);
+            sum += float_data[i];
+            if (float_data[i] == 0.0f) zero_count++;
+        }
+        
+        float mean = sum / float_count;
+        ESP_LOGI(TAG, "Input data stats: min=%.3f, max=%.3f, mean=%.3f", min_val, max_val, mean);
+        ESP_LOGI(TAG, "Zero values: %d/%zu (%.1f%%)", zero_count, float_count, 
+                 (zero_count * 100.0f) / float_count);
+    }
+    
+    ESP_LOGI(TAG, "=== END INPUT ANALYSIS ===");
+}
+
+// Add this helper function to model_handler.cpp
+// const char* ModelHandler::tflite_type_to_string(TfLiteType type) const {
+    // switch (type) {
+        // case kTfLiteFloat32: return "FLOAT32";
+        // case kTfLiteInt32: return "INT32";
+        // case kTfLiteUInt8: return "UINT8";
+        // case kTfLiteInt8: return "INT8";
+        // case kTfLiteInt64: return "INT64";
+        // case kTfLiteString: return "STRING";
+        // case kTfLiteBool: return "BOOL";
+        // case kTfLiteInt16: return "INT16";
+        // case kTfLiteComplex64: return "COMPLEX64";
+        // case kTfLiteComplex128: return "COMPLEX128";
+        // case kTfLiteFloat16: return "FLOAT16";
+        // case kTfLiteFloat64: return "FLOAT64";
+        // default: return "UNKNOWN";
+    // }
+// }
+
+void ModelHandler::debug_input_tensor_details() const {
+    TfLiteTensor* input = input_tensor();
+    if (!input) return;
+    
+    ESP_LOGI(TAG, "=== INPUT TENSOR DETAILS ===");
+    ESP_LOGI(TAG, "Type: %s", tflite_type_to_string(input->type));
+    ESP_LOGI(TAG, "Dimensions: %d", input->dims->size);
+    for (int i = 0; i < input->dims->size; i++) {
+        ESP_LOGI(TAG, "  dim[%d]: %d", i, input->dims->data[i]);
+    }
+    ESP_LOGI(TAG, "Bytes: %zu", input->bytes);
+    ESP_LOGI(TAG, "Quantization: scale=%.6f, zero_point=%d", 
+             input->params.scale, input->params.zero_point);
+    ESP_LOGI(TAG, "=== END TENSOR DETAILS ===");
+}
+
+
+void ModelHandler::debug_tensor_types() const {
+    TfLiteTensor* input = input_tensor();
+    TfLiteTensor* output = output_tensor();
+    
+    ESP_LOGI(TAG, "=== TENSOR TYPE VERIFICATION (vs Python) ===");
+    
+    if (input) {
+        ESP_LOGI(TAG, "INPUT: type=%s, scale=%.6f, zp=%d",
+                 input->type == kTfLiteUInt8 ? "UINT8" : 
+                 input->type == kTfLiteInt8 ? "INT8" : "FLOAT32",
+                 input->params.scale, input->params.zero_point);
+        
+        // Compare with Python expectations
+        if (input->type == kTfLiteUInt8 && std::abs(input->params.scale - 0.003922f) < 0.000001f && input->params.zero_point == 0) {
+            ESP_LOGI(TAG, "✓ INPUT matches Python: UINT8, scale=0.003922, zp=0");
+        } else if (input->type == kTfLiteUInt8) {
+            ESP_LOGI(TAG, "⚠️ INPUT is UINT8 but scale/zp don't match Python exactly");
         }
     }
     
-    // **MOVED DEBUG CODE HERE - after model_output_ is set**
+    if (output) {
+        ESP_LOGI(TAG, "OUTPUT: type=%s, scale=%.6f, zp=%d",
+                 output->type == kTfLiteUInt8 ? "UINT8" : 
+                 output->type == kTfLiteInt8 ? "INT8" : "FLOAT32",
+                 output->params.scale, output->params.zero_point);
+        
+        // Compare with Python expectations  
+        if (output->type == kTfLiteUInt8 && std::abs(output->params.scale - 0.003906f) < 0.000001f && output->params.zero_point == 0) {
+            ESP_LOGI(TAG, "✓ OUTPUT matches Python: UINT8, scale=0.003906, zp=0");
+        } else if (output->type == kTfLiteUInt8) {
+            ESP_LOGI(TAG, "⚠️ OUTPUT is UINT8 but scale/zp don't match Python exactly");
+        }
+    }
+    
+    // Check if this matches your model structure
+    ESP_LOGI(TAG, "Expected from Python analysis:");
+    ESP_LOGI(TAG, "  - Input: UINT8, scale=0.003922, zp=0");
+    ESP_LOGI(TAG, "  - Output: UINT8, scale=0.003906, zp=0");
+}
+
+void ModelHandler::debug_input_data_stats(const uint8_t* input_data, size_t input_size) const {
+    ESP_LOGI(TAG, "=== INPUT DATA STATISTICS ===");
+    
+    if (!input_data || input_size == 0) {
+        ESP_LOGE(TAG, "Invalid input data for statistics");
+        return;
+    }
+    
+    // Calculate statistics
+    uint32_t sum = 0;
+    uint8_t min_val = 255;
+    uint8_t max_val = 0;
+    int zero_count = 0;
+    int low_count = 0;  // < 50
+    int high_count = 0; // > 200
+    
+    for (size_t i = 0; i < input_size; i++) {
+        uint8_t val = input_data[i];
+        sum += val;
+        if (val < min_val) min_val = val;
+        if (val > max_val) max_val = val;
+        if (val == 0) zero_count++;
+        if (val < 50) low_count++;
+        if (val > 200) high_count++;
+    }
+    
+    float mean = static_cast<float>(sum) / input_size;
+    
+    ESP_LOGI(TAG, "Input data range: [%u, %u]", min_val, max_val);
+    ESP_LOGI(TAG, "Input data mean: %.2f", mean);
+    ESP_LOGI(TAG, "Counts - zeros: %d, low (<50): %d, high (>200): %d", 
+             zero_count, low_count, high_count);
+    ESP_LOGI(TAG, "Zero percentage: %.2f%%", (zero_count * 100.0f) / input_size);
+    
+    // Check for potential issues
+    if (zero_count > input_size * 0.3f) {
+        ESP_LOGW(TAG, "⚠️  High zero count - possible preprocessing issue");
+    }
+    if (max_val < 100) {
+        ESP_LOGW(TAG, "⚠️  Low maximum value - image might be too dark");
+    }
+}
+
+void ModelHandler::debug_quantized_input_details(TfLiteTensor* input, size_t input_size) const {
+    ESP_LOGI(TAG, "=== QUANTIZED INPUT ANALYSIS ===");
+    ESP_LOGI(TAG, "Input quantization - scale: %.6f, zero_point: %d",
+             input->params.scale, input->params.zero_point);
+    
+    // Show first 10 values in both quantized and dequantized form
+    ESP_LOGI(TAG, "First 10 input values (quantized -> dequantized):");
+    for (int i = 0; i < 10 && i < input_size; i++) {
+        uint8_t quantized = input->data.uint8[i];
+        float dequantized = (quantized - input->params.zero_point) * input->params.scale;
+        ESP_LOGI(TAG, "  [%d]: %u -> %.6f", i, quantized, dequantized);
+    }
+    
+    // Check if this matches expected Python behavior
+    if (input->params.scale == 0.003922f && input->params.zero_point == 0) {
+        ESP_LOGI(TAG, "✅ Input quantization matches Python preprocessing");
+    } else {
+        ESP_LOGW(TAG, "⚠️  Input quantization differs from Python expectations");
+    }
+}
+
+void ModelHandler::debug_int8_conversion_details(TfLiteTensor* input, const uint8_t* input_data, size_t input_size) const {
+    ESP_LOGI(TAG, "=== INT8 CONVERSION ANALYSIS ===");
+    ESP_LOGI(TAG, "Input quantization - scale: %.6f, zero_point: %d",
+             input->params.scale, input->params.zero_point);
+    
+    // Show conversion examples
+    ESP_LOGI(TAG, "First 10 conversion examples (uint8 -> int8 -> dequantized):");
+    for (int i = 0; i < 10 && i < input_size; i++) {
+        uint8_t original = input_data[i];
+        int8_t converted = input->data.int8[i];
+        float dequantized = (converted - input->params.zero_point) * input->params.scale;
+        ESP_LOGI(TAG, "  [%d]: %u -> %d -> %.6f", i, original, converted, dequantized);
+    }
+}
+
+void ModelHandler::debug_pre_inference_state() const {
+    ESP_LOGI(TAG, "=== PRE-INFERENCE STATE ===");
+    
+    TfLiteTensor* input = input_tensor();
+    if (input) {
+        ESP_LOGI(TAG, "Input tensor ready - type: %s, bytes: %d",
+                 input->type == kTfLiteUInt8 ? "UINT8" : 
+                 input->type == kTfLiteInt8 ? "INT8" : "FLOAT32",
+                 input->bytes);
+    }
+    
+    // Check interpreter state
+    if (interpreter_) {
+        ESP_LOGI(TAG, "Interpreter arena used: %zu bytes", interpreter_->arena_used_bytes());
+    }
+}
+
+void ModelHandler::debug_output_tensor_details(TfLiteTensor* output) const {
+    ESP_LOGI(TAG, "=== OUTPUT TENSOR DETAILS ===");
+    
+    ESP_LOGI(TAG, "Output type: %s", 
+             output->type == kTfLiteFloat32 ? "FLOAT32" :
+             output->type == kTfLiteUInt8 ? "UINT8" :
+             output->type == kTfLiteInt8 ? "INT8" : "OTHER");
+    
+    ESP_LOGI(TAG, "Output quantization - scale: %.6f, zero_point: %d",
+             output->params.scale, output->params.zero_point);
+    
+    ESP_LOGI(TAG, "Output dimensions: %d", output->dims->size);
+    for (int i = 0; i < output->dims->size; i++) {
+        ESP_LOGI(TAG, "  dim[%d]: %d", i, output->dims->data[i]);
+    }
+    
+    ESP_LOGI(TAG, "Output size (elements): %d", output_size_);
+}
+
+void ModelHandler::debug_raw_outputs(TfLiteTensor* output) const {
+    ESP_LOGI(TAG, "=== RAW OUTPUTS BEFORE PROCESSING ===");
+    
+    if (output->type == kTfLiteUInt8 || output->type == kTfLiteInt8) {
+        ESP_LOGI(TAG, "Quantized raw outputs (%s):", 
+                 output->type == kTfLiteUInt8 ? "UINT8" : "INT8");
+        
+        for (int i = 0; i < output_size_ && i < 10; i++) {
+            if (output->type == kTfLiteUInt8) {
+                ESP_LOGI(TAG, "  [%d]: %u", i, output->data.uint8[i]);
+            } else {
+                ESP_LOGI(TAG, "  [%d]: %d", i, output->data.int8[i]);
+            }
+        }
+    } else {
+        ESP_LOGI(TAG, "Float raw outputs:");
+        for (int i = 0; i < output_size_ && i < 10; i++) {
+            ESP_LOGI(TAG, "  [%d]: %.6f", i, output->data.f[i]);
+        }
+    }
+}
+
+void ModelHandler::debug_qat_model_output() const {
     ESP_LOGI(TAG, "=== QAT MODEL DEBUG ===");
     ESP_LOGI(TAG, "Output processing method: %s", config_.output_processing.c_str());
     ESP_LOGI(TAG, "Scale factor: %.1f", config_.scale_factor);
@@ -1057,16 +1444,22 @@ bool ModelHandler::invoke_model(const uint8_t* input_data, size_t input_size) {
         ESP_LOGI(TAG, "  %d: value=%d, score=%.6f", 
                  i, predictions[i].second, predictions[i].first);
     }
-#endif
     
-    // Process the output to get both value and confidence
-    processed_output_ = process_output(model_output_);
-    ESP_LOGD(TAG, "Processed output - Value: %.1f, Confidence: %.6f", 
-             processed_output_.value, processed_output_.confidence);
+    // Additional QAT-specific analysis
+    float min_val = *std::min_element(model_output_, model_output_ + output_size_);
+    float max_val = *std::max_element(model_output_, model_output_ + output_size_);
+    ESP_LOGI(TAG, "Output range: min=%.6f, max=%.6f", min_val, max_val);
     
-    DURATION_END("ModelHandler::invoke_model");
-    return true;
+    // Check if outputs look like probabilities or logits
+    bool looks_like_probabilities = (min_val >= 0.0f && max_val <= 1.0f);
+    bool looks_like_logits = (max_val > 1.0f || min_val < 0.0f);
+    
+    ESP_LOGI(TAG, "Output characteristics:");
+    ESP_LOGI(TAG, "  - Looks like probabilities: %s", looks_like_probabilities ? "YES" : "NO");
+    ESP_LOGI(TAG, "  - Looks like logits: %s", looks_like_logits ? "YES" : "NO");
 }
+
+#endif
 
 size_t ModelHandler::get_arena_peak_bytes() const {
   return interpreter_ ? interpreter_->arena_used_bytes() : 0;

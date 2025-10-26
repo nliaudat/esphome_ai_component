@@ -13,13 +13,8 @@
 #include <inttypes.h> // for crc check PRIu32 formatting
 // #endif
 
-
-
-
-
 namespace esphome {
 namespace meter_reader_tflite {
-    
     
 // for model_data.h (not progmem way)
 // extern const uint8_t model_data[];
@@ -52,8 +47,6 @@ struct ConfigTestResult {
     std::vector<float> zone_confidences;
     std::vector<float> zone_values;
 };
-
-
 // #endif
 
 constexpr size_t MAX_OPERATORS = 100;
@@ -143,12 +136,38 @@ class ModelHandler {
   std::vector<ModelConfig> generate_debug_configs() const; 
   void feed_watchdog();
   void verify_model_crc(const uint8_t* model_data, size_t model_size);
-  // uint32_t crc32_runtime(const uint8_t* data, size_t length);
+  
+  // Updated debug function declarations with correct parameters
+  void debug_qat_model_output() const;
+  void debug_raw_outputs(TfLiteTensor* output) const;
+  void debug_output_tensor_details(TfLiteTensor* output) const;
+  void debug_pre_inference_state() const;
+  void debug_int8_conversion_details(TfLiteTensor* input, const uint8_t* input_data, size_t input_size) const;
+  void debug_quantized_input_details(TfLiteTensor* input, size_t input_size) const;
+  void debug_input_data_stats(const uint8_t* input_data, size_t input_size) const;
+  void debug_tensor_types() const;
+  
+  // Additional helper methods for better quantization analysis
+  void debug_quantization_consistency_check() const;
+  void debug_model_performance() const;
+  
+  
+// #endif
+
+// #ifdef DEBUG_METER_READER_TFLITE
+
+    bool verify_input_quantization(const uint8_t* input_data, size_t input_size) const;
+    void debug_input_quantization_analysis(const uint8_t* input_data, 
+                                         size_t input_size,
+                                         const std::string& stage) const;
+    void debug_input_tensor_details() const;
 // #endif
 
  protected:
   ProcessedOutput process_output(const float* output_data) const;
+  ProcessedOutput process_output(const uint8_t* output_data) const;
   bool validate_model_config();
+  void preprocess_input(uint8_t* input_data, size_t input_size);
 
  private:
   const tflite::Model* tflite_model_{nullptr};
