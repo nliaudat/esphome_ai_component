@@ -84,20 +84,20 @@ static const std::unordered_map<std::string, ModelConfig> MODEL_CONFIGS = {
             .input_channels = 1,
             .input_order = "RGB",
             .input_size = {32, 20}, 
-            .normalize = true 
+            .normalize = false 
         }
     },
     {"digit_recognizer_v4_10cls_RGB", 
         ModelConfig{
             .description = "digit_recognizer_v4_10cls_RGB",
-            .tensor_arena_size = "170KB", //check_tflite_model.py reports : Total Arena Size: 129.56 KB
-            .output_processing = "softmax",
+            .tensor_arena_size = "512KB", //"170KB", //check_tflite_model.py reports : Total Arena Size: 129.56 KB
+            .output_processing = "auto_detect", //qat_quantized, auto_detect
             .scale_factor = 1.0f,
             .input_type = "uint8",  
             .input_channels = 3,
             .input_order = "RGB",
             .input_size = {32, 20}, 
-            .normalize = true 
+            .normalize = false 
         }
     },
     {"digit_recognizer_v4_100cls_GRAY", 
@@ -110,7 +110,7 @@ static const std::unordered_map<std::string, ModelConfig> MODEL_CONFIGS = {
             .input_channels = 1,
             .input_order = "RGB",
             .input_size = {32, 20}, 
-            .normalize = true 
+            .normalize = false 
         }
     },
     {"digit_recognizer_v4_100cls_RGB", 
@@ -123,7 +123,7 @@ static const std::unordered_map<std::string, ModelConfig> MODEL_CONFIGS = {
             .input_channels = 3,
             .input_order = "RGB",
             .input_size = {32, 20}, 
-            .normalize = true 
+            .normalize = false 
         }
     }
 };
