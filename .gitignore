@@ -12,3 +12,4 @@ compile.bat
 secrets.yaml
 /components/meter_reader_tflite/__pycache__
 secrets.yaml
+.vscode/settings.json
