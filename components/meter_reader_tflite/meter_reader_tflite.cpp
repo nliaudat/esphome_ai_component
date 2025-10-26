@@ -586,9 +586,9 @@ bool MeterReaderTFLite::load_model() {
             // Keep the existing tensor_arena_size_requested_ value
         }
     } else {
-        config = DEFAULT_MODEL_CONFIG;
-        ESP_LOGW(TAG, "Model type '%s' not found, using default config: %s", 
-                model_type_.c_str(), config.description.c_str());
+        // config = DEFAULT_MODEL_CONFIG;
+        ESP_LOGE(TAG, "Model type '%s' not found", 
+                model_type_.c_str());
     }
 
     // Allocate tensor arena with the determined size
