@@ -313,6 +313,8 @@ class ImageProcessor {
      */
     void arrange_channels(uint8_t* output, uint8_t r, uint8_t g, uint8_t b, 
                          int output_channels) const;
+                         
+    // bool validate_input_for_quantization(const uint8_t* data, size_t size) const;
     
 #ifdef DEBUG_METER_READER_TFLITE
     void debug_log_image(const uint8_t* data, size_t size, 
@@ -350,6 +352,12 @@ class ImageProcessor {
                                                int channels,
                                                const std::string& zone_name,
                                                bool normalized);
+                                               
+    // bool verify_quantization_consistency() const;
+    
+    // void debug_quantization_analysis(const uint8_t* processed_data, 
+                                               // size_t data_size,
+                                               // const std::string& stage);
                                               
 
     

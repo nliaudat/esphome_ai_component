@@ -22,7 +22,7 @@ CONF_RAW_DATA_ID = 'raw_data_id'
 CONF_DEBUG = 'debug'
 CONF_DEBUG_IMAGE = 'debug_image'
 CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL = 'debug_image_out_serial'
-CONF_MODEL_TYPE = 'model_type' 
+# CONF_MODEL_TYPE = 'model_type' 
 
 CONF_FLASH_LIGHT = 'flash_light'
 CONF_FLASH_PRE_TIME = 'flash_pre_time'
@@ -57,7 +57,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(MeterReaderTFLite),
     cv.Required(CONF_MODEL): cv.file_,
     cv.Required(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera),
-    cv.Optional(CONF_MODEL_TYPE, default="class100-0180"): cv.string,  # Add model type selection
+    # cv.Optional(CONF_MODEL_TYPE, default="class100-0180"): cv.string,  # Add model type selection
     cv.Optional(CONF_CONFIDENCE_THRESHOLD, default=0.7): cv.float_range(
         min=0.0, max=1.0
     ),
@@ -122,11 +122,16 @@ async def to_code(config):
 
     cam = await cg.get_variable(config[CONF_CAMERA_ID])
     cg.add(var.set_camera(cam))
-    
-    # Set model type from configuration
-    cg.add(var.set_model_config(config[CONF_MODEL_TYPE]))
-    
+      
+    # Extract model type from filename (without extension)
     model_path = config[CONF_MODEL]
+    model_filename = os.path.basename(model_path)
+    model_type = os.path.splitext(model_filename)[0]  # Remove .tflite extension
+       
+    # Set model type from extracted filename
+    cg.add(var.set_model_config(model_type))
+    
+    # model_path = config[CONF_MODEL]
     
     # Read the model file as binary data
     with open(model_path, "rb") as f:
@@ -147,9 +152,9 @@ async def to_code(config):
     # The actual size will be determined from model_config.h in the C++ code
     if CONF_TENSOR_ARENA_SIZE in config:
         cg.add(var.set_tensor_arena_size(config[CONF_TENSOR_ARENA_SIZE]))
-    else:
-        # Default will be handled in the C++ code based on model type from model_config.h
-        cg.add(var.set_tensor_arena_size(512 * 1024))  # 512KB default fallback
+    # else:
+        # # Default will be handled in the C++ code based on model type from model_config.h
+        # cg.add(var.set_tensor_arena_size(512 * 1024))  # 512KB default fallback
     
     # Get camera resolution from substitutions
     width, height = 640, 480  # Defaults

@@ -908,6 +908,11 @@ bool ImageProcessor::process_rgb888_crop_and_scale_to_uint8(
         }
     }
     
+    // Validate quantization after processing
+    // if (!validate_input_for_quantization(output_buffer, model_width * model_height * model_channels)) {
+        // ESP_LOGW(TAG, "Quantization validation failed for processed zone");
+    // }
+    
 /* #ifdef DEBUG_METER_READER_TFLITE
     // Use output_buffer instead of float_output for uint8 processing
     DEBUG_ZONE_INFO(zone, crop_width, crop_height, model_width, model_height);
@@ -1232,7 +1237,38 @@ void ImageProcessor::arrange_channels(float* output, uint8_t r, uint8_t g, uint8
         float gray = 0.299f * r + 0.587f * g + 0.114f * b;
         output[0] = normalize ? gray / 255.0f : gray;
     }
+    
+    
+    if (model_handler_->is_model_quantized() && !normalize) {
+        // The model expects uint8 but we're feeding float - this might be the issue!
+        ESP_LOGW(TAG, "Model expects quantized input but processing as float32");
+    }
 }
+
+/* bool ImageProcessor::validate_input_for_quantization(const uint8_t* data, size_t size) const {
+    if (!model_handler_->is_model_quantized()) {
+        return true; // No quantization check needed for float models
+    }
+    
+    // Check if input data is properly quantized
+    uint8_t min_val = 255;
+    uint8_t max_val = 0;
+    
+    for (size_t i = 0; i < size; i++) {
+        min_val = std::min(min_val, data[i]);
+        max_val = std::max(max_val, data[i]);
+    }
+    
+    ESP_LOGD(TAG, "Quantized input range: [%u, %u]", min_val, max_val);
+    
+    // For uint8 models, values should typically be in 0-255 range
+    if (max_val > 255) {
+        ESP_LOGW(TAG, "Input values exceed uint8 range");
+        return false;
+    }
+    
+    return true;
+} */
 
 void ImageProcessor::arrange_channels(uint8_t* output, uint8_t r, uint8_t g, uint8_t b, 
                                     int output_channels) const {
@@ -1540,6 +1576,84 @@ void ImageProcessor::debug_output_float_preview(const float* data,
     
     ESP_LOGI(TAG, "FLOAT_PREVIEW_END:%s", zone_name.c_str());
 }
+
+
+/* // quantization consistency checking
+bool ImageProcessor::verify_quantization_consistency() const {
+    TfLiteTensor* input_tensor = model_handler_->input_tensor();
+    if (!input_tensor) return false;
+    
+    // Expected quantization from Python analysis
+    const float expected_scale = 0.003922f;  // 1/255
+    const int expected_zp = 0;
+    
+    float actual_scale = input_tensor->params.scale;
+    int actual_zp = input_tensor->params.zero_point;
+    
+    ESP_LOGI(TAG, "Quantization verification:");
+    ESP_LOGI(TAG, "  Expected: scale=%.6f, zp=%d", expected_scale, expected_zp);
+    ESP_LOGI(TAG, "  Actual: scale=%.6f, zp=%d", actual_scale, actual_zp);
+    
+    // Use tolerance for floating point comparison
+    const float tolerance = 0.0001f;
+    bool scale_match = fabs(actual_scale - expected_scale) < tolerance;
+    bool zp_match = (actual_zp == expected_zp);
+    
+    if (scale_match && zp_match) {
+        ESP_LOGI(TAG, "✓ Quantization parameters match Python expectations");
+        return true;
+    } else {
+        ESP_LOGW(TAG, "⚠️ Quantization parameters differ from Python");
+        if (!scale_match) {
+            ESP_LOGW(TAG, "  Scale difference: %.6f vs %.6f", actual_scale, expected_scale);
+        }
+        if (!zp_match) {
+            ESP_LOGW(TAG, "  Zero point difference: %d vs %d", actual_zp, expected_zp);
+        }
+        return false;
+    }
+}
+
+void ImageProcessor::debug_quantization_analysis(const uint8_t* processed_data, 
+                                               size_t data_size,
+                                               const std::string& stage) {
+    if (!processed_data || data_size == 0) return;
+    
+    TfLiteTensor* input_tensor = model_handler_->input_tensor();
+    if (!input_tensor) return;
+    
+    ESP_LOGI(TAG, "=== QUANTIZATION ANALYSIS: %s ===", stage.c_str());
+    ESP_LOGI(TAG, "Model input type: %s", tflite_type_to_string(input_tensor->type));
+    ESP_LOGI(TAG, "Model quantization: scale=%.6f, zp=%d", 
+             input_tensor->params.scale, input_tensor->params.zero_point);
+    
+    // Analyze processed data
+    uint8_t min_val = 255;
+    uint8_t max_val = 0;
+    uint32_t sum = 0;
+    
+    for (size_t i = 0; i < data_size; i++) {
+        min_val = std::min(min_val, processed_data[i]);
+        max_val = std::max(max_val, processed_data[i]);
+        sum += processed_data[i];
+    }
+    
+    float mean = static_cast<float>(sum) / data_size;
+    
+    ESP_LOGI(TAG, "Processed data: min=%u, max=%u, mean=%.1f", min_val, max_val, mean);
+    ESP_LOGI(TAG, "Expected range: [0, 255] for uint8 models");
+    
+    // Check if data matches model expectations
+    if (input_tensor->type == kTfLiteUInt8) {
+        if (min_val >= 0 && max_val <= 255) {
+            ESP_LOGI(TAG, "✓ Processed data matches uint8 model expectations");
+        } else {
+            ESP_LOGW(TAG, "⚠️ Processed data outside uint8 range");
+        }
+    }
+    
+    ESP_LOGI(TAG, "=== END QUANTIZATION ANALYSIS ===");
+} */
 
 #endif
 

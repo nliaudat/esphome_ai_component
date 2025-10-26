@@ -549,49 +549,46 @@ bool MeterReaderTFLite::load_model() {
     DURATION_START();
     ESP_LOGI(TAG, "Loading TFLite model...");
     
-    // Get model configuration from model_config.h
+    // Get model configuration from model_config.h FIRST
     ModelConfig config;
     auto it = MODEL_CONFIGS.find(model_type_);
     if (it != MODEL_CONFIGS.end()) {
         config = it->second;
         ESP_LOGI(TAG, "Using model config: %s", config.description.c_str());
         
-        // Use tensor arena size from model configuration if not explicitly set
-        if (tensor_arena_size_requested_ == (50 * 1024)) { // If using default
-            // Parse tensor arena size from model config string (e.g., "512KB")
-            std::string arena_size_str = config.tensor_arena_size;
-            size_t multiplier = 1;
-            
-            if (arena_size_str.find("KB") != std::string::npos) {
-                multiplier = 1024;
-                arena_size_str = arena_size_str.substr(0, arena_size_str.length() - 2);
-            } else if (arena_size_str.find("MB") != std::string::npos) {
-                multiplier = 1024 * 1024;
-                arena_size_str = arena_size_str.substr(0, arena_size_str.length() - 2);
-            } else if (arena_size_str.find("B") != std::string::npos) {
-                arena_size_str = arena_size_str.substr(0, arena_size_str.length() - 1);
-            }
-            
-            // Manual string to integer conversion without exceptions
-            const char* str = arena_size_str.c_str();
-            char* end_ptr;
-            long size_value = strtol(str, &end_ptr, 10);
-            
-            // Check if conversion was successful
-            if (end_ptr != str && *end_ptr == '\0' && size_value > 0) {
-                tensor_arena_size_requested_ = size_value * multiplier;
-                ESP_LOGI(TAG, "Using model-specific tensor arena size: %s (%zu bytes)", 
-                        config.tensor_arena_size.c_str(), tensor_arena_size_requested_);
-            } else {
-                ESP_LOGW(TAG, "Failed to parse tensor arena size from config: %s, using default", 
-                        config.tensor_arena_size.c_str());
-                // Keep the default tensor_arena_size_requested_ value
-            }
+        // ALWAYS use tensor arena size from model configuration (override any previous setting)
+        std::string arena_size_str = config.tensor_arena_size;
+        size_t multiplier = 1;
+        
+        if (arena_size_str.find("KB") != std::string::npos) {
+            multiplier = 1024;
+            arena_size_str = arena_size_str.substr(0, arena_size_str.length() - 2);
+        } else if (arena_size_str.find("MB") != std::string::npos) {
+            multiplier = 1024 * 1024;
+            arena_size_str = arena_size_str.substr(0, arena_size_str.length() - 2);
+        } else if (arena_size_str.find("B") != std::string::npos) {
+            arena_size_str = arena_size_str.substr(0, arena_size_str.length() - 1);
+        }
+        
+        // Manual string to integer conversion without exceptions
+        const char* str = arena_size_str.c_str();
+        char* end_ptr;
+        long size_value = strtol(str, &end_ptr, 10);
+        
+        // Check if conversion was successful
+        if (end_ptr != str && *end_ptr == '\0' && size_value > 0) {
+            tensor_arena_size_requested_ = size_value * multiplier;
+            ESP_LOGI(TAG, "Using model-specific tensor arena size: %s (%zu bytes)", 
+                    config.tensor_arena_size.c_str(), tensor_arena_size_requested_);
+        } else {
+            ESP_LOGW(TAG, "Failed to parse tensor arena size from config: %s, using default", 
+                    config.tensor_arena_size.c_str());
+            // Keep the existing tensor_arena_size_requested_ value
         }
     } else {
-        config = DEFAULT_MODEL_CONFIG;
-        ESP_LOGW(TAG, "Model type '%s' not found, using default config: %s", 
-                model_type_.c_str(), config.description.c_str());
+        // config = DEFAULT_MODEL_CONFIG;
+        ESP_LOGE(TAG, "Model type '%s' not found", 
+                model_type_.c_str());
     }
 
     // Allocate tensor arena with the determined size
@@ -601,7 +598,7 @@ bool MeterReaderTFLite::load_model() {
         return false;
     }
 
-    // Load the model
+    // Load the model with the config
     if (!model_handler_.load_model(model_, model_length_, 
                                  tensor_arena_allocation_.data.get(), 
                                  tensor_arena_allocation_.actual_size,
@@ -609,6 +606,7 @@ bool MeterReaderTFLite::load_model() {
         ESP_LOGE(TAG, "Failed to load model into interpreter");
         return false;
     }
+
 
     ESP_LOGI(TAG, "Model loaded successfully");
     ESP_LOGI(TAG, "Input dimensions: %dx%dx%d", 
