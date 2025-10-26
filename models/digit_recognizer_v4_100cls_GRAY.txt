@@ -1,0 +1,76 @@
+
+================================================================================
+TFLITE MODEL COMPREHENSIVE INSPECTION REPORT
+================================================================================
+Model: digit_recognizer_v4_100cls_GRAY.tflite
+Timestamp: 2025-10-26 14:11:52
+TensorFlow Version: 2.20.0
+File Size: 70.55 KB
+
+================================================================================
+MODEL SUMMARY: TFLite Model
+================================================================================
+Layer (type)              Output Shape         Param #         Size (KB) 
+--------------------------------------------------------------------------------
+QUANTIZE_0                [ 1 32 20  1]        0               0.62      
+CONV_2D_1                 [ 1 32 20 20]        100             0.26      
+RELU6_2                   [ 1 32 20 20]        0               0.00      
+MAX_POOL_2D_3             [ 1 16 10 20]        0               0.00      
+CONV_2D_4                 [ 1 16 10 36]        100             0.20      
+RELU6_5                   [ 1 16 10 36]        0               0.00      
+MAX_POOL_2D_6             [ 1  8  5 36]        0               0.00      
+CONV_2D_7                 [ 1  8  5 48]        0               0.20      
+RELU6_8                   [ 1  8  5 48]        0               0.00      
+CONV_2D_9                 [ 1  8  5 56]        0               0.20      
+RELU6_10                  [ 1  8  5 56]        0               0.00      
+MEAN_11                   [ 1 56]              64              0.06      
+FULLY_CONNECTED_12        [ 1 64]              0               0.10      
+RELU6_13                  [ 1 64]              0               0.00      
+FULLY_CONNECTED_14        [  1 100]            0               0.10      
+SOFTMAX_15                [  1 100]            0               0.00      
+QUANTIZE_16               [  1 100]            0               0.00      
+DELEGATE_17               [ 1 32 20 20]        100             0.26      
+DELEGATE_18               [ 1 16 10 36]        100             0.20      
+DELEGATE_19               [ 1  8  5 48]        0               0.20      
+DELEGATE_20               [ 1  8  5 56]        0               0.20      
+DELEGATE_21               [ 1 64]              0               0.16      
+DELEGATE_22               [  1 100]            0               0.10      
+--------------------------------------------------------------------------------
+Total params: 464
+Total memory: 2.83 KB
+Total operations: 23
+
+================================================================================
+INPUT/OUTPUT SUMMARY
+================================================================================
+Input 0:  [ 1 32 20  1]   <class 'numpy.uint8'>
+Output 0: [  1 100]       <class 'numpy.uint8'>
+
+================================================================================
+MEMORY USAGE ANALYSIS
+================================================================================
+Tensor Name                    Shape                Dtype      Elements     Memory (KB) 
+--------------------------------------------------------------------------------
+tfl.pseudo_qconst5             [56  3  3 48]        <class 'numpy.int8'> 24,192       23.62       
+tfl.pseudo_qconst7             [48  3  3 36]        <class 'numpy.int8'> 15,552       15.19       
+digit_recognizer_v4_grayscal   [ 1 32 20 20]        <class 'numpy.int8'> 12,800       12.50       
+digit_recognizer_v4_grayscal   [ 1 32 20 20]        <class 'numpy.int8'> 12,800       12.50       
+tfl.pseudo_qconst9             [36  3  3 20]        <class 'numpy.int8'> 6,480        6.33        
+tfl.pseudo_qconst1             [100  64]            <class 'numpy.int8'> 6,400        6.25        
+digit_recognizer_v4_grayscal   [ 1 16 10 36]        <class 'numpy.int8'> 5,760        5.62        
+digit_recognizer_v4_grayscal   [ 1 16 10 36]        <class 'numpy.int8'> 5,760        5.62        
+tfl.pseudo_qconst3             [64 56]              <class 'numpy.int8'> 3,584        3.50        
+digit_recognizer_v4_grayscal   [ 1 16 10 20]        <class 'numpy.int8'> 3,200        3.12        
+digit_recognizer_v4_grayscal   [ 1  8  5 56]        <class 'numpy.int8'> 2,240        2.19        
+digit_recognizer_v4_grayscal   [ 1  8  5 56]        <class 'numpy.int8'> 2,240        2.19        
+digit_recognizer_v4_grayscal   [ 1  8  5 48]        <class 'numpy.int8'> 1,920        1.88        
+digit_recognizer_v4_grayscal   [ 1  8  5 48]        <class 'numpy.int8'> 1,920        1.88        
+digit_recognizer_v4_grayscal   [ 1  8  5 36]        <class 'numpy.int8'> 1,440        1.41        
+serving_default_input:0        [ 1 32 20  1]        <class 'numpy.uint8'> 640          0.62        
+tfl.quantize                   [ 1 32 20  1]        <class 'numpy.int8'> 640          0.62        
+tfl.pseudo_qconst              [100]                <class 'numpy.int32'> 100          0.39        
+tfl.pseudo_qconst2             [64]                 <class 'numpy.int32'> 64           0.25        
+tfl.pseudo_qconst4             [56]                 <class 'numpy.int32'> 56           0.22        
+--------------------------------------------------------------------------------
+Total Memory Usage: 106.97 KB
+Number of Tensors: 31
