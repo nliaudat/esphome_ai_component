@@ -1238,6 +1238,10 @@ void ImageProcessor::arrange_channels(float* output, uint8_t r, uint8_t g, uint8
         output[0] = normalize ? gray / 255.0f : gray;
     }
     
+#ifdef DEBUG_METER_READER_TFLITE    
+    ESP_LOGD(TAG, "Channel‑swap debug: raw(R,G,B)=(%d,%d,%d) → stored(%d,%d,%d)",
+             r, g, b, output[0], output[1], output[2]);
+#endif             
     
     if (model_handler_->is_model_quantized() && !normalize) {
         // The model expects uint8 but we're feeding float - this might be the issue!
