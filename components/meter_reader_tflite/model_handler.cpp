@@ -342,29 +342,36 @@ void ModelHandler::debug_input_pattern() const {
 }
 
 
-ProcessedOutput ModelHandler::process_output(const float* output_data) const {
+
+ProcessedOutput ModelHandler::process_output(const float *output_data) const {
   const int num_classes = output_size_;
   ProcessedOutput result = {0.0f, 0.0f};
-  
+
   if (num_classes <= 0) {
     ESP_LOGE(TAG, "Invalid number of output classes: %d", num_classes);
     return result;
   }
-  
+
+  /* -----------------------------------------------------------------------
+   *  DEBUG: raw model output before any processing
+   * ----------------------------------------------------------------------- */
 #ifdef DEBUG_METER_READER_TFLITE
-  // RAW model output
   ESP_LOGD(TAG, "Raw model outputs before any processing:");
   for (int i = 0; i < num_classes; i++) {
-      ESP_LOGD(TAG, "  Class %d: %.6f", i, output_data[i]);
+    ESP_LOGD(TAG, "  Class %d: %.6f", i, output_data[i]);
   }
 #endif
 
-  // Debug: log output range
+  /* -----------------------------------------------------------------------
+   *  Debug: output range
+   * ----------------------------------------------------------------------- */
   float min_val = *std::min_element(output_data, output_data + num_classes);
   float max_val = *std::max_element(output_data, output_data + num_classes);
   ESP_LOGD(TAG, "Output range: min=%.6f, max=%.6f", min_val, max_val);
 
-  // Find the max value and its index
+  /* -----------------------------------------------------------------------
+   *  Find the index of the maximum value (used by several branches)
+   * ----------------------------------------------------------------------- */
   int max_idx = 0;
   float max_val_output = output_data[0];
   for (int i = 1; i < num_classes; i++) {
@@ -374,223 +381,292 @@ ProcessedOutput ModelHandler::process_output(const float* output_data) const {
     }
   }
 
-  // Process based on output processing method
+  /* -----------------------------------------------------------------------
+   *  Process according to the selected output_processing mode
+   * ----------------------------------------------------------------------- */
   if (config_.output_processing == "direct_class") {
+    /* ---------------------------------------------------------------
+     *  Direct class – the tensor already contains the class index.
+     * --------------------------------------------------------------- */
     result.value = static_cast<float>(max_idx);
     result.confidence = max_val_output;
-    ESP_LOGD(TAG, "Direct class - Value: %.1f, Confidence: %.6f", 
+    ESP_LOGD(TAG,
+             "Direct class - Value: %.1f, Confidence: %.6f",
              result.value, result.confidence);
-  }
-  else if (config_.output_processing == "softmax") {
-    // Calculate softmax probabilities
+
+  } else if (config_.output_processing == "softmax") {
+    /* ---------------------------------------------------------------
+     *  Soft-max – compute probabilities from raw logits.
+     * --------------------------------------------------------------- */
+    float max_logit = *std::max_element(output_data,
+                                        output_data + num_classes);
+    std::vector<float> exp_vals(num_classes);
     float sum = 0.0f;
-    std::vector<float> exp_values(num_classes);
-    
-    // Subtract max value for numerical stability
-    float max_val = *std::max_element(output_data, output_data + num_classes);
     for (int i = 0; i < num_classes; i++) {
-        exp_values[i] = expf(output_data[i] - max_val);
-        sum += exp_values[i];
+      exp_vals[i] = expf(output_data[i] - max_logit);
+      sum += exp_vals[i];
     }
-    
-    // Find the class with highest probability after softmax
+
     int softmax_max_idx = 0;
     float softmax_max_val = 0.0f;
     for (int i = 0; i < num_classes; i++) {
-        float prob = exp_values[i] / sum;
-        if (prob > softmax_max_val) {
-            softmax_max_val = prob;
-            softmax_max_idx = i;
-        }
-    }
-    
-    result.value = static_cast<float>(softmax_max_idx) / config_.scale_factor;
-    result.confidence = softmax_max_val;
-    ESP_LOGD(TAG, "Softmax - Value: %.1f, Confidence: %.6f", 
-             result.value, result.confidence);
-  }
-  else if (config_.output_processing == "logits") { 
-    // Treat raw outputs as logits - just find maximum value
-    result.value = static_cast<float>(max_idx);
-    
-    // **FIXED: Better confidence calculation for logits**
-    // For dequantized QAT models, outputs are typically in reasonable ranges
-    if (min_val >= 0.0f && max_val <= 1.0f) {
-        // Outputs are already in 0-1 range (like probabilities)
-        result.confidence = max_val_output;
-    } else {
-        // True logits with wider range - normalize to 0-1
-        float confidence_range = max_val - min_val;
-        if (confidence_range > 0.001f) {
-            result.confidence = (max_val_output - min_val) / confidence_range;
-        } else {
-            result.confidence = 1.0f;
-        }
-        // Clamp to [0,1] range for safety
-        result.confidence = std::max(0.0f, std::min(1.0f, result.confidence));
-    }
-    
-    // Apply scale factor if configured
-    if (config_.scale_factor != 1.0f) {
-        result.value = result.value / config_.scale_factor;
-    }
-    
-    ESP_LOGD(TAG, "Logits - Value: %.1f, Raw Max: %.6f, Confidence: %.6f", 
-             result.value, max_val_output, result.confidence);
-  }
-  else if (config_.output_processing == "qat_quantized") {
-    // **NEW: Specialized processing for QAT quantized models**
-    // Direct classification with proper confidence handling for dequantized outputs
-    result.value = static_cast<float>(max_idx);
-    
-    // For QAT models after dequantization, outputs are typically in reasonable ranges
-    // Use min-max normalization for confidence with clamping
-    if (max_val > min_val) {
-        result.confidence = (max_val_output - min_val) / (max_val - min_val);
-    } else {
-        result.confidence = 1.0f;
-    }
-    
-    // Clamp to [0,1] range to match Python implementation
-    result.confidence = std::max(0.0f, std::min(1.0f, result.confidence));
-    
-    // Apply scale factor if configured
-    if (config_.scale_factor != 1.0f) {
-        result.value = result.value / config_.scale_factor;
-    }
-    
-    ESP_LOGD(TAG, "QAT Quantized - Value: %.1f, Confidence: %.6f (raw: %.6f)", 
-             result.value, result.confidence, max_val_output);
-  }
-  else if (config_.output_processing == "experimental_scale") {
-    // Experimental: try to handle very negative logits
-    // Scale the outputs to make them more reasonable for softmax
-    std::vector<float> scaled_outputs(num_classes);
-    float scale_factor = 0.1f; // Adjust this based on observed output range
-    
-    for (int i = 0; i < num_classes; i++) {
-      scaled_outputs[i] = output_data[i] * scale_factor;
-    }
-    
-    // Then apply softmax to the scaled values
-    float sum = 0.0f;
-    std::vector<float> exp_values(num_classes);
-    
-    float max_val = *std::max_element(scaled_outputs.begin(), scaled_outputs.end());
-    for (int i = 0; i < num_classes; i++) {
-      exp_values[i] = expf(scaled_outputs[i] - max_val);
-      sum += exp_values[i];
-    }
-    
-    // Find the class with highest probability after softmax
-    int softmax_max_idx = 0;
-    float softmax_max_val = 0.0f;
-    for (int i = 0; i < num_classes; i++) {
-      float prob = exp_values[i] / sum;
+      float prob = exp_vals[i] / sum;
       if (prob > softmax_max_val) {
         softmax_max_val = prob;
         softmax_max_idx = i;
       }
     }
-    
+
     result.value = static_cast<float>(softmax_max_idx) / config_.scale_factor;
     result.confidence = softmax_max_val;
-    ESP_LOGD(TAG, "Experimental scale - Value: %.1f, Confidence: %.6f", 
+    ESP_LOGD(TAG,
+             "Softmax - Value: %.1f, Confidence: %.6f",
              result.value, result.confidence);
-  }
-  else if (config_.output_processing == "logits_jomjol") {
-    // Exact replication of GetOutClassification() behavior
-    // Simply find the maximum value and return its index (scaled by 10)
-    result.value = static_cast<float>(max_idx) / config_.scale_factor;
-    
-    // For confidence, use the raw maximum value
-    // Original C++ code didn't calculate confidence, so we use raw value
-    result.confidence = max_val_output;
-    
-    ESP_LOGD(TAG, "Logits jomjol - Value: %.1f, Raw Max: %.6f", 
-             result.value, max_val_output);
-  }
-  else if (config_.output_processing == "softmax_jomjol") {
-    // Exact replication of Python script behavior
-    // Always apply softmax first, then find max probability
-    float sum = 0.0f;
-    std::vector<float> exp_values(num_classes);
-    
-    // Subtract max for numerical stability (like TensorFlow does)
-    float max_val = *std::max_element(output_data, output_data + num_classes);
-    for (int i = 0; i < num_classes; i++) {
-        exp_values[i] = expf(output_data[i] - max_val);
-        sum += exp_values[i];
-    }
-    
-    // Find the class with highest probability after softmax
-    int max_idx = 0;
-    float max_prob = 0.0f;
-    for (int i = 0; i < num_classes; i++) {
-        float prob = exp_values[i] / sum;
-        if (prob > max_prob) {
-            max_prob = prob;
-            max_idx = i;
-        }
-    }
-    
-    // Apply scaling (like Python script's default case)
-    result.value = static_cast<float>(max_idx) / config_.scale_factor;
-    result.confidence = max_prob;
 
-#ifdef DEBUG_METER_READER_TFLITE    
+  } else if (config_.output_processing == "logits") {
+    /* ---------------------------------------------------------------
+     *  Logits – raw scores, need a confidence derived from the range.
+     * --------------------------------------------------------------- */
+    result.value = static_cast<float>(max_idx);
+
+    /* ----- Better confidence calculation for logits ----- */
+    if (min_val >= 0.0f && max_val <= 1.0f) {
+      /* Values already in 0-1 range (behave like probabilities). */
+      result.confidence = max_val_output;
+    } else {
+      /* Wider range – normalise to 0-1. */
+      float confidence_range = max_val - min_val;
+      if (confidence_range > 0.001f) {
+        result.confidence = (max_val_output - min_val) / confidence_range;
+      } else {
+        result.confidence = 1.0f;
+      }
+      result.confidence = std::max(0.0f,
+                                   std::min(1.0f, result.confidence));
+    }
+
+    /* Apply optional scale factor (used for 100-class models). */
+    if (config_.scale_factor != 1.0f) {
+      result.value = result.value / config_.scale_factor;
+    }
+
+    ESP_LOGD(TAG,
+             "Logits - Value: %.1f, Raw Max: %.6f, Confidence: %.6f",
+             result.value, max_val_output, result.confidence);
+
+  } else if (config_.output_processing == "qat_quantized") {
+    /* ---------------------------------------------------------------
+     *  QAT-quantized – de-quantised output, treat similarly to logits
+     *  but clamp confidence to [0,1].
+     * --------------------------------------------------------------- */
+    result.value = static_cast<float>(max_idx);
+
+    if (max_val > min_val) {
+      result.confidence = (max_val_output - min_val) / (max_val - min_val);
+    } else {
+      result.confidence = 1.0f;
+    }
+    result.confidence = std::max(0.0f,
+                                 std::min(1.0f, result.confidence));
+
+    if (config_.scale_factor != 1.0f) {
+      result.value = result.value / config_.scale_factor;
+    }
+
+    ESP_LOGD(TAG,
+             "QAT Quantized - Value: %.1f, Confidence: %.6f (raw: %.6f)",
+             result.value, result.confidence, max_val_output);
+
+  } else if (config_.output_processing == "experimental_scale") {
+    /* ---------------------------------------------------------------
+     *  Experimental – scale logits before soft-max (helps very negative
+     *  values).  The scale factor can be tuned per model.
+     * --------------------------------------------------------------- */
+    const float scale_factor = 0.1f;   // tweak if needed
+    std::vector<float> scaled(num_classes);
+    for (int i = 0; i < num_classes; ++i) {
+      scaled[i] = output_data[i] * scale_factor;
+    }
+
+    float max_scaled = *std::max_element(scaled.begin(), scaled.end());
+    std::vector<float> exp_vals(num_classes);
+    float sum = 0.0f;
+    for (int i = 0; i < num_classes; ++i) {
+      exp_vals[i] = expf(scaled[i] - max_scaled);
+      sum += exp_vals[i];
+    }
+
+    int exp_max_idx = 0;
+    float exp_max_val = 0.0f;
+    for (int i = 0; i < num_classes; ++i) {
+      float prob = exp_vals[i] / sum;
+      if (prob > exp_max_val) {
+        exp_max_val = prob;
+        exp_max_idx = i;
+      }
+    }
+
+    result.value = static_cast<float>(exp_max_idx) / config_.scale_factor;
+    result.confidence = exp_max_val;
+    ESP_LOGD(TAG,
+             "Experimental scale - Value: %.1f, Confidence: %.6f",
+             result.value, result.confidence);
+
+  } else if (config_.output_processing == "logits_jomjol") {
+    /* ---------------------------------------------------------------
+     *  Logits Jomjol – same as “logits” but confidence is the raw max.
+     * --------------------------------------------------------------- */
+    result.value = static_cast<float>(max_idx) / config_.scale_factor;
+    result.confidence = max_val_output;   // raw max as confidence
+    ESP_LOGD(TAG,
+             "Logits jomjol - Value: %.1f, Raw Max: %.6f",
+             result.value, max_val_output);
+
+  } else if (config_.output_processing == "softmax_jomjol") {
+    /* ---------------------------------------------------------------
+     *  Softmax Jomjol – replicate the Python script: always apply soft-max,
+     *  then take the arg-max.
+     * --------------------------------------------------------------- */
+    float max_logit = *std::max_element(output_data,
+                                        output_data + num_classes);
+    std::vector<float> exp_vals(num_classes);
+    float sum = 0.0f;
+    for (int i = 0; i < num_classes; ++i) {
+      exp_vals[i] = expf(output_data[i] - max_logit);
+      sum += exp_vals[i];
+    }
+
+    int sm_max_idx = 0;
+    float sm_max_val = 0.0f;
+    for (int i = 0; i < num_classes; ++i) {
+      float prob = exp_vals[i] / sum;
+      if (prob > sm_max_val) {
+        sm_max_val = prob;
+        sm_max_idx = i;
+      }
+    }
+
+    result.value = static_cast<float>(sm_max_idx) / config_.scale_factor;
+    result.confidence = sm_max_val;
+
+#ifdef DEBUG_METER_READER_TFLITE
     ESP_LOGD(TAG, "Softmax jomjol probabilities:");
-    for (int i = 0; i < num_classes; i++) {
-        float prob = exp_values[i] / sum;
-        ESP_LOGD(TAG, "  Class %d: %.6f", i, prob);
+    for (int i = 0; i < num_classes; ++i) {
+      float prob = exp_vals[i] / sum;
+      ESP_LOGD(TAG, "  Class %d: %.6f", i, prob);
     }
 #endif
-    
-    ESP_LOGD(TAG, "Softmax jomjol - Value: %.1f, Confidence: %.6f", 
+
+    ESP_LOGD(TAG,
+             "Softmax jomjol - Value: %.1f, Confidence: %.6f",
              result.value, result.confidence);
-  }
-  else if (config_.output_processing == "auto_detect") {
-    // **NEW: Auto-detect output type based on value ranges**
-    bool looks_like_probabilities = (min_val >= 0.0f && max_val <= 1.0f);
-    bool looks_like_logits = (max_val > 1.0f || min_val < 0.0f);
-    
-    if (looks_like_probabilities) {
-        // Treat as probabilities - use direct classification
-        result.value = static_cast<float>(max_idx);
-        result.confidence = max_val_output;
-        ESP_LOGD(TAG, "Auto-detected probabilities - Value: %.1f, Confidence: %.6f", 
-                 result.value, result.confidence);
-    } else if (looks_like_logits) {
-        // Treat as logits - use direct classification with normalized confidence
-        result.value = static_cast<float>(max_idx);
-        if (max_val > min_val) {
-            result.confidence = (max_val_output - min_val) / (max_val - min_val);
-        } else {
-            result.confidence = 1.0f;
+
+  } else if (config_.output_processing == "auto_detect") {
+    /* ---------------------------------------------------------------
+     *  AUTO-DETECT – decide at run-time whether the tensor already
+     *  contains probabilities, a one-hot class index, or raw logits.
+     * --------------------------------------------------------------- */
+    // ---- gather basic statistics ------------------------------------------------
+    float min_val_ad = output_data[0];
+    float max_val_ad = output_data[0];
+    float sum_ad     = 0.0f;
+    int   non_zero_ad = 0;
+
+    for (int i = 0; i < num_classes; ++i) {
+      float v = output_data[i];
+      if (v < min_val_ad) min_val_ad = v;
+      if (v > max_val_ad) max_val_ad = v;
+      sum_ad += v;
+      if (std::fabs(v) > 1e-6f) ++non_zero_ad;
+    }
+
+    // ---- heuristic 1: already-normalised probabilities -------------------------
+    bool looks_like_probs_ad =
+        (min_val_ad >= 0.0f && max_val_ad <= 1.0f &&
+         std::fabs(sum_ad - 1.0f) <= 0.05f);
+
+    // ---- heuristic 2: one-hot class index ------------------------------------
+    bool looks_like_one_hot_ad = (non_zero_ad == 1 && max_val_ad >= 0.5f);
+
+    // ---- heuristic 3: treat everything else as logits -------------------------
+    bool looks_like_logits_ad = !looks_like_probs_ad && !looks_like_one_hot_ad;
+
+    ESP_LOGI(TAG,
+             "AUTO-DETECT: min=%.3f max=%.3f sum=%.3f nz=%d => probs=%s one_hot=%s logits=%s",
+             min_val_ad, max_val_ad, sum_ad, non_zero_ad,
+             looks_like_probs_ad ? "YES" : "NO",
+             looks_like_one_hot_ad ? "YES" : "NO",
+             looks_like_logits_ad ? "YES" : "NO");
+
+    if (looks_like_probs_ad) {
+      // ----- Already soft-maxed probabilities -----
+      int max_idx_ad = 0;
+      float max_prob_ad = output_data[0];
+      for (int i = 1; i < num_classes; ++i) {
+        if (output_data[i] > max_prob_ad) {
+          max_prob_ad = output_data[i];
+          max_idx_ad = i;
         }
-        result.confidence = std::max(0.0f, std::min(1.0f, result.confidence));
-        ESP_LOGD(TAG, "Auto-detected logits - Value: %.1f, Confidence: %.6f", 
-                 result.value, result.confidence);
+      }
+      result.value      = static_cast<float>(max_idx_ad) / config_.scale_factor;
+      result.confidence = max_prob_ad;
+      ESP_LOGD(TAG,
+               "Auto-detect (softmax): value=%.1f confidence=%.6f",
+               result.value, result.confidence);
+    } else if (looks_like_one_hot_ad) {
+      // ----- Direct class index (one-hot) -----
+      int class_id_ad = 0;
+      for (int i = 0; i < num_classes; ++i) {
+        if (std::fabs(output_data[i]) > 0.5f) {
+          class_id_ad = i;
+          break;
+        }
+      }
+      result.value      = static_cast<float>(class_id_ad) / config_.scale_factor;
+      result.confidence = 1.0f;   // no probability info, assume full confidence
+      ESP_LOGD(TAG,
+               "Auto-detect (direct): value=%.1f confidence=1.0",
+               result.value);
     } else {
-        // Fallback to direct classification
-        result.value = static_cast<float>(max_idx);
-        result.confidence = max_val_output;
-        ESP_LOGW(TAG, "Auto-detection failed, using direct class - Value: %.1f, Confidence: %.6f", 
-                 result.value, result.confidence);
+      // ----- Raw logits – compute soft-max ourselves -----
+      float max_logit_ad = *std::max_element(output_data,
+                                            output_data + num_classes);
+      std::vector<float> exp_vals_ad(num_classes);
+      float exp_sum_ad = 0.0f;
+      for (int i = 0; i < num_classes; ++i) {
+        exp_vals_ad[i] = expf(output_data[i] - max_logit_ad);
+        exp_sum_ad    += exp_vals_ad[i];
+      }
+
+      int   max_idx_ad = 0;
+      float max_prob_ad = exp_vals_ad[0] / exp_sum_ad;
+      for (int i = 1; i < num_classes; ++i) {
+        float prob = exp_vals_ad[i] / exp_sum_ad;
+        if (prob > max_prob_ad) {
+          max_prob_ad = prob;
+          max_idx_ad = i;
+        }
+      }
+
+      result.value      = static_cast<float>(max_idx_ad) / config_.scale_factor;
+      result.confidence = max_prob_ad;
+      ESP_LOGD(TAG,
+               "Auto-detect (logits): value=%.1f confidence=%.6f",
+               result.value, result.confidence);
     }
-    
-    // Apply scale factor if configured
-    if (config_.scale_factor != 1.0f) {
-        result.value = result.value / config_.scale_factor;
-    }
-  }
-  else {
-    ESP_LOGE(TAG, "Unknown output processing method: %s", 
+
+  } else {
+    /* ---------------------------------------------------------------
+     *  Unknown processing method – fall back to direct classification.
+     * --------------------------------------------------------------- */
+    ESP_LOGE(TAG,
+             "Unknown output processing method: %s",
              config_.output_processing.c_str());
-    // Default to direct classification
+
     result.value = static_cast<float>(max_idx);
     result.confidence = max_val_output;
-    ESP_LOGW(TAG, "Using default direct classification - Value: %.1f, Confidence: %.6f", 
+    ESP_LOGW(TAG,
+             "Fallback to direct classification - Value: %.1f, Confidence: %.6f",
              result.value, result.confidence);
   }
 
@@ -904,7 +980,19 @@ bool ModelHandler::invoke_model(const uint8_t* input_data, size_t input_size) {
         float* dst = input->data.f;
         
         // The loop is replaced with memcpy to fix a buffer overflow.
+        // memcpy(dst, input_data, input_size);
+
+
+    if (config_.normalize) {
+        // Convert 0-255 → 0-1
+        for (size_t i = 0; i < input_size / sizeof(float); ++i) {
+            dst[i] = static_cast<float>(input_data[i]) / 255.0f;
+        }
+    } else {
         memcpy(dst, input_data, input_size);
+    }
+     
+        
 
         // Debug logging
         ESP_LOGD(TAG, "First 5 float32 inputs:");
