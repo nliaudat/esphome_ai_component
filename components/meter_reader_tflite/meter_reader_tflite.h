@@ -124,6 +124,8 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_camera_window_width(int width) { camera_window_width_ = width; }
   void set_camera_window_height(int height) { camera_window_height_ = height; }
   void set_camera_window_configured(bool configured) { camera_window_configured_ = configured; } 
+  
+  void force_flash_inference();
 
 /** ########### PROTECTED ############# **/
  protected:

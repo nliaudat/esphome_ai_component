@@ -1077,5 +1077,56 @@ void MeterReaderTFLite::reinitialize_image_processor() {
     }
 }
 
+void MeterReaderTFLite::force_flash_inference() {
+  // -----------------------------------------------------------------------
+  // Make sure the flash hardware is configured
+  // -----------------------------------------------------------------------
+  if (!flash_light_ || !flash_light_enabled_) {
+    ESP_LOGW(TAG, "Force‑inference requested but flash light is not configured");
+    return;
+  }
+
+  // -----------------------------------------------------------------------
+  // Cancel any pending frame request and clear the “paused” flag
+  // -----------------------------------------------------------------------
+  set_pause_processing(false);          // ensure AI is allowed to run
+  frame_requested_.store(false);
+  frame_available_.store(false);
+  pending_frame_.reset();
+
+  // -----------------------------------------------------------------------
+  // Turn the flash on immediately
+  // -----------------------------------------------------------------------
+  ESP_LOGI(TAG, "Force‑inference: enabling flash");
+  enable_flash_light();                 // protected → we are inside the class
+
+  // -----------------------------------------------------------------------
+  // After 3 seconds request a fresh frame
+  // -----------------------------------------------------------------------
+  const uint32_t FLASH_WAIT_MS = 3000;   // 3 seconds illumination time
+  this->set_timeout(FLASH_WAIT_MS, [this]() {
+    ESP_LOGI(TAG, "Force‑inference: requesting frame after flash warm‑up");
+
+    // Request a frame (same logic that `update()` uses)
+    if (!frame_requested_.load() && !frame_available_.load()) {
+      frame_requested_.store(true);
+      last_request_time_ = millis();
+    }
+
+    // -------------------------------------------------------------------
+    // When the frame has been processed we turn the flash off.
+    //     We don’t know exactly when the processing finishes, so we
+    //     schedule a *short* safety timeout (500 ms) after the request.
+    // -------------------------------------------------------------------
+    const uint32_t SAFETY_TIMEOUT_MS = 500;
+    this->set_timeout(SAFETY_TIMEOUT_MS, [this]() {
+      // If the AI is still busy we simply turn the flash off – the
+      // next normal update will re‑enable it if needed.
+      ESP_LOGI(TAG, "Force‑inference: disabling flash");
+      disable_flash_light();
+    });
+  });
+}
+
 }  // namespace meter_reader_tflite
 }  // namespace esphome

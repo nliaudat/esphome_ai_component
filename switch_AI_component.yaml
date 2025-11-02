@@ -15,3 +15,14 @@ switch:
           if (id(meter_reader) != nullptr) {
             id(meter_reader).set_pause_processing(false);
           }
+
+button:
+  - platform: template
+    name: "Force AI inference"
+    id: force_ai_inference
+    icon: "mdi:arrow-top-bold-hexagon-outline"
+    on_press:
+      - lambda: |-
+          if (id(meter_reader) != nullptr) {
+            id(meter_reader).force_flash_inference(); 
+          }
