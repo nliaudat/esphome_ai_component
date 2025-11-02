@@ -2,8 +2,8 @@
 ================================================================================
 TFLITE MODEL COMPREHENSIVE INSPECTION REPORT
 ================================================================================
-Model: digit_recognizer_v4_10cls_RGB.tflite
-Timestamp: 2025-10-26 14:10:10
+Model: ../models/digit_recognizer_v4_10cls_RGB.tflite
+Timestamp: 2025-11-02 09:05:33
 TensorFlow Version: 2.20.0
 File Size: 79.33 KB
 
@@ -75,3 +75,194 @@ tfl.pseudo_qconst4             [64]                 <class 'numpy.int32'> 64    
 --------------------------------------------------------------------------------
 Total Memory Usage: 129.03 KB
 Number of Tensors: 34
+
+================================================================================
+DETAILED OPERATIONS BREAKDOWN
+================================================================================
+
+OPERATION COUNTS:
+  CONV_2D: 4
+  DELEGATE: 6
+  DEPTHWISE_CONV_2D: 1
+  FULLY_CONNECTED: 2
+  MAX_POOL_2D: 2
+  MEAN: 1
+  QUANTIZE: 2
+  RELU6: 5
+  SOFTMAX: 1
+
+DETAILED OPERATION INFO:
+
+QUANTIZE (index: 0):
+  Input tensors: [0]
+  Output tensors: [16]
+    Input 0: shape=[ 1 32 20  3], dtype=<class 'numpy.uint8'>
+    Output 16: shape=[ 1 32 20  3], dtype=<class 'numpy.int8'>
+
+DEPTHWISE_CONV_2D (index: 1):
+  Input tensors: [16 15 14]
+  Output tensors: [17]
+    Input 16: shape=[ 1 32 20  3], dtype=<class 'numpy.int8'>
+    Input 15: shape=[1 3 3 3], dtype=<class 'numpy.int8'>
+    Input 14: shape=[3], dtype=<class 'numpy.int32'>
+    Output 17: shape=[ 1 32 20  3], dtype=<class 'numpy.int8'>
+
+CONV_2D (index: 2):
+  Input tensors: [17 13 12]
+  Output tensors: [18]
+    Input 17: shape=[ 1 32 20  3], dtype=<class 'numpy.int8'>
+    Input 13: shape=[24  1  1  3], dtype=<class 'numpy.int8'>
+    Input 12: shape=[24], dtype=<class 'numpy.int32'>
+    Output 18: shape=[ 1 32 20 24], dtype=<class 'numpy.int8'>
+
+RELU6 (index: 3):
+  Input tensors: [18]
+  Output tensors: [19]
+    Input 18: shape=[ 1 32 20 24], dtype=<class 'numpy.int8'>
+    Output 19: shape=[ 1 32 20 24], dtype=<class 'numpy.int8'>
+
+MAX_POOL_2D (index: 4):
+  Input tensors: [19]
+  Output tensors: [20]
+    Input 19: shape=[ 1 32 20 24], dtype=<class 'numpy.int8'>
+    Output 20: shape=[ 1 16 10 24], dtype=<class 'numpy.int8'>
+
+CONV_2D (index: 5):
+  Input tensors: [20 11 10]
+  Output tensors: [21]
+    Input 20: shape=[ 1 16 10 24], dtype=<class 'numpy.int8'>
+    Input 11: shape=[40  3  3 24], dtype=<class 'numpy.int8'>
+    Input 10: shape=[40], dtype=<class 'numpy.int32'>
+    Output 21: shape=[ 1 16 10 40], dtype=<class 'numpy.int8'>
+
+RELU6 (index: 6):
+  Input tensors: [21]
+  Output tensors: [22]
+    Input 21: shape=[ 1 16 10 40], dtype=<class 'numpy.int8'>
+    Output 22: shape=[ 1 16 10 40], dtype=<class 'numpy.int8'>
+
+MAX_POOL_2D (index: 7):
+  Input tensors: [22]
+  Output tensors: [23]
+    Input 22: shape=[ 1 16 10 40], dtype=<class 'numpy.int8'>
+    Output 23: shape=[ 1  8  5 40], dtype=<class 'numpy.int8'>
+
+CONV_2D (index: 8):
+  Input tensors: [23  9  8]
+  Output tensors: [24]
+    Input 23: shape=[ 1  8  5 40], dtype=<class 'numpy.int8'>
+    Input 9: shape=[56  3  3 40], dtype=<class 'numpy.int8'>
+    Input 8: shape=[56], dtype=<class 'numpy.int32'>
+    Output 24: shape=[ 1  8  5 56], dtype=<class 'numpy.int8'>
+
+RELU6 (index: 9):
+  Input tensors: [24]
+  Output tensors: [25]
+    Input 24: shape=[ 1  8  5 56], dtype=<class 'numpy.int8'>
+    Output 25: shape=[ 1  8  5 56], dtype=<class 'numpy.int8'>
+
+CONV_2D (index: 10):
+  Input tensors: [25  7  6]
+  Output tensors: [26]
+    Input 25: shape=[ 1  8  5 56], dtype=<class 'numpy.int8'>
+    Input 7: shape=[64  3  3 56], dtype=<class 'numpy.int8'>
+    Input 6: shape=[64], dtype=<class 'numpy.int32'>
+    Output 26: shape=[ 1  8  5 64], dtype=<class 'numpy.int8'>
+
+RELU6 (index: 11):
+  Input tensors: [26]
+  Output tensors: [27]
+    Input 26: shape=[ 1  8  5 64], dtype=<class 'numpy.int8'>
+    Output 27: shape=[ 1  8  5 64], dtype=<class 'numpy.int8'>
+
+MEAN (index: 12):
+  Input tensors: [27  1]
+  Output tensors: [28]
+    Input 27: shape=[ 1  8  5 64], dtype=<class 'numpy.int8'>
+    Input 1: shape=[2], dtype=<class 'numpy.int32'>
+    Output 28: shape=[ 1 64], dtype=<class 'numpy.int8'>
+
+FULLY_CONNECTED (index: 13):
+  Input tensors: [28  5  4]
+  Output tensors: [29]
+    Input 28: shape=[ 1 64], dtype=<class 'numpy.int8'>
+    Input 5: shape=[72 64], dtype=<class 'numpy.int8'>
+    Input 4: shape=[72], dtype=<class 'numpy.int32'>
+    Output 29: shape=[ 1 72], dtype=<class 'numpy.int8'>
+
+RELU6 (index: 14):
+  Input tensors: [29]
+  Output tensors: [30]
+    Input 29: shape=[ 1 72], dtype=<class 'numpy.int8'>
+    Output 30: shape=[ 1 72], dtype=<class 'numpy.int8'>
+
+FULLY_CONNECTED (index: 15):
+  Input tensors: [30  3  2]
+  Output tensors: [31]
+    Input 30: shape=[ 1 72], dtype=<class 'numpy.int8'>
+    Input 3: shape=[10 72], dtype=<class 'numpy.int8'>
+    Input 2: shape=[10], dtype=<class 'numpy.int32'>
+    Output 31: shape=[ 1 10], dtype=<class 'numpy.int8'>
+
+SOFTMAX (index: 16):
+  Input tensors: [31]
+  Output tensors: [32]
+    Input 31: shape=[ 1 10], dtype=<class 'numpy.int8'>
+    Output 32: shape=[ 1 10], dtype=<class 'numpy.int8'>
+
+QUANTIZE (index: 17):
+  Input tensors: [32]
+  Output tensors: [33]
+    Input 32: shape=[ 1 10], dtype=<class 'numpy.int8'>
+    Output 33: shape=[ 1 10], dtype=<class 'numpy.uint8'>
+
+DELEGATE (index: 18):
+  Input tensors: [12 13 14 15 16]
+  Output tensors: [18]
+    Input 12: shape=[24], dtype=<class 'numpy.int32'>
+    Input 13: shape=[24  1  1  3], dtype=<class 'numpy.int8'>
+    Input 14: shape=[3], dtype=<class 'numpy.int32'>
+    Input 15: shape=[1 3 3 3], dtype=<class 'numpy.int8'>
+    Input 16: shape=[ 1 32 20  3], dtype=<class 'numpy.int8'>
+    Output 18: shape=[ 1 32 20 24], dtype=<class 'numpy.int8'>
+
+DELEGATE (index: 19):
+  Input tensors: [10 11 19]
+  Output tensors: [21]
+    Input 10: shape=[40], dtype=<class 'numpy.int32'>
+    Input 11: shape=[40  3  3 24], dtype=<class 'numpy.int8'>
+    Input 19: shape=[ 1 32 20 24], dtype=<class 'numpy.int8'>
+    Output 21: shape=[ 1 16 10 40], dtype=<class 'numpy.int8'>
+
+DELEGATE (index: 20):
+  Input tensors: [ 8  9 22]
+  Output tensors: [24]
+    Input 8: shape=[56], dtype=<class 'numpy.int32'>
+    Input 9: shape=[56  3  3 40], dtype=<class 'numpy.int8'>
+    Input 22: shape=[ 1 16 10 40], dtype=<class 'numpy.int8'>
+    Output 24: shape=[ 1  8  5 56], dtype=<class 'numpy.int8'>
+
+DELEGATE (index: 21):
+  Input tensors: [ 6  7 25]
+  Output tensors: [26]
+    Input 6: shape=[64], dtype=<class 'numpy.int32'>
+    Input 7: shape=[64  3  3 56], dtype=<class 'numpy.int8'>
+    Input 25: shape=[ 1  8  5 56], dtype=<class 'numpy.int8'>
+    Output 26: shape=[ 1  8  5 64], dtype=<class 'numpy.int8'>
+
+DELEGATE (index: 22):
+  Input tensors: [ 1  4  5 27]
+  Output tensors: [29]
+    Input 1: shape=[2], dtype=<class 'numpy.int32'>
+    Input 4: shape=[72], dtype=<class 'numpy.int32'>
+    Input 5: shape=[72 64], dtype=<class 'numpy.int8'>
+    Input 27: shape=[ 1  8  5 64], dtype=<class 'numpy.int8'>
+    Output 29: shape=[ 1 72], dtype=<class 'numpy.int8'>
+
+DELEGATE (index: 23):
+  Input tensors: [ 2  3 30]
+  Output tensors: [31]
+    Input 2: shape=[10], dtype=<class 'numpy.int32'>
+    Input 3: shape=[10 72], dtype=<class 'numpy.int8'>
+    Input 30: shape=[ 1 72], dtype=<class 'numpy.int8'>
+    Output 31: shape=[ 1 10], dtype=<class 'numpy.int8'>

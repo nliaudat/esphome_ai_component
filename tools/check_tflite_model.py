@@ -433,13 +433,13 @@ if __name__ == "__main__":
     )
     
 # Basic inspection
-# python check_tflite_model.py model.tflite
+# py check_tflite_model.py ../models/digit_recognizer_v4_10cls_RGB.tflite
 
 # Comprehensive analysis with evaluation
-# python check_tflite_model.py model.tflite --verbose --evaluate --debug
+# python check_tflite_model.py ../models/digit_recognizer_v4_10cls_RGB.tflite --verbose --evaluate --debug
 
 # Save detailed report to file
-# python check_tflite_model.py model.tflite --output_file report.txt --verbose
+# python check_tflite_model.py ../models/digit_recognizer_v4_10cls_RGB.tflite --output_file digit_recognizer_v4_10cls_RGB.txt --verbose
 
 # Evaluate with custom test data
-# python check_tflite_model.py model.tflite --evaluate --test_data /path/to/test_data
+# python check_tflite_model.py ../models/digit_recognizer_v4_10cls_RGB.tflite --evaluate --test_data /path/to/test_data
