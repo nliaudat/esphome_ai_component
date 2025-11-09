@@ -980,17 +980,17 @@ bool ModelHandler::invoke_model(const uint8_t* input_data, size_t input_size) {
         float* dst = input->data.f;
         
         // The loop is replaced with memcpy to fix a buffer overflow.
-        // memcpy(dst, input_data, input_size);
-
-
-    if (config_.normalize) {
-        // Convert 0-255 → 0-1
-        for (size_t i = 0; i < input_size / sizeof(float); ++i) {
-            dst[i] = static_cast<float>(input_data[i]) / 255.0f;
-        }
-    } else {
         memcpy(dst, input_data, input_size);
-    }
+
+
+    // if (config_.normalize) {
+        //// Convert 0-255 → 0-1
+        // for (size_t i = 0; i < input_size / sizeof(float); ++i) {
+            // dst[i] = static_cast<float>(input_data[i]) / 255.0f;
+        // }
+    // } else {
+        // memcpy(dst, input_data, input_size);
+    // }
      
         
 

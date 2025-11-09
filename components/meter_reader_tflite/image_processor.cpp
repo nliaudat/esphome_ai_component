@@ -1239,7 +1239,7 @@ void ImageProcessor::arrange_channels(float* output, uint8_t r, uint8_t g, uint8
     }
     
 #ifdef DEBUG_METER_READER_TFLITE    
-    ESP_LOGD(TAG, "Channel‑swap debug: raw(R,G,B)=(%d,%d,%d) → stored(%d,%d,%d)",
+    ESP_LOGD(TAG, "Channel swap debug: raw(R,G,B)=(%d,%d,%d) → stored(%d,%d,%d)",
              r, g, b, output[0], output[1], output[2]);
 #endif             
     

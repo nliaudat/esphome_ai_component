@@ -74,24 +74,24 @@ static const std::unordered_map<std::string, ModelConfig> MODEL_CONFIGS = {
             .invert = true
         }
     },
-    {"digit_recognizer_v4_10cls_GRAY", 
-        ModelConfig{
-            .description = "digit_recognizer_v4_10cls_GRAY",
-            .tensor_arena_size = "130KB", //check_tflite_model.py reports : Total Arena Size: 101.21 KB (doubling the model size seems to be validated in my tests)
-            .output_processing = "softmax",
-            .scale_factor = 1.0f,
-            .input_type = "uint8",  
-            .input_channels = 1,
-            .input_order = "RGB",
-            .input_size = {32, 20}, 
-            .normalize = false 
-        }
-    },
+    // {"digit_recognizer_v4_10cls_GRAY", 
+        // ModelConfig{
+            // .description = "digit_recognizer_v4_10cls_GRAY",
+            // .tensor_arena_size = "130KB", //check_tflite_model.py reports : Total Arena Size: 101.21 KB (doubling the model size seems to be validated in my tests)
+            // .output_processing = "softmax",
+            // .scale_factor = 1.0f,
+            // .input_type = "uint8",  
+            // .input_channels = 1,
+            // .input_order = "RGB",
+            // .input_size = {32, 20}, 
+            // .normalize = false 
+        // }
+    // },
     {"digit_recognizer_v4_10cls_RGB", 
         ModelConfig{
             .description = "digit_recognizer_v4_10cls_RGB",
-            .tensor_arena_size = "170KB", //check_tflite_model.py reports : Total Arena Size: 129.56 KB
-            .output_processing = "auto_detect", //qat_quantized, auto_detect
+            .tensor_arena_size = "110KB", //check_tflite_model.py reports : Total Arena Size: 104 KB
+            .output_processing = "softmax", //qat_quantized, auto_detect
             .scale_factor = 1.0f,
             .input_type = "uint8",  
             .input_channels = 3,
@@ -100,36 +100,36 @@ static const std::unordered_map<std::string, ModelConfig> MODEL_CONFIGS = {
             .normalize = false 
         }
     },
-    {"digit_recognizer_v4_100cls_GRAY", 
-        ModelConfig{
-            .description = "digit_recognizer_v4_100cls_GRAY",
-            .tensor_arena_size = "150KB", //check_tflite_model.py reports : Total Arena Size: 107.45 KB
-            .output_processing = "softmax",
-            .scale_factor = 10.0f,
-            .input_type = "uint8",  
-            .input_channels = 1,
-            .input_order = "RGB",
-            .input_size = {32, 20}, 
-            .normalize = false 
-        }
-    },
-    {"digit_recognizer_v4_100cls_RGB", 
-        ModelConfig{
-            .description = "digit_recognizer_v4_100cls_RGB",
-            .tensor_arena_size = "190KB", //check_tflite_model.py reports : Total Arena Size: 136.50 KB 
-            .output_processing = "softmax",
-            .scale_factor = 10.0f,
-            .input_type = "uint8",  
-            .input_channels = 3,
-            .input_order = "RGB",
-            .input_size = {32, 20}, 
-            .normalize = false 
-        }
-    },
+    // {"digit_recognizer_v4_100cls_GRAY", 
+        // ModelConfig{
+            // .description = "digit_recognizer_v4_100cls_GRAY",
+            // .tensor_arena_size = "150KB", //check_tflite_model.py reports : Total Arena Size: 107.45 KB
+            // .output_processing = "softmax",
+            // .scale_factor = 10.0f,
+            // .input_type = "uint8",  
+            // .input_channels = 1,
+            // .input_order = "RGB",
+            // .input_size = {32, 20}, 
+            // .normalize = false 
+        // }
+    // },
+    // {"digit_recognizer_v4_100cls_RGB", 
+        // ModelConfig{
+            // .description = "digit_recognizer_v4_100cls_RGB",
+            // .tensor_arena_size = "190KB", //check_tflite_model.py reports : Total Arena Size: 136.50 KB 
+            // .output_processing = "softmax",
+            // .scale_factor = 10.0f,
+            // .input_type = "uint8",  
+            // .input_channels = 3,
+            // .input_order = "RGB",
+            // .input_size = {32, 20}, 
+            // .normalize = false 
+        // }
+    // },
     {"digit_recognizer_v3_10cls_RGB", 
         ModelConfig{
             .description = "digit_recognizer_v3_10cls_RGB",
-            .tensor_arena_size = "100KB", //check_tflite_model.py reports : Total Arena Size: 75 KB
+            .tensor_arena_size = "75KB", //check_tflite_model.py reports : Total Arena Size: 70.3 KB
             .output_processing = "softmax", //qat_quantized, auto_detect
             .scale_factor = 1.0f,
             .input_type = "uint8",  
