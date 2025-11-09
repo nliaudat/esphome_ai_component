@@ -62,7 +62,8 @@ api:
 meter_reader_tflite:
   id: meter_reader
   camera_id: ${id_prefix}espcam
-  model: "dig-class100-0180-s2-q.tflite"  # Must be in same directory as YAML
+  # model: "dig-class100-0180-s2-q.tflite"  # Must be in same directory as YAML
+  model: "digit_recognizer_v4_10cls_RGB.tflite"
   confidence_threshold: 0.7
   # tensor_arena_size: "768KB" # OPTIONAL, set in model_config.h | check_tflite_model.py gives : Total Arena Size: 415.08 KB (Approx. RAM needed for inference)
   update_interval: 60s
