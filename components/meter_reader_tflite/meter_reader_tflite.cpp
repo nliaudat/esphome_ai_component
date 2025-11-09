@@ -366,9 +366,9 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
                     value_sensor_->publish_state(validated_reading);
                 }
                 
-                if (confidence_sensor_ != nullptr) {
-                    confidence_sensor_->publish_state(avg_confidence);
-                }
+                // if (confidence_sensor_ != nullptr) {
+                    // confidence_sensor_->publish_state(avg_confidence);
+                // }
                 
                 ESP_LOGI(TAG, "Reading published - valid and confidence threshold met");
             } else {
