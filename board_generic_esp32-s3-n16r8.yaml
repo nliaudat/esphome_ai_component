@@ -117,7 +117,7 @@ psram:
 
   
 light:
-  - platform: fastled_clockless
+  - platform: esp32_rmt_led_strip
     rgb_order: GRB
     pin: ${flash_led_pin} #GPIO48
     num_leds: 1
