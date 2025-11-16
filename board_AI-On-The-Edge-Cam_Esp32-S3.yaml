@@ -34,7 +34,7 @@ esphome:
     name: "Prokyber.AI-On-The-Edge-Cam"
     version: "${revision}.dev"
   platformio_options:
-    board_build.f_cpu: 240000000L
+    # board_build.f_cpu: 240000000L
     board_build.f_flash: 80000000L
     board_build.flash_size: 16MB
     board_build.arduino.memory_type: opi_opi
@@ -101,6 +101,7 @@ esp32:
   board: ${board} 
   variant: esp32s3 
   flash_size: 16MB
+  cpu_frequency: 240MHZ
   framework:
     type: ${framework} 
     version: recommended
