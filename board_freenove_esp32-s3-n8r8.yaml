@@ -29,7 +29,7 @@ esphome:
     - -DTF_LITE_DISABLE_X86_NEON #for tflite micro
     - -DESP_NN  #use hardware acceleration : https://github.com/espressif/esp-nn (only if using tflite)
     # build_flags: -DBOARD_HAS_PSRAM -DCORE_DEBUG_LEVEL=0
-    board_build.f_cpu: 240000000L
+    # board_build.f_cpu: 240000000L
     # board_build.f_flash: 80000000L
     # board_build.flash_mode: qio
     # board_build.flash_mode: dio
@@ -70,6 +70,7 @@ substitutions:
 esp32:
   board: ${board} 
   # variant: esp32s3 
+  cpu_frequency: 240MHZ
   flash_size: 8MB
   framework:
     type: ${framework} 
