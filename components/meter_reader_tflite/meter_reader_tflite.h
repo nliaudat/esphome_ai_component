@@ -14,6 +14,8 @@
 #include "esphome/components/camera/camera.h"
 #include "esphome/components/globals/globals_component.h"
 #include "esphome/components/light/light_state.h"
+#include "esphome/components/text_sensor/text_sensor.h"
+// #include "esphome/core/application.h"
 #include "model_handler.h"
 #include "memory_manager.h"
 #include "image_processor.h"
@@ -126,6 +128,9 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_camera_window_configured(bool configured) { camera_window_configured_ = configured; } 
   
   void force_flash_inference();
+  
+  void set_inference_logs(text_sensor::TextSensor *sensor) { inference_logs_ = sensor; }
+  void set_main_logs(text_sensor::TextSensor *sensor) { main_logs_ = sensor; }
 
 /** ########### PROTECTED ############# **/
  protected:
@@ -199,6 +204,9 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   
   float last_reading_{0.0f};
   float last_confidence_{0.0f};
+  
+  text_sensor::TextSensor *inference_logs_{nullptr};
+  text_sensor::TextSensor *main_logs_{nullptr};
   
   
   esp32_camera::ESP32Camera *camera_{nullptr}; ///< Camera component reference

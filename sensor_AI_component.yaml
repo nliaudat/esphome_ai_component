@@ -6,36 +6,36 @@ sensor:
     unit_of_measurement: "units"
     accuracy_decimals: 0
     icon: "mdi:counter"
-    update_interval: 30s
-    lambda: |-
-      auto reader = id(meter_reader);
-      if (reader != nullptr) {
-        float reading = reader->get_last_reading();
-        float confidence = reader->get_last_confidence();
-        float threshold = reader->get_confidence_threshold();
-        // Only return readings that meet the component's confidence threshold
-        if (reading > 0.0 && confidence >= threshold) {
-          return reading;
-        }
-      }
-      return NAN;  // Will not update the sensor state
+    # update_interval: 30s
+    # lambda: |-
+      # auto reader = id(meter_reader);
+      # if (reader != nullptr) {
+        # float reading = reader->get_last_reading();
+        # float confidence = reader->get_last_confidence();
+        # float threshold = reader->get_confidence_threshold();
+        # // Only return readings that meet the component's confidence threshold
+        # if (reading > 0.0 && confidence >= threshold) {
+          # return reading;
+        # }
+      # }
+      # return NAN;  // Will not update the sensor state
 
   - platform: template
     name: "Meter Reading Confidence"
     id: meter_confidence
     unit_of_measurement: "%"
-    accuracy_decimals: 0
+    accuracy_decimals: 2
     icon: "mdi:percent"
-    update_interval: 30s
-    lambda: |-
-      auto reader = id(meter_reader);
-      if (reader != nullptr) {
-        float confidence = reader->get_last_confidence();
-        float reading = reader->get_last_reading();
-        float threshold = reader->get_confidence_threshold();
-        // Only return confidence for valid readings that meet threshold
-        if (reading > 0.0 && confidence >= threshold) {
-          return confidence * 100.0; // Convert to percentage
-        }
-      }
-      return NAN;  // Will not update the sensor state
+    # update_interval: 30s
+    # lambda: |-
+      # auto reader = id(meter_reader);
+      # if (reader != nullptr) {
+        # float confidence = reader->get_last_confidence();
+        # float reading = reader->get_last_reading();
+        # float threshold = reader->get_confidence_threshold();
+        # // Only return confidence for valid readings that meet threshold
+        # if (reading > 0.0 && confidence >= threshold) {
+          # return confidence * 100.0; // Convert to percentage
+        # }
+      # }
+      # return NAN;  // Will not update the sensor state

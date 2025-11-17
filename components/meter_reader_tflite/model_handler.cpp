@@ -1070,11 +1070,12 @@ bool ModelHandler::invoke_model(const uint8_t* input_data, size_t input_size) {
         // Dequantize the outputs
         const float scale = output->params.scale;
         const int zero_point = output->params.zero_point;
-        
+
+#ifdef DEBUG_METER_READER_TFLITE         
         ESP_LOGD(TAG, "Quantized output (%s) - scale: %.6f, zero_point: %d",
                  output->type == kTfLiteUInt8 ? "uint8" : "int8",
                  scale, zero_point);
-        
+#endif        
         // Prepare dequantized output buffer
         dequantized_output_.resize(output_size_);
         
@@ -1088,7 +1089,8 @@ bool ModelHandler::invoke_model(const uint8_t* input_data, size_t input_size) {
             }
         }
         model_output_ = dequantized_output_.data();
-        
+
+#ifdef DEBUG_METER_READER_TFLITE        
         ESP_LOGD(TAG, "First 5 dequantized outputs:");
         if (output->type == kTfLiteUInt8) {
             for (int i = 0; i < 5 && i < output_size_; i++) {
@@ -1099,6 +1101,7 @@ bool ModelHandler::invoke_model(const uint8_t* input_data, size_t input_size) {
                 ESP_LOGD(TAG, "  [%d]: %d -> %.6f", i, output->data.int8[i], dequantized_output_[i]);
             }
         }
+#endif
     } 
     else {
         model_output_ = output->data.f;

@@ -31,4 +31,15 @@ logger:
     # CropZoneHandler: DEBUG
     
     
+text_sensor:  
+  - platform: template
+    name: "${friendly_name} main logs"
+    entity_category: diagnostic
+    icon: mdi:math-log
+    id: main_logs
     
+  - platform: template
+    name: "${friendly_name} inference"
+    entity_category: diagnostic
+    icon: mdi:math-log
+    id: inference_logs

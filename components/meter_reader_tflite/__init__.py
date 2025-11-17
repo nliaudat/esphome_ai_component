@@ -5,7 +5,7 @@ import os
 import zlib
 from esphome.const import CONF_ID, CONF_MODEL
 from esphome.core import CORE, HexInt
-from esphome.components import esp32, sensor
+from esphome.components import esp32, sensor, text_sensor
 import esphome.components.esp32_camera as esp32_camera
 from esphome.cpp_generator import RawExpression
 from esphome.components import globals
@@ -86,6 +86,10 @@ CONFIG_SCHEMA = cv.Schema({
     # cv.Optional(CONF_AUTO_CAMERA_WINDOW, default=False): cv.boolean,
     cv.Optional(CONF_ALLOW_NEGATIVE_RATES, default=False): cv.boolean,
     cv.Optional(CONF_MAX_ABSOLUTE_DIFF, default=100): cv.positive_int,
+    cv.Optional("value_sensor"): cv.use_id(sensor.Sensor),
+    cv.Optional("confidence_sensor"): cv.use_id(sensor.Sensor),
+    cv.Optional("inference_logs"): cv.use_id(text_sensor.TextSensor),
+    cv.Optional("main_logs"): cv.use_id(text_sensor.TextSensor),
 }).extend(cv.polling_component_schema('60s'))
 
 async def to_code(config):
@@ -93,7 +97,8 @@ async def to_code(config):
 
     esp32.add_idf_component(
         name="espressif/esp-tflite-micro",
-        ref="~1.3.4"
+        # ref="~1.3.4" #https://github.com/espressif/esp-tflite-micro/issues/120
+        ref="1.3.4" # fix to 1.3.4 cause 1.3.5 has bug
     )
     
     esp32.add_idf_component(
@@ -243,3 +248,20 @@ async def to_code(config):
     # Set validation parameters
     cg.add(var.set_allow_negative_rates(config[CONF_ALLOW_NEGATIVE_RATES]))
     cg.add(var.set_max_absolute_diff(config[CONF_MAX_ABSOLUTE_DIFF]))
+    
+    
+    if "value_sensor" in config:
+        value_sensor = await cg.get_variable(config["value_sensor"])
+        cg.add(var.set_value_sensor(value_sensor))
+    
+    if "confidence_sensor" in config:
+        confidence_sensor = await cg.get_variable(config["confidence_sensor"])
+        cg.add(var.set_confidence_sensor(confidence_sensor))
+    
+    if "inference_logs" in config:
+        inference_logs = await cg.get_variable(config["inference_logs"])
+        cg.add(var.set_inference_logs(inference_logs))
+    
+    if "main_logs" in config:
+        main_logs = await cg.get_variable(config["main_logs"])
+        cg.add(var.set_main_logs(main_logs))

@@ -127,7 +127,7 @@ void MeterReaderTFLite::setup() {
         }
         
         #endif
-        
+                
         
     });
 }
@@ -356,9 +356,21 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
             last_reading_ = validated_reading;
             last_confidence_ = avg_confidence;
             
-            ESP_LOGI(TAG, "Reading: %.1f -> %.1f (valid: %s, confidence: %.2f, threshold: %.2f)", 
-                    final_reading, validated_reading, is_valid ? "yes" : "no", 
-                    avg_confidence, confidence_threshold_);
+            ESP_LOGI(TAG, "Reading: %.1f -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%%)", 
+                final_reading, validated_reading, is_valid ? "yes" : "no", 
+                avg_confidence * 100.0f, confidence_threshold_ * 100.0f);
+                    
+
+            if (inference_logs_) {
+                // Publish to inference logs text sensor
+                char inference_log[150];
+                snprintf(inference_log, sizeof(inference_log),
+                         "Reading: %.1f -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%%)",
+                         final_reading, validated_reading, is_valid ? "yes" : "no",
+                         avg_confidence * 100.0f, confidence_threshold_ * 100.0f);
+                inference_logs_->publish_state(inference_log);
+
+            }
 
             // Only publish to sensors if confidence meets threshold AND reading is valid
             if (avg_confidence >= confidence_threshold_ && is_valid) {
@@ -366,9 +378,10 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
                     value_sensor_->publish_state(validated_reading);
                 }
                 
-                // if (confidence_sensor_ != nullptr) {
-                    // confidence_sensor_->publish_state(avg_confidence);
-                // }
+                 if (confidence_sensor_ != nullptr) {
+                     confidence_sensor_->publish_state(avg_confidence * 100.0f); // Convert to percentage
+                 }
+                 
                 
                 ESP_LOGI(TAG, "Reading published - valid and confidence threshold met");
             } else {
