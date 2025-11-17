@@ -93,7 +93,8 @@ async def to_code(config):
 
     esp32.add_idf_component(
         name="espressif/esp-tflite-micro",
-        ref="~1.3.4"
+        # ref="~1.3.4" #https://github.com/espressif/esp-tflite-micro/issues/120
+        ref="1.3.4" # fix to 1.3.4 cause 1.3.5 has bug
     )
     
     esp32.add_idf_component(
