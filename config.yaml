@@ -64,7 +64,7 @@ meter_reader_tflite:
   camera_id: ${id_prefix}espcam
   # model: "dig-class100-0180-s2-q.tflite"  # Must be in same directory as YAML
   model: "digit_recognizer_v4_10cls_RGB.tflite"
-  confidence_threshold: 0.7
+  # confidence_threshold: 0.7
   # tensor_arena_size: "768KB" # OPTIONAL, set in model_config.h | check_tflite_model.py gives : Total Arena Size: 415.08 KB (Approx. RAM needed for inference)
   update_interval: 60s
   debug: false
@@ -83,6 +83,12 @@ meter_reader_tflite:
   # ### Enhanced validation parameters
   allow_negative_rates: false    # Prevent meter rollbacks
   max_absolute_diff: 300         # Maximum allowed absolute difference
+  #sensors
+  value_sensor: meter_value
+  confidence_sensor: meter_confidence
+  inference_logs: inference_logs
+  # main_logs: main_logs
+
   
 
 
