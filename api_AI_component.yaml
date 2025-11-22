@@ -1,34 +1,34 @@
 api:
   services:
-    - service: set_crop_zones
-      variables:
-        zones: string
-      then:
-        - text_sensor.template.publish:
-            id: crop_zones_sensor
-            state: !lambda 'return zones;'
-        - lambda: |-
-            id(crop_zones) = zones;  // Update global var
-            id(meter_reader).set_crop_zones(zones);
+    # - service: set_crop_zones
+    #   variables:
+    #     zones: string
+    #   then:
+    #     - text_sensor.template.publish:
+    #         id: crop_zones_sensor
+    #         state: !lambda 'return zones;'
+    #     # - lambda: |-
+    #         # id(crop_zones) = zones;  // Update global var
+    #         # id(meter_reader).set_crop_zones(zones);
             
-    - service: set_camera_window
-      variables:
-        offset_x: int
-        offset_y: int
-        width: int
-        height: int
-      then:
-        - lambda: |-
-            if (offset_x >= 0 && offset_y >= 0 && width > 0 && height > 0) {
-              id(meter_reader).set_camera_window(offset_x, offset_y, width, height);
-            }
+    # - service: set_camera_window
+    #   variables:
+    #     offset_x: int
+    #     offset_y: int
+    #     width: int
+    #     height: int
+    #   then:
+    #     # - lambda: |-
+    #         # if (offset_x >= 0 && offset_y >= 0 && width > 0 && height > 0) {
+    #           # id(meter_reader).set_camera_window(offset_x, offset_y, width, height);
+    #         # }
     
     # - service: auto_camera_window
-      # then:
-        # - lambda: |-
-            # id(meter_reader).set_camera_window_from_crop_zones();
+    #   then:
+    #     - lambda: |-
+    #         id(meter_reader).set_camera_window_from_crop_zones();
     
-    - service: reset_camera_window
-      then:
-        - lambda: |-
-            id(meter_reader).reset_camera_window();
+    # - service: reset_camera_window
+    #   then:
+    #     # - lambda: |-
+    #         # id(meter_reader).reset_camera_window();

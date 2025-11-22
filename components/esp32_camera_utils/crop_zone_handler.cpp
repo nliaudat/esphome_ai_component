@@ -1,15 +1,12 @@
-#include "crop_zones.h"
-#include "esp_log.h"
-#include "debug_utils.h"
+#include "crop_zone_handler.h"
+#include "esphome/core/log.h"
 #include <algorithm>
 #include <cstdlib> // for strtol
 
 namespace esphome {
-namespace meter_reader_tflite {
+namespace esp32_camera_utils {
 
-// static const char *const TAG = "CropZoneHandler";
 const char *const CropZoneHandler::TAG = "CropZoneHandler";
-
 
 void CropZoneHandler::parse_zones(const std::string &zones_json) {
   ESP_LOGD(TAG, "Parsing crop zones JSON: %s", zones_json.c_str());
@@ -100,13 +97,13 @@ void CropZoneHandler::parse_zones(const std::string &zones_json) {
       zones_.push_back({coords[0], coords[1], coords[2], coords[3]});
     } else {
       ESP_LOGE(TAG, "Invalid zone format (expected 4 coordinates, got %d): %s", 
-               coords.size(), zone_str.c_str());
+               (int)coords.size(), zone_str.c_str());
     }
 
     pos = end + 1;
   }
 
-  ESP_LOGI(TAG, "Parsed %d crop zones", zones_.size());
+  ESP_LOGI(TAG, "Parsed %d crop zones", (int)zones_.size());
 }
 
 void CropZoneHandler::set_default_zone(int width, int height) {
@@ -139,5 +136,5 @@ void CropZoneHandler::set_debug_zones() {
 }
 
 
-}  // namespace meter_reader_tflite
+}  // namespace esp32_camera_utils
 }  // namespace esphome

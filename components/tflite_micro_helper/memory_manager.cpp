@@ -1,9 +1,9 @@
 #include "memory_manager.h"
-#include "esp_log.h"
+#include "esphome/core/log.h"
 #include "debug_utils.h"
 
 namespace esphome {
-namespace meter_reader_tflite {
+namespace tflite_micro_helper {
 
 static const char *const TAG = "MemoryManager";
 
@@ -71,13 +71,5 @@ void MemoryManager::report_memory_status(size_t requested_size,
   }
 }
 
-static void log_current_memory_usage(const char* context) {
-    size_t free_internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-    size_t free_psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
-    
-    ESP_LOGD(TAG, "[%s] Free: Internal=%zuB, PSRAM=%zuB", 
-             context, free_internal, free_psram);
-}
-
-}  // namespace meter_reader_tflite
+}  // namespace tflite_micro_helper
 }  // namespace esphome

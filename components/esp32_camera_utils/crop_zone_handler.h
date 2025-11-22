@@ -4,9 +4,10 @@
 #include "esphome/components/globals/globals_component.h"
 #include <vector>
 #include <string>
+#include <functional>
 
 namespace esphome {
-namespace meter_reader_tflite {
+namespace esp32_camera_utils {
 
 struct CropZone {
   int x1;
@@ -95,5 +96,5 @@ class CropZoneHandler {
   std::function<void()> on_zones_changed_; 
 };
 
-}  // namespace meter_reader_tflite
+}  // namespace esp32_camera_utils
 }  // namespace esphome

@@ -1,8 +1,7 @@
-#include "camera_control.h"
+#include "camera_window_control.h"
 
 namespace esphome {
-namespace meter_reader_tflite {
-namespace camera_control {
+namespace esp32_camera_utils {
 
 const char *const CameraWindowControl::TAG = "CameraWindowControl";
 
@@ -71,7 +70,7 @@ bool CameraWindowControl::set_window_from_crop_zones(esp32_camera::ESP32Camera* 
   }
   
   ESP_LOGI(TAG, "Setting camera window from %d crop zones: %s", 
-           zones.size(), config.to_string().c_str());
+           (int)zones.size(), config.to_string().c_str());
   
   return set_window(camera, config);
 }
@@ -166,102 +165,6 @@ bool CameraWindowControl::is_sensor_supported(sensor_t* sensor) const {
   
   return false;
 }
-
-/**
- * After deep analysis of esp-idf esp32-camera ov2640.c, ov3660.c, ov5640.c
- * @brief Sets a custom window (ROI) on the camera sensor for digital zoom/cropping
- * 
- * This function configures the sensor to capture only a specific region of interest (ROI)
- * while maintaining the desired output resolution. Different sensors have different
- * requirements and parameter mappings.
- * 
- * Supported Sensors:
- * - OV2640 (PID: 0x26)
- * - OV3660 (PID: 0x3660) 
- * - OV5640 (PID: 0x5640)
- * 
- * Sensor-Specific Requirements:
- * 
- * OV2640:
- * - All dimensions must be multiples of 4 pixels
- * - Parameter mapping: set_res_raw(0, 0, 0, 0, offsetX, offsetY, width, height, outputX, outputY, false, false)
- * - Uses offsetX/offsetY for window position, width/height for window size
- * - No scaling or binning in set_res_raw (handled internally)
- * - May require pixel format re-application after window change
- * 
- * OV3660/OV5640:
- * - All dimensions must be multiples of 2 pixels
- * - Parameter mapping: set_res_raw(startX, startY, endX, endY, 0, 0, totalX, totalY, outputX, outputY, scale, binning)
- * - Uses startX/startY and endX/endY to define window boundaries
- * - totalX/totalY should be full sensor resolution
- * - Scale enabled when output resolution ≠ window size
- * - Binning enabled when window ≤ half sensor size
- * 
- * Aspect Ratio Considerations:
- * 
- * Native Sensor Resolutions & Ratios:
- * - OV2640: 1600x1200 (4:3 ratio)
- * - OV3660: 2048x1536 (4:3 ratio) 
- * - OV5640: 2592x1944 (4:3 ratio)
- * 
- * Ratio Handling in Drivers:
- * - All sensors natively use 4:3 aspect ratio
- * - Predefined ratio tables maintain aspect ratio for standard framesizes
- * - Custom windows can use any aspect ratio, but scaling may occur
- * - For non-4:3 outputs, scaling is automatically applied
- * 
- * Ratio Table Structure (from drivers):
- * - max_width/max_height: Maximum sensor resolution
- * - start_x/start_y: Starting coordinates for this ratio
- * - end_x/end_y: Ending coordinates for this ratio  
- * - total_x/total_y: Total active sensor area
- * - offset_x/offset_y: Offset for centering the image
- * 
- * Alignment Requirements:
- * - OV2640: Multiples of 4 (strict)
- * - OV3660/OV5640: Multiples of 2
- * - Function automatically applies alignment before setting window
- * 
- * Parameter Definitions:
- * - window_offset_x/y: Top-left corner of ROI in sensor coordinates
- * - window_width/height: Size of the ROI to capture
- * - output_width/height: Desired output resolution (may be scaled from ROI)
- * - full_sensor_width/height: Maximum sensor resolution (sensor-dependent)
- * 
- * Timing Considerations:
- * - 20ms delay after set_framesize
- * - 100ms delay after set_res_raw
- * - Additional 50ms delay for OV2640 pixel format stabilization
- * 
- * Error Handling:
- * - Returns false if sensor is null or unsupported
- * - Validates window bounds against sensor limits
- * - Ensures minimum window size of 32x32 pixels
- * - Logs detailed error information on failure
- * 
- * Usage Example:
- * @code
- * // 4:3 ratio window (recommended for best quality)
- * WindowConfig config{100, 100, 800, 600, true};
- * 
- * // 16:9 ratio window (will be scaled)
- * WindowConfig config{100, 150, 800, 450, true};
- * 
- * if (set_sensor_window(sensor, config)) {
- *     ESP_LOGI(TAG, "Window set successfully");
- * }
- * @endcode
- * 
- * @param sensor Pointer to the camera sensor structure
- * @param config Window configuration parameters
- * @return true if window was set successfully, false otherwise
- * 
- * @note For OV2640, the window dimensions are automatically aligned to multiples of 4
- * @note For best performance, use output resolution that matches common framesizes
- * @note Binning may affect image quality but improves performance for small windows
- * @note 4:3 aspect ratio windows provide best quality (native sensor ratio)
- * @note Non-4:3 ratios will be scaled, which may reduce image quality
- */
 
 bool CameraWindowControl::set_sensor_window(sensor_t* sensor, const WindowConfig& config) {
   if (!sensor) return false;
@@ -477,7 +380,7 @@ CameraWindowControl::WindowConfig CameraWindowControl::calculate_window_from_zon
   config.height = (config.height / 4) * 4;
   
   ESP_LOGD(TAG, "Calculated window from %d zones: %s", 
-           zones.size(), config.to_string().c_str());
+           (int)zones.size(), config.to_string().c_str());
   
   return config;
 }
@@ -696,6 +599,5 @@ bool CameraWindowControl::reset_to_full_frame_with_reset(esp32_camera::ESP32Came
     return reset_to_full_frame(camera);
 }
 
-}  // namespace camera_control
-}  // namespace meter_reader_tflite
+}  // namespace esp32_camera_utils
 }  // namespace esphome

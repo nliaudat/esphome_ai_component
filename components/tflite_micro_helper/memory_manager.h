@@ -1,4 +1,3 @@
-// memory_manager.h
 #pragma once
 
 #include <memory>
@@ -6,7 +5,7 @@
 #include "esp_heap_caps.h"
 
 namespace esphome {
-namespace meter_reader_tflite {
+namespace tflite_micro_helper {
 
 class MemoryManager {
  public:
@@ -30,6 +29,5 @@ class MemoryManager {
                                  size_t model_size);
 };
 
-
-}  // namespace meter_reader_tflite
+}  // namespace tflite_micro_helper
 }  // namespace esphome

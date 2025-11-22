@@ -5,24 +5,24 @@ switch:
     icon: "mdi:pause"
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
-    turn_on_action:
-      - lambda: |-
-          if (id(meter_reader) != nullptr) {
-            id(meter_reader).set_pause_processing(true);
-          }
-    turn_off_action:
-      - lambda: |-
-          if (id(meter_reader) != nullptr) {
-            id(meter_reader).set_pause_processing(false);
-          }
+    # turn_on_action:
+      # - lambda: |-
+          # if (id(meter_reader) != nullptr) {
+            # id(meter_reader).set_pause_processing(true);
+          # }
+    # turn_off_action:
+      # - lambda: |-
+          # if (id(meter_reader) != nullptr) {
+            # id(meter_reader).set_pause_processing(false);
+          # }
 
 button:
   - platform: template
     name: "Force AI inference"
     id: force_ai_inference
     icon: "mdi:arrow-top-bold-hexagon-outline"
-    on_press:
-      - lambda: |-
-          if (id(meter_reader) != nullptr) {
-            id(meter_reader).force_flash_inference(); 
-          }
+    # on_press:
+      # - lambda: |-
+          # if (id(meter_reader) != nullptr) {
+            # id(meter_reader).force_flash_inference(); 
+          # }

@@ -8,11 +8,12 @@
 
 #include "meter_reader_tflite.h"
 #include "esp_log.h"
-#include "debug_utils.h"
+#include "esphome/components/tflite_micro_helper/debug_utils.h"
 #include "model_config.h"
 #include <numeric>
 
-
+using namespace esphome::tflite_micro_helper;
+using namespace esphome::esp32_camera_utils;
 
 namespace esphome {
 namespace meter_reader_tflite {
@@ -879,14 +880,14 @@ bool MeterReaderTFLite::set_camera_window(int offset_x, int offset_y, int width,
     
     // Use reset before setting new window
     bool success = camera_window_control_.set_window_with_reset(
-        camera_, camera_control::CameraWindowControl::WindowConfig{
+        camera_, CameraWindowControl::WindowConfig{
             offset_x, offset_y, width, height, true});
     
     if (success) {
         // Update dimensions
         auto new_dims = camera_window_control_.update_dimensions_after_window(
             camera_, 
-            camera_control::CameraWindowControl::WindowConfig{offset_x, offset_y, width, height, true},
+            CameraWindowControl::WindowConfig{offset_x, offset_y, width, height, true},
             camera_width_, camera_height_);
         
         camera_width_ = new_dims.first;
@@ -1132,7 +1133,7 @@ void MeterReaderTFLite::force_flash_inference() {
     //     schedule a *short* safety timeout (500 ms) after the request.
     // -------------------------------------------------------------------
     const uint32_t SAFETY_TIMEOUT_MS = 500;
-    this->set_timeout(SAFETY_TIMEOUT_MS, [this]() {
+    this->set_timeout(SAFETY_TIMEOUT_MS, [this, SAFETY_TIMEOUT_MS]() {
       // If the AI is still busy we simply turn the flash off – the
       // next normal update will re enable it if needed.
       ESP_LOGI(TAG, "Force inference: disabling flash");

@@ -2,12 +2,11 @@
 
 #include "esphome/components/esp32_camera/esp32_camera.h"
 #include "esp_camera.h"
-#include "esp_log.h"
-#include "crop_zones.h"
+#include "esphome/core/log.h"
+#include "crop_zone_handler.h"
 
 namespace esphome {
-namespace meter_reader_tflite {
-namespace camera_control {
+namespace esp32_camera_utils {
 
 class CameraWindowControl {
  public:
@@ -131,12 +130,15 @@ class CameraWindowControl {
     bool set_window_with_reset(esp32_camera::ESP32Camera* camera, const WindowConfig& config);
     bool reset_to_full_frame_with_reset(esp32_camera::ESP32Camera* camera);
 
+  // Sensor detection and specific implementations
+  std::string get_sensor_name(sensor_t* sensor) const;
+  bool is_sensor_supported(sensor_t* sensor) const;
+
  private:
   static const char *const TAG;
   
   // Sensor detection and specific implementations
-  std::string get_sensor_name(sensor_t* sensor) const;
-  bool is_sensor_supported(sensor_t* sensor) const;
+
   
   // Main window setting function
   bool set_sensor_window(sensor_t* sensor, const WindowConfig& config);
@@ -153,6 +155,5 @@ class CameraWindowControl {
   framesize_t get_max_framesize(sensor_t* sensor) const;
 };
 
-}  // namespace camera_control
-}  // namespace meter_reader_tflite
+}  // namespace esp32_camera_utils
 }  // namespace esphome

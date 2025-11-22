@@ -12,7 +12,7 @@ from esphome.components import globals
 from esphome.components import light
 
 CODEOWNERS = ["@nl"]
-DEPENDENCIES = ['esp32', 'camera']
+DEPENDENCIES = ['esp32', 'camera', 'tflite_micro_helper', 'esp32_camera_utils']
 AUTO_LOAD = ['sensor']
 
 CONF_CAMERA_ID = 'camera_id'
@@ -116,27 +116,21 @@ async def to_code(config):
     cg.add_build_flag("-DESP_NN")
     cg.add_build_flag("-DUSE_ESP32_CAMERA_CONV")
     cg.add_build_flag("-DOPTIMIZED_KERNEL=esp_nn")
-    
-    #memory debug
-    # cg.add_build_flag("CONFIG_HEAP_TRACING_STANDALONE")
-    # cg.add_build_flag("CONFIG_HEAP_TRACING_DEST")
-
 
     var = cg.new_Pvariable(config[CONF_ID])
+    cg.add_global(cg.RawStatement('#include "esphome/components/meter_reader_tflite/meter_reader_tflite.h"'))
+    cg.add_global(cg.RawStatement('using namespace esphome::meter_reader_tflite;'))
     await cg.register_component(var, config)
 
     cam = await cg.get_variable(config[CONF_CAMERA_ID])
     cg.add(var.set_camera(cam))
-      
-    # Extract model type from filename (without extension)
+    
     model_path = config[CONF_MODEL]
     model_filename = os.path.basename(model_path)
     model_type = os.path.splitext(model_filename)[0]  # Remove .tflite extension
        
     # Set model type from extracted filename
     cg.add(var.set_model_config(model_type))
-    
-    # model_path = config[CONF_MODEL]
     
     # Read the model file as binary data
     with open(model_path, "rb") as f:

@@ -2,10 +2,13 @@
 
 #include <string>
 #include <unordered_map>
-#include "model_handler.h"
+#include "esphome/components/tflite_micro_helper/model_handler.h"
+#include "esphome/components/tflite_micro_helper/op_resolver.h"
 
 namespace esphome {
 namespace meter_reader_tflite {
+
+using tflite_micro_helper::ModelConfig;
 
 static const std::unordered_map<std::string, ModelConfig> MODEL_CONFIGS = {
     {"dig-class100-0180-s2-q", 
