@@ -1,5 +1,5 @@
 /**
- * @file output_validation.h
+ * @file value_validator.h
  * @brief Output validation and historical data management for meter readings.
  */
 
@@ -51,10 +51,10 @@ class ReadingHistory {
 };
 
 /**
- * @class OutputValidator
+ * @class ValueValidator
  * @brief Validates meter readings against historical data and rules
  */
-class OutputValidator {
+class ValueValidator {
  public:
   struct ValidationConfig {
     bool allow_negative_rates{false};

@@ -9,10 +9,10 @@ from esphome.components import esp32, sensor, text_sensor
 import esphome.components.esp32_camera as esp32_camera
 from esphome.cpp_generator import RawExpression
 from esphome.components import globals
-from esphome.components import light
+import esphome.components.flash_light_controller as flash_light_controller
 
 CODEOWNERS = ["@nl"]
-DEPENDENCIES = ['esp32', 'camera', 'tflite_micro_helper', 'esp32_camera_utils']
+DEPENDENCIES = ['esp32', 'camera', 'tflite_micro_helper', 'esp32_camera_utils', 'flash_light_controller']
 AUTO_LOAD = ['sensor']
 
 CONF_CAMERA_ID = 'camera_id'
@@ -24,9 +24,7 @@ CONF_DEBUG_IMAGE = 'debug_image'
 CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL = 'debug_image_out_serial'
 # CONF_MODEL_TYPE = 'model_type' 
 
-CONF_FLASH_LIGHT = 'flash_light'
-CONF_FLASH_PRE_TIME = 'flash_pre_time'
-CONF_FLASH_POST_TIME = 'flash_post_time'
+CONF_FLASH_LIGHT_CONTROLLER = 'flash_light_controller'
 
 CONF_CROP_ZONES = 'crop_zones_global'
 
@@ -70,10 +68,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_DEBUG, default=False): cv.boolean, 
     cv.Optional(CONF_DEBUG_IMAGE, default=False): cv.boolean, 
     cv.Optional(CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL, default=False): cv.boolean,
-    cv.Optional(CONF_FLASH_LIGHT): cv.use_id(light.LightState), 
-    cv.Optional(CONF_FLASH_PRE_TIME, default=5000): cv.positive_int,
-    cv.Optional(CONF_FLASH_POST_TIME, default=2000): cv.positive_int,
-    # cv.Optional(CONF_FLASH_DURATION, default=2200): cv.positive_int, 
+    cv.Optional(CONF_FLASH_LIGHT_CONTROLLER): cv.use_id(flash_light_controller.FlashLightController),
     cv.Optional(CONF_CROP_ZONES): cv.use_id(globals.GlobalsComponent),
     cv.Optional(CONF_CAMERA_WINDOW): cv.Any(
     cv.Schema({  # Or detailed configuration
@@ -208,18 +203,10 @@ async def to_code(config):
         crop_global = await cg.get_variable(config[CONF_CROP_ZONES])
         cg.add(var.set_crop_zones_global(crop_global))    
 
-
-        
-    # Set flash light if configured
-    if CONF_FLASH_LIGHT in config:
-        flash_light = await cg.get_variable(config[CONF_FLASH_LIGHT])
-        cg.add(var.set_flash_light(flash_light))
-        
-    if CONF_FLASH_PRE_TIME in config:
-        cg.add(var.set_flash_pre_time(config[CONF_FLASH_PRE_TIME]))
-    
-    if CONF_FLASH_POST_TIME in config:
-        cg.add(var.set_flash_post_time(config[CONF_FLASH_POST_TIME]))
+    # Set flash light controller if configured
+    if CONF_FLASH_LIGHT_CONTROLLER in config:
+        flash_controller = await cg.get_variable(config[CONF_FLASH_LIGHT_CONTROLLER])
+        cg.add(var.set_flash_controller(flash_controller))
     
 
     # Handle optional camera window configuration

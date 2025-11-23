@@ -61,13 +61,13 @@ api:
   
 
 tflite_micro_helper:
-  model: "digit_recognizer_v4_10cls_RGB.tflite"
-  # confidence_threshold: 0.7
-  # tensor_arena_size: "768KB" # OPTIONAL, set in model_config.h | check_tflite_model.py gives : Total Arena Size: 415.08 KB (Approx. RAM needed for inference)
-    #sensors
-  value_sensor: meter_value
-  confidence_sensor: meter_confidence
-  inference_logs: inference_logs
+  # model: "digit_recognizer_v4_10cls_RGB.tflite"
+  # # confidence_threshold: 0.7
+  # # tensor_arena_size: "768KB" # OPTIONAL, set in model_config.h | check_tflite_model.py gives : Total Arena Size: 415.08 KB (Approx. RAM needed for inference)
+  #   #sensors
+  # value_sensor: meter_value
+  # confidence_sensor: meter_confidence
+  # inference_logs: inference_logs
 
 esp32_camera_utils:
   id: camera_utils
@@ -86,14 +86,19 @@ flash_light_controller:
 
 meter_reader_tflite:
   id: meter_reader
-  # camera_id: ${id_prefix}espcam
-  # model: "dig-class100-0180-s2-q.tflite"  # Must be in same directory as YAML
+  camera_id: ${id_prefix}espcam
+  model: "digit_recognizer_v4_10cls_RGB.tflite"
+  
+  value_sensor: meter_value
+  confidence_sensor: meter_confidence
+  inference_logs: inference_logs
 
   update_interval: 60s
   debug: false
   debug_image: false # static embedded image (debug.jpg)
   debug_image_out_serial: false
   # crop_zones_global: crop_zones  # Reference the global variables set in globals_AI_component.yaml | To update, use http://[hassio]/developer-tools/action >esphome.[s3cam_tflite]_set_crop_zones | to get, use the tools>draw_regions.py
+  flash_light_controller: flash_controller
   # flash_light: ${id_prefix}flash # optional : flash light at taking image
   # flash_pre_time: 7000    # 7 seconds before update (time to stabilize)
   # flash_post_time: 2000   # 2 seconds after update

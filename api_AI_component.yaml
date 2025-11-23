@@ -1,5 +1,5 @@
-api:
-  services:
+# api:
+#   services:
     # - service: set_crop_zones
     #   variables:
     #     zones: string

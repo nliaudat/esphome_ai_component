@@ -1,16 +1,16 @@
 /**
- * @file output_validation.cpp
+ * @file value_validator.cpp
  * @brief Implementation of output validation for meter readings.
  */
 
-#include "output_validation.h"
+#include "value_validator.h"
 #include "esphome/core/log.h"
 #include "esphome/core/application.h"
 
 namespace esphome {
 namespace meter_reader_tflite {
 
-static const char *const TAG = "output_validation";
+static const char *const TAG = "value_validator";
 
 void ReadingHistory::setup() {
   hour_readings_.clear();
@@ -108,7 +108,7 @@ void ReadingHistory::clear() {
   day_readings_.clear();
 }
 
-void OutputValidator::setup() {
+void ValueValidator::setup() {
   history_.setup();
   last_valid_reading_ = 0;
   first_reading_ = true;
@@ -118,7 +118,7 @@ void OutputValidator::setup() {
   last_good_values_.resize(config_.smart_validation_window, 0);
 }
 
-bool OutputValidator::validate_reading(int new_reading, float confidence, int& validated_reading) {
+bool ValueValidator::validate_reading(int new_reading, float confidence, int& validated_reading) {
   uint32_t current_time = millis();
   
   // Always add to history for tracking
@@ -158,7 +158,7 @@ bool OutputValidator::validate_reading(int new_reading, float confidence, int& v
   return is_valid;
 }
 
-bool OutputValidator::is_digit_plausible(int new_reading, int last_reading) const {
+bool ValueValidator::is_digit_plausible(int new_reading, int last_reading) const {
   // Calculate absolute difference
   int absolute_diff = std::abs(new_reading - last_reading);
   
@@ -176,14 +176,14 @@ bool OutputValidator::is_digit_plausible(int new_reading, int last_reading) cons
     if (negative_diff > 5) { // Allow very small negative changes (up to 5 units)
       ESP_LOGW(TAG, "Negative rate detected: %d -> %d (diff: %d)", 
                last_reading, new_reading, negative_diff);
-      return false;
+    return false;
     }
   }
   
   return true;
 }
 
-int OutputValidator::apply_smart_validation(int new_reading, float confidence) {
+int ValueValidator::apply_smart_validation(int new_reading, float confidence) {
   // High confidence readings get more lenient validation
   float confidence_factor = std::min(1.0f, confidence / 0.7f); // Normalize to 0.7 threshold
   
@@ -233,7 +233,7 @@ int OutputValidator::apply_smart_validation(int new_reading, float confidence) {
   return new_reading;
 }
 
-int OutputValidator::find_most_plausible_reading(int new_reading, const std::vector<int>& recent_readings) {
+int ValueValidator::find_most_plausible_reading(int new_reading, const std::vector<int>& recent_readings) {
   if (recent_readings.empty()) return new_reading;
   
   // Calculate average of recent readings
@@ -267,13 +267,13 @@ int OutputValidator::find_most_plausible_reading(int new_reading, const std::vec
   return new_reading; // Fallback to original
 }
 
-bool OutputValidator::is_small_increment(int new_reading, int last_reading) const {
+bool ValueValidator::is_small_increment(int new_reading, int last_reading) const {
   // Check if this could be a simple digit increment
   int diff = new_reading - last_reading;
   return (diff > 0 && diff <= 10); // Allow small positive increments
 }
 
-int OutputValidator::calculate_digit_difference(int reading1, int reading2) const {
+int ValueValidator::calculate_digit_difference(int reading1, int reading2) const {
   // Convert to strings to compare digit by digit
   std::string str1 = std::to_string(reading1);
   std::string str2 = std::to_string(reading2);
@@ -291,12 +291,12 @@ int OutputValidator::calculate_digit_difference(int reading1, int reading2) cons
   return digit_diff;
 }
 
-void OutputValidator::reset() {
+void ValueValidator::reset() {
   history_.clear();
   last_valid_reading_ = 0;
   first_reading_ = true;
   last_good_values_.clear();
-  ESP_LOGI(TAG, "Output validator reset");
+  ESP_LOGI(TAG, "Value validator reset");
 }
 
 }  // namespace meter_reader_tflite
