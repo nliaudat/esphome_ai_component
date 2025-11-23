@@ -1,4 +1,5 @@
 #include "meter_reader_tflite.h"
+#include "model_config.h"
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
 #include "esphome/core/application.h"
@@ -10,6 +11,10 @@
 
 namespace esphome {
 namespace meter_reader_tflite {
+
+using tflite_micro_helper::MemoryManager;
+using tflite_micro_helper::ModelConfig;
+using tflite_micro_helper::ProcessedOutput;
 
 static const char *const TAG = "meter_reader_tflite";
 
@@ -57,23 +62,229 @@ void MeterReaderTFLite::setup() {
         );
     }
     
+    // Register image callback
+    if (camera_) {
+        camera_->add_image_callback([this](std::shared_ptr<camera::CameraImage> image) {
+            if (this->frame_requested_) {
+                this->pending_frame_ = image;
+                this->frame_available_ = true;
+                this->frame_requested_ = false;
+                this->last_frame_received_ = millis();
+                ESP_LOGV(TAG, "Frame received via callback");
+            }
+        });
+    }
+
     // Initialize validation
     setup_output_validation();
 }
 
 void MeterReaderTFLite::setup_output_validation() {
-    if (!model_handler_.invoke_model(result.data->get(), result.size)) {
-        ESP_LOGE(TAG, "Model invocation failed");
-        return false;
+    ValueValidator::ValidationConfig config;
+    config.allow_negative_rates = allow_negative_rates_;
+    config.max_absolute_diff = max_absolute_diff_;
+    // config.max_rate_change = 0.15f; // Default
+    
+    value_validator_.set_config(config);
+    value_validator_.setup();
+    
+    ESP_LOGD(TAG, "Output validation initialized (Max Diff: %d, Allow Negative: %s)", 
+             max_absolute_diff_, allow_negative_rates_ ? "YES" : "NO");
+}
+
+void MeterReaderTFLite::update() {
+    if (pause_processing_) return;
+
+    // Check if we are already processing or have a request pending
+    if (processing_frame_) {
+        ESP_LOGW(TAG, "Still processing previous frame, skipping update");
+        return;
     }
 
-    // Get both value and confidence from the model handler
-    ProcessedOutput output = model_handler_.get_processed_output();
-    *value = output.value;
-    *confidence = output.confidence;
+    if (frame_requested_) {
+        ESP_LOGW(TAG, "Frame request still pending, skipping update");
+        return;
+    }
 
-    ESP_LOGD(TAG, "Model result - Value: %.1f, Confidence: %.6f", *value, *confidence);
-    return true;
+    // Request a new frame
+    if (camera_) {
+        frame_requested_ = true;
+        last_request_time_ = millis();
+        ESP_LOGV(TAG, "Requesting new frame");
+        
+        if (flash_controller_) {
+            flash_controller_->initiate_capture_sequence([this]() {
+                // Trigger camera if possible, otherwise wait for callback
+                // this->camera_->update(); // Try this if compilation allows
+            });
+        } else {
+             // Trigger camera if possible
+             // this->camera_->update(); 
+        }
+    }
+}
+
+void MeterReaderTFLite::loop() {
+    // 1. Handle Frame Request Timeout
+    if (frame_requested_ && !frame_available_) {
+        if (millis() - last_request_time_ > 5000) {
+            ESP_LOGW(TAG, "Frame request timed out");
+            frame_requested_ = false;
+        }
+    }
+
+    // 2. Process Available Frame
+    if (frame_available_) {
+        process_available_frame();
+    }
+}
+
+void MeterReaderTFLite::process_available_frame() {
+    if (!pending_frame_) {
+        frame_available_ = false;
+        return;
+    }
+
+    // Move frame to local scope to free atomic/shared quickly if needed, 
+    // though we process it here.
+    std::shared_ptr<camera::CameraImage> frame = pending_frame_;
+    pending_frame_ = nullptr;
+    frame_available_ = false;
+
+    process_full_image(frame);
+}
+
+void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> frame) {
+    if (!frame) return;
+    
+    processing_frame_ = true;
+    DURATION_START();
+
+    // 1. Get Crop Zones
+    const auto& zones = crop_zone_handler_.get_zones();
+    if (zones.empty()) {
+        ESP_LOGW(TAG, "No crop zones defined. Skipping processing.");
+        processing_frame_ = false;
+        return;
+    }
+
+    // 2. Prepare Model Input Buffer
+    TfLiteTensor* input_tensor = model_handler_.input_tensor();
+    if (!input_tensor) {
+        ESP_LOGE(TAG, "Model input tensor is null");
+        processing_frame_ = false;
+        return;
+    }
+
+    uint8_t* tensor_data = nullptr;
+    if (input_tensor->type == kTfLiteFloat32) {
+        tensor_data = reinterpret_cast<uint8_t*>(input_tensor->data.f);
+    } else if (input_tensor->type == kTfLiteUInt8 || input_tensor->type == kTfLiteInt8) {
+        tensor_data = reinterpret_cast<uint8_t*>(input_tensor->data.uint8);
+    } else {
+        ESP_LOGE(TAG, "Unsupported input tensor type");
+        processing_frame_ = false;
+        return;
+    }
+    
+    size_t tensor_size = input_tensor->bytes;
+
+    // 3. Process Each Zone
+    std::vector<float> readings;
+    std::vector<float> confidences;
+    
+    // Optimization: Reserve memory to avoid reallocations
+    readings.reserve(zones.size());
+    confidences.reserve(zones.size());
+    
+    ESP_LOGD(TAG, "Processing %d zones...", zones.size());
+
+    for (size_t i = 0; i < zones.size(); i++) {
+        const auto& zone = zones[i];
+        
+        // A. Process Image Zone directly into Model Input Tensor
+        // This avoids allocating an intermediate buffer
+        if (!image_processor_->process_zone_to_buffer(frame, zone, tensor_data, tensor_size)) {
+            ESP_LOGE(TAG, "Failed to process zone %d", i);
+            readings.push_back(0.0f); // Error placeholder
+            confidences.push_back(0.0f);
+            continue;
+        }
+
+        // B. Run Inference
+        if (model_handler_.invoke() != kTfLiteOk) {
+            ESP_LOGE(TAG, "Model invocation failed for zone %d", i);
+            readings.push_back(0.0f);
+            confidences.push_back(0.0f);
+            continue;
+        }
+
+        // C. Process Output
+        // Assuming model output is [value, confidence] or similar, handled by model_handler
+        TfLiteTensor* output_tensor = model_handler_.output_tensor();
+        if (!output_tensor) {
+             ESP_LOGE(TAG, "Output tensor is null");
+             continue;
+        }
+        
+        ProcessedOutput output = model_handler_.process_output(output_tensor->data.f);
+        
+        readings.push_back(output.value);
+        confidences.push_back(output.confidence);
+        
+        ESP_LOGV(TAG, "Zone %d: Value=%.2f, Conf=%.2f", i, output.value, output.confidence);
+    }
+
+    // 4. Combine and Validate
+    if (!readings.empty()) {
+        float combined_value = combine_readings(readings);
+        
+        // Calculate average confidence
+        float avg_confidence = 0.0f;
+        for (float c : confidences) avg_confidence += c;
+        if (!confidences.empty()) avg_confidence /= confidences.size();
+        
+        // Validate
+        float validated_value = 0.0f;
+        if (validate_and_update_reading(combined_value, avg_confidence, validated_value)) {
+            // Success
+            if (value_sensor_) value_sensor_->publish_state(validated_value);
+            if (confidence_sensor_) confidence_sensor_->publish_state(avg_confidence);
+            
+            std::string log_msg = "Read: " + std::to_string(validated_value);
+            if (main_logs_) main_logs_->publish_state(log_msg);
+        } else {
+            // Validation failed
+            std::string log_msg = "Invalid: " + std::to_string(combined_value);
+            if (main_logs_) main_logs_->publish_state(log_msg);
+        }
+        
+        // Update inference logs
+        if (inference_logs_) {
+            std::stringstream ss;
+            ss << "V:" << std::fixed << std::setprecision(1) << combined_value 
+               << " C:" << std::setprecision(2) << avg_confidence 
+               << " (" << millis() - start_time << "ms)";
+            inference_logs_->publish_state(ss.str());
+        }
+    }
+
+    processing_frame_ = false;
+    DURATION_END("Full processing");
+}
+
+bool MeterReaderTFLite::validate_and_update_reading(float raw_reading, float confidence, float& validated_reading) {
+    int raw_int = static_cast<int>(round(raw_reading));
+    int valid_int = 0;
+    
+    bool is_valid = value_validator_.validate_reading(raw_int, confidence, valid_int);
+    
+    validated_reading = static_cast<float>(valid_int);
+    return is_valid;
+}
+
+bool MeterReaderTFLite::process_model_result(const esp32_camera_utils::ImageProcessor::ProcessResult& result, float* value, float* confidence) {
+    return false; // Unused
 }
 
 void MeterReaderTFLite::set_model(const uint8_t *model, size_t length) {
@@ -105,7 +316,7 @@ void MeterReaderTFLite::set_camera_image_format(int width, int height, const std
 
 
 float MeterReaderTFLite::combine_readings(const std::vector<float> &readings) {
-    std::string digit_string;
+    float combined_value = 0.0f;
     
     ESP_LOGI(TAG, "Processing %d readings:", readings.size());
     
@@ -123,18 +334,10 @@ float MeterReaderTFLite::combine_readings(const std::vector<float> &readings) {
                     i + 1, readings[i], digit);
         }
         
-        digit_string += std::to_string(digit);
+        combined_value = combined_value * 10.0f + digit;
     }
     
-    ESP_LOGI(TAG, "Concatenated digit string: %s", digit_string.c_str());
-    
-    // Convert string to float (like Python's int())
-    float combined_value = std::stof(digit_string);
-    
-    // ESP_LOGD(TAG, "Raw readings: [%.1f, %.1f, %.1f, %.1f, %.1f, %.1f, %.1f, %.1f]", 
-         // readings[0], readings[1], readings[2], readings[3], 
-         // readings[4], readings[5], readings[6], readings[7]);
-         
+    // Log raw readings for debugging
     std::string readings_str;
     for (const auto& reading : readings) {
       if (!readings_str.empty()) {
@@ -156,34 +359,6 @@ MeterReaderTFLite::~MeterReaderTFLite() {
     
     // Add memory validation
     ESP_LOGI(TAG, "Component destruction - memory cleanup");
-    #ifdef DEBUG_METER_READER_TFLITE
-    // Optional: Add leak detection here
-    // MemoryTracker::dump_leaks();
-    #endif
-}
-
-size_t MeterReaderTFLite::available() const {
-    return 0; // Frames processed directly in callback
-}
-
-uint8_t *MeterReaderTFLite::peek_data_buffer() {
-    return nullptr; // Image data handled internally
-}
-
-void MeterReaderTFLite::consume_data(size_t consumed) {
-    // Not used - image processed in one go
-}
-
-void MeterReaderTFLite::return_image() {
-    // Image released after processing completes
-}
-
-void MeterReaderTFLite::set_image(std::shared_ptr<camera::CameraImage> image) {
-    // Part of CameraImageReader interface - not used directly
-}
-
-void MeterReaderTFLite::set_model_config(const std::string &model_type) {
-    model_type_ = model_type;
 }
 
 void MeterReaderTFLite::print_debug_info() {
@@ -198,7 +373,7 @@ void MeterReaderTFLite::print_debug_info() {
              tensor_arena_allocation_.actual_size, tensor_arena_allocation_.actual_size / 1024.0f);
     
     // Get the actual peak usage from the interpreter
-    size_t peak_usage = model_handler_.get_arena_peak_bytes();
+    size_t peak_usage = model_handler_.get_arena_used_bytes();
     ESP_LOGI(TAG, "  Arena Peak Usage: %zu bytes (%.1f KB)", peak_usage, peak_usage / 1024.0f);
     
     // Calculate total memory usage
@@ -214,9 +389,6 @@ void MeterReaderTFLite::print_debug_info() {
     );
     ESP_LOGI(TAG, "----------------------------------");
 }
-// void MeterReaderTFLite::print_debug_info() {
-    // print_meter_reader_debug_info(this);
-// }
 
 bool esphome::meter_reader_tflite::MeterReaderTFLite::load_model() {
     DURATION_START();
@@ -362,11 +534,41 @@ void MeterReaderTFLite::test_with_debug_image_all_configs() {
         auto processed_zones = image_processor_->split_image_in_zone(debug_image_, debug_zones);
 
         if (!processed_zones.empty() && processed_zones.size() == debug_zones.size()) {
-            // Prepare zone data for testing
-            std::vector<std::vector<uint8_t>> zone_data;
+            ESP_LOGI(TAG, "Successfully processed %d zones from debug image", processed_zones.size());
             
-            for (size_t zone_idx = 0; zone_idx < processed_zones.size(); zone_idx++) {
-                auto& zone_result = processed_zones[zone_idx];
+            // Run inference on each zone
+            for (size_t i = 0; i < processed_zones.size(); i++) {
+                auto& zone_result = processed_zones[i];
+                
+                // Copy to model input
+                TfLiteTensor* input = model_handler_.input_tensor();
+                if (input->bytes != zone_result.size) {
+                     ESP_LOGE(TAG, "Size mismatch: Input=%d, Zone=%d", input->bytes, zone_result.size);
+                     continue;
+                }
+                
+                if (input->type == kTfLiteFloat32) {
+                    memcpy(input->data.f, zone_result.data->get(), zone_result.size);
+                } else {
+                    memcpy(input->data.uint8, zone_result.data->get(), zone_result.size);
+                }
+                
+                // Invoke
+                if (model_handler_.invoke() == kTfLiteOk) {
+                    TfLiteTensor* output_tensor = model_handler_.output_tensor();
+                    ProcessedOutput out = model_handler_.process_output(output_tensor->data.f);
+                    ESP_LOGI(TAG, "Zone %d: Value=%.2f, Conf=%.2f", i, out.value, out.confidence);
+                } else {
+                    ESP_LOGE(TAG, "Inference failed for zone %d", i);
+                }
+            }
+        } else {
+            ESP_LOGE(TAG, "Failed to process debug zones");
+        }
+    } else {
+        ESP_LOGE(TAG, "No debug image set");
+    }
+}
 
 void MeterReaderTFLite::debug_test_with_pattern() {
     ESP_LOGI(TAG, "Testing with simple pattern instead of debug image");
@@ -446,8 +648,21 @@ void MeterReaderTFLite::reinitialize_image_processor() {
     }
 }
 
-// force_flash_inference removed - use FlashLightController
+void MeterReaderTFLite::dump_config() {
+    ESP_LOGCONFIG(TAG, "Meter Reader TFLite:");
+    ESP_LOGCONFIG(TAG, "  Model Type: %s", model_type_.c_str());
+    ESP_LOGCONFIG(TAG, "  Confidence Threshold: %.2f", confidence_threshold_);
+    ESP_LOGCONFIG(TAG, "  Tensor Arena Size: %zu", tensor_arena_size_requested_);
+    ESP_LOGCONFIG(TAG, "  Camera Dimensions: %dx%d", camera_width_, camera_height_);
+    ESP_LOGCONFIG(TAG, "  Pixel Format: %s", pixel_format_.c_str());
+    ESP_LOGCONFIG(TAG, "  Allow Negative Rates: %s", allow_negative_rates_ ? "YES" : "NO");
+    ESP_LOGCONFIG(TAG, "  Max Absolute Diff: %d", max_absolute_diff_);
+}
 
+void MeterReaderTFLite::set_model_config(const std::string &model_type) {
+    model_type_ = model_type;
+    ESP_LOGD(TAG, "Model type set to: %s", model_type_.c_str());
+}
 
 }  // namespace meter_reader_tflite
 }  // namespace esphome

@@ -19,6 +19,7 @@
 #include "esphome/components/esp32_camera_utils/camera_window_control.h"
 #include "esphome/components/flash_light_controller/flash_light_controller.h"
 #include "value_validator.h"
+#include <atomic>
 
 namespace esphome {
 namespace meter_reader_tflite {
@@ -29,6 +30,7 @@ class MeterReaderTFLite : public PollingComponent {
   void update() override;
   void loop() override;
   void dump_config() override;
+  ~MeterReaderTFLite();
 
   void set_camera(esp32_camera::ESP32Camera *camera) { camera_ = camera; }
   void set_model(const uint8_t *model, size_t length);

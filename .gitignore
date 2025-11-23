@@ -17,4 +17,3 @@ secrets.yaml
 /components/flash_light_controller/__pycache__
 /components/tflite_micro_helper/__pycache__
 compile_log.txt
-compile_log.txt
