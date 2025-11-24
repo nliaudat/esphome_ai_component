@@ -17,6 +17,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_FLASH_LIGHT): cv.use_id(light.LightState),
     cv.Optional(CONF_FLASH_PRE_TIME, default="5s"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_FLASH_POST_TIME, default="2s"): cv.positive_time_period_milliseconds,
+    cv.Optional("debug", default=False): cv.boolean,
 }).extend(cv.COMPONENT_SCHEMA)
 
 async def to_code(config):
@@ -32,3 +33,6 @@ async def to_code(config):
         
     if CONF_FLASH_POST_TIME in config:
         cg.add(var.set_flash_post_time(config[CONF_FLASH_POST_TIME]))
+
+    if config.get("debug", False):
+        cg.add_define("DEBUG_FLASH_LIGHT_CONTROLLER")

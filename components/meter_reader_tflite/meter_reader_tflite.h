@@ -42,8 +42,10 @@ class MeterReaderTFLite : public PollingComponent {
   void set_inference_logs(text_sensor::TextSensor *sensor) { inference_logs_ = sensor; }
   void set_main_logs(text_sensor::TextSensor *sensor) { main_logs_ = sensor; }
   
+  #ifdef DEBUG_METER_READER_TFLITE
   void set_debug_mode(bool debug) { debug_mode_ = debug; }
   void set_debug_image(const uint8_t *data, size_t size);
+  #endif
   
   // Flash light controller setter
   void set_flash_controller(flash_light_controller::FlashLightController *controller) { flash_controller_ = controller; }
@@ -135,9 +137,12 @@ class MeterReaderTFLite : public PollingComponent {
   bool process_model_result(const esp32_camera_utils::ImageProcessor::ProcessResult& result, float* value, float* confidence);
   float combine_readings(const std::vector<float> &readings);
   void print_debug_info();
+  
+  #ifdef DEBUG_METER_READER_TFLITE
   void test_with_debug_image();
   void test_with_debug_image_all_configs();
   void debug_test_with_pattern();
+  #endif
   
   bool test_camera_after_reset();
   void basic_camera_recovery();

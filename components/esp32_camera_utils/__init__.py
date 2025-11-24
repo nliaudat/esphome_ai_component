@@ -21,6 +21,7 @@ CONFIG_SCHEMA = cv.Schema({
         cv.Required(CONF_HEIGHT): cv.int_,
     }),
     cv.Optional(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera),
+    cv.Optional("debug", default=False): cv.boolean,
 }).extend(cv.COMPONENT_SCHEMA)
 
 async def to_code(config):
@@ -39,3 +40,6 @@ async def to_code(config):
     if CONF_CAMERA_ID in config:
         cam = await cg.get_variable(config[CONF_CAMERA_ID])
         cg.add(var.set_camera(cam))
+
+    if config.get("debug", False):
+        cg.add_define("DEBUG_ESP32_CAMERA_UTILS")

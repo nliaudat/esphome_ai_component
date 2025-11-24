@@ -56,10 +56,12 @@ api:
   
 
 tflite_micro_helper:
+  debug: true
 
 esp32_camera_utils:
   id: camera_utils
   camera_id: ${id_prefix}espcam
+  debug: true
   camera_window:  # can be set in http://[hassio]/developer-tools/action > esphome.[s3cam_tflite]_set_camera_window
     offset_x: 928 # multiple of 4
     offset_y: 480 # multiple of 4
@@ -71,6 +73,7 @@ flash_light_controller:
   flash_light: ${id_prefix}flash
   flash_pre_time: 7000ms
   flash_post_time: 2000ms
+  debug: true
 
 meter_reader_tflite:
   id: meter_reader
@@ -82,7 +85,7 @@ meter_reader_tflite:
   inference_logs: inference_logs
 
   update_interval: 60s
-  debug: false
+  debug: true
   debug_image: false # static embedded image (debug.jpg)
   debug_image_out_serial: false
   # crop_zones_global: crop_zones  # Reference the global variables set in globals_AI_component.yaml | To update, use http://[hassio]/developer-tools/action >esphome.[s3cam_tflite]_set_crop_zones | to get, use the tools>draw_regions.py

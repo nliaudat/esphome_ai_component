@@ -21,6 +21,9 @@ static const char *const TAG = "meter_reader_tflite";
 #define DURATION_START() uint32_t start_time = millis()
 #define DURATION_END(name) ESP_LOGD(TAG, "%s took %u ms", name, millis() - start_time)
 
+// Uncomment to enable debug mode
+// #define DEBUG_METER_READER_TFLITE
+
 void MeterReaderTFLite::setup() {
     ESP_LOGCONFIG(TAG, "Setting up Meter Reader TFLite...");
     
@@ -77,6 +80,18 @@ void MeterReaderTFLite::setup() {
 
     // Initialize validation
     setup_output_validation();
+
+    // Process debug image AFTER ImageProcessor is initialized
+    #ifdef DEBUG_METER_READER_TFLITE
+    if (debug_image_) {
+        ESP_LOGI(TAG, "Processing debug image after setup completion");
+        this->set_timeout(1000, [this]() { // Small delay to ensure everything is ready
+            this->test_with_debug_image();
+        });
+    } else {
+        ESP_LOGE(TAG, "No debug image set to process.");
+    }
+    #endif
 }
 
 void MeterReaderTFLite::setup_output_validation() {
@@ -463,6 +478,7 @@ bool esphome::meter_reader_tflite::MeterReaderTFLite::load_model() {
     return true;
 }
 
+#ifdef DEBUG_METER_READER_TFLITE
 class DebugCameraImage : public camera::CameraImage {
  public:
     DebugCameraImage(const uint8_t* data, size_t size, int width, int height)
@@ -604,6 +620,7 @@ void MeterReaderTFLite::debug_test_with_pattern() {
     
     ESP_LOGI(TAG, "Basic camera recovery completed");
 }
+#endif
 
 bool MeterReaderTFLite::camera_supports_window() const {
     if (!camera_) {

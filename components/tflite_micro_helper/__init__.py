@@ -6,7 +6,9 @@ DEPENDENCIES = ['esp32', 'esp32_camera_utils']
 
 tflite_micro_helper_ns = cg.esphome_ns.namespace('tflite_micro_helper')
 
-CONFIG_SCHEMA = cv.Schema({})
+CONFIG_SCHEMA = cv.Schema({
+    cv.Optional("debug", default=False): cv.boolean,
+})
 
 def to_code(config):
     esp32.add_idf_component(
@@ -24,3 +26,6 @@ def to_code(config):
     cg.add_build_flag("-DESP_NN")
     cg.add_build_flag("-DUSE_ESP32_CAMERA_CONV")
     cg.add_build_flag("-DOPTIMIZED_KERNEL=esp_nn")
+
+    if config.get("debug", False):
+        cg.add_define("DEBUG_TFLITE_MICRO_HELPER")
