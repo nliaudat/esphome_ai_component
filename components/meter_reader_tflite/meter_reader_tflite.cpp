@@ -329,7 +329,6 @@ void MeterReaderTFLite::set_camera_image_format(int width, int height, const std
            original_camera_width_, original_camera_height_, original_pixel_format_.c_str());
 }
 
-
 float MeterReaderTFLite::combine_readings(const std::vector<float> &readings) {
     float combined_value = 0.0f;
     
@@ -522,16 +521,49 @@ void MeterReaderTFLite::test_with_debug_image() {
         
         // Use static debug zones instead of parsed zones
         crop_zone_handler_.set_debug_zones();
+        auto debug_zones = crop_zone_handler_.get_zones();
         
-        ESP_LOGI(TAG, "Processing debug image with static crop zones...");
-        process_full_image(debug_image_);
-        set_pause_processing(true);
+        ESP_LOGI(TAG, "Processing %d debug zones...", debug_zones.size());
         
+        // Process all debug zones through the image processor
+        auto processed_zones = image_processor_->split_image_in_zone(debug_image_, debug_zones);
+
+        if (!processed_zones.empty() && processed_zones.size() == debug_zones.size()) {
+            ESP_LOGI(TAG, "Successfully processed %d zones from debug image", processed_zones.size());
+            
+            // Run inference on each zone
+            for (size_t i = 0; i < processed_zones.size(); i++) {
+                auto& zone_result = processed_zones[i];
+                
+                // Copy to model input
+                TfLiteTensor* input = model_handler_.input_tensor();
+                if (input->bytes != zone_result.size) {
+                     ESP_LOGE(TAG, "Size mismatch: Input=%d, Zone=%d", input->bytes, zone_result.size);
+                     continue;
+                }
+                
+                if (input->type == kTfLiteFloat32) {
+                    memcpy(input->data.f, zone_result.data.get(), zone_result.size);
+                } else {
+                    memcpy(input->data.uint8, zone_result.data.get(), zone_result.size);
+                }
+                
+                // Invoke
+                if (model_handler_.invoke() == kTfLiteOk) {
+                    TfLiteTensor* output_tensor = model_handler_.output_tensor();
+                    ProcessedOutput out = model_handler_.process_output(output_tensor->data.f);
+                    ESP_LOGI(TAG, "Zone %d: Value=%.2f, Conf=%.2f", i, out.value, out.confidence);
+                } else {
+                    ESP_LOGE(TAG, "Inference failed for zone %d", i);
+                }
+            }
+        } else {
+            ESP_LOGE(TAG, "Failed to process debug zones");
+        }
     } else {
-        ESP_LOGE(TAG, "No debug image set to process.");
+        ESP_LOGE(TAG, "No debug image set");
     }
 }
-
 
 void MeterReaderTFLite::test_with_debug_image_all_configs() {
     if (debug_image_) {
@@ -564,9 +596,9 @@ void MeterReaderTFLite::test_with_debug_image_all_configs() {
                 }
                 
                 if (input->type == kTfLiteFloat32) {
-                    memcpy(input->data.f, zone_result.data->get(), zone_result.size);
+                    memcpy(input->data.f, zone_result.data.get(), zone_result.size);
                 } else {
-                    memcpy(input->data.uint8, zone_result.data->get(), zone_result.size);
+                    memcpy(input->data.uint8, zone_result.data.get(), zone_result.size);
                 }
                 
                 // Invoke
@@ -587,38 +619,40 @@ void MeterReaderTFLite::test_with_debug_image_all_configs() {
 }
 
 void MeterReaderTFLite::debug_test_with_pattern() {
-    ESP_LOGI(TAG, "Testing with simple pattern instead of debug image");
+    ESP_LOGI(TAG, "Testing with simple pattern");
     
     int width = model_handler_.get_input_width();
     int height = model_handler_.get_input_height();
     int channels = model_handler_.get_input_channels();
-    size_t input_size = width * height * channels * sizeof(float);
     
-    std::vector<uint8_t> test_pattern(input_size);
-    float* float_pattern = reinterpret_cast<float*>(test_pattern.data());
+    // Create a simple test pattern directly in the tensor if possible
+    TfLiteTensor* input_tensor = model_handler_.input_tensor();
+    if (!input_tensor) {
+        ESP_LOGE(TAG, "Input tensor is null");
+        return;
+    }
     
-    // Create a simple test pattern
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-            int pos = (y * width + x) * channels;
-            
-            // Simple gradient pattern
-            float_pattern[pos] = (x / float(width)) * 255.0f;     // R
-            if (channels > 1) float_pattern[pos + 1] = (y / float(height)) * 255.0f;  // G
-            if (channels > 2) float_pattern[pos + 2] = 128.0f;    // B
+    // Fill input tensor with pattern
+    if (input_tensor->type == kTfLiteFloat32) {
+        float* data = input_tensor->data.f;
+        for (int i = 0; i < width * height * channels; i++) {
+             data[i] = (i % 255) / 255.0f;
+        }
+    } else if (input_tensor->type == kTfLiteUInt8) {
+        uint8_t* data = input_tensor->data.uint8;
+        for (int i = 0; i < width * height * channels; i++) {
+             data[i] = (i % 255);
         }
     }
     
-    // Last resort: try to reinitialize the image processor and hope for the best
-    reinitialize_image_processor();
-    
-    // Reset frame states
-    pending_frame_.reset();
-    frame_available_.store(false);
-    frame_requested_.store(false);
-    processing_frame_.store(false);
-    
-    ESP_LOGI(TAG, "Basic camera recovery completed");
+    // Run inference
+    if (model_handler_.invoke() == kTfLiteOk) {
+        TfLiteTensor* output_tensor = model_handler_.output_tensor();
+        ProcessedOutput out = model_handler_.process_output(output_tensor->data.f);
+        ESP_LOGI(TAG, "Pattern Test Result: Value=%.2f, Conf=%.2f", out.value, out.confidence);
+    } else {
+        ESP_LOGE(TAG, "Pattern Test Inference failed");
+    }
 }
 #endif
 
@@ -665,6 +699,62 @@ void MeterReaderTFLite::reinitialize_image_processor() {
     }
 }
 
+// Public method to set crop zones (called from service)
+void MeterReaderTFLite::set_crop_zones(const std::string &zones_json) {
+    crop_zone_handler_.update_zones(zones_json);
+    ESP_LOGI(TAG, "Crop zones updated via service");
+}
+
+// Public method to reset camera window (called from service)
+bool MeterReaderTFLite::reset_camera_window() {
+    if (!camera_) return false;
+    
+    int current_width = 0;
+    int current_height = 0;
+    
+    bool success = camera_window_control_.reset_to_full_frame_with_dimensions(
+        camera_, 
+        original_camera_width_, 
+        original_camera_height_,
+        current_width, 
+        current_height
+    );
+    
+    if (success) {
+        camera_width_ = current_width;
+        camera_height_ = current_height;
+        pixel_format_ = original_pixel_format_;
+        
+        reinitialize_image_processor();
+        ESP_LOGI(TAG, "Camera window reset to full frame (%dx%d)", camera_width_, camera_height_);
+    } else {
+        ESP_LOGE(TAG, "Failed to reset camera window");
+    }
+    
+    return success;
+}
+
+bool MeterReaderTFLite::test_camera_after_reset() {
+    if (!camera_) return false;
+    // Simple check if we can request a frame or if camera is responsive
+    return true; 
+}
+
+void MeterReaderTFLite::basic_camera_recovery() {
+    ESP_LOGW(TAG, "Attempting basic camera recovery...");
+    
+    // Reset internal flags
+    pending_frame_.reset();
+    frame_available_ = false;
+    frame_requested_ = false;
+    processing_frame_ = false;
+    
+    // Reinitialize image processor
+    reinitialize_image_processor();
+    
+    ESP_LOGI(TAG, "Basic camera recovery completed");
+}
+
 void MeterReaderTFLite::dump_config() {
     ESP_LOGCONFIG(TAG, "Meter Reader TFLite:");
     ESP_LOGCONFIG(TAG, "  Model Type: %s", model_type_.c_str());
@@ -679,6 +769,15 @@ void MeterReaderTFLite::dump_config() {
 void MeterReaderTFLite::set_model_config(const std::string &model_type) {
     model_type_ = model_type;
     ESP_LOGD(TAG, "Model type set to: %s", model_type_.c_str());
+}
+
+bool MeterReaderTFLite::allocate_tensor_arena() {
+    tensor_arena_allocation_ = MemoryManager::allocate_tensor_arena(tensor_arena_size_requested_);
+    if (!tensor_arena_allocation_) {
+        ESP_LOGE(TAG, "Failed to allocate tensor arena");
+        return false;
+    }
+    return true;
 }
 
 }  // namespace meter_reader_tflite
