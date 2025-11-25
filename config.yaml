@@ -88,7 +88,7 @@ meter_reader_tflite:
   debug: true
   debug_image: false # static embedded image (debug.jpg)
   debug_image_out_serial: false
-  # crop_zones_global: crop_zones  # Reference the global variables set in globals_AI_component.yaml | To update, use http://[hassio]/developer-tools/action >esphome.[s3cam_tflite]_set_crop_zones | to get, use the tools>draw_regions.py
+  crop_zones_global: crop_zones  # Reference the global variables set in globals_AI_component.yaml | To update, use http://[hassio]/developer-tools/action >esphome.[s3cam_tflite]_set_crop_zones | to get, use the tools>draw_regions.py
   flash_light_controller: flash_controller
   # flash_light: ${id_prefix}flash # optional : flash light at taking image
   # flash_pre_time: 7000    # 7 seconds before update (time to stabilize)
