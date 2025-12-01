@@ -8,6 +8,7 @@
 #include "tensorflow/lite/schema/schema_generated.h"
 
 #include "op_resolver.h"
+#include "memory_manager.h"
 
 namespace esphome {
 namespace tflite_micro_helper {
@@ -35,7 +36,11 @@ struct ProcessedOutput {
 
 class ModelHandler {
  public:
-  bool load_model(const uint8_t *model_data, size_t model_size,
+  // High-level load model that handles memory allocation
+  bool load_model(const uint8_t *model_data, size_t model_size, const ModelConfig &config);
+
+  // Low-level load model (kept for internal use or specific cases)
+  bool load_model_with_arena(const uint8_t *model_data, size_t model_size,
                  uint8_t* tensor_arena, size_t tensor_arena_size,
                  const ModelConfig &config);
 
@@ -78,6 +83,11 @@ class ModelHandler {
     return interpreter_->arena_used_bytes();
   }
   
+  // Memory management helpers
+  size_t get_tensor_arena_size() const { return tensor_arena_allocation_.actual_size; }
+  
+  void report_memory_status();
+  
   // Debug helpers
   void log_input_stats() const;
   void debug_input_pattern() const;
@@ -93,6 +103,12 @@ class ModelHandler {
   std::unique_ptr<tflite::MicroInterpreter> interpreter_;
   ModelConfig config_;
   int output_size_{0};
+  
+  // Memory management
+  MemoryManager memory_manager_;
+  MemoryManager::AllocationResult tensor_arena_allocation_;
+  size_t tensor_arena_size_requested_{0};
+  size_t model_length_{0};
 };
 
 }  // namespace tflite_micro_helper

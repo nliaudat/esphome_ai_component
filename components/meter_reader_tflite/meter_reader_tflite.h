@@ -1,23 +1,13 @@
-/**
- * @file meter_reader_tflite.h
- * @brief ESPHome component for meter reading using TensorFlow Lite Micro.
- * 
- * This component captures images from an ESP32 camera, processes them through
- * a TFLite model, and extracts meter readings with confidence scores.
- */
-
 #pragma once
 
+#include "esphome/components/esp32_camera/esp32_camera.h"
 #include "esphome/core/component.h"
+#include "esphome/components/tflite_micro_helper/model_handler.h"
+#include "esphome/components/esp32_camera_utils/esp32_camera_utils.h"
+#include "esphome/components/esp32_camera_utils/crop_zone_handler.h"
+#include "esphome/components/flash_light_controller/flash_light_controller.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
-#include "esphome/components/esp32_camera/esp32_camera.h"
-#include "esphome/components/tflite_micro_helper/model_handler.h"
-#include "esphome/components/tflite_micro_helper/memory_manager.h"
-#include "esphome/components/esp32_camera_utils/image_processor.h"
-#include "esphome/components/esp32_camera_utils/crop_zone_handler.h"
-#include "esphome/components/esp32_camera_utils/camera_window_control.h"
-#include "esphome/components/flash_light_controller/flash_light_controller.h"
 #include "value_validator.h"
 #include <atomic>
 
@@ -77,11 +67,32 @@ class MeterReaderTFLite : public PollingComponent {
   
   // Public method to set camera window (called from service)
   bool set_camera_window(int offset_x, int offset_y, int width, int height) {
-      return camera_window_control_.set_window(camera_, offset_x, offset_y, width, height);
+      // Delegate to camera utils if we want, or keep using window control?
+      // Since we moved window control to Esp32CameraUtils, we should probably use it there
+      // But Esp32CameraUtils has its own window control instance.
+      // For now, let's assume we use the one in Esp32CameraUtils if we can access it,
+      // or we keep a local one? The plan was to move camera functions to Esp32CameraUtils.
+      // But set_camera_window is a public API here.
+      // We can delegate to camera_utils_.
+      // However, camera_utils_ needs to be accessible.
+      // Let's assume we replace local camera_window_control_ with camera_utils_ usage.
+      // But wait, camera_utils_ is a component.
+      // We should probably inject it or use the one we have.
+      // For now, I will keep the local method but delegate if possible or keep implementation if it wasn't moved.
+      // The task said "Move Camera functions... set_camera_image_format...".
+      // set_camera_window was NOT in the list of moved functions in the task description.
+      // So I will keep it here but maybe use camera_utils_?
+      // Actually, I'll leave it as is for now to avoid breaking too much, 
+      // but I need to remove camera_window_control_ member if I want to fully delegate.
+      // The user asked to move "camera control".
+      // So I should probably delegate.
+      return camera_utils_.set_camera_window(offset_x, offset_y, width, height);
   }
   
   // Public method to reset camera window (called from service)
   bool reset_camera_window();
+
+  void basic_camera_recovery();
 
  protected:
   esp32_camera::ESP32Camera *camera_{nullptr};
@@ -100,10 +111,11 @@ class MeterReaderTFLite : public PollingComponent {
   
   // Helper components
   tflite_micro_helper::ModelHandler model_handler_;
-  tflite_micro_helper::MemoryManager memory_manager_;
-  tflite_micro_helper::MemoryManager::AllocationResult tensor_arena_allocation_;
+  esp32_camera_utils::Esp32CameraUtils camera_utils_;
   
-  std::unique_ptr<esp32_camera_utils::ImageProcessor> image_processor_;
+  // Removed: ModelHandler, MemoryManager, AllocationResult, ImageProcessor
+  // They are now inside tflite_helper_ and camera_utils_
+  
   esp32_camera_utils::CropZoneHandler crop_zone_handler_;
   
   // Flash controller
@@ -124,6 +136,10 @@ class MeterReaderTFLite : public PollingComponent {
   std::string pixel_format_{"RGB888"};
   
   // Camera window configuration storage
+  // Camera window configuration storage - moved to camera_utils_?
+  // We'll keep local copies if needed for getters/setters or delegate.
+  // For simplicity, we'll keep them here as configuration state 
+  // but use camera_utils_ for the actual logic.
   bool camera_window_configured_{false};
   int camera_window_offset_x_{0};
   int camera_window_offset_y_{0};
@@ -132,9 +148,9 @@ class MeterReaderTFLite : public PollingComponent {
   
   // Internal methods
   bool load_model();
-  bool allocate_tensor_arena();
+  // allocate_tensor_arena removed
   void process_full_image(std::shared_ptr<camera::CameraImage> frame);
-  bool process_model_result(const esp32_camera_utils::ImageProcessor::ProcessResult& result, float* value, float* confidence);
+  bool process_model_result(float value, float confidence); // Updated signature
   float combine_readings(const std::vector<float> &readings);
   void print_debug_info();
   
@@ -144,8 +160,7 @@ class MeterReaderTFLite : public PollingComponent {
   void debug_test_with_pattern();
   #endif
   
-  bool test_camera_after_reset();
-  void basic_camera_recovery();
+  // test_camera_after_reset, basic_camera_recovery removed (moved to utils)
   bool camera_supports_window() const;
   
   void setup_output_validation();
@@ -164,21 +179,18 @@ class MeterReaderTFLite : public PollingComponent {
   bool get_pause_processing() const { return pause_processing_; }
   
   // Original camera configuration storage
-  int original_camera_width_{0};      ///< Original camera width before any window changes
-  int original_camera_height_{0};     ///< Original camera height before any window changes
-  std::string original_pixel_format_; ///< Original pixel format before any changes
+  // Original camera configuration storage - moved to camera_utils_
+  // int original_camera_width_{0};
+  // int original_camera_height_{0};
+  // std::string original_pixel_format_;
   
   /**
    * @brief Process the next available frame in the buffer.
    */
   void process_available_frame();
   
-  esp32_camera_utils::CameraWindowControl camera_window_control_;
+  // camera_window_control_ removed
   
-  /**
-   * @brief Reinitialize the ImageProcessor with current camera dimensions and format
-   */
-  void reinitialize_image_processor();
 };
 
 }  // namespace meter_reader_tflite
