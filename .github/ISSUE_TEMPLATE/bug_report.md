@@ -7,6 +7,13 @@ assignees: ''
 
 ---
 
+###################################################################################
+
+Issues are reserved only for developper and code related.
+
+If you have question you can make a discussion and the community can help you
+###################################################################################
+
 **Describe the bug**
 A clear and concise description of what the bug is.
 
