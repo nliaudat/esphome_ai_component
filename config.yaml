@@ -79,6 +79,11 @@ meter_reader_tflite:
   id: meter_reader
   camera_id: ${id_prefix}espcam
   model: "digit_recognizer_v4_10cls_RGB.tflite"
+  camera_window:
+    offset_x: 928
+    offset_y: 480
+    width: 448
+    height: 88
   
   value_sensor: meter_value
   confidence_sensor: meter_confidence

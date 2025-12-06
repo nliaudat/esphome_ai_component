@@ -36,6 +36,22 @@ void Esp32CameraUtils::dump_config() {
   }
 }
 
+bool Esp32CameraUtils::set_camera_window(int offset_x, int offset_y, int width, int height) {
+    set_camera_window_config(offset_x, offset_y, width, height);
+    bool success = window_control_.set_window(camera_, offset_x, offset_y, width, height);
+    
+    if (success) {
+        camera_width_ = width;
+        camera_height_ = height;
+        
+        if (has_processor_config_) {
+            reinitialize_image_processor(last_config_template_);
+        }
+        ESP_LOGI(TAG, "Camera window set to %dx%d. ImageProcessor updated.", width, height);
+    }
+    return success;
+}
+
 
 void Esp32CameraUtils::set_camera_image_format(int width, int height, const std::string &pixel_format) {
   camera_width_ = width;
@@ -129,7 +145,46 @@ bool Esp32CameraUtils::process_zone(std::shared_ptr<camera::CameraImage> frame, 
         ESP_LOGE(TAG, "ImageProcessor not initialized");
         return false;
     }
-    return image_processor_->process_zone_to_buffer(frame, zone, output_buffer, output_size);
+
+    // Translate global crop zone to local window coordinates
+    CropZone local_zone = zone;
+    
+    // If we have a window offset, adjust the coordinates
+    if (has_config_) {
+        local_zone.x1 -= offset_x_;
+        local_zone.y1 -= offset_y_;
+        local_zone.x2 -= offset_x_;
+        local_zone.y2 -= offset_y_;
+        
+        // Clip to actual image dimensions to prevent out-of-bounds errors
+        // This handles cases where the crop zone might slightly overlap the window edge
+        // or if the window configuration is slightly out of sync.
+        int img_width = camera_width_;
+        int img_height = camera_height_;
+        
+        // Use actual frame dimensions if available and different (e.g. JPEG)
+        // Note: CameraImage doesn't expose dimensions directly, so we rely on camera_width_
+        // which should match the window width if configured correctly.
+        // If we needed actual JPEG dims, we'd need to parse the header here or let ImageProcessor handle it.
+        // For now, we assume camera_width_ is correct (window width).
+
+        // Basic clipping
+        local_zone.x1 = std::max(0, local_zone.x1);
+        local_zone.y1 = std::max(0, local_zone.y1);
+        local_zone.x2 = std::min(img_width, local_zone.x2);
+        local_zone.y2 = std::min(img_height, local_zone.y2);
+        
+        // Check if the zone is valid after clipping
+        if (local_zone.x2 <= local_zone.x1 || local_zone.y2 <= local_zone.y1) {
+            ESP_LOGW(TAG, "Crop zone outside of current camera window (Global: %d,%d->%d,%d | Window Offset: %d,%d | Local: %d,%d->%d,%d)", 
+                     zone.x1, zone.y1, zone.x2, zone.y2, 
+                     offset_x_, offset_y_,
+                     local_zone.x1, local_zone.y1, local_zone.x2, local_zone.y2);
+            return false;
+        }
+    }
+
+    return image_processor_->process_zone_to_buffer(frame, local_zone, output_buffer, output_size);
 }
 
 }  // namespace esp32_camera_utils

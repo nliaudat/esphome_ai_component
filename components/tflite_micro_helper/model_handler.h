@@ -33,6 +33,12 @@ struct ProcessedOutput {
   float value;
   float confidence;
 };
+struct ConfigTestResult {
+  ModelConfig config;
+  float avg_confidence;
+  std::vector<float> zone_confidences;
+  std::vector<float> zone_values;
+};
 
 class ModelHandler {
  public:
@@ -76,6 +82,7 @@ class ModelHandler {
   }
 
   ProcessedOutput process_output(const float *output_data) const;
+  ProcessedOutput process_output(TfLiteTensor* output_tensor) const;
   
   const ModelConfig& get_config() const { return config_; }
   
@@ -97,6 +104,28 @@ class ModelHandler {
   bool verify_model_crc(const uint8_t *model_data, size_t length);
   void debug_model_architecture() const;
   bool validate_model_config() const;
+  
+  // Advanced Debugging
+  void debug_input_quantization_analysis(const uint8_t* input_data, size_t input_size, const std::string& stage) const;
+  void debug_input_tensor_details() const;
+  void debug_tensor_types() const;
+  void debug_input_data_stats(const uint8_t* input_data, size_t input_size) const;
+  void debug_quantized_input_details(TfLiteTensor* input, size_t input_size) const;
+  void debug_int8_conversion_details(TfLiteTensor* input, const uint8_t* input_data, size_t input_size) const;
+  void debug_pre_inference_state() const;
+  void debug_output_tensor_details(TfLiteTensor* output) const;
+  void debug_raw_outputs(TfLiteTensor* output) const;
+  void debug_qat_model_output() const;
+
+  // Parameter Sweeping / Testing
+  std::vector<ModelConfig> generate_debug_configs() const;
+  void test_configuration(const ModelConfig& config, 
+                          const std::vector<std::vector<uint8_t>>& zone_data,
+                          std::vector<ConfigTestResult>& results);
+  void debug_test_parameters(const std::vector<std::vector<uint8_t>>& zone_data);
+  bool invoke_model(const uint8_t* data, size_t len); // Helper for tests
+  
+  static void feed_watchdog();
 
  private:
   const tflite::Model *tflite_model_{nullptr};

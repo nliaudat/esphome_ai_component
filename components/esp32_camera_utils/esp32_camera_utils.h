@@ -22,10 +22,7 @@ class Esp32CameraUtils : public Component {
     has_config_ = true;
   }
 
-  bool set_camera_window(int offset_x, int offset_y, int width, int height) {
-      set_camera_window_config(offset_x, offset_y, width, height);
-      return window_control_.set_window(camera_, offset_x, offset_y, width, height);
-  }
+  bool set_camera_window(int offset_x, int offset_y, int width, int height);
 
   void set_camera(esp32_camera::ESP32Camera *camera) { camera_ = camera; }
 

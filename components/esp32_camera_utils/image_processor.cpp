@@ -246,6 +246,36 @@ bool ImageProcessor::process_zone_to_buffer(
     return success;
 }
 
+// Helper to parse JPEG dimensions (accessible to class)
+bool get_jpeg_dimensions(const uint8_t* data, size_t size, int& width, int& height) {
+    if (size < 2 || data[0] != 0xFF || data[1] != 0xD8) return false;
+    size_t pos = 2;
+    while (pos < size) {
+        // Skip padding 0xFF
+        while (pos < size && data[pos] == 0xFF) pos++;
+        if (pos >= size) return false;
+        
+        uint8_t marker = data[pos];
+        pos++;
+        
+        if (marker == 0xDA) return false; // SOS - header ended
+        if (marker == 0xD9) return false; // EOI
+        
+        if (pos + 2 > size) return false;
+        uint16_t len = (data[pos] << 8) | data[pos + 1];
+        
+        if (marker == 0xC0 || marker == 0xC2) { // SOF0 (Baseline) or SOF2 (Progressive)
+            if (pos + 7 > size) return false;
+            height = (data[pos + 3] << 8) | data[pos + 4];
+            width = (data[pos + 5] << 8) | data[pos + 6];
+            return true;
+        }
+        
+        pos += len;
+    }
+    return false;
+}
+
 bool ImageProcessor::process_jpeg_zone_to_buffer(
     std::shared_ptr<camera::CameraImage> image,
     const CropZone &zone,
@@ -263,12 +293,27 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
         return false;
     }
 
+    // Determine actual JPEG dimensions to avoid resize errors
+    int jpeg_width = config_.camera_width;
+    int jpeg_height = config_.camera_height;
+    
+    // Always attempt to get actual dimensions from JPEG header
+    if (get_jpeg_dimensions(jpeg_data, jpeg_size, jpeg_width, jpeg_height)) {
+        if (jpeg_width != config_.camera_width || jpeg_height != config_.camera_height) {
+             // Just debug log, this is expected in windowed mode or if using debug image
+            ESP_LOGD(TAG, "JPEG dimensions (%dx%d) differ from config (%dx%d). Using actual dimensions.",
+                     jpeg_width, jpeg_height, config_.camera_width, config_.camera_height);
+        }
+    } else {
+        ESP_LOGW(TAG, "Failed to parse JPEG dimensions, using config");
+    }
+
     jpeg_dec_config_t decode_config = DEFAULT_JPEG_DEC_CONFIG();
     decode_config.output_type = JPEG_PIXEL_FORMAT_RGB888;
-    decode_config.scale.width = static_cast<uint16_t>(config_.camera_width);
-    decode_config.scale.height = static_cast<uint16_t>(config_.camera_height);
-    decode_config.clipper.width = static_cast<uint16_t>(config_.camera_width);
-    decode_config.clipper.height = static_cast<uint16_t>(config_.camera_height);
+    decode_config.scale.width = static_cast<uint16_t>(jpeg_width);
+    decode_config.scale.height = static_cast<uint16_t>(jpeg_height);
+    decode_config.clipper.width = static_cast<uint16_t>(jpeg_width);
+    decode_config.clipper.height = static_cast<uint16_t>(jpeg_height);
     decode_config.rotate = JPEG_ROTATE_0D;
     decode_config.block_enable = false;
     
@@ -280,7 +325,7 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
         return false;
     }
 
-    size_t full_image_size = config_.camera_width * config_.camera_height * 3;
+    size_t full_image_size = jpeg_width * jpeg_height * 3;
     uint8_t* full_image_buf = (uint8_t*)jpeg_calloc_align(full_image_size, 16);
     if (!full_image_buf) {
         jpeg_dec_close(decoder);
@@ -315,8 +360,13 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
     int crop_width = zone.x2 - zone.x1;
     int crop_height = zone.y2 - zone.y1;
     
+    // Validate zone against ACTUAL image dimensions, not config
+    // This allows processing of images that don't match config (e.g. debug images or windowed captures)
     if (zone.x1 < 0 || zone.y1 < 0 || 
-        zone.x2 > config_.camera_width || zone.y2 > config_.camera_height) {
+        zone.x2 > jpeg_width || zone.y2 > jpeg_height) {
+        ESP_LOGE(TAG, "Crop zone (%d,%d -> %d,%d) out of bounds for actual image (%dx%d) - Config: %dx%d",
+                 zone.x1, zone.y1, zone.x2, zone.y2, jpeg_width, jpeg_height,
+                 config_.camera_width, config_.camera_height);
         jpeg_free_align(full_image_buf);
         jpeg_dec_close(decoder);
         return false;
@@ -331,7 +381,7 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
     }
 
     for (int y = 0; y < crop_height; y++) {
-        const uint8_t* src = full_image_buf + ((zone.y1 + y) * config_.camera_width + zone.x1) * 3;
+        const uint8_t* src = full_image_buf + ((zone.y1 + y) * jpeg_width + zone.x1) * 3;
         uint8_t* dst = cropped_buf + y * crop_width * 3;
         memcpy(dst, src, crop_width * 3);
     }
