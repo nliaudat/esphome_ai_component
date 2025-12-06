@@ -273,6 +273,56 @@ void ModelHandler::debug_input_pattern() const {
     ESP_LOGD(TAG, "  Looks like -1 to 1 normalized: %s", looks_normalized_neg1_1 ? "YES" : "NO");
 }
 
+ProcessedOutput ModelHandler::process_output(TfLiteTensor* output_tensor) const {
+    if (!output_tensor) {
+        ESP_LOGE(TAG, "Null output tensor");
+        return {0.0f, 0.0f};
+    }
+
+    if (output_tensor->type == kTfLiteFloat32) {
+        return process_output(output_tensor->data.f);
+    } 
+    else if (output_tensor->type == kTfLiteUInt8 || output_tensor->type == kTfLiteInt8) {
+        // Calculate total elements
+        int count = 1; 
+        for(int i=0; i < output_tensor->dims->size; i++) {
+            count *= output_tensor->dims->data[i];
+        }
+        
+        // Safety check against buffer overflow if count differs from output_size_
+        // Use local vector, not output_size_ member if they differ? 
+        // process_output(float*) relies on output_size_ to iterate. 
+        // So count MUST match output_size_ or we get bounds issues in process_output(float*).
+        
+        std::vector<float> dequantized(count);
+        float scale = output_tensor->params.scale;
+        int32_t zero_point = output_tensor->params.zero_point;
+        
+        if (scale == 0.0f) { 
+             scale = 1.0f; 
+             // ESP_LOGW(TAG, "Output tensor has scale 0.0, assuming 1.0");
+        }
+
+        if (output_tensor->type == kTfLiteUInt8) {
+            uint8_t* data = output_tensor->data.uint8;
+            for(int i=0; i<count; i++) {
+                dequantized[i] = (data[i] - zero_point) * scale;
+            }
+        } else { // Int8
+            int8_t* data = output_tensor->data.int8;
+            for(int i=0; i<count; i++) {
+                dequantized[i] = (data[i] - zero_point) * scale;
+            }
+        }
+        
+        return process_output(dequantized.data());
+    } 
+    else {
+        ESP_LOGE(TAG, "Unsupported output tensor type: %d", output_tensor->type);
+        return {0.0f, 0.0f};
+    }
+}
+
 ProcessedOutput ModelHandler::process_output(const float *output_data) const {
   const int num_classes = output_size_;
   ProcessedOutput result = {0.0f, 0.0f};

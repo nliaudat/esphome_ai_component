@@ -547,7 +547,7 @@ bool MeterReaderTFLite::process_model_result(const ImageProcessor::ProcessResult
     }
 
     // Process output
-    ProcessedOutput output = model_handler_.process_output(output_tensor->data.f);
+    ProcessedOutput output = model_handler_.process_output(output_tensor);
     *value = output.value;
     *confidence = output.confidence;
 
