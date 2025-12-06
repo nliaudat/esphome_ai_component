@@ -45,6 +45,8 @@ class OpResolverManager {
           add_status = resolver.AddRelu(); break;
         case tflite::BuiltinOperator_RELU6:
           add_status = resolver.AddRelu6(); break;
+        // case tflite::BuiltinOperator_RELU_N1_TO_1:
+          // add_status = resolver.AddReluN1To1(); break;
         case tflite::BuiltinOperator_LOGISTIC:
           add_status = resolver.AddLogistic(); break;
         case tflite::BuiltinOperator_TANH:
@@ -83,6 +85,8 @@ class OpResolverManager {
           add_status = resolver.AddRsqrt(); break;
         case tflite::BuiltinOperator_SQUARE:
           add_status = resolver.AddSquare(); break;
+        // case tflite::BuiltinOperator_POW:
+          // add_status = resolver.AddPow(); break;
         case tflite::BuiltinOperator_EXP:
           add_status = resolver.AddExp(); break;
         case tflite::BuiltinOperator_LOG:
@@ -155,6 +159,14 @@ class OpResolverManager {
           add_status = resolver.AddReduceMax(); break;
         case tflite::BuiltinOperator_REDUCE_MIN:
           add_status = resolver.AddReduceMin(); break;
+        // case tflite::BuiltinOperator_REDUCE_PROD:
+          // add_status = resolver.AddReduceProd(); break;
+        // case tflite::BuiltinOperator_REDUCE_SUM:
+          // add_status = resolver.AddSum(); break;
+        // case tflite::BuiltinOperator_REDUCE_ANY:
+          // add_status = resolver.AddReduceAny(); break;
+        // case tflite::BuiltinOperator_REDUCE_ALL:
+          // add_status = resolver.AddReduceAll(); break;
 
         // ====== Element-wise Ops ======
         case tflite::BuiltinOperator_MAXIMUM:
@@ -165,6 +177,8 @@ class OpResolverManager {
           add_status = resolver.AddArgMax(); break;
         case tflite::BuiltinOperator_ARG_MIN:
           add_status = resolver.AddArgMin(); break;
+        // case tflite::BuiltinOperator_SELECT:
+          // add_status = resolver.AddSelect(); break;
         case tflite::BuiltinOperator_SELECT_V2:
           add_status = resolver.AddSelectV2(); break;
         case tflite::BuiltinOperator_ELU:
@@ -187,14 +201,32 @@ class OpResolverManager {
           add_status = resolver.AddGather(); break;
         case tflite::BuiltinOperator_GATHER_ND:
           add_status = resolver.AddGatherNd(); break;
+        // case tflite::BuiltinOperator_WHERE:
+          // add_status = resolver.AddWhere(); break;
+        // case tflite::BuiltinOperator_REVERSE_SEQUENCE:
+          // add_status = resolver.AddReverseSequence(); break;
         case tflite::BuiltinOperator_REVERSE_V2:
           add_status = resolver.AddReverseV2(); break;
         case tflite::BuiltinOperator_UNIDIRECTIONAL_SEQUENCE_LSTM:
           add_status = resolver.AddUnidirectionalSequenceLSTM(); break;
+        // case tflite::BuiltinOperator_BIDIRECTIONAL_SEQUENCE_LSTM:
+          // add_status = resolver.AddBidirectionalSequenceLSTM(); break;
+        // case tflite::BuiltinOperator_BIDIRECTIONAL_SEQUENCE_RNN:
+          // add_status = resolver.AddBidirectionalSequenceRnn(); break;
+
+        // ====== Quantization Ops ======
+        // case tflite::BuiltinOperator_FAKE_QUANT:
+          // add_status = resolver.AddFakeQuant(); break;
 
         // ====== Embedding Ops ======
         case tflite::BuiltinOperator_EMBEDDING_LOOKUP:
           add_status = resolver.AddEmbeddingLookup(); break;
+        // case tflite::BuiltinOperator_EMBEDDING_LOOKUP_SPARSE:
+          // add_status = resolver.AddEmbeddingLookupSparse(); break;
+
+        // ====== Local Response Normalization ======
+        // case tflite::BuiltinOperator_LOCAL_RESPONSE_NORMALIZATION:
+          // add_status = resolver.AddLocalResponseNormalization(); break;
 
         // ====== Matrix Operations ======
         case tflite::BuiltinOperator_BATCH_MATMUL:
