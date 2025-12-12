@@ -17,9 +17,6 @@ meter_reader_tflite:
   confidence_threshold: 0.7        # Minimum confidence (0.0 - 1.0)
   tensor_arena_size: 512KB         # Memory for TFLite (default: 512KB)
   
-  # Image Rotation (Requires esp32_camera_utils)
-  rotation: "0"                    # "0", "90", "180", "270"
-  
   # Debugging
   debug: false                     # Enable verbose logging
   debug_image: false               # Use embedded static image for testing
@@ -37,6 +34,15 @@ meter_reader_tflite:
   # Integration
   flash_light_controller: my_flash # Link to flash controller
   crop_zones_global: my_zones      # Link to global crop zone variable
+```
+
+### Image Rotation
+
+To rotate the camera image, configure the `esp32_camera_utils` component:
+
+```yaml
+esp32_camera_utils:
+  rotation: "90" # Options: "0", "90", "180", "270"
 ```
 
 ## 📡 Sensor Configuration
@@ -62,12 +68,3 @@ Set `debug: true` to see detailed breakdown of:
 - Inference time
 - Post-processing logic
 - Zone-by-zone analysis
-
-## 🔄 Rotation
-The component supports rotating the camera image before inference. This is useful if your camera is mounted sideways or upside down.
-- **0**: No rotation (default)
-- **90**: 90 degrees clockwise
-- **180**: 180 degrees
-- **270**: 270 degrees clockwise
-
-*Rotation is handled efficiently by `esp32_camera_utils`.*

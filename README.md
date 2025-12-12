@@ -26,6 +26,8 @@ The repository allows you to use specific components based on your needs:
 
 ### 1. Installation
 
+***A detailed procedure for setting up is available in [wiki/setup page](https://github.com/nliaudat/esphome_ai_component/wiki/Setup)***
+
 Add the components to your ESPHome configuration:
 
 ```yaml
@@ -46,17 +48,76 @@ external_components:
 ```yaml
 esp32_camera:
   name: "My Camera"
-  # ... standard camera config ...
+  resolution: 640x480
+  pixel_format: JPEG
+
+# Helper component for image rotation and processing
+esp32_camera_utils:
+  rotation: "90" # Optional: Rotate image 0, 90, 180, 270
 
 meter_reader_tflite:
   id: my_meter_reader
-  model: "my_model.tflite"
+  model: "digit_recognizer.tflite"
   camera_id: my_camera
   update_interval: 60s
-  rotation: "90" # Optional: Rotate image 0, 90, 180, 270
+  
+  # Optional: Link to other components
+  flash_light_controller: my_flash_controller
+  crop_zones_global: my_crop_zones
 ```
 
-*See individual component READMEs for detailed configuration options.*
+## ✨ Key Features
+
+- **🤖 TensorFlow Lite Micro**: Full TFLite Micro runtime support (with operators detection and auto loading)
+- **📷 Camera Integration**: State of the art ESP32 camera integration with TrackedBuffer for better memory management and windowing for OV2640 like camera
+- **🖼️ Image Preprocessing**: Automatic cropping, scaling, and format conversion
+- **⚡ Optimized Performance**: ESP-NN accelerated operations
+- **🎯 Multi-Zone Processing**: Process multiple regions of interest
+- **🔧 Flexible Configuration**: Support for various model types and input formats
+- **🐛 Advanced Debugging**: Real-time image analysis and model output inspection
+- **🔄 Image Rotation**: Full support for 0°, 90°, 180°, 270° rotation on both JPEG and Raw formats (via `esp32_camera_utils`).
+
+## 🎯 Use Cases
+
+### Meter Reading
+- Water, electricity, gas meter digit recognition
+- Analog gauge reading
+- Digital display extraction
+
+### Computer Vision Applications
+- **Object Detection**: Identify objects in camera frames
+- **Image Classification**: Categorize images into classes
+- **Anomaly Detection**: Detect unusual patterns or events
+- **Quality Control**: Inspect products or components
+
+## 🔍 Troubleshooting
+
+### Common Issues
+
+**❌ Model loading fails**
+- **Cause**: Tensor arena size is too small.
+- **Solution**: Increase `tensor_arena_size` in `meter_reader_tflite` config.
+```yaml
+meter_reader_tflite:
+  tensor_arena_size: 768KB  # Default is 512KB
+```
+
+**❌ Poor inference results**
+- **Cause**: Input image poor quality or wrong crop.
+- **Solution**: Enable debug mode to see what the model actually "sees".
+```yaml
+meter_reader_tflite:
+  debug: true
+```
+
+**❌ Camera frame issues**
+- **Cause**: Low memory or bandwidth issues.
+- **Solution**: Lower resolution or framerate in `esp32_camera`.
+
+### Performance Tips
+1. **Use quantized models** (int8) for better performance
+2. **Enable ESP-NN optimizations** (enabled by default)
+3. **Use appropriate tensor_arena_size** (already calculated per model)
 
 ## 🔄 Backward Compatibility
 
@@ -71,15 +132,16 @@ external_components:
     components: [legacy_meter_reader_tflite]
 ```
 
-## ✨ Key Features
+## 🧠 Optimized Models
 
-- **Modular Architecture**: Use only what you need.
-- **Image Rotation**: Full support for 0°, 90°, 180°, 270° rotation on both JPEG and Raw formats.
-- **Optimized Performance**: Hardware-accelerated operations where available.
-- **Advanced Debugging**: Comprehensive debug modes for image analysis and model inspection.
+New optimized models are available for digit recognition that significantly improve performance:
+
+*   **Source**: [nliaudat/digit_recognizer](https://github.com/nliaudat/digit_recognizer)
+*   **Performance**: Capable of full image processing and 8-digit inference in **less than 500 ms**.
+
+These models are recommended for faster response times and lower power consumption.
 
 ## 📄 License
 
 * Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC-BY-NC-SA)
 * No commercial use
-* AI models from [haverland](https://github.com/haverland/Tenth-of-step-of-a-meter-digit) are under Apache Licence

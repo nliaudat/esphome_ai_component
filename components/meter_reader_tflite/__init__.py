@@ -70,14 +70,14 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL, default=False): cv.boolean,
     cv.Optional(CONF_FLASH_LIGHT_CONTROLLER): cv.use_id(flash_light_controller.FlashLightController),
     cv.Optional(CONF_CROP_ZONES): cv.use_id(globals.GlobalsComponent),
-    cv.Optional(CONF_CAMERA_WINDOW): cv.Any(
-    cv.Schema({  # Or detailed configuration
-        cv.Optional('offset_x', default=0): cv.int_,
-        cv.Optional('offset_y', default=0): cv.int_,
-        cv.Optional('width'): cv.int_,
-        cv.Optional('height'): cv.int_,
-        })
-    ),
+    # cv.Optional(CONF_CAMERA_WINDOW): cv.Any(
+    # cv.Schema({  # Or detailed configuration
+    #     cv.Optional('offset_x', default=0): cv.int_,
+    #     cv.Optional('offset_y', default=0): cv.int_,
+    #     cv.Optional('width'): cv.int_,
+    #     cv.Optional('height'): cv.int_,
+    #     })
+    # ),
     # cv.Optional(CONF_AUTO_CAMERA_WINDOW, default=False): cv.boolean,
     cv.Optional(CONF_ALLOW_NEGATIVE_RATES, default=False): cv.boolean,
     cv.Optional(CONF_MAX_ABSOLUTE_DIFF, default=100): cv.positive_int,
@@ -208,27 +208,28 @@ async def to_code(config):
         flash_controller = await cg.get_variable(config[CONF_FLASH_LIGHT_CONTROLLER])
         cg.add(var.set_flash_controller(flash_controller))
     
-
     # Handle optional camera window configuration
-    if CONF_CAMERA_WINDOW in config:
-        window_config = config[CONF_CAMERA_WINDOW]
-        if 'width' in window_config and 'height' in window_config:
-            offset_x = window_config.get('offset_x', 0)
-            offset_y = window_config.get('offset_y', 0)
-            width = window_config['width']
-            height = window_config['height']
+    # if CONF_CAMERA_WINDOW in config:
+    #     window_config = config[CONF_CAMERA_WINDOW]
+    #     if 'width' in window_config and 'height' in window_config:
+    #         offset_x = window_config.get('offset_x', 0)
+    #         offset_y = window_config.get('offset_y', 0)
+    #         width = window_config['width']
+    #         height = window_config['height']
             
-            # Store window configuration as member variables
-            cg.add(var.set_camera_window_offset_x(offset_x))
-            cg.add(var.set_camera_window_offset_y(offset_y))
-            cg.add(var.set_camera_window_width(width))
-            cg.add(var.set_camera_window_height(height))
-            cg.add(var.set_camera_window_configured(True))
+    #         # Store window configuration as member variables
+    #         cg.add(var.set_camera_window_offset_x(offset_x))
+    #         cg.add(var.set_camera_window_offset_y(offset_y))
+    #         cg.add(var.set_camera_window_width(width))
+    #         cg.add(var.set_camera_window_height(height))
+    #         cg.add(var.set_camera_window_configured(True)) 
 
 
     # Set validation parameters
-    cg.add(var.set_allow_negative_rates(config[CONF_ALLOW_NEGATIVE_RATES]))
-    cg.add(var.set_max_absolute_diff(config[CONF_MAX_ABSOLUTE_DIFF]))
+    if CONF_ALLOW_NEGATIVE_RATES in config:
+        cg.add(var.set_allow_negative_rates(config[CONF_ALLOW_NEGATIVE_RATES]))
+    if CONF_MAX_ABSOLUTE_DIFF in config:
+        cg.add(var.set_max_absolute_diff(config[CONF_MAX_ABSOLUTE_DIFF]))
     
 
     

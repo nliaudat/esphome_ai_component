@@ -14,12 +14,12 @@ A dedicated component for advanced image processing operations on ESP32, specifi
 
 ## ⚙️ Configuration
 
-This component is typically loaded automatically by `meter_reader_tflite`, but can be configured directly:
+This component is responsible for image rotation and preprocessing.
 
 ```yaml
 esp32_camera_utils:
   id: camera_utils
-  camera_id: my_camera
+  camera_id: my_camera # ID of the esp32_camera component
   
   # Global Rotation Setting
   rotation: "90"  # Options: "0", "90", "180", "270"
