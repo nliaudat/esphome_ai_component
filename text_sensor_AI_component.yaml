@@ -3,9 +3,9 @@ text_sensor:
     name: "Crop Zones"  # Exposed to HA
     id: crop_zones_sensor
     #Update ESPHome when changed from HA
-    on_value:
-      then:
-        - lambda: |-
-            ESP_LOGI("crop_zones", "Received crop zones: %s", x.c_str());
-            id(crop_zones) = x;  //Store in global var
-            id(meter_reader).set_crop_zones(x);
+    # on_value:
+      # then:
+        # - lambda: |-
+            # ESP_LOGI("crop_zones", "Received crop zones: %s", x.c_str());
+            # id(crop_zones) = x;  //Store in global var
+            # # id(meter_reader).set_crop_zones(x);

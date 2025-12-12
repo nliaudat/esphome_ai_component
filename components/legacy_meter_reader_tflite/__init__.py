@@ -9,10 +9,10 @@ from esphome.components import esp32, sensor, text_sensor
 import esphome.components.esp32_camera as esp32_camera
 from esphome.cpp_generator import RawExpression
 from esphome.components import globals
-import esphome.components.flash_light_controller as flash_light_controller
+from esphome.components import light
 
 CODEOWNERS = ["@nl"]
-DEPENDENCIES = ['esp32', 'camera', 'tflite_micro_helper', 'esp32_camera_utils', 'flash_light_controller']
+DEPENDENCIES = ['esp32', 'camera']
 AUTO_LOAD = ['sensor']
 
 CONF_CAMERA_ID = 'camera_id'
@@ -24,7 +24,9 @@ CONF_DEBUG_IMAGE = 'debug_image'
 CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL = 'debug_image_out_serial'
 # CONF_MODEL_TYPE = 'model_type' 
 
-CONF_FLASH_LIGHT_CONTROLLER = 'flash_light_controller'
+CONF_FLASH_LIGHT = 'flash_light'
+CONF_FLASH_PRE_TIME = 'flash_pre_time'
+CONF_FLASH_POST_TIME = 'flash_post_time'
 
 CONF_CROP_ZONES = 'crop_zones_global'
 
@@ -68,16 +70,19 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_DEBUG, default=False): cv.boolean, 
     cv.Optional(CONF_DEBUG_IMAGE, default=False): cv.boolean, 
     cv.Optional(CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL, default=False): cv.boolean,
-    cv.Optional(CONF_FLASH_LIGHT_CONTROLLER): cv.use_id(flash_light_controller.FlashLightController),
+    cv.Optional(CONF_FLASH_LIGHT): cv.use_id(light.LightState), 
+    cv.Optional(CONF_FLASH_PRE_TIME, default=5000): cv.positive_int,
+    cv.Optional(CONF_FLASH_POST_TIME, default=2000): cv.positive_int,
+    # cv.Optional(CONF_FLASH_DURATION, default=2200): cv.positive_int, 
     cv.Optional(CONF_CROP_ZONES): cv.use_id(globals.GlobalsComponent),
-    # cv.Optional(CONF_CAMERA_WINDOW): cv.Any(
-    # cv.Schema({  # Or detailed configuration
-    #     cv.Optional('offset_x', default=0): cv.int_,
-    #     cv.Optional('offset_y', default=0): cv.int_,
-    #     cv.Optional('width'): cv.int_,
-    #     cv.Optional('height'): cv.int_,
-    #     })
-    # ),
+    cv.Optional(CONF_CAMERA_WINDOW): cv.Any(
+    cv.Schema({  # Or detailed configuration
+        cv.Optional('offset_x', default=0): cv.int_,
+        cv.Optional('offset_y', default=0): cv.int_,
+        cv.Optional('width'): cv.int_,
+        cv.Optional('height'): cv.int_,
+        })
+    ),
     # cv.Optional(CONF_AUTO_CAMERA_WINDOW, default=False): cv.boolean,
     cv.Optional(CONF_ALLOW_NEGATIVE_RATES, default=False): cv.boolean,
     cv.Optional(CONF_MAX_ABSOLUTE_DIFF, default=100): cv.positive_int,
@@ -90,42 +95,48 @@ CONFIG_SCHEMA = cv.Schema({
 async def to_code(config):
     """Code generation for the component."""
 
-    # esp32.add_idf_component(
-    #     name="espressif/esp-tflite-micro",
-    #     # ref="~1.3.4" #https://github.com/espressif/esp-tflite-micro/issues/120
-    #     ref="1.3.4" # fix to 1.3.4 cause 1.3.5 has bug
-    # )
+    esp32.add_idf_component(
+        name="espressif/esp-tflite-micro",
+        # ref="~1.3.4" #https://github.com/espressif/esp-tflite-micro/issues/120
+        ref="1.3.4" # fix to 1.3.4 cause 1.3.5 has bug
+    )
     
-    # esp32.add_idf_component(
-    #     name="espressif/esp-nn",
-    #     ref="~1.1.2"
-    # )
+    esp32.add_idf_component(
+        name="espressif/esp-nn",
+        ref="~1.1.2"
+    )
     
-    # esp32.add_idf_component(
-    #     name="espressif/esp_new_jpeg",
-    #     ref="1.0.0"
-    # )
+    esp32.add_idf_component(
+        name="espressif/esp_new_jpeg",
+        ref="0.6.1"
+    )
         
-    # cg.add_build_flag("-DTF_LITE_STATIC_MEMORY")
-    # cg.add_build_flag("-DTF_LITE_DISABLE_X86_NEON")
-    # cg.add_build_flag("-DESP_NN")
-    # cg.add_build_flag("-DUSE_ESP32_CAMERA_CONV")
-    # cg.add_build_flag("-DOPTIMIZED_KERNEL=esp_nn")
+    cg.add_build_flag("-DTF_LITE_STATIC_MEMORY")
+    cg.add_build_flag("-DTF_LITE_DISABLE_X86_NEON")
+    cg.add_build_flag("-DESP_NN")
+    cg.add_build_flag("-DUSE_ESP32_CAMERA_CONV")
+    cg.add_build_flag("-DOPTIMIZED_KERNEL=esp_nn")
+    
+    #memory debug
+    # cg.add_build_flag("CONFIG_HEAP_TRACING_STANDALONE")
+    # cg.add_build_flag("CONFIG_HEAP_TRACING_DEST")
+
 
     var = cg.new_Pvariable(config[CONF_ID])
-    cg.add_global(cg.RawStatement('#include "esphome/components/meter_reader_tflite/meter_reader_tflite.h"'))
-    cg.add_global(cg.RawStatement('using namespace esphome::meter_reader_tflite;'))
     await cg.register_component(var, config)
 
     cam = await cg.get_variable(config[CONF_CAMERA_ID])
     cg.add(var.set_camera(cam))
-    
+      
+    # Extract model type from filename (without extension)
     model_path = config[CONF_MODEL]
     model_filename = os.path.basename(model_path)
     model_type = os.path.splitext(model_filename)[0]  # Remove .tflite extension
        
     # Set model type from extracted filename
     cg.add(var.set_model_config(model_type))
+    
+    # model_path = config[CONF_MODEL]
     
     # Read the model file as binary data
     with open(model_path, "rb") as f:
@@ -203,35 +214,40 @@ async def to_code(config):
         crop_global = await cg.get_variable(config[CONF_CROP_ZONES])
         cg.add(var.set_crop_zones_global(crop_global))    
 
-    # Set flash light controller if configured
-    if CONF_FLASH_LIGHT_CONTROLLER in config:
-        flash_controller = await cg.get_variable(config[CONF_FLASH_LIGHT_CONTROLLER])
-        cg.add(var.set_flash_controller(flash_controller))
+
+        
+    # Set flash light if configured
+    if CONF_FLASH_LIGHT in config:
+        flash_light = await cg.get_variable(config[CONF_FLASH_LIGHT])
+        cg.add(var.set_flash_light(flash_light))
+        
+    if CONF_FLASH_PRE_TIME in config:
+        cg.add(var.set_flash_pre_time(config[CONF_FLASH_PRE_TIME]))
     
+    if CONF_FLASH_POST_TIME in config:
+        cg.add(var.set_flash_post_time(config[CONF_FLASH_POST_TIME]))
+    
+
     # Handle optional camera window configuration
-    # if CONF_CAMERA_WINDOW in config:
-    #     window_config = config[CONF_CAMERA_WINDOW]
-    #     if 'width' in window_config and 'height' in window_config:
-    #         offset_x = window_config.get('offset_x', 0)
-    #         offset_y = window_config.get('offset_y', 0)
-    #         width = window_config['width']
-    #         height = window_config['height']
+    if CONF_CAMERA_WINDOW in config:
+        window_config = config[CONF_CAMERA_WINDOW]
+        if 'width' in window_config and 'height' in window_config:
+            offset_x = window_config.get('offset_x', 0)
+            offset_y = window_config.get('offset_y', 0)
+            width = window_config['width']
+            height = window_config['height']
             
-    #         # Store window configuration as member variables
-    #         cg.add(var.set_camera_window_offset_x(offset_x))
-    #         cg.add(var.set_camera_window_offset_y(offset_y))
-    #         cg.add(var.set_camera_window_width(width))
-    #         cg.add(var.set_camera_window_height(height))
-    #         cg.add(var.set_camera_window_configured(True)) 
+            # Store window configuration as member variables
+            cg.add(var.set_camera_window_offset_x(offset_x))
+            cg.add(var.set_camera_window_offset_y(offset_y))
+            cg.add(var.set_camera_window_width(width))
+            cg.add(var.set_camera_window_height(height))
+            cg.add(var.set_camera_window_configured(True))
 
 
     # Set validation parameters
-    if CONF_ALLOW_NEGATIVE_RATES in config:
-        cg.add(var.set_allow_negative_rates(config[CONF_ALLOW_NEGATIVE_RATES]))
-    if CONF_MAX_ABSOLUTE_DIFF in config:
-        cg.add(var.set_max_absolute_diff(config[CONF_MAX_ABSOLUTE_DIFF]))
-    
-
+    cg.add(var.set_allow_negative_rates(config[CONF_ALLOW_NEGATIVE_RATES]))
+    cg.add(var.set_max_absolute_diff(config[CONF_MAX_ABSOLUTE_DIFF]))
     
     
     if "value_sensor" in config:
