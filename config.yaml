@@ -7,13 +7,13 @@
       # type: git
       # url: https://github.com/nliaudat/esphome_ai_component
       # ref: main
-    # components: [meter_reader_tflite]
+    # components: [legacy_meter_reader_tflite]
       
 external_components:    
   - source:
       type: local
       path: components 
-    components: [meter_reader_tflite] 
+    components: [meter_reader_tflite, tflite_micro_helper, esp32_camera_utils, flash_light_controller] 
       
 
 
@@ -56,34 +56,46 @@ safe_mode:
 
 api:
   reboot_timeout: 0s # do not reboot if hassio connection is lost.
-            
-     
-  
-meter_reader_tflite:
-  id: meter_reader
+
+tflite_micro_helper:
+  debug: true
+
+esp32_camera_utils:
+  id: camera_utils
   camera_id: ${id_prefix}espcam
-  # model: "dig-class100-0180-s2-q.tflite"  # Must be in same directory as YAML
-  model: "digit_recognizer_v4_10cls_RGB.tflite"
-  # confidence_threshold: 0.7
-  # tensor_arena_size: "768KB" # OPTIONAL, set in model_config.h | check_tflite_model.py gives : Total Arena Size: 415.08 KB (Approx. RAM needed for inference)
-  update_interval: 60s
-  debug: false
-  debug_image: false # static embedded image (debug.jpg)
-  debug_image_out_serial: false
-  crop_zones_global: crop_zones  # Reference the global variables set in globals_AI_component.yaml | To update, use http://[hassio]/developer-tools/action >esphome.[s3cam_tflite]_set_crop_zones | to get, use the tools>draw_regions.py
-  flash_light: ${id_prefix}flash # optional : flash light at taking image
-  flash_pre_time: 7000    # 7 seconds before update (time to stabilize)
-  flash_post_time: 2000   # 2 seconds after update
-  # ### zoom availale for OV2640, OV3660, OV5640, SC101IOT, SC030IOT from crop zones (explicit)
+  debug: true
+  ### zoom availale for OV2640, OV3660, OV5640, SC101IOT, SC030IOT from crop zones (explicit)
   camera_window:  # can be set in http://[hassio]/developer-tools/action > esphome.[s3cam_tflite]_set_camera_window
     offset_x: 928 # multiple of 4
     offset_y: 480 # multiple of 4
     width: 448 # multiple of 4 and 4:3 proportions with height for best quality
     height: 88 #  multiple of 4 and 4:3 proportions with width for best quality
-  # ### Enhanced validation parameters
+  rotation: "90" # 0, 90, 180, 270
+
+# optional : flash light at taking image
+flash_light_controller:
+  id: flash_controller
+  flash_light: ${id_prefix}flash
+  flash_pre_time: 7000ms # 7 seconds before update (time to stabilize)
+  flash_post_time: 2000ms # 2 seconds after update
+  debug: true
+
+meter_reader_tflite:
+  id: meter_reader
+  camera_id: ${id_prefix}espcam
+  model: "digit_recognizer_v4_10cls_RGB.tflite"
+
+  update_interval: 60s
+  debug: true
+  debug_image: false # static embedded image (debug.jpg)
+  debug_image_out_serial: false
+
+  crop_zones_global: crop_zones  # Reference the global variables set in globals_AI_component.yaml | To update, use http://[hassio]/developer-tools/action >esphome.[s3cam_tflite]_set_crop_zones | to get, use the tools>draw_regions.py
+  flash_light_controller: flash_controller
+  ### Enhanced validation parameters
   allow_negative_rates: false    # Prevent meter rollbacks
   max_absolute_diff: 300         # Maximum allowed absolute difference
-  #sensors
+
   value_sensor: meter_value
   confidence_sensor: meter_confidence
   inference_logs: inference_logs

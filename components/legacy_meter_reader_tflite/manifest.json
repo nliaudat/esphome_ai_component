@@ -1,5 +1,5 @@
 {
   "name": "meter_reader_tflite",
-  "version": "2.0.0",
+  "version": "1.0.0",
   "build_system": "cmake"
 }

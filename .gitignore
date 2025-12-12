@@ -13,3 +13,6 @@ secrets.yaml
 /components/meter_reader_tflite/__pycache__
 secrets.yaml
 .vscode/settings.json
+/components/esp32_camera_utils/__pycache__
+/components/flash_light_controller/__pycache__
+/components/tflite_micro_helper/__pycache__

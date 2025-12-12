@@ -8,12 +8,12 @@ switch:
     turn_on_action:
       - lambda: |-
           if (id(meter_reader) != nullptr) {
-            id(meter_reader).set_pause_processing(true);
+            id(meter_reader)->set_pause_processing(true);
           }
     turn_off_action:
       - lambda: |-
           if (id(meter_reader) != nullptr) {
-            id(meter_reader).set_pause_processing(false);
+            id(meter_reader)->set_pause_processing(false);
           }
 
 button:
@@ -24,5 +24,5 @@ button:
     on_press:
       - lambda: |-
           if (id(meter_reader) != nullptr) {
-            id(meter_reader).force_flash_inference(); 
+            id(meter_reader)->force_flash_inference(); 
           }
