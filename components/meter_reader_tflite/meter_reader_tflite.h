@@ -64,6 +64,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_camera_image_format(int width, int height, const std::string &pixel_format);
   void set_camera(esp32_camera::ESP32Camera *camera) { camera_ = camera; }
   void set_model_config(const std::string &model_type);
+  void set_rotation(int rotation) { rotation_ = rotation; }
 
   void print_debug_info();
   void report_memory_status();
@@ -99,6 +100,8 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   // Output validation configuration
   void set_allow_negative_rates(bool allow) { allow_negative_rates_ = allow; }
   void set_max_absolute_diff(int max_diff) { max_absolute_diff_ = max_diff; }
+  
+
 
 # ifdef DEBUG_METER_READER_TFLITE
   void set_debug_image(const uint8_t* data, size_t size);
@@ -193,6 +196,8 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   std::string model_type_{"default"};        ///< Model type identifier
   bool allow_negative_rates_{false};         ///< Whether to allow negative rate changes
   int max_absolute_diff_{100};               ///< Maximum absolute difference allowed between readings
+  int rotation_{0};                          ///< Rotation in degrees (0, 90, 180, 270)
+
 
   // State variables
   size_t tensor_arena_size_actual_{0};       ///< Actual allocated tensor arena size

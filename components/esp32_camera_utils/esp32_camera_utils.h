@@ -41,6 +41,9 @@ class Esp32CameraUtils : public Component {
   // Helper to process a zone directly
   bool process_zone(std::shared_ptr<camera::CameraImage> frame, const CropZone& zone, 
                    uint8_t* output_buffer, size_t output_size);
+  
+  // Image rotation configuration (0, 90, 180, 270 degrees clockwise)
+  void set_rotation(int rotation) { rotation_ = rotation; }
 
  protected:
   int offset_x_{0};
@@ -48,6 +51,7 @@ class Esp32CameraUtils : public Component {
   int width_{0};
   int height_{0};
   bool has_config_{false};
+  int rotation_{0};                          ///< Image rotation in degrees (0, 90, 180, 270)
   esp32_camera::ESP32Camera *camera_{nullptr};
   CameraWindowControl window_control_;
   

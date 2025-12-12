@@ -1,3 +1,11 @@
+/**
+ * @file image_processor.h
+ * @brief Image processing utilities for cropping, scaling, and format conversion.
+ * 
+ * Handles JPEG decoding with optional rotation (0°, 90°, 180°, 270°),
+ * raw format processing (RGB888, RGB565, Grayscale), and conversion to
+ * TensorFlow Lite model input formats (float32 or uint8).
+ */
 #pragma once
 
 #include <memory>
@@ -17,16 +25,26 @@ enum ImageProcessorInputType {
     kInputTypeUnknown
 };
 
+// Image rotation options (clockwise)
+enum ImageRotation {
+    ROTATION_0 = 0,      // No rotation
+    ROTATION_90 = 90,    // 90° clockwise
+    ROTATION_180 = 180,  // 180°
+    ROTATION_270 = 270   // 270° clockwise (or 90° counter-clockwise)
+};
+
 struct ImageProcessorConfig {
   int camera_width;
   int camera_height;
   std::string pixel_format;
+  ImageRotation rotation{ROTATION_0};  // Image rotation (clockwise)
   
   int model_width;
   int model_height;
   int model_channels;
   ImageProcessorInputType input_type;
   bool normalize; // For float32 conversion
+  std::string input_order{"RGB"}; // "RGB" or "BGR"
   
   bool validate() const {
     return camera_width > 0 && camera_height > 0 && !pixel_format.empty() &&
@@ -191,6 +209,30 @@ class ImageProcessor {
   bool scale_rgb888_to_uint8(
       const uint8_t* src, int src_w, int src_h,
       uint8_t* dst, int dst_w, int dst_h, int channels);
+
+  // Channel arrangement helpers
+  void arrange_channels(float* output, uint8_t r, uint8_t g, uint8_t b, int output_channels, bool normalize) const;
+  void arrange_channels(uint8_t* output, uint8_t r, uint8_t g, uint8_t b, int output_channels) const;
+
+      
+  // Software rotation for raw formats (when JPEG rotation not available)
+  bool apply_software_rotation(
+      const uint8_t* input, uint8_t* output,
+      int width, int height, int bytes_per_pixel,
+      ImageRotation rotation);
+
+#ifdef DEBUG_METER_READER_TFLITE
+  // Debug functions for image analysis
+  void debug_log_image_stats(const uint8_t* data, size_t size, const std::string& stage);
+  void debug_log_float_stats(const float* data, size_t count, const std::string& stage);
+  void debug_log_image(const uint8_t* data, size_t size, int width, int height, int channels, const std::string& stage);
+  void debug_log_float_image(const float* data, size_t count, int width, int height, int channels, const std::string& stage);
+  void debug_log_rgb888_image(const uint8_t* data, int width, int height, const std::string& stage);
+  void debug_analyze_processed_zone(const uint8_t* data, int width, int height, int channels, const std::string& zone_name);
+  void debug_analyze_float_zone(const float* data, int width, int height, int channels, const std::string& zone_name, bool normalized);
+  void debug_output_zone_preview(const uint8_t* data, int width, int height, int channels, const std::string& zone_name);
+  void debug_output_float_preview(const float* data, int width, int height, int channels, const std::string& zone_name, bool normalized);
+#endif
 };
 
 }  // namespace esp32_camera_utils

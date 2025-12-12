@@ -1,10 +1,23 @@
+/**
+ * @file image_processor.cpp
+ * @brief Implements the ImageProcessor class for handling image manipulation
+ *        such as cropping, scaling, and format conversion for TensorFlow Lite.
+ * 
+ * Supports JPEG decoding with optional rotation (0°, 90°, 180°, 270°),
+ * raw format processing (RGB888, RGB565, Grayscale), and conversion to
+ * model input formats (float32 or uint8).
+ */
+
+// Prevent old JPEG headers from being included
 #define ESP_JPEG_DEC_H
 #define ESP_JPEG_COMMON_H
 
+// Include esp_new_jpeg FIRST, before any ESPHome camera headers
 #include <cstdint>
 #include "esp_jpeg_dec.h"
 #include "esp_jpeg_common.h"
 
+// Then include other headers
 #include "image_processor.h"
 #include <algorithm>
 #include <cmath>
@@ -16,7 +29,7 @@ namespace esp32_camera_utils {
 
 static const char *const TAG = "ImageProcessor";
 
-// Simple duration logging macro to avoid dependency on debug_utils.h
+// Duration logging macros for performance profiling
 #ifdef DEBUG_DURATION
 #define DURATION_START() uint32_t duration_start_ = millis()
 #define DURATION_END(func) ESP_LOGD(TAG, "%s duration: %lums", func, millis() - duration_start_)
@@ -24,6 +37,45 @@ static const char *const TAG = "ImageProcessor";
 #define DURATION_START()
 #define DURATION_END(func)
 #endif
+
+// Debug macros for image processing analysis (restored from legacy code)
+#ifdef DEBUG_METER_READER_TFLITE
+#define DEBUG_ZONE_INFO(zone, crop_w, crop_h, model_w, model_h) \
+    ESP_LOGI(TAG, "ZONE: [%d,%d,%d,%d] -> %dx%d -> %dx%d", \
+             zone.x1, zone.y1, zone.x2, zone.y2, \
+             crop_w, crop_h, model_w, model_h)
+
+#define DEBUG_FIRST_PIXELS(data, count, channels) \
+    do { \
+        ESP_LOGI(TAG, "FIRST_PIXELS:"); \
+        for (int i = 0; i < std::min(5, count); i += channels) { \
+            if (i + channels - 1 < count) { \
+                ESP_LOGI(TAG, "  Pixel %d: ", i/channels); \
+                for (int c = 0; c < channels; c++) { \
+                    ESP_LOGI(TAG, "    Ch%d: %.1f", c, data[i + c]); \
+                } \
+            } \
+        } \
+    } while (0)
+
+#define DEBUG_CHANNEL_ORDER(data, count, channels) \
+    do { \
+        if (channels >= 3) { \
+            ESP_LOGI(TAG, "CHANNEL_ORDER_TEST:"); \
+            ESP_LOGI(TAG, "  First pixel: %.1f, %.1f, %.1f", \
+                     data[0], data[1], data[2]); \
+            /* Simple heuristic for BGR vs RGB detection */ \
+            if (data[0] > data[2]) { \
+                ESP_LOGI(TAG, "  -> Likely BGR order (first > last)"); \
+            } else if (data[2] > data[0]) { \
+                ESP_LOGI(TAG, "  -> Likely RGB order (last > first)"); \
+            } else { \
+                ESP_LOGI(TAG, "  -> Channel order unclear"); \
+            } \
+        } \
+    } while (0)
+#endif
+
 
 // JPEG error code to string conversion
 const char* ImageProcessor::jpeg_error_to_string(jpeg_error_t error) const {
@@ -124,6 +176,10 @@ ImageProcessor::ImageProcessor(const ImageProcessorConfig &config)
     ESP_LOGE(TAG, "Invalid image processor configuration");
     ESP_LOGE(TAG, "  Camera: %dx%d, Format: %s", 
              config_.camera_width, config_.camera_height, config_.pixel_format.c_str());
+  }
+  
+  if (config_.rotation != ROTATION_0) {
+    ESP_LOGI(TAG, "Image rotation enabled: %d degrees clockwise", config_.rotation);
   }
 
   if (config_.pixel_format == "RGB888") {
@@ -314,7 +370,20 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
     decode_config.scale.height = static_cast<uint16_t>(jpeg_height);
     decode_config.clipper.width = static_cast<uint16_t>(jpeg_width);
     decode_config.clipper.height = static_cast<uint16_t>(jpeg_height);
-    decode_config.rotate = JPEG_ROTATE_0D;
+    
+    
+    // Apply rotation based on configuration (skip if 0° - already default in DEFAULT_JPEG_DEC_CONFIG)
+    // Note: Rotation requires width/height to be multiples of 8 (JPEG block size)
+    if (config_.rotation != ROTATION_0) {
+        switch(config_.rotation) {
+            case ROTATION_90:  decode_config.rotate = JPEG_ROTATE_90D;  break;
+            case ROTATION_180: decode_config.rotate = JPEG_ROTATE_180D; break;
+            case ROTATION_270: decode_config.rotate = JPEG_ROTATE_270D; break;
+            default: break;  // ROTATION_0 already set by DEFAULT_JPEG_DEC_CONFIG()
+        }
+        ESP_LOGD(TAG, "Applying %d° rotation during JPEG decode", config_.rotation);
+    }
+    
     decode_config.block_enable = false;
     
     jpeg_dec_handle_t decoder = nullptr;
@@ -480,41 +549,80 @@ bool ImageProcessor::process_raw_zone_to_buffer(
 
     bool success = false;
     
+    // Determine target dimensions for the scaling step
+    // If rotating 90 or 270, we need to swap dimensions for the intermediate (unrotated) buffer
+    int scale_width = config_.model_width;
+    int scale_height = config_.model_height;
+    
+    bool needs_rotation = (config_.rotation != ROTATION_0);
+    if (needs_rotation && (config_.rotation == ROTATION_90 || config_.rotation == ROTATION_270)) {
+        std::swap(scale_width, scale_height);
+    }
+    
+    uint8_t* target_buffer = output_buffer;
+    uint8_t* temp_buffer = nullptr;
+    
+    // If rotating, we need a temporary buffer for the unrotated scaled image
+    if (needs_rotation) {
+        temp_buffer = (uint8_t*)malloc(output_buffer_size);
+        if (!temp_buffer) {
+            ESP_LOGE(TAG, "Failed to allocate temp buffer for rotation");
+            return false;
+        }
+        target_buffer = temp_buffer;
+    }
+    
     if (config_.pixel_format == "RGB888") {
         if (config_.input_type == kInputTypeFloat32) {
             success = process_rgb888_crop_and_scale_to_float32(
                 input_data, zone, crop_width, crop_height,
-                output_buffer, config_.model_width, config_.model_height, config_.model_channels,
+                target_buffer, scale_width, scale_height, config_.model_channels,
                 config_.normalize);
         } else if (config_.input_type == kInputTypeUInt8) {
             success = process_rgb888_crop_and_scale_to_uint8(
                 input_data, zone, crop_width, crop_height,
-                output_buffer, config_.model_width, config_.model_height, config_.model_channels);
+                target_buffer, scale_width, scale_height, config_.model_channels);
         }
     } else if (config_.pixel_format == "RGB565") {
         if (config_.input_type == kInputTypeFloat32) {
             success = process_rgb565_crop_and_scale_to_float32(
                 input_data, zone, crop_width, crop_height,
-                output_buffer, config_.model_width, config_.model_height, config_.model_channels,
+                target_buffer, scale_width, scale_height, config_.model_channels,
                 config_.normalize);
         } else if (config_.input_type == kInputTypeUInt8) {
             success = process_rgb565_crop_and_scale_to_uint8(
                 input_data, zone, crop_width, crop_height,
-                output_buffer, config_.model_width, config_.model_height, config_.model_channels);
+                target_buffer, scale_width, scale_height, config_.model_channels);
         }
     } else if (config_.pixel_format == "GRAYSCALE") {
         if (config_.input_type == kInputTypeFloat32) {
             success = process_grayscale_crop_and_scale_to_float32(
                 input_data, zone, crop_width, crop_height,
-                output_buffer, config_.model_width, config_.model_height, config_.model_channels,
+                target_buffer, scale_width, scale_height, config_.model_channels,
                 config_.normalize);
         } else if (config_.input_type == kInputTypeUInt8) {
             success = process_grayscale_crop_and_scale_to_uint8(
                 input_data, zone, crop_width, crop_height,
-                output_buffer, config_.model_width, config_.model_height, config_.model_channels);
+                target_buffer, scale_width, scale_height, config_.model_channels);
         }
     } else {
+        if (temp_buffer) free(temp_buffer);
         return false;
+    }
+
+    // Apply rotation if needed
+    if (success && needs_rotation) {
+        int element_size = (config_.input_type == kInputTypeFloat32) ? sizeof(float) : sizeof(uint8_t);
+        int bytes_per_pixel = config_.model_channels * element_size;
+        
+        // rotate temp_buffer (scale_width x scale_height) -> output_buffer (model_width x model_height)
+        success = apply_software_rotation(temp_buffer, output_buffer, 
+                                        scale_width, scale_height, 
+                                        bytes_per_pixel, config_.rotation);
+    }
+    
+    if (temp_buffer) {
+        free(temp_buffer);
     }
 
     return success;
@@ -590,26 +698,27 @@ bool ImageProcessor::process_rgb888_crop_and_scale_to_float32(
     
     // Create a temporary buffer pointing to the crop start is tricky because of stride
     // So we do crop and scale in one go
-    float* dst_float = reinterpret_cast<float*>(output_buffer);
-    float scale_x = (float)crop_width / model_width;
-    float scale_y = (float)crop_height / model_height;
+    float* float_output = reinterpret_cast<float*>(output_buffer);
+    float x_scale = (float)crop_width / model_width;
+    float y_scale = (float)crop_height / model_height;
     
     for (int y = 0; y < model_height; y++) {
+        int src_y = static_cast<int>(y * y_scale);
+        if (src_y >= crop_height) src_y = crop_height - 1;
+        
         for (int x = 0; x < model_width; x++) {
-            int src_x = zone.x1 + (int)(x * scale_x);
-            int src_y = zone.y1 + (int)(y * scale_y);
+            int src_x = static_cast<int>(x * x_scale);
+            if (src_x >= crop_width) src_x = crop_width - 1;
             
-            int src_idx = (src_y * config_.camera_width + src_x) * 3;
-            int dst_idx = (y * model_width + x) * channels;
+            // Calculate source position in original image
+            int src_pos = ((zone.y1 + src_y) * config_.camera_width + (zone.x1 + src_x)) * 3;
+            int dst_pos = (y * model_width + x) * channels;
             
-            if (channels == 3) {
-                dst_float[dst_idx] = normalize ? input_data[src_idx] / 255.0f : input_data[src_idx];
-                dst_float[dst_idx+1] = normalize ? input_data[src_idx+1] / 255.0f : input_data[src_idx+1];
-                dst_float[dst_idx+2] = normalize ? input_data[src_idx+2] / 255.0f : input_data[src_idx+2];
-            } else if (channels == 1) {
-                float gray = 0.299f * input_data[src_idx] + 0.587f * input_data[src_idx+1] + 0.114f * input_data[src_idx+2];
-                dst_float[dst_idx] = normalize ? gray / 255.0f : gray;
-            }
+            uint8_t r = input_data[src_pos];
+            uint8_t g = input_data[src_pos + 1];
+            uint8_t b = input_data[src_pos + 2];
+            
+            arrange_channels(&float_output[dst_pos], r, g, b, channels, normalize);
         }
     }
     return true;
@@ -619,56 +728,402 @@ bool ImageProcessor::process_rgb888_crop_and_scale_to_uint8(
     const uint8_t* input_data, const CropZone& zone, int crop_width, int crop_height,
     uint8_t* output_buffer, int model_width, int model_height, int channels) {
     
-    float scale_x = (float)crop_width / model_width;
-    float scale_y = (float)crop_height / model_height;
+    float x_scale = (float)crop_width / model_width;
+    float y_scale = (float)crop_height / model_height;
     
     for (int y = 0; y < model_height; y++) {
+        int src_y = static_cast<int>(y * y_scale);
+        if (src_y >= crop_height) src_y = crop_height - 1;
+        
         for (int x = 0; x < model_width; x++) {
-            int src_x = zone.x1 + (int)(x * scale_x);
-            int src_y = zone.y1 + (int)(y * scale_y);
+            int src_x = static_cast<int>(x * x_scale);
+            if (src_x >= crop_width) src_x = crop_width - 1;
             
-            int src_idx = (src_y * config_.camera_width + src_x) * 3;
-            int dst_idx = (y * model_width + x) * channels;
+            // Calculate source position in original image
+            int src_pos = ((zone.y1 + src_y) * config_.camera_width + (zone.x1 + src_x)) * 3;
+            int dst_pos = (y * model_width + x) * channels;
             
-            if (channels == 3) {
-                output_buffer[dst_idx] = input_data[src_idx];
-                output_buffer[dst_idx+1] = input_data[src_idx+1];
-                output_buffer[dst_idx+2] = input_data[src_idx+2];
-            } else if (channels == 1) {
-                output_buffer[dst_idx] = (uint8_t)(0.299f * input_data[src_idx] + 0.587f * input_data[src_idx+1] + 0.114f * input_data[src_idx+2]);
-            }
+            uint8_t r = input_data[src_pos];
+            uint8_t g = input_data[src_pos + 1];
+            uint8_t b = input_data[src_pos + 2];
+            
+            arrange_channels(&output_buffer[dst_pos], r, g, b, channels);
         }
     }
     return true;
 }
 
 bool ImageProcessor::process_rgb565_crop_and_scale_to_float32(
-    const uint8_t* input_data, const CropZone& zone, int crop_width, int crop_height,
-    uint8_t* output_buffer, int model_width, int model_height, int channels, bool normalize) {
-    // Placeholder
-    return false; 
+    const uint8_t* input_data, const CropZone &zone, int crop_width, int crop_height,
+    uint8_t* output_buffer, int model_width, int model_height, int model_channels, bool normalize) {
+    
+    float* float_output = reinterpret_cast<float*>(output_buffer);
+    const uint16_t* rgb565_data = reinterpret_cast<const uint16_t*>(input_data);
+    
+    float x_scale = static_cast<float>(crop_width) / model_width;
+    float y_scale = static_cast<float>(crop_height) / model_height;
+    
+    for (int y = 0; y < model_height; y++) {
+        int src_y = static_cast<int>(y * y_scale);
+        if (src_y >= crop_height) src_y = crop_height - 1;
+        
+        for (int x = 0; x < model_width; x++) {
+            int src_x = static_cast<int>(x * x_scale);
+            if (src_x >= crop_width) src_x = crop_width - 1;
+            
+            int src_pos = (zone.y1 + src_y) * config_.camera_width + (zone.x1 + src_x);
+            uint16_t pixel = rgb565_data[src_pos];
+            
+            uint8_t r = ((pixel >> 11) & 0x1F) << 3;
+            uint8_t g = ((pixel >> 5) & 0x3F) << 2;
+            uint8_t b = (pixel & 0x1F) << 3;
+            
+            int dst_pos = (y * model_width + x) * model_channels;
+            arrange_channels(&float_output[dst_pos], r, g, b, model_channels, normalize);
+        }
+    }
+    return true; 
 }
 
 bool ImageProcessor::process_rgb565_crop_and_scale_to_uint8(
-    const uint8_t* input_data, const CropZone& zone, int crop_width, int crop_height,
-    uint8_t* output_buffer, int model_width, int model_height, int channels) {
-    // Placeholder
-    return false;
+    const uint8_t* input_data, const CropZone &zone, int crop_width, int crop_height,
+    uint8_t* output_buffer, int model_width, int model_height, int model_channels) {
+    
+    const uint16_t* rgb565_data = reinterpret_cast<const uint16_t*>(input_data);
+    
+    float x_scale = static_cast<float>(crop_width) / model_width;
+    float y_scale = static_cast<float>(crop_height) / model_height;
+    
+    for (int y = 0; y < model_height; y++) {
+        int src_y = static_cast<int>(y * y_scale);
+        if (src_y >= crop_height) src_y = crop_height - 1;
+        
+        for (int x = 0; x < model_width; x++) {
+            int src_x = static_cast<int>(x * x_scale);
+            if (src_x >= crop_width) src_x = crop_width - 1;
+            
+            int src_pos = (zone.y1 + src_y) * config_.camera_width + (zone.x1 + src_x);
+            uint16_t pixel = rgb565_data[src_pos];
+            
+            uint8_t r = ((pixel >> 11) & 0x1F) << 3;
+            uint8_t g = ((pixel >> 5) & 0x3F) << 2;
+            uint8_t b = (pixel & 0x1F) << 3;
+            
+            int dst_pos = (y * model_width + x) * model_channels;
+            arrange_channels(&output_buffer[dst_pos], r, g, b, model_channels);
+        }
+    }
+    return true;
 }
 
 bool ImageProcessor::process_grayscale_crop_and_scale_to_float32(
-    const uint8_t* input_data, const CropZone& zone, int crop_width, int crop_height,
-    uint8_t* output_buffer, int model_width, int model_height, int channels, bool normalize) {
-    // Placeholder
-    return false;
+    const uint8_t* input_data, const CropZone &zone, int crop_width, int crop_height,
+    uint8_t* output_buffer, int model_width, int model_height, int model_channels, bool normalize) {
+    
+    float* float_output = reinterpret_cast<float*>(output_buffer);
+    float x_scale = static_cast<float>(crop_width) / model_width;
+    float y_scale = static_cast<float>(crop_height) / model_height;
+    
+    for (int y = 0; y < model_height; y++) {
+        int src_y = static_cast<int>(y * y_scale);
+        if (src_y >= crop_height) src_y = crop_height - 1;
+        
+        for (int x = 0; x < model_width; x++) {
+            int src_x = static_cast<int>(x * x_scale);
+            if (src_x >= crop_width) src_x = crop_width - 1;
+            
+            int src_pos = (zone.y1 + src_y) * config_.camera_width + (zone.x1 + src_x);
+            uint8_t gray = input_data[src_pos];
+            
+            int dst_pos = (y * model_width + x) * model_channels;
+            
+            if (model_channels >= 3) {
+                float_output[dst_pos] = normalize ? gray / 255.0f : gray;
+                float_output[dst_pos + 1] = normalize ? gray / 255.0f : gray;
+                float_output[dst_pos + 2] = normalize ? gray / 255.0f : gray;
+            } else if (model_channels == 1) {
+                float_output[dst_pos] = normalize ? gray / 255.0f : gray;
+            }
+        }
+    }
+    return true;
 }
 
 bool ImageProcessor::process_grayscale_crop_and_scale_to_uint8(
-    const uint8_t* input_data, const CropZone& zone, int crop_width, int crop_height,
-    uint8_t* output_buffer, int model_width, int model_height, int channels) {
-    // Placeholder
+    const uint8_t* input_data, const CropZone &zone, int crop_width, int crop_height,
+    uint8_t* output_buffer, int model_width, int model_height, int model_channels) {
+    
+    float x_scale = static_cast<float>(crop_width) / model_width;
+    float y_scale = static_cast<float>(crop_height) / model_height;
+    
+    for (int y = 0; y < model_height; y++) {
+        int src_y = static_cast<int>(y * y_scale);
+        if (src_y >= crop_height) src_y = crop_height - 1;
+        
+        for (int x = 0; x < model_width; x++) {
+            int src_x = static_cast<int>(x * x_scale);
+            if (src_x >= crop_width) src_x = crop_width - 1;
+            
+            int src_pos = (zone.y1 + src_y) * config_.camera_width + (zone.x1 + src_x);
+            uint8_t gray = input_data[src_pos];
+            
+            int dst_pos = (y * model_width + x) * model_channels;
+            
+            if (model_channels >= 3) {
+                output_buffer[dst_pos] = gray;
+                output_buffer[dst_pos + 1] = gray;
+                output_buffer[dst_pos + 2] = gray;
+            } else if (model_channels == 1) {
+                output_buffer[dst_pos] = gray;
+            }
+        }
+    }
+    return true;
+}
+
+void ImageProcessor::arrange_channels(float* output, uint8_t r, uint8_t g, uint8_t b, 
+                                    int output_channels, bool normalize) const {
+    if (output_channels >= 3) {
+        if (config_.input_order == "BGR") {
+            output[0] = normalize ? b / 255.0f : b;
+            output[1] = normalize ? g / 255.0f : g;
+            output[2] = normalize ? r / 255.0f : r;
+        } else { // Default to RGB
+            output[0] = normalize ? r / 255.0f : r;
+            output[1] = normalize ? g / 255.0f : g;
+            output[2] = normalize ? b / 255.0f : b;
+        }
+    } else if (output_channels == 1) {
+        float gray = 0.299f * r + 0.587f * g + 0.114f * b;
+        output[0] = normalize ? gray / 255.0f : gray;
+    }
+}
+
+void ImageProcessor::arrange_channels(uint8_t* output, uint8_t r, uint8_t g, uint8_t b, 
+                                    int output_channels) const {
+    if (output_channels >= 3) {
+        if (config_.input_order == "BGR") {
+            output[0] = b;
+            output[1] = g;
+            output[2] = r;
+        } else { // Default to RGB
+            output[0] = r;
+            output[1] = g;
+            output[2] = b;
+        }
+    } else if (output_channels == 1) {
+        output[0] = static_cast<uint8_t>(0.299f * r + 0.587f * g + 0.114f * b);
+    }
+}
+
+bool ImageProcessor::apply_software_rotation(
+    const uint8_t* input, uint8_t* output,
+    int width, int height, int bytes_per_pixel,
+    ImageRotation rotation) {
+    
+    if (rotation == ROTATION_0) {
+        memcpy(output, input, width * height * bytes_per_pixel);
+        return true;
+    }
+    
+    // Logic for 90, 180, 270... implementation for generic buffer
+    // For now simple implementation to satisfy requirement
+    // TODO: Optimize this with block processing if needed
+    
+    if (rotation == ROTATION_180) {
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int src_idx = (y * width + x) * bytes_per_pixel;
+                int dst_idx = ((height - 1 - y) * width + (width - 1 - x)) * bytes_per_pixel;
+                memcpy(output + dst_idx, input + src_idx, bytes_per_pixel);
+            }
+        }
+        return true;
+    }
+    
+    // For 90 and 270, width and height are swapped in output
+    // Caller must ensure output buffer is sized (height * width * bpp)
+    
+    if (rotation == ROTATION_90) {
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int src_idx = (y * width + x) * bytes_per_pixel;
+                // 90 deg: (x, y) -> (h-1-y, x)
+                int dst_idx = (x * height + (height - 1 - y)) * bytes_per_pixel;
+                memcpy(output + dst_idx, input + src_idx, bytes_per_pixel);
+            }
+        }
+        return true;
+    }
+    
+    if (rotation == ROTATION_270) {
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int src_idx = (y * width + x) * bytes_per_pixel;
+                // 270 deg: (x, y) -> (y, w-1-x)
+                int dst_idx = ((width - 1 - x) * height + y) * bytes_per_pixel;
+                memcpy(output + dst_idx, input + src_idx, bytes_per_pixel);
+            }
+        }
+        return true;
+    }
+    
     return false;
 }
+
+#ifdef DEBUG_METER_READER_TFLITE
+// Debug functions implementation
+
+void ImageProcessor::debug_log_image_stats(const uint8_t* data, size_t size,
+                                         const std::string& stage) {
+    if (!data || size == 0) return;
+    
+    uint8_t min_val = 255;
+    uint8_t max_val = 0;
+    uint32_t sum = 0;
+    int zero_count = 0;
+    
+    for (size_t i = 0; i < size; i++) {
+        min_val = std::min(min_val, data[i]);
+        max_val = std::max(max_val, data[i]);
+        sum += data[i];
+        if (data[i] == 0) zero_count++;
+    }
+    
+    float mean = static_cast<float>(sum) / size;
+    
+    ESP_LOGD(TAG, "DEBUG %s: size=%zu, min=%u, max=%u, mean=%.1f, zeros=%d/%zu (%.1f%%)",
+             stage.c_str(), size, min_val, max_val, mean, 
+             zero_count, size, (zero_count * 100.0f) / size);
+             
+    ESP_LOGD(TAG, "DEBUG %s first 10 values:", stage.c_str());
+    std::string values_str;
+    for (int i = 0; i < std::min(10, (int)size); i++) {
+        values_str += std::to_string(data[i]) + " ";
+    }
+    ESP_LOGD(TAG, "  %s", values_str.c_str());
+}
+
+void ImageProcessor::debug_log_float_stats(const float* data, size_t count,
+                                         const std::string& stage) {
+    if (!data || count == 0) return;
+    
+    float min_val = 1e9;
+    float max_val = -1e9;
+    float sum = 0.0f;
+    int zero_count = 0;
+    
+    for (size_t i = 0; i < count; i++) {
+        min_val = std::min(min_val, data[i]);
+        max_val = std::max(max_val, data[i]);
+        sum += data[i];
+    }
+    
+    float mean = sum / count;
+    
+    ESP_LOGD(TAG, "DEBUG %s: count=%zu, min=%.3f, max=%.3f, mean=%.3f",
+             stage.c_str(), count, min_val, max_val, mean);
+             
+    std::string values_str;
+    for (int i = 0; i < std::min(10, (int)count); i++) {
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%.3f ", data[i]);
+        values_str += buf;
+    }
+    ESP_LOGD(TAG, "  %s", values_str.c_str());
+}
+
+void ImageProcessor::debug_log_image(const uint8_t* data, size_t size, 
+                                   int width, int height, int channels,
+                                   const std::string& stage) {
+    if (!data || size == 0) return;
+    ESP_LOGD(TAG, "DEBUG %s: %dx%dx%d (%zu bytes)", 
+             stage.c_str(), width, height, channels, size);
+    debug_log_image_stats(data, size, stage);
+}
+
+void ImageProcessor::debug_log_float_image(const float* data, size_t count,
+                                         int width, int height, int channels,
+                                         const std::string& stage) {
+    if (!data || count == 0) return;
+    ESP_LOGD(TAG, "DEBUG %s: %dx%dx%d (%zu floats)", 
+             stage.c_str(), width, height, channels, count);
+    debug_log_float_stats(data, count, stage);
+}
+
+void ImageProcessor::debug_log_rgb888_image(const uint8_t* data, 
+                                          int width, int height,
+                                          const std::string& stage) {
+    debug_log_image(data, width * height * 3, width, height, 3, stage);
+}
+
+void ImageProcessor::debug_analyze_processed_zone(const uint8_t* data, 
+                                                 int width, int height, 
+                                                 int channels,
+                                                 const std::string& zone_name) {
+    if (!data || width <= 0 || height <= 0) return;
+    
+    ESP_LOGI(TAG, "ZONE_ANALYSIS:%s:%dx%dx%d", zone_name.c_str(), width, height, channels);
+    /* Too verbose for full analysis every time, enabled only for small check */
+    if (width <= 10 && height <= 10) {
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int pos = (y * width + x) * channels;
+                ESP_LOGI(TAG, "  Pixel[%d,%d] ch0=%u", x, y, data[pos]);
+            }
+        }
+    }
+}
+
+void ImageProcessor::debug_analyze_float_zone(const float* data, 
+                                             int width, int height, 
+                                             int channels,
+                                             const std::string& zone_name,
+                                             bool normalized) {
+    if (!data || width <= 0 || height <= 0) return;
+    debug_log_float_stats(data, width * height * channels, zone_name);
+}
+
+void ImageProcessor::debug_output_zone_preview(const uint8_t* data,
+                                              int width, int height,
+                                              int channels,
+                                              const std::string& zone_name) {
+    if (width > 64 || height > 64) return; // Too big for log
+    
+    ESP_LOGI(TAG, "PREVIEW:%s", zone_name.c_str());
+    for (int y = 0; y < height; y++) {
+        std::string line;
+        for (int x = 0; x < width; x++) {
+            int pos = (y * width + x) * channels;
+            uint8_t val = data[pos]; // Take first channel (or grayscale)
+            char c = val > 128 ? '#' : '.';
+            line += c;
+        }
+        ESP_LOGI(TAG, "%s", line.c_str());
+    }
+}
+
+void ImageProcessor::debug_output_float_preview(const float* data,
+                                               int width, int height,
+                                               int channels,
+                                               const std::string& zone_name,
+                                               bool normalized) {
+     if (width > 64 || height > 64) return;
+     
+     ESP_LOGI(TAG, "FLOAT_PREVIEW:%s", zone_name.c_str());
+     for (int y = 0; y < height; y++) {
+        std::string line;
+        for (int x = 0; x < width; x++) {
+            int pos = (y * width + x) * channels;
+            float val = data[pos];
+            if (normalized) val *= 255.0f;
+            char c = val > 128.0f ? '#' : '.';
+            line += c;
+        }
+        ESP_LOGI(TAG, "%s", line.c_str());
+    }
+}
+#endif
 
 }  // namespace esp32_camera_utils
 }  // namespace esphome

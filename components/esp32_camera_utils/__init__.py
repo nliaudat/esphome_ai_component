@@ -12,6 +12,17 @@ Esp32CameraUtils = esp32_camera_utils_ns.class_('Esp32CameraUtils', cg.Component
 CONF_CAMERA_WINDOW = 'camera_window'
 CONF_CAMERA_ID = 'camera_id'
 
+CONF_ROTATION = 'rotation'
+
+# Rotation options mapping
+ROTATION_OPTIONS = {
+    "0": 0,
+    "90": 90,
+    "180": 180,
+    "270": 270,
+}
+
+
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(Esp32CameraUtils),
     cv.Optional(CONF_CAMERA_WINDOW): cv.Schema({
@@ -22,13 +33,16 @@ CONFIG_SCHEMA = cv.Schema({
     }),
     cv.Optional(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera),
     cv.Optional("debug", default=False): cv.boolean,
+    cv.Optional(CONF_ROTATION, default="0"): cv.one_of("0", "90", "180", "270"),
 }).extend(cv.COMPONENT_SCHEMA)
 
 async def to_code(config):
     esp32.add_idf_component(
         name="espressif/esp_new_jpeg",
-        ref="0.6.1"
+        ref="1.0.0"
     )
+
+    cg.add_build_flag("-DUSE_ESP32_CAMERA_CONV")
     
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
@@ -40,6 +54,10 @@ async def to_code(config):
     if CONF_CAMERA_ID in config:
         cam = await cg.get_variable(config[CONF_CAMERA_ID])
         cg.add(var.set_camera(cam))
+    
+    # Set image rotation (convert string to int)
+    rotation_value = ROTATION_OPTIONS.get(config[CONF_ROTATION], 0)
+    cg.add(var.set_rotation(rotation_value))
 
     if config.get("debug", False):
         cg.add_define("DEBUG_ESP32_CAMERA_UTILS")

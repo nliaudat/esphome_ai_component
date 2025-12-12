@@ -90,27 +90,27 @@ CONFIG_SCHEMA = cv.Schema({
 async def to_code(config):
     """Code generation for the component."""
 
-    esp32.add_idf_component(
-        name="espressif/esp-tflite-micro",
-        # ref="~1.3.4" #https://github.com/espressif/esp-tflite-micro/issues/120
-        ref="1.3.4" # fix to 1.3.4 cause 1.3.5 has bug
-    )
+    # esp32.add_idf_component(
+    #     name="espressif/esp-tflite-micro",
+    #     # ref="~1.3.4" #https://github.com/espressif/esp-tflite-micro/issues/120
+    #     ref="1.3.4" # fix to 1.3.4 cause 1.3.5 has bug
+    # )
     
-    esp32.add_idf_component(
-        name="espressif/esp-nn",
-        ref="~1.1.2"
-    )
+    # esp32.add_idf_component(
+    #     name="espressif/esp-nn",
+    #     ref="~1.1.2"
+    # )
     
-    esp32.add_idf_component(
-        name="espressif/esp_new_jpeg",
-        ref="0.6.1"
-    )
+    # esp32.add_idf_component(
+    #     name="espressif/esp_new_jpeg",
+    #     ref="1.0.0"
+    # )
         
-    cg.add_build_flag("-DTF_LITE_STATIC_MEMORY")
-    cg.add_build_flag("-DTF_LITE_DISABLE_X86_NEON")
-    cg.add_build_flag("-DESP_NN")
-    cg.add_build_flag("-DUSE_ESP32_CAMERA_CONV")
-    cg.add_build_flag("-DOPTIMIZED_KERNEL=esp_nn")
+    # cg.add_build_flag("-DTF_LITE_STATIC_MEMORY")
+    # cg.add_build_flag("-DTF_LITE_DISABLE_X86_NEON")
+    # cg.add_build_flag("-DESP_NN")
+    # cg.add_build_flag("-DUSE_ESP32_CAMERA_CONV")
+    # cg.add_build_flag("-DOPTIMIZED_KERNEL=esp_nn")
 
     var = cg.new_Pvariable(config[CONF_ID])
     cg.add_global(cg.RawStatement('#include "esphome/components/meter_reader_tflite/meter_reader_tflite.h"'))
@@ -229,6 +229,8 @@ async def to_code(config):
     # Set validation parameters
     cg.add(var.set_allow_negative_rates(config[CONF_ALLOW_NEGATIVE_RATES]))
     cg.add(var.set_max_absolute_diff(config[CONF_MAX_ABSOLUTE_DIFF]))
+    
+
     
     
     if "value_sensor" in config:

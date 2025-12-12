@@ -17,26 +17,7 @@ namespace tflite_micro_helper {
 
 static const char *const TAG = "ModelHandler";
 
-// ... [Existing code] ...
-
-// Helper to convert type to string for debug
-static const char* tflite_type_to_string(TfLiteType type) {
-    switch (type) {
-        case kTfLiteFloat32: return "FLOAT32";
-        case kTfLiteInt32: return "INT32";
-        case kTfLiteUInt8: return "UINT8";
-        case kTfLiteInt8: return "INT8";
-        case kTfLiteInt64: return "INT64";
-        case kTfLiteString: return "STRING";
-        case kTfLiteBool: return "BOOL";
-        case kTfLiteInt16: return "INT16";
-        case kTfLiteComplex64: return "COMPLEX64";
-        case kTfLiteComplex128: return "COMPLEX128";
-        case kTfLiteFloat16: return "FLOAT16";
-        case kTfLiteFloat64: return "FLOAT64";
-        default: return "UNKNOWN";
-    }
-}
+// tflite_type_to_string is defined in debug_utils.h as inline
 
 void ModelHandler::debug_input_quantization_analysis(const uint8_t* input_data, 
                                                    size_t input_size,

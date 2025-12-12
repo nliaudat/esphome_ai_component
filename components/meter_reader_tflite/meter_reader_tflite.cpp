@@ -112,6 +112,14 @@ void MeterReaderTFLite::setup() {
         config.model_height = model_handler_.get_input_height();
         config.model_channels = model_handler_.get_input_channels();
         
+        // Set rotation based on configuration
+        switch(rotation_) {
+            case 90:  config.rotation = ROTATION_90;  break;
+            case 180: config.rotation = ROTATION_180; break;
+            case 270: config.rotation = ROTATION_270; break;
+            default:  config.rotation = ROTATION_0;   break;
+        }
+        
         TfLiteTensor* input = model_handler_.input_tensor();
         if (input->type == kTfLiteFloat32) {
             config.input_type = kInputTypeFloat32;
@@ -137,9 +145,10 @@ void MeterReaderTFLite::setup() {
         //model_handler_.debug_test_parameters(debug_image_->get_data_buffer(), debug_image_->get_data_length());
 
 
-        } else {
-            ESP_LOGE(TAG, "No debug image set to process.");
-        }
+        } 
+        // else {
+        //     ESP_LOGE(TAG, "No debug image set to process.");
+        // }
 
         #endif
 
@@ -807,18 +816,6 @@ bool MeterReaderTFLite::allocate_tensor_arena() {
 void MeterReaderTFLite::enable_flash_light() {
     if (flash_controller_) {
         ESP_LOGI(TAG, "Enabling flash light (via controller)");
-        // The controller should manage the light, but we need to trigger it manually?
-        // Or does the controller only work on update()? 
-        // If the controller has public methods to turn on, we use them.
-        // Assuming flash_controller_ has a way to force on, or we just rely on the underlying light?
-        // If we have a controller, we might not have direct access to 'turn_on' if it's not a light component itself.
-        // BUT usually the controller has a reference to the light.
-        // Let's assume for now we use the LightState if available (flash_light_) OR we assume the controller exposes the light.
-        // If the user provided a controller, they usually also provided the light to the controller.
-        // The 'flash_light_' member in THIS class might be null if only controller was passed.
-        // We should check if we can get the light from the controller?
-        // For safely, let's just log if we can't control it directly here, but 
-        // 'force_flash_inference' relies on manual control.
         if (flash_light_) {
              ESP_LOGI(TAG, "Enabling flash light directly");
              flash_auto_controlled_.store(true);
@@ -901,9 +898,6 @@ void MeterReaderTFLite::set_flash_controller(flash_light_controller::FlashLightC
     // ESP_LOGI(TAG, "Flash duration set to %ums", duration_ms);
 // }
 
-#ifdef DEBUG_METER_READER_TFLITE
-
-#endif
 
 // ###### camera parameters
 
@@ -1135,6 +1129,14 @@ void MeterReaderTFLite::reinitialize_image_processor() {
         config.model_height = model_handler_.get_input_height();
         config.model_channels = model_handler_.get_input_channels();
         
+        // Set rotation based on configuration
+        switch(rotation_) {
+            case 90:  config.rotation = ROTATION_90;  break;
+            case 180: config.rotation = ROTATION_180; break;
+            case 270: config.rotation = ROTATION_270; break;
+            default:  config.rotation = ROTATION_0;   break;
+        }
+        
         TfLiteTensor* input = model_handler_.input_tensor();
         if (input && input->type == kTfLiteFloat32) {
             config.input_type = kInputTypeFloat32;
@@ -1142,10 +1144,11 @@ void MeterReaderTFLite::reinitialize_image_processor() {
             config.input_type = kInputTypeUInt8;
         }
         config.normalize = model_handler_.get_config().normalize;
+        config.input_order = model_handler_.get_config().input_order;
 
         image_processor_ = std::make_unique<ImageProcessor>(config);
-        ESP_LOGI(TAG, "ImageProcessor reinitialized with dimensions: %dx%d, format: %s",
-                 camera_width_, camera_height_, pixel_format_.c_str());
+        ESP_LOGI(TAG, "ImageProcessor reinitialized with dimensions: %dx%d, format: %s, rotation: %d deg",
+                 camera_width_, camera_height_, pixel_format_.c_str(), rotation_);
     } else {
         ESP_LOGW(TAG, "ImageProcessor not available for reinitialization");
     }
