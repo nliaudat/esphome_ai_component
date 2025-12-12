@@ -6,13 +6,15 @@ import zlib
 from esphome.const import CONF_ID, CONF_MODEL, CONF_ROTATION
 from esphome.core import CORE, HexInt
 from esphome.components import esp32, sensor, text_sensor
+
 import esphome.components.esp32_camera as esp32_camera
 from esphome.cpp_generator import RawExpression
 from esphome.components import globals
 import esphome.components.flash_light_controller as flash_light_controller
 
 CODEOWNERS = ["@nl"]
-DEPENDENCIES = ['esp32', 'camera', 'tflite_micro_helper', 'esp32_camera_utils', 'flash_light_controller']
+DEPENDENCIES = ['esp32', 'tflite_micro_helper', 'esp32_camera_utils', 'flash_light_controller']
+
 AUTO_LOAD = ['sensor']
 
 CONF_CAMERA_ID = 'camera_id'
@@ -24,6 +26,8 @@ CONF_DEBUG_IMAGE = 'debug_image'
 CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL = 'debug_image_out_serial'
 # CONF_MODEL_TYPE = 'model_type' 
 CONF_ROTATION = 'rotation'
+CONF_PREVIEW = 'preview_camera'
+CONF_GENERATE_PREVIEW = 'generate_preview'
 
 # Rotation options mapping
 ROTATION_OPTIONS = {
@@ -43,6 +47,7 @@ CONF_MAX_ABSOLUTE_DIFF = 'max_absolute_diff'
 
 meter_reader_tflite_ns = cg.esphome_ns.namespace('meter_reader_tflite')
 MeterReaderTFLite = meter_reader_tflite_ns.class_('MeterReaderTFLite', cg.PollingComponent)
+
 
 def datasize_to_bytes(value):
     """Parse a data size string with units like KB, MB to bytes."""
@@ -94,6 +99,10 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("confidence_sensor"): cv.use_id(sensor.Sensor),
     cv.Optional("inference_logs"): cv.use_id(text_sensor.TextSensor),
     cv.Optional("main_logs"): cv.use_id(text_sensor.TextSensor),
+    cv.Optional(CONF_GENERATE_PREVIEW, default=False): cv.boolean,
+    # cv.Optional(CONF_PREVIEW): camera_component.CAMERA_SCHEMA.extend({
+    #     cv.GenerateID(): cv.declare_id(MeterPreviewCamera),
+    # }),
 }).extend(cv.polling_component_schema('60s'))
 
 async def to_code(config):
@@ -228,7 +237,17 @@ async def to_code(config):
         
     if config.get(CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL, False):
         cg.add_define("DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL")
+     
+    if config.get(CONF_GENERATE_PREVIEW, False):
+        cg.add(var.set_generate_preview(True))
 
+    # if CONF_PREVIEW in config:
+    #     preview_conf = config[CONF_PREVIEW]
+    #     preview_cam = cg.new_Pvariable(preview_conf[CONF_ID], var)
+    #     await camera_component.register_camera(preview_cam, preview_conf)
+    #     cg.add(var.set_preview_camera(preview_cam))
+   
+    # Handle crop zones (either global or local)
     if CONF_CROP_ZONES in config:
         crop_global = await cg.get_variable(config[CONF_CROP_ZONES])
         cg.add(var.set_crop_zones_global(crop_global))    

@@ -4,12 +4,42 @@
 #include <iomanip>
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
+#include "esphome/core/application.h"
 
 namespace esphome {
 namespace meter_reader_tflite {
 
 using namespace esphome::esp32_camera_utils;
 using namespace esphome::tflite_micro_helper;
+
+// Preview functionality replaced by Template Camera integration
+
+class RotatedPreviewImage : public camera::CameraImage {
+  using UniqueBufferPtr = esphome::esp32_camera_utils::ImageProcessor::UniqueBufferPtr;
+ public:
+  RotatedPreviewImage(UniqueBufferPtr &&data, size_t len, int width, int height, pixformat_t format)
+      : data_(std::move(data)), len_(len), width_(width), height_(height), format_(format) {}
+
+  uint8_t *get_data_buffer() { return data_->get(); }
+  size_t get_data_length() { return len_; }
+  bool was_requested_by(camera::CameraRequester requester) const { return true; }
+  int get_width() { return width_; }
+  int get_height() { return height_; }
+  pixformat_t get_format() { return format_; }
+
+ protected:
+  UniqueBufferPtr data_;
+  size_t len_;
+  int width_;
+  int height_;
+  pixformat_t format_;
+};
+
+
+
+
+#include "esp_camera.h" 
+#include "img_converters.h"
 
 static const char *const TAG = "meter_reader_tflite";
 
@@ -136,8 +166,9 @@ void MeterReaderTFLite::setup() {
 
         image_processor_ = std::make_unique<ImageProcessor>(config);
 
-        ESP_LOGI(TAG, "Meter Reader TFLite setup complete. Configured Rotation: %d degrees", rotation_);
-        this->print_debug_info();
+    ESP_LOGI(TAG, "Setup complete");
+
+    this->print_debug_info();
 
         // Process debug image AFTER ImageProcessor is initialized
         #ifdef DEBUG_METER_READER_TFLITE
@@ -257,8 +288,8 @@ void MeterReaderTFLite::update() {
                 // Schedule flash disable
                 this->set_timeout(disable_time, [this]() {
                     ESP_LOGI(TAG, "Disabling flash as scheduled");
-                    this->disable_flash_light();
                     flash_scheduled_ = false;
+                    this->disable_flash_light();
                 });
             });
             flash_scheduled_ = true;
@@ -449,7 +480,69 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
              processing_success = false;
         }
 
-        auto processed_zones = image_processor_->split_image_in_zone(frame, effective_zones);
+        std::vector<ImageProcessor::ProcessResult> processed_zones = image_processor_->split_image_in_zone(frame, effective_zones);
+
+        // Update preview image for template camera
+        // Only if enabled via config OR requested on-demand
+        bool should_generate = generate_preview_;
+        if (request_preview_) {
+            should_generate = true;
+            request_preview_ = false; // Clear one-shot flag
+        }
+
+        if (should_generate && image_processor_) {
+            // Let's create a temporary ImageProcessorConfig for preview that uses the original camera dimensions
+            // but applies the rotation. This avoids scaling to model input size for the preview.
+            ImageProcessorConfig preview_config;
+            preview_config.camera_width = camera_width_;
+            preview_config.camera_height = camera_height_;
+            preview_config.pixel_format = pixel_format_;
+            // For preview, we want output dimensions to be camera dimensions (after rotation)
+            preview_config.model_width = (rotation_ == 90 || rotation_ == 270) ? camera_height_ : camera_width_;
+            preview_config.model_height = (rotation_ == 90 || rotation_ == 270) ? camera_width_ : camera_height_;
+            preview_config.model_channels = 3; // Assume RGB for preview output
+            
+            switch(rotation_) {
+                case 90:  preview_config.rotation = ROTATION_90;  break;
+                case 180: preview_config.rotation = ROTATION_180; break;
+                case 270: preview_config.rotation = ROTATION_270; break;
+                default:  preview_config.rotation = ROTATION_0;   break;
+            }
+            preview_config.input_type = kInputTypeUInt8; // Always output uint8 for preview
+            preview_config.normalize = false; // No normalization for preview
+            preview_config.input_order = "RGB";
+            ImageProcessor preview_processor(preview_config);
+
+            CropZone full_image_zone = {0, 0, camera_width_, camera_height_};
+            std::vector<CropZone> preview_zones = {full_image_zone};
+            std::vector<ImageProcessor::ProcessResult> preview_results = preview_processor.split_image_in_zone(frame, preview_zones);
+
+            if (!preview_results.empty() && preview_results[0].data && preview_results[0].size > 0) {
+                ImageProcessor::ProcessResult &preview_result = preview_results[0];
+                
+                // The preview_processor outputs RGB888 by default if output_rgb888 is true.
+
+                // If not, it outputs based on model_channels.
+                // Let's assume it outputs RGB888 for now.
+                pixformat_t preview_format = PIXFORMAT_RGB888;
+                if (preview_config.model_channels == 1) {
+                    preview_format = PIXFORMAT_GRAYSCALE;
+                }
+
+                // Use direct allocation to avoid make_shared forwarding issues
+                auto preview_image = std::shared_ptr<RotatedPreviewImage>(new RotatedPreviewImage(
+                    std::move(preview_result.data), preview_result.size,
+                    preview_config.model_width, preview_config.model_height,
+                    preview_format
+                ));
+                this->update_preview_image(preview_image);
+                ESP_LOGD(TAG, "Generated rotated preview image: %dx%d, %zu bytes", 
+                         preview_config.model_width, preview_config.model_height, preview_result.size);
+            } else {
+                ESP_LOGW(TAG, "Failed to generate rotated preview image.");
+            }
+        }
+
 
         std::vector<float> readings;
         std::vector<float> confidences;
@@ -1337,6 +1430,27 @@ void MeterReaderTFLite::set_debug_mode(bool debug_mode) {
     ESP_LOGI(TAG, "Debug mode %s", debug_mode ? "enabled" : "disabled");
 }
 #endif
+
+
+
+
+
+
+void MeterReaderTFLite::take_preview_image() {
+    request_preview_ = true;
+    ESP_LOGI(TAG, "Manual preview requested via button - triggering update cycle");
+    this->update();
+}
+
+std::shared_ptr<camera::CameraImage> MeterReaderTFLite::get_preview_image() {
+    std::lock_guard<std::mutex> lock(preview_mutex_);
+    return last_preview_image_;
+}
+
+void MeterReaderTFLite::update_preview_image(std::shared_ptr<camera::CameraImage> image) {
+    std::lock_guard<std::mutex> lock(preview_mutex_);
+    last_preview_image_ = image;
+}
 
 }  // namespace meter_reader_tflite
 }  // namespace esphome

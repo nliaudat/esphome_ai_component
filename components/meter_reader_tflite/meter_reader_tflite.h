@@ -31,6 +31,12 @@
 namespace esphome {
 namespace meter_reader_tflite {
 
+class MeterReaderTFLite;
+
+
+
+
+
 class MeterReaderTFLite : public PollingComponent, public camera::CameraImageReader {
  public:
   void setup() override;
@@ -65,6 +71,11 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_camera(esp32_camera::ESP32Camera *camera) { camera_ = camera; }
   void set_model_config(const std::string &model_type);
   void set_rotation(int rotation) { rotation_ = rotation; }
+  void set_generate_preview(bool generate) { generate_preview_ = generate; }
+  void take_preview_image(); // One-shot trigger
+  std::shared_ptr<camera::CameraImage> get_preview_image();
+  void update_preview_image(std::shared_ptr<camera::CameraImage> image);
+
 
   void print_debug_info();
   void report_memory_status();
@@ -109,6 +120,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void test_with_debug_image_all_configs();
   void set_debug_mode(bool debug_mode);
   void debug_test_with_pattern();
+  // Debug logic methods
 # endif
 
   void set_flash_light(light::LightState* flash_light);
@@ -219,11 +231,11 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
   // Component instances
   tflite_micro_helper::MemoryManager memory_manager_;             ///< Memory management utilities
+  tflite_micro_helper::MemoryManager::AllocationResult tensor_arena_allocation_;  ///< Tensor arena allocation result
   tflite_micro_helper::ModelHandler model_handler_;               ///< TFLite model handling
   std::unique_ptr<esp32_camera_utils::ImageProcessor> image_processor_;  ///< Image processing utilities
   esp32_camera_utils::CropZoneHandler crop_zone_handler_;        ///< Crop zone management
   ValueValidator output_validator_;         ///< Output validation and historical data
-  tflite_micro_helper::MemoryManager::AllocationResult tensor_arena_allocation_;  ///< Tensor arena allocation result
 
   // Camera window configuration storage
   int camera_window_offset_x_{0};
@@ -273,6 +285,14 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
    * @brief Reinitialize the ImageProcessor with current camera dimensions and format
    */
   void reinitialize_image_processor();
+  
+  // Preview Image Storage
+  bool generate_preview_{false};
+  bool request_preview_{false}; // For on-demand button
+  std::shared_ptr<camera::CameraImage> last_preview_image_{nullptr};
+  std::mutex preview_mutex_;
+  
+
 };
 
 }  // namespace meter_reader_tflite
