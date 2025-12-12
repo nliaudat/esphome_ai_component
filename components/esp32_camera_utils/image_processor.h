@@ -221,7 +221,7 @@ class ImageProcessor {
       int width, int height, int bytes_per_pixel,
       ImageRotation rotation);
 
-#ifdef DEBUG_METER_READER_TFLITE
+#ifdef DEBUG_ESP32_CAMERA_UTILS
   // Debug functions for image analysis
   void debug_log_image_stats(const uint8_t* data, size_t size, const std::string& stage);
   void debug_log_float_stats(const float* data, size_t count, const std::string& stage);

@@ -13,11 +13,17 @@ using namespace esphome::tflite_micro_helper;
 
 static const char *const TAG = "meter_reader_tflite";
 
+// #define DEBUG_METER_READER_TFLITE
+
+#ifdef DURATION_START
+#undef DURATION_START
+#endif
+#ifdef DURATION_END
+#undef DURATION_END
+#endif
+
 #define DURATION_START() uint32_t start_time = millis()
 #define DURATION_END(name) ESP_LOGD(TAG, "%s took %u ms", name, millis() - start_time)
-
-// Uncomment to enable debug mode
-#define DEBUG_METER_READER_TFLITE
 
 void MeterReaderTFLite::setup() {
     ESP_LOGI(TAG, "Setting up Meter Reader TFLite...");

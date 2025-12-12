@@ -31,15 +31,27 @@ static const char *const TAG = "ImageProcessor";
 
 // Duration logging macros for performance profiling
 #ifdef DEBUG_DURATION
+#ifdef DURATION_START
+#undef DURATION_START
+#endif
 #define DURATION_START() uint32_t duration_start_ = millis()
+#ifdef DURATION_END
+#undef DURATION_END
+#endif
 #define DURATION_END(func) ESP_LOGD(TAG, "%s duration: %lums", func, millis() - duration_start_)
 #else
+#ifdef DURATION_START
+#undef DURATION_START
+#endif
 #define DURATION_START()
+#ifdef DURATION_END
+#undef DURATION_END
+#endif
 #define DURATION_END(func)
 #endif
 
 // Debug macros for image processing analysis (restored from legacy code)
-#ifdef DEBUG_METER_READER_TFLITE
+#ifdef DEBUG_ESP32_CAMERA_UTILS
 #define DEBUG_ZONE_INFO(zone, crop_w, crop_h, model_w, model_h) \
     ESP_LOGI(TAG, "ZONE: [%d,%d,%d,%d] -> %dx%d -> %dx%d", \
              zone.x1, zone.y1, zone.x2, zone.y2, \
@@ -971,7 +983,7 @@ bool ImageProcessor::apply_software_rotation(
     return false;
 }
 
-#ifdef DEBUG_METER_READER_TFLITE
+#ifdef DEBUG_ESP32_CAMERA_UTILS
 // Debug functions implementation
 
 void ImageProcessor::debug_log_image_stats(const uint8_t* data, size_t size,
