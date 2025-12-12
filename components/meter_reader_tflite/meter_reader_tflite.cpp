@@ -136,7 +136,7 @@ void MeterReaderTFLite::setup() {
 
         image_processor_ = std::make_unique<ImageProcessor>(config);
 
-        ESP_LOGI(TAG, "Meter Reader TFLite setup complete");
+        ESP_LOGI(TAG, "Meter Reader TFLite setup complete. Configured Rotation: %d degrees", rotation_);
         this->print_debug_info();
 
         // Process debug image AFTER ImageProcessor is initialized

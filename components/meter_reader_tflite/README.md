@@ -20,7 +20,8 @@ meter_reader_tflite:
   # Debugging
   debug: false                     # Enable verbose logging
   debug_image: false               # Use embedded static image for testing
-  debug_image_out_serial: false    # Dump processed image to serial
+  debug_image_out_serial: false    # Dump processed image to serial (very slow!)
+  rotation: "0"                    # Image rotation in degrees ("0", "90", "180", "270").
   
   # Advanced Validation
   allow_negative_rates: false      # Prevent reading from decreasing
@@ -38,12 +39,25 @@ meter_reader_tflite:
 
 ### Image Rotation
 
+**Image Rotation**:
+The `rotation` parameter allows you to rotate the camera image by 90, 180, or 270 degrees. This is useful if your camera is mounted sideways or upside down.
+
 To rotate the camera image, configure the `esp32_camera_utils` component:
 
 ```yaml
 esp32_camera_utils:
   rotation: "90" # Options: "0", "90", "180", "270"
+  # Optional: Image Rotation
+  # Options: "0", "90", "180", "270"
+  rotation: "90"
 ```
+
+> [!IMPORTANT]
+> **Important Note on "Link to HA"**:
+> *   The `rotation` setting **ONLY affects the AI Meter Reader**. The AI will now "see" the image rotated.
+> *   The **Live Camera View** in Home Assistant (Hassio) comes directly from the camera hardware/webserver, which typically **does NOT support 90-degree rotation** (only 180 flip/mirror).
+> *   **Result**: Your HA view will remain sideways, but the AI should now correctly read the digits because it is processing the rotated version internally.
+
 
 ## 📡 Sensor Configuration
 

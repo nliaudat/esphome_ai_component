@@ -377,12 +377,24 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
     }
 
     jpeg_dec_config_t decode_config = DEFAULT_JPEG_DEC_CONFIG();
+    int crop_width = zone.x2 - zone.x1;
+    int crop_height = zone.y2 - zone.y1;
+
+    // Validate zone against ACTUAL image dimensions, not config
+    // This allows processing of images that don't match config (e.g. debug images or windowed captures)
+    if (zone.x1 < 0 || zone.y1 < 0 || 
+        zone.x2 > jpeg_width || zone.y2 > jpeg_height) {
+        ESP_LOGE(TAG, "Crop zone (%d,%d -> %d,%d) out of bounds for actual image (%dx%d) - Config: %dx%d",
+                 zone.x1, zone.y1, zone.x2, zone.y2, jpeg_width, jpeg_height,
+                 config_.camera_width, config_.camera_height);
+        return false;
+    }
+
     decode_config.output_type = JPEG_PIXEL_FORMAT_RGB888;
     decode_config.scale.width = static_cast<uint16_t>(jpeg_width);
     decode_config.scale.height = static_cast<uint16_t>(jpeg_height);
     decode_config.clipper.width = static_cast<uint16_t>(jpeg_width);
     decode_config.clipper.height = static_cast<uint16_t>(jpeg_height);
-    
     
     // Apply rotation based on configuration (skip if 0° - already default in DEFAULT_JPEG_DEC_CONFIG)
     // Note: Rotation requires width/height to be multiples of 8 (JPEG block size)
@@ -438,20 +450,7 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
         return false;
     }
 
-    int crop_width = zone.x2 - zone.x1;
-    int crop_height = zone.y2 - zone.y1;
-    
-    // Validate zone against ACTUAL image dimensions, not config
-    // This allows processing of images that don't match config (e.g. debug images or windowed captures)
-    if (zone.x1 < 0 || zone.y1 < 0 || 
-        zone.x2 > jpeg_width || zone.y2 > jpeg_height) {
-        ESP_LOGE(TAG, "Crop zone (%d,%d -> %d,%d) out of bounds for actual image (%dx%d) - Config: %dx%d",
-                 zone.x1, zone.y1, zone.x2, zone.y2, jpeg_width, jpeg_height,
-                 config_.camera_width, config_.camera_height);
-        jpeg_free_align(full_image_buf);
-        jpeg_dec_close(decoder);
-        return false;
-    }
+
 
     size_t cropped_size = crop_width * crop_height * 3;
     uint8_t* cropped_buf = (uint8_t*)jpeg_calloc_align(cropped_size, 16);
@@ -461,8 +460,15 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
         return false;
     }
 
+    // Calculate effective width/stride of the DECODED image in the buffer
+    int decoded_width = jpeg_width;
+    if (config_.rotation == ROTATION_90 || config_.rotation == ROTATION_270) {
+        decoded_width = jpeg_height;
+    }
+
     for (int y = 0; y < crop_height; y++) {
-        const uint8_t* src = full_image_buf + ((zone.y1 + y) * jpeg_width + zone.x1) * 3;
+        // Use decoded_width for stride calculation
+        const uint8_t* src = full_image_buf + ((zone.y1 + y) * decoded_width + zone.x1) * 3;
         uint8_t* dst = cropped_buf + y * crop_width * 3;
         memcpy(dst, src, crop_width * 3);
     }

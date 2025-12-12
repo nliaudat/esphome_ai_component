@@ -8,4 +8,4 @@ text_sensor:
         # - lambda: |-
             # ESP_LOGI("crop_zones", "Received crop zones: %s", x.c_str());
             # id(crop_zones) = x;  //Store in global var
-            # # id(meter_reader).set_crop_zones(x);
+            # id(meter_reader)->set_crop_zones(x);

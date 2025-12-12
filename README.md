@@ -51,9 +51,6 @@ esp32_camera:
   resolution: 640x480
   pixel_format: JPEG
 
-# Helper component for image rotation and processing
-esp32_camera_utils:
-  rotation: "90" # Optional: Rotate image 0, 90, 180, 270
 
 meter_reader_tflite:
   id: my_meter_reader
@@ -64,7 +61,14 @@ meter_reader_tflite:
   # Optional: Link to other components
   flash_light_controller: my_flash_controller
   crop_zones_global: my_crop_zones
+  
+  # Image Rotation
+  rotation: "90" # Options: "0", "90", "180", "270"
 ```
+
+> [!NOTE]
+> **Rotation behavior**: The `rotation` setting only affects the AI processing. The internal webserver and Home Assistant live view will likely remain unrotated (sideways) as the camera hardware only supports 180° flips. This is normal behavior.
+
 
 ## ✨ Key Features
 

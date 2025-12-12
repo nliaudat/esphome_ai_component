@@ -3,7 +3,7 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 import os
 import zlib
-from esphome.const import CONF_ID, CONF_MODEL
+from esphome.const import CONF_ID, CONF_MODEL, CONF_ROTATION
 from esphome.core import CORE, HexInt
 from esphome.components import esp32, sensor, text_sensor
 import esphome.components.esp32_camera as esp32_camera
@@ -23,7 +23,15 @@ CONF_DEBUG = 'debug'
 CONF_DEBUG_IMAGE = 'debug_image'
 CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL = 'debug_image_out_serial'
 # CONF_MODEL_TYPE = 'model_type' 
+CONF_ROTATION = 'rotation'
 
+# Rotation options mapping
+ROTATION_OPTIONS = {
+    "0": 0,
+    "90": 90,
+    "180": 180,
+    "270": 270,
+}
 CONF_FLASH_LIGHT_CONTROLLER = 'flash_light_controller'
 
 CONF_CROP_ZONES = 'crop_zones_global'
@@ -59,6 +67,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_CONFIDENCE_THRESHOLD, default=0.7): cv.float_range(
         min=0.0, max=1.0
     ),
+    cv.Optional(CONF_ROTATION, default="0"): cv.one_of("0", "90", "180", "270"),
     # Make tensor_arena_size optional since it's now in model_config.h
     cv.Optional(CONF_TENSOR_ARENA_SIZE): cv.All( 
         datasize_to_bytes,
@@ -160,6 +169,27 @@ async def to_code(config):
     pixel_format = CORE.config["substitutions"].get("camera_pixel_format", "RGB888")
     if pixel_format == "JPEG":   
         cg.add(var.set_camera_image_format(width, height, pixel_format))
+    
+    # Set image rotation
+    # Priority 1: Check meter_reader_tflite specific rotation
+    rotation_str = config.get(CONF_ROTATION)
+    
+    # Priority 2: Check esp32_camera_utils configuration if not set locally
+    if rotation_str is None or rotation_str == "0":
+        # Search for esp32_camera_utils in top-level config
+        # Note: CORE.config is fully validated config
+        for comp_name, comp_config in CORE.config.items():
+            if comp_name.startswith("esp32_camera_utils"):
+                # Handle both single dict and list of dicts (though component is likely unique)
+                conf_list = comp_config if isinstance(comp_config, list) else [comp_config]
+                for conf in conf_list:
+                     if "rotation" in conf:
+                         rotation_str = conf["rotation"]
+                         break
+                         
+    print(f"DEBUG_ROTATION_CHECK: Final rotation string is '{rotation_str}'")
+    rotation_value = ROTATION_OPTIONS.get(str(rotation_str), 0)
+    cg.add(var.set_rotation(rotation_value))
     
     cg.add_define("USE_SERVICE_DEBUG")
 

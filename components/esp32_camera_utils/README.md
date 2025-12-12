@@ -1,6 +1,6 @@
 # ESP32 Camera Utils
 
-A dedicated component for advanced image processing operations on ESP32, specifically designed to prepare images for AI models.
+A dedicated component for advanced image processing operations on ESP32, specifically designed to prepare images for AI models. However, for the **Meter Reader** component, you should configure rotation directly in the `meter_reader_tflite` configuration.
 
 ## ✨ Features
 
