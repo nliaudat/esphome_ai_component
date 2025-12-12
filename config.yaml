@@ -70,7 +70,7 @@ esp32_camera_utils:
     offset_y: 480 # multiple of 4
     width: 448 # multiple of 4 and 4:3 proportions with height for best quality
     height: 88 #  multiple of 4 and 4:3 proportions with width for best quality
-  rotation: "90" # 0, 90, 180, 270
+  # rotation: "90" # 0, 90, 180, 270
 
 # optional : flash light at taking image
 flash_light_controller:
