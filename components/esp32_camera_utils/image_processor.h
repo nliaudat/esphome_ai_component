@@ -213,6 +213,7 @@ public:
   static bool apply_software_rotation(
       const uint8_t* input, uint8_t* output,
       int src_w, int src_h, int bytes_per_pixel,
+      float rotation_deg, int& out_w, int& out_h);
 #endif
 
   // Helper to decode JPEG to RGB888
