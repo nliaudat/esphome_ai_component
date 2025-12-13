@@ -541,7 +541,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
             // Let's create a temporary ImageProcessorConfig for preview that uses the actual frame dimensions
             // but applies the rotation. This avoids scaling to model input size for the preview.
             #ifdef DEV_ENABLE_ROTATION
-            auto rotated_preview = ImageProcessor::generate_rotated_preview(frame, rotation_);
+            auto rotated_preview = ImageProcessor::generate_rotated_preview(frame, rotation_, camera_width_, camera_height_);
             
             if (rotated_preview) {
                 // Cast to RotatedPreviewImage to ensure it matches stored type if needed, 
