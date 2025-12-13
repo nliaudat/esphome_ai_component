@@ -72,10 +72,12 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_model_config(const std::string &model_type);
   void set_rotation(float rotation) { rotation_ = rotation; }
   void set_generate_preview(bool generate) { generate_preview_ = generate; }
+#ifdef DEV_ENABLE_ROTATION
   void take_preview_image(); // One-shot trigger
   void capture_preview(); // Immediate capture for button
   std::shared_ptr<camera::CameraImage> get_preview_image();
   void update_preview_image(std::shared_ptr<camera::CameraImage> image);
+#endif
 
 
   void print_debug_info();

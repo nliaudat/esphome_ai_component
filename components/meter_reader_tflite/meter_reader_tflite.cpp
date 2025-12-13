@@ -1470,10 +1470,13 @@ void MeterReaderTFLite::set_debug_mode(bool debug_mode) {
 
 
 
+#ifdef DEV_ENABLE_ROTATION
 void MeterReaderTFLite::take_preview_image() {
     this->capture_preview();
 }
+#endif
 
+#ifdef DEV_ENABLE_ROTATION
 void MeterReaderTFLite::capture_preview() {
     ESP_LOGI(TAG, "Manual preview requested - initiating IMMEDIATE capture sequence");
     
@@ -1527,6 +1530,7 @@ void MeterReaderTFLite::update_preview_image(std::shared_ptr<camera::CameraImage
     std::lock_guard<std::mutex> lock(preview_mutex_);
     last_preview_image_ = image;
 }
+#endif
 
 #ifdef USE_WEB_SERVER
 void MeterReaderTFLite::set_web_server(web_server_base::WebServerBase *web_server) {
