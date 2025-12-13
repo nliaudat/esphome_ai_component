@@ -121,6 +121,9 @@ void ValueValidator::setup() {
 bool ValueValidator::validate_reading(int new_reading, float confidence, int& validated_reading) {
   uint32_t current_time = millis();
   
+  // Capture last confidence before adding the new reading
+  float last_confidence = history_.get_last_confidence();
+
   // Always add to history for tracking
   history_.add_reading(new_reading, current_time, confidence);
   
@@ -139,7 +142,7 @@ bool ValueValidator::validate_reading(int new_reading, float confidence, int& va
   }
   
   // Apply smart validation
-  validated_reading = apply_smart_validation(new_reading, confidence);
+  validated_reading = apply_smart_validation(new_reading, confidence, last_confidence);
   
   bool is_valid = (validated_reading == new_reading);
   
@@ -183,13 +186,33 @@ bool ValueValidator::is_digit_plausible(int new_reading, int last_reading) const
   return true;
 }
 
-int ValueValidator::apply_smart_validation(int new_reading, float confidence) {
+int ValueValidator::apply_smart_validation(int new_reading, float confidence, float last_confidence) {
   // High confidence readings get more lenient validation
   float confidence_factor = std::min(1.0f, confidence / 0.7f); // Normalize to 0.7 threshold
   
   // Adjust max diff based on confidence
   int effective_max_diff = config_.max_absolute_diff * confidence_factor;
   
+  // High confidence override: If confidence is very high (> 90%) AND greater than the previous confidence,
+  // trust the reading even if it deviates significantly from history.
+  // This solves getting stuck with a bad low-confidence reading in history.
+  if (confidence > 0.90f && confidence > last_confidence) {
+      bool is_plausible = is_digit_plausible(new_reading, last_valid_reading_);
+      
+      if (!is_plausible) {
+          ESP_LOGW(TAG, "Validation Override: High confidence (%.2f > %.2f) reading %d accepted despite validation failure (last: %d)", 
+                   confidence, last_confidence, new_reading, last_valid_reading_);
+                   
+          // If the deviation is huge, it's likely a reset or correction of bad history
+          // so we shouldn't mix it with old "good" values
+          if (std::abs(new_reading - last_valid_reading_) > (config_.max_absolute_diff * 10)) {
+              last_good_values_.clear();
+              ESP_LOGI(TAG, "History cleared due to high-confidence correction");
+          }
+          return new_reading;
+      }
+  }
+
   // Basic digit plausibility check
   if (!is_digit_plausible(new_reading, last_valid_reading_)) {
     // Try to find a plausible reading from recent history

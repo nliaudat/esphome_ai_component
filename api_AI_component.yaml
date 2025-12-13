@@ -1,3 +1,6 @@
+# web_server:
+#   port: 80
+
 api:
   services:
     - service: set_crop_zones
@@ -32,3 +35,16 @@ api:
       then:
         - lambda: |-
             id(meter_reader).reset_camera_window();
+
+# button:
+#   - platform: template
+#     name: "Take Preview Picture"
+#     id: take_preview_btn
+#     on_press:
+#       - lambda: |-
+#           id(meter_reader).capture_preview();
+
+
+
+
+

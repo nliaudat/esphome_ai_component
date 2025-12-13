@@ -4,12 +4,26 @@
 #include <iomanip>
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
+#include "esphome/core/application.h"
+
+#ifdef USE_WEB_SERVER
+#include "esphome/components/web_server_base/web_server_base.h"
+#ifdef DEV_ENABLE_ROTATION
+#include "esphome/components/esp32_camera_utils/preview_web_handler.h"
+#endif
+#endif
+#include "esp_camera.h"
+#include "img_converters.h"
 
 namespace esphome {
 namespace meter_reader_tflite {
 
 using namespace esphome::esp32_camera_utils;
 using namespace esphome::tflite_micro_helper;
+
+
+
+
 
 static const char *const TAG = "meter_reader_tflite";
 
@@ -119,12 +133,9 @@ void MeterReaderTFLite::setup() {
         config.model_channels = model_handler_.get_input_channels();
         
         // Set rotation based on configuration
-        switch(rotation_) {
-            case 90:  config.rotation = ROTATION_90;  break;
-            case 180: config.rotation = ROTATION_180; break;
-            case 270: config.rotation = ROTATION_270; break;
-            default:  config.rotation = ROTATION_0;   break;
-        }
+        #ifdef DEV_ENABLE_ROTATION
+        config.rotation = rotation_;
+        #endif
         
         TfLiteTensor* input = model_handler_.input_tensor();
         if (input->type == kTfLiteFloat32) {
@@ -136,8 +147,32 @@ void MeterReaderTFLite::setup() {
 
         image_processor_ = std::make_unique<ImageProcessor>(config);
 
-        ESP_LOGI(TAG, "Meter Reader TFLite setup complete. Configured Rotation: %d degrees", rotation_);
-        this->print_debug_info();
+    ESP_LOGI(TAG, "Setup complete");
+
+    // Register web server handler
+    // Register web server handler
+    // Register web server handler
+    #ifdef USE_WEB_SERVER
+    if (this->web_server_) {
+        // Create and register the preview handler
+        // We pass a lambda that returns the current preview image
+        #ifdef DEV_ENABLE_ROTATION
+        auto handler = new esphome::esp32_camera_utils::PreviewWebHandler([this]() {
+            return this->get_preview_image();
+        });
+        this->web_server_->add_handler(handler);
+        ESP_LOGI(TAG, "SUCCESS: Registered HTTP preview handler at /preview via PreviewWebHandler");
+        #else
+        ESP_LOGW(TAG, "Rotation disabled: HTTP preview handler not available");
+        #endif
+    } else {
+        ESP_LOGE(TAG, "FAILURE: Web server enabled but no instance provided via config!");
+    }
+    #else
+        ESP_LOGW(TAG, "Web server not enabled in defines - HTTP preview disabled");
+    #endif
+
+    this->print_debug_info();
 
         // Process debug image AFTER ImageProcessor is initialized
         #ifdef DEBUG_METER_READER_TFLITE
@@ -257,8 +292,8 @@ void MeterReaderTFLite::update() {
                 // Schedule flash disable
                 this->set_timeout(disable_time, [this]() {
                     ESP_LOGI(TAG, "Disabling flash as scheduled");
-                    this->disable_flash_light();
                     flash_scheduled_ = false;
+                    this->disable_flash_light();
                 });
             });
             flash_scheduled_ = true;
@@ -336,8 +371,8 @@ void MeterReaderTFLite::process_available_frame() {
 void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> frame) {
     DURATION_START();
 
-    // Check if processing is paused
-    if (pause_processing_) {
+    // Check if processing is paused (unless we have a pending preview request)
+    if (pause_processing_ && !request_preview_) {
         ESP_LOGI(TAG, "AI processing paused - skipping frame processing");
         DURATION_END("process_full_image (paused)");
         return;
@@ -449,7 +484,88 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
              processing_success = false;
         }
 
-        auto processed_zones = image_processor_->split_image_in_zone(frame, effective_zones);
+        std::vector<ImageProcessor::ProcessResult> processed_zones = image_processor_->split_image_in_zone(frame, effective_zones);
+
+        // Update preview image for template camera
+        // Only if enabled via config OR requested on-demand
+        bool should_generate = generate_preview_;
+        bool is_manual_request = request_preview_; // Capture state before clearing
+        if (is_manual_request) {
+            should_generate = true;
+            request_preview_ = false; // Clear one-shot flag
+        }
+
+        if (should_generate && image_processor_) {
+            // Determine actual source dimensions from the frame itself
+            int src_w = camera_width_;
+            int src_h = camera_height_;
+
+            // Safe dimension extraction from JPEG data
+            // The esp32_camera struct might report configured resolution (e.g. 640x480) 
+            // even if the actual JPEG is windowed/cropped (e.g. 448x88).
+            const uint8_t *data = frame->get_data_buffer();
+            size_t len = frame->get_data_length();
+            bool dims_found = false;
+            
+            // Simple JPEG generic parser to find SOF0 (Start Of Frame 0) marker 0xFFC0
+            for (size_t i = 0; i < len - 9; i++) {
+                if (data[i] == 0xFF && data[i+1] == 0xC0) {
+                     // Found SOF0
+                     // Skip marker (2) + length (2) + precision (1) to get height (2) + width (2)
+                     // Height is at offset 5, Width at offset 7 from marker start (0xFF)
+                     int h_high = data[i+5];
+                     int h_low = data[i+6];
+                     int w_high = data[i+7];
+                     int w_low = data[i+8];
+                     
+                     src_h = (h_high << 8) | h_low;
+                     src_w = (w_high << 8) | w_low;
+                     dims_found = true;
+                     ESP_LOGV(TAG, "Parsed JPEG dimensions from header: %dx%d", src_w, src_h);
+                     break;
+                }
+            }
+
+            if (!dims_found) {
+                // Fallback to previous logic if not JPEG or SOF not found
+                auto esp_image = std::static_pointer_cast<esphome::esp32_camera::ESP32CameraImage>(frame);
+                if (esp_image) {
+                    camera_fb_t *fb = esp_image->get_raw_buffer();
+                    if (fb) {
+                        src_w = fb->width;
+                        src_h = fb->height;
+                    }
+                }
+            }
+            
+            // Let's create a temporary ImageProcessorConfig for preview that uses the actual frame dimensions
+            // but applies the rotation. This avoids scaling to model input size for the preview.
+            #ifdef DEV_ENABLE_ROTATION
+            auto rotated_preview = ImageProcessor::generate_rotated_preview(frame, rotation_);
+            
+            if (rotated_preview) {
+                // Cast to RotatedPreviewImage to ensure it matches stored type if needed, 
+                // but update_preview_image takes shared_ptr<RotatedPreviewImage>
+                this->update_preview_image(std::static_pointer_cast<RotatedPreviewImage>(rotated_preview));
+                ESP_LOGD(TAG, "Preview image updated successfully");
+            } else {
+                ESP_LOGW(TAG, "Failed to generate rotated preview image.");
+            }
+            #endif
+            
+            // USER REQUEST: If this was a manual preview request, skip the heavy AI inference
+            if (is_manual_request) {
+                 ESP_LOGI(TAG, "Preview-only request processed. Skipping AI inference.");
+                 // request_preview_ is already cleared above
+                 return;
+            }
+            // If it was just the periodic generation (generate_preview_ == true but request_preview_ == false),
+            // we continue to inference as usual.
+        }
+            
+
+
+
 
         std::vector<float> readings;
         std::vector<float> confidences;
@@ -821,17 +937,8 @@ bool MeterReaderTFLite::allocate_tensor_arena() {
 
 void MeterReaderTFLite::enable_flash_light() {
     if (flash_controller_) {
-        ESP_LOGI(TAG, "Enabling flash light (via controller)");
-        if (flash_light_) {
-             ESP_LOGI(TAG, "Enabling flash light directly");
-             flash_auto_controlled_.store(true);
-             auto call = flash_light_->turn_on();
-             // call.set_brightness(1.0f); // Full brightness
-             call.set_transition_length(0);
-             call.perform();
-        } else {
-             ESP_LOGW(TAG, "Flash controller present but no direct light access for forced inference. Assuming controller handles it or light not passed to MeterReader.");
-        }
+        ESP_LOGI(TAG, "Enabling flash light (via controller direct access)");
+        flash_controller_->enable_flash();
     } else if (flash_light_) {
         ESP_LOGI(TAG, "Enabling flash light");
         flash_auto_controlled_.store(true);
@@ -859,7 +966,10 @@ bool MeterReaderTFLite::is_flash_forced_on() const {
 }
 
 void MeterReaderTFLite::disable_flash_light() {
-    if (flash_light_ && flash_auto_controlled_.load()) {
+    if (flash_controller_) {
+        ESP_LOGI(TAG, "Disabling flash light (via controller)");
+        flash_controller_->disable_flash();
+    } else if (flash_light_ && flash_auto_controlled_.load()) {
         ESP_LOGI(TAG, "Disabling flash light");
         flash_auto_controlled_.store(false);
         auto call = flash_light_->turn_off();
@@ -1136,7 +1246,24 @@ void MeterReaderTFLite::reinitialize_image_processor() {
         config.model_channels = model_handler_.get_input_channels();
         
         // Set rotation based on configuration
-        switch(rotation_) {
+        // switch(rotation_) is invalid for float. Use if/else or cast.
+        int rot = (int)rotation_;
+        if (rot == 0) {
+            // No rotation needed or handled by 0 case
+        } else if (rot == 90 || rot == 270) {
+             // Swap dimensions logic?
+             // Actually, verify what was inside the switch.
+        }
+        
+        // original logic was just swapping width/height for display?
+        // Let's see the context.
+        if ((int)rotation_ == 90 || (int)rotation_ == 270) {
+             // std::swap(config.camera_width, config.camera_height); ?
+             // Inspecting logical intent: reinitialize_image_processor uses this to set config?
+        }
+        
+        // Actually, just casting to int for switch is simplest if values are 0, 90, 180, 270
+        switch((int)rotation_) {
             case 90:  config.rotation = ROTATION_90;  break;
             case 180: config.rotation = ROTATION_180; break;
             case 270: config.rotation = ROTATION_270; break;
@@ -1335,6 +1462,75 @@ void MeterReaderTFLite::debug_test_with_pattern() {
 void MeterReaderTFLite::set_debug_mode(bool debug_mode) {
     debug_mode_ = debug_mode;
     ESP_LOGI(TAG, "Debug mode %s", debug_mode ? "enabled" : "disabled");
+}
+#endif
+
+
+
+
+
+
+void MeterReaderTFLite::take_preview_image() {
+    this->capture_preview();
+}
+
+void MeterReaderTFLite::capture_preview() {
+    ESP_LOGI(TAG, "Manual preview requested - initiating IMMEDIATE capture sequence");
+    
+    // 1. Set the flag so the processor knows to generate the preview image
+    request_preview_ = true;
+
+    // 2. Clear any existing request/frame states
+    frame_requested_.store(false);
+    frame_available_.store(false);
+    
+    // 3. Force Flash ON immediately (if available)
+    if (flash_controller_ || flash_light_) {
+        ESP_LOGI(TAG, "Preview: Turning flash ON");
+        this->enable_flash_light();
+    }
+
+    // 4. Request frame after warmup specified by controller
+    uint32_t PREVIEW_WARMUP_MS = 1000; // Default
+    uint32_t FLASH_POST_MS = 2000; // Default
+    
+    if (flash_controller_) {
+         PREVIEW_WARMUP_MS = flash_controller_->get_flash_pre_time();
+         FLASH_POST_MS = flash_controller_->get_flash_post_time();
+    } else if (flash_light_) {
+         PREVIEW_WARMUP_MS = flash_pre_time_;
+         FLASH_POST_MS = flash_post_time_;
+    }
+    
+    this->set_timeout(PREVIEW_WARMUP_MS, [this, FLASH_POST_MS]() {
+        ESP_LOGI(TAG, "Preview: Requesting frame now");
+        if (!frame_available_.load()) {
+            frame_requested_.store(true);
+            last_request_time_ = millis();
+        }
+        
+        // 5. Schedule Flash OFF (safety)
+        // Give it time to capture and process
+        this->set_timeout(FLASH_POST_MS, [this]() {
+            ESP_LOGI(TAG, "Preview: Turning flash OFF");
+            this->disable_flash_light();
+        });
+    });
+}
+
+std::shared_ptr<camera::CameraImage> MeterReaderTFLite::get_preview_image() {
+    std::lock_guard<std::mutex> lock(preview_mutex_);
+    return last_preview_image_;
+}
+
+void MeterReaderTFLite::update_preview_image(std::shared_ptr<camera::CameraImage> image) {
+    std::lock_guard<std::mutex> lock(preview_mutex_);
+    last_preview_image_ = image;
+}
+
+#ifdef USE_WEB_SERVER
+void MeterReaderTFLite::set_web_server(web_server_base::WebServerBase *web_server) {
+    this->web_server_ = web_server;
 }
 #endif
 

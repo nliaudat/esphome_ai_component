@@ -82,7 +82,7 @@ class ValueValidator {
   std::deque<int> last_good_values_; // Store last N good values for precise comparison
   
   bool is_digit_plausible(int new_reading, int last_reading) const;
-  int apply_smart_validation(int new_reading, float confidence);
+  int apply_smart_validation(int new_reading, float confidence, float last_confidence);
   int find_most_plausible_reading(int new_reading, const std::vector<int>& recent_readings);
   bool is_small_increment(int new_reading, int last_reading) const;
   int calculate_digit_difference(int reading1, int reading2) const;

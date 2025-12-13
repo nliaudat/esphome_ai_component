@@ -2,7 +2,7 @@
  * @file image_processor.h
  * @brief Image processing utilities for cropping, scaling, and format conversion.
  * 
- * Handles JPEG decoding with optional rotation (0°, 90°, 180°, 270°),
+ * Handles JPEG decoding with optional rotation (0 deg, 90 deg, 180 deg, 270 deg),
  * raw format processing (RGB888, RGB565, Grayscale), and conversion to
  * TensorFlow Lite model input formats (float32 or uint8).
  */
@@ -25,19 +25,18 @@ enum ImageProcessorInputType {
     kInputTypeUnknown
 };
 
-// Image rotation options (clockwise)
-enum ImageRotation {
-    ROTATION_0 = 0,      // No rotation
-    ROTATION_90 = 90,    // 90° clockwise
-    ROTATION_180 = 180,  // 180°
-    ROTATION_270 = 270   // 270° clockwise (or 90° counter-clockwise)
-};
+// Rotation constants
+constexpr float ROTATION_0 = 0.0f;
+constexpr float ROTATION_90 = 90.0f;
+constexpr float ROTATION_180 = 180.0f;
+constexpr float ROTATION_270 = 270.0f;
 
 struct ImageProcessorConfig {
   int camera_width;
   int camera_height;
-  std::string pixel_format;
-  ImageRotation rotation{ROTATION_0};  // Image rotation (clockwise)
+  std::string pixel_format; // "RGB888", "RGB565", "GRAYSCALE", "JPEG"
+  
+  float rotation{0.0f};  // Image rotation in degrees (clockwise)
   
   int model_width;
   int model_height;
@@ -127,99 +126,97 @@ class ImageProcessor {
 
   ImageProcessor(const ImageProcessorConfig &config);
 
+  /**
+   * Process an image and split it into the requested zones (cropping + resizing).
+   */
   std::vector<ProcessResult> split_image_in_zone(
       std::shared_ptr<camera::CameraImage> image,
       const std::vector<CropZone> &zones);
-      
-  // New method for direct processing to pre-allocated buffer (zero allocation during inference)
+
+  /**
+   * Process a single zone.
+   */
+  ProcessResult process_zone(
+      std::shared_ptr<camera::CameraImage> image,
+      const CropZone &zone);
+
+  /**
+   * Process a single zone directly into a provided buffer.
+   */
   bool process_zone_to_buffer(
       std::shared_ptr<camera::CameraImage> image,
       const CropZone &zone,
       uint8_t* output_buffer,
       size_t output_buffer_size);
 
-  const ProcessingStats& get_stats() const { return stats_; }
-  void reset_stats() { stats_ = ProcessingStats(); }
+  bool validate_zone(const CropZone &zone) const;
   
-  // Helper to calculate required buffer size
   size_t get_required_buffer_size() const;
 
- private:
+private:
   ImageProcessorConfig config_;
   ProcessingStats stats_;
   std::mutex processing_mutex_;
-  int bytes_per_pixel_{3};
+  int bytes_per_pixel_{0};
 
   UniqueBufferPtr allocate_image_buffer(size_t size);
-  
-  ProcessResult process_zone(
-      std::shared_ptr<camera::CameraImage> image,
-      const CropZone &zone);
-      
-  bool validate_input_image(std::shared_ptr<camera::CameraImage> image) const;
-  bool validate_zone(const CropZone &zone) const;
   bool validate_buffer_size(size_t required, size_t available, const char* context) const;
-
-  // Raw processing methods
-  bool process_raw_zone_to_buffer(
-      std::shared_ptr<camera::CameraImage> image,
-      const CropZone &zone,
-      uint8_t* output_buffer,
-      size_t output_buffer_size);
-
-  // JPEG processing methods
+  bool validate_input_image(std::shared_ptr<camera::CameraImage> image) const;
+  
+  // Internal processing methods
   bool process_jpeg_zone_to_buffer(
       std::shared_ptr<camera::CameraImage> image,
       const CropZone &zone,
       uint8_t* output_buffer,
       size_t output_buffer_size);
       
+  bool process_raw_zone_to_buffer(
+      std::shared_ptr<camera::CameraImage> image,
+      const CropZone &zone,
+      uint8_t* output_buffer,
+      size_t output_buffer_size);
+
+  // Helper processing methods
+  bool process_rgb888_crop_and_scale_to_float32(const uint8_t* input_data, const CropZone& zone, int crop_width, int crop_height, uint8_t* output_buffer, int model_width, int model_height, int channels, bool normalize, int src_stride_width);
+  bool process_rgb888_crop_and_scale_to_uint8(const uint8_t* input_data, const CropZone& zone, int crop_width, int crop_height, uint8_t* output_buffer, int model_width, int model_height, int channels, int src_stride_width);
+  
+  bool process_rgb565_crop_and_scale_to_float32(const uint8_t* input_data, const CropZone &zone, int crop_width, int crop_height, uint8_t* output_buffer, int model_width, int model_height, int model_channels, bool normalize, int src_stride_width);
+  bool process_rgb565_crop_and_scale_to_uint8(const uint8_t* input_data, const CropZone &zone, int crop_width, int crop_height, uint8_t* output_buffer, int model_width, int model_height, int model_channels, int src_stride_width);
+  
+  bool process_grayscale_crop_and_scale_to_float32(const uint8_t* input_data, const CropZone &zone, int crop_width, int crop_height, uint8_t* output_buffer, int model_width, int model_height, int model_channels, bool normalize, int src_stride_width);
+  bool process_grayscale_crop_and_scale_to_uint8(const uint8_t* input_data, const CropZone &zone, int crop_width, int crop_height, uint8_t* output_buffer, int model_width, int model_height, int model_channels, int src_stride_width);
+
+  bool scale_rgb888_to_float32(const uint8_t* src, int src_w, int src_h, uint8_t* dst, int dst_w, int dst_h, int channels, bool normalize);
+  bool scale_rgb888_to_uint8(const uint8_t* src, int src_w, int src_h, uint8_t* dst, int dst_w, int dst_h, int channels);
+
+  void arrange_channels(float* output, uint8_t r, uint8_t g, uint8_t b, int output_channels, bool normalize) const;
+
   const char* jpeg_error_to_string(jpeg_error_t error) const;
 
-  // Format conversion helpers
-  bool process_rgb888_crop_and_scale_to_float32(
-      const uint8_t* input_data, const CropZone& zone, int crop_width, int crop_height,
-      uint8_t* output_buffer, int model_width, int model_height, int channels, bool normalize);
-      
-  bool process_rgb888_crop_and_scale_to_uint8(
-      const uint8_t* input_data, const CropZone& zone, int crop_width, int crop_height,
-      uint8_t* output_buffer, int model_width, int model_height, int channels);
-      
-  bool process_rgb565_crop_and_scale_to_float32(
-      const uint8_t* input_data, const CropZone& zone, int crop_width, int crop_height,
-      uint8_t* output_buffer, int model_width, int model_height, int channels, bool normalize);
-      
-  bool process_rgb565_crop_and_scale_to_uint8(
-      const uint8_t* input_data, const CropZone& zone, int crop_width, int crop_height,
-      uint8_t* output_buffer, int model_width, int model_height, int channels);
-      
-  bool process_grayscale_crop_and_scale_to_float32(
-      const uint8_t* input_data, const CropZone& zone, int crop_width, int crop_height,
-      uint8_t* output_buffer, int model_width, int model_height, int channels, bool normalize);
-      
-  bool process_grayscale_crop_and_scale_to_uint8(
-      const uint8_t* input_data, const CropZone& zone, int crop_width, int crop_height,
-      uint8_t* output_buffer, int model_width, int model_height, int channels);
+public:
+  /**
+   * Helper to parse actual dimensions from a JPEG buffer (SOF0 marker).
+   */
+  static bool get_jpeg_dimensions(const uint8_t *data, size_t len, int &width, int &height);
 
-  // Scaling helpers
-  bool scale_rgb888_to_float32(
-      const uint8_t* src, int src_w, int src_h,
-      uint8_t* dst, int dst_w, int dst_h, int channels, bool normalize);
-      
-  bool scale_rgb888_to_uint8(
-      const uint8_t* src, int src_w, int src_h,
-      uint8_t* dst, int dst_w, int dst_h, int channels);
+#ifdef DEV_ENABLE_ROTATION
+  /**
+   * Generates a rotated preview image from a source image.
+   */
+  static std::shared_ptr<camera::CameraImage> generate_rotated_preview(
+      std::shared_ptr<camera::CameraImage> source, 
+      float rotation);
 
-  // Channel arrangement helpers
-  void arrange_channels(float* output, uint8_t r, uint8_t g, uint8_t b, int output_channels, bool normalize) const;
-  void arrange_channels(uint8_t* output, uint8_t r, uint8_t g, uint8_t b, int output_channels) const;
-
-      
-  // Software rotation for raw formats (when JPEG rotation not available)
+  // ... (existing declarations)
+  
+  // Software rotation for arbitrary angles
   bool apply_software_rotation(
       const uint8_t* input, uint8_t* output,
-      int width, int height, int bytes_per_pixel,
-      ImageRotation rotation);
+      int src_w, int src_h, int bytes_per_pixel,
+      float rotation_deg, int& out_w, int& out_h);
+#endif
+
+  void arrange_channels(uint8_t* output, uint8_t r, uint8_t g, uint8_t b, int output_channels) const;
 
 #ifdef DEBUG_ESP32_CAMERA_UTILS
   // Debug functions for image analysis
@@ -234,6 +231,30 @@ class ImageProcessor {
   void debug_output_float_preview(const float* data, int width, int height, int channels, const std::string& zone_name, bool normalized);
 #endif
 };
+
+#ifdef DEV_ENABLE_ROTATION
+// RotatedPreviewImage class moved here for shared usage
+class RotatedPreviewImage : public camera::CameraImage {
+  using UniqueBufferPtr = esphome::esp32_camera_utils::ImageProcessor::UniqueBufferPtr;
+ public:
+  RotatedPreviewImage(UniqueBufferPtr &&data, size_t len, int width, int height, pixformat_t format)
+      : data_(std::move(data)), len_(len), width_(width), height_(height), format_(format) {}
+
+  uint8_t *get_data_buffer() override { return data_->get(); }
+  size_t get_data_length() override { return len_; }
+  bool was_requested_by(camera::CameraRequester requester) const override { return true; }
+  int get_width() { return width_; }
+  int get_height() { return height_; }
+  pixformat_t get_format() { return format_; }
+
+ protected:
+  UniqueBufferPtr data_;
+  size_t len_;
+  int width_;
+  int height_;
+  pixformat_t format_;
+};
+#endif
 
 }  // namespace esp32_camera_utils
 }  // namespace esphome

@@ -3,8 +3,10 @@ import esphome.config_validation as cv
 from esphome.components import esp32
 import esphome.components.esp32_camera as esp32_camera
 from esphome.const import CONF_ID, CONF_OFFSET_X, CONF_OFFSET_Y, CONF_WIDTH, CONF_HEIGHT
+from esphome.core import CORE
 
-DEPENDENCIES = ['esp32', 'camera']
+
+DEPENDENCIES = ['esp32']
 
 esp32_camera_utils_ns = cg.esphome_ns.namespace('esp32_camera_utils')
 Esp32CameraUtils = esp32_camera_utils_ns.class_('Esp32CameraUtils', cg.Component)
@@ -34,6 +36,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera),
     cv.Optional("debug", default=False): cv.boolean,
     cv.Optional(CONF_ROTATION, default="0"): cv.one_of("0", "90", "180", "270"),
+    cv.Optional("enable_rotation", default=False): cv.boolean,
 }).extend(cv.COMPONENT_SCHEMA)
 
 async def to_code(config):
@@ -58,6 +61,13 @@ async def to_code(config):
     # Set image rotation (convert string to int)
     rotation_value = ROTATION_OPTIONS.get(config[CONF_ROTATION], 0)
     cg.add(var.set_rotation(rotation_value))
+    
+    if config.get("enable_rotation", False):
+        cg.add_define("DEV_ENABLE_ROTATION")
 
     if config.get("debug", False):
         cg.add_define("DEBUG_ESP32_CAMERA_UTILS")
+        
+    if 'web_server' in CORE.config:
+        cg.add_define("USE_WEB_SERVER")
+

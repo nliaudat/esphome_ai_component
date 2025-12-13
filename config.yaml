@@ -70,7 +70,8 @@ esp32_camera_utils:
     offset_y: 480 # multiple of 4
     width: 448 # multiple of 4 and 4:3 proportions with height for best quality
     height: 88 #  multiple of 4 and 4:3 proportions with width for best quality
-  # rotation: "90" # 0, 90, 180, 270
+  # rotation: "5" # 0, 90, 180, 270
+  enable_rotation: false
 
 # optional : flash light at taking image
 flash_light_controller:
@@ -89,6 +90,16 @@ meter_reader_tflite:
   debug: true
   debug_image: false # static embedded image (debug.jpg)
   debug_image_out_serial: false
+  
+  # Image Rotation (required for preview to show rotated digits)
+  # rotation: "90"
+  enable_rotation: false
+
+  # Preview of what the AI sees (Rotated Live Cam)
+  # Set to true to enable continuous updates, or false for on-demand only (via button)
+  generate_preview: false
+
+
 
   crop_zones_global: crop_zones  # Reference the global variables set in globals_AI_component.yaml | To update, use http://[hassio]/developer-tools/action >esphome.[s3cam_tflite]_set_crop_zones | to get, use the tools>draw_regions.py
   flash_light_controller: flash_controller
@@ -134,6 +145,11 @@ packages:
   sensor_others: !include sensor_others.yaml
   logger: !include logger.yaml 
   time: !include time.yaml
+
+
+
+
+
 
 
 
