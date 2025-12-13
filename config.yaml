@@ -70,7 +70,8 @@ esp32_camera_utils:
     offset_y: 480 # multiple of 4
     width: 448 # multiple of 4 and 4:3 proportions with height for best quality
     height: 88 #  multiple of 4 and 4:3 proportions with width for best quality
-  # rotation: "90" # 0, 90, 180, 270
+  # rotation: "5" # 0, 90, 180, 270
+  enable_rotation: false
 
 # optional : flash light at taking image
 flash_light_controller:
@@ -92,6 +93,7 @@ meter_reader_tflite:
   
   # Image Rotation (required for preview to show rotated digits)
   # rotation: "90"
+  enable_rotation: false
 
   # Preview of what the AI sees (Rotated Live Cam)
   # Set to true to enable continuous updates, or false for on-demand only (via button)
@@ -151,10 +153,4 @@ packages:
 
 
 
-# camera:
-#   - platform: template
-#     name: "Meter AI Preview"
-#     id: meter_ai_preview
-#     update_interval: 1s
-#     image: |-
-#       return id(meter_reader).get_preview_image();
+

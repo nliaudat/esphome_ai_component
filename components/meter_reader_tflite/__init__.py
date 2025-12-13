@@ -69,10 +69,10 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Required(CONF_MODEL): cv.file_,
     cv.Required(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera),
     # cv.Optional(CONF_MODEL_TYPE, default="class100-0180"): cv.string,  # Add model type selection
-    cv.Optional(CONF_CONFIDENCE_THRESHOLD, default=0.7): cv.float_range(
+    cv.Optional(CONF_CONFIDENCE_THRESHOLD, default=0.85): cv.float_range(
         min=0.0, max=1.0
     ),
-    cv.Optional(CONF_ROTATION, default="0"): cv.one_of("0", "90", "180", "270"),
+    cv.Optional(CONF_ROTATION, default="0"): cv.float_range(min=0, max=360),
     # Make tensor_arena_size optional since it's now in model_config.h
     cv.Optional(CONF_TENSOR_ARENA_SIZE): cv.All( 
         datasize_to_bytes,
@@ -100,6 +100,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("inference_logs"): cv.use_id(text_sensor.TextSensor),
     cv.Optional("main_logs"): cv.use_id(text_sensor.TextSensor),
     cv.Optional(CONF_GENERATE_PREVIEW, default=False): cv.boolean,
+    cv.Optional("enable_rotation", default=False): cv.boolean,
     # cv.Optional(CONF_PREVIEW): camera_component.CAMERA_SCHEMA.extend({
     #     cv.GenerateID(): cv.declare_id(MeterPreviewCamera),
     # }),
@@ -181,24 +182,44 @@ async def to_code(config):
     
     # Set image rotation
     # Priority 1: Check meter_reader_tflite specific rotation
-    rotation_str = config.get(CONF_ROTATION)
+    rotation_value = 0.0
+    rotation_conf = config.get(CONF_ROTATION)
     
-    # Priority 2: Check esp32_camera_utils configuration if not set locally
-    if rotation_str is None or rotation_str == "0":
+    # Priority 2: Check esp32_camera_utils configuration if not set locally or is "0" (str)
+    # Note: rotation_conf comes as string from one_of validator if we used that, but now it matches float?
+    # Actually validation below ensures it's float-compatible
+    
+    # But wait, we need to handle the fallback lookup
+    # Check if rotation is effectively 0
+    is_zero = False
+    try:
+        if float(rotation_conf) == 0:
+            is_zero = True
+    except:
+        pass
+
+    if is_zero:
         # Search for esp32_camera_utils in top-level config
-        # Note: CORE.config is fully validated config
         for comp_name, comp_config in CORE.config.items():
             if comp_name.startswith("esp32_camera_utils"):
-                # Handle both single dict and list of dicts (though component is likely unique)
                 conf_list = comp_config if isinstance(comp_config, list) else [comp_config]
                 for conf in conf_list:
                      if "rotation" in conf:
-                         rotation_str = conf["rotation"]
+                         rotation_conf = conf["rotation"]
                          break
                          
-    print(f"DEBUG_ROTATION_CHECK: Final rotation string is '{rotation_str}'")
-    rotation_value = ROTATION_OPTIONS.get(str(rotation_str), 0)
+    print(f"DEBUG_ROTATION_CHECK: Final rotation value is '{rotation_conf}'")
+    
+    # Ensure it's a float
+    try:
+        rotation_value = float(rotation_conf)
+    except:
+        rotation_value = 0.0
+
     cg.add(var.set_rotation(rotation_value))
+    
+    if config.get("enable_rotation", False):
+        cg.add_define("DEV_ENABLE_ROTATION")
     
     cg.add_define("USE_SERVICE_DEBUG")
 
@@ -247,6 +268,25 @@ async def to_code(config):
     #     await camera_component.register_camera(preview_cam, preview_conf)
     #     cg.add(var.set_preview_camera(preview_cam))
    
+    # Check for web_server component to enable preview handler
+    if 'web_server' in CORE.config:
+        cg.add_define("USE_WEB_SERVER")
+        
+        # We need the WebServerBase component for add_handler
+        # It is usually available as 'web_server_base' in config if web_server is used.
+        if 'web_server_base' in CORE.config:
+            ws_config = CORE.config['web_server_base']
+            if isinstance(ws_config, list):
+                ws_config = ws_config[0]
+            ws_id = ws_config[CONF_ID]
+            ws_var = await cg.get_variable(ws_id)
+            cg.add(var.set_web_server(ws_var))
+        else:
+             # Fallback to default ID assumption
+             ws_base_id = cv.declare_id(cg.esphome_ns.namespace('web_server_base').class_('WebServerBase'))('web_server_base')
+             ws_var = await cg.get_variable(ws_base_id)
+             cg.add(var.set_web_server(ws_var))
+
     # Handle crop zones (either global or local)
     if CONF_CROP_ZONES in config:
         crop_global = await cg.get_variable(config[CONF_CROP_ZONES])

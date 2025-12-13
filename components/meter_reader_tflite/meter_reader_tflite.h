@@ -23,6 +23,10 @@
 #include "esphome/components/tflite_micro_helper/memory_manager.h"
 #include "esphome/components/flash_light_controller/flash_light_controller.h"
 
+#ifdef USE_WEB_SERVER
+#include "esphome/components/web_server_base/web_server_base.h"
+#endif
+
 #include <atomic>
 #include <vector>
 #include <string>
@@ -32,10 +36,6 @@ namespace esphome {
 namespace meter_reader_tflite {
 
 class MeterReaderTFLite;
-
-
-
-
 
 class MeterReaderTFLite : public PollingComponent, public camera::CameraImageReader {
  public:
@@ -70,9 +70,10 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_camera_image_format(int width, int height, const std::string &pixel_format);
   void set_camera(esp32_camera::ESP32Camera *camera) { camera_ = camera; }
   void set_model_config(const std::string &model_type);
-  void set_rotation(int rotation) { rotation_ = rotation; }
+  void set_rotation(float rotation) { rotation_ = rotation; }
   void set_generate_preview(bool generate) { generate_preview_ = generate; }
   void take_preview_image(); // One-shot trigger
+  void capture_preview(); // Immediate capture for button
   std::shared_ptr<camera::CameraImage> get_preview_image();
   void update_preview_image(std::shared_ptr<camera::CameraImage> image);
 
@@ -148,6 +149,10 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_inference_logs(text_sensor::TextSensor *sensor) { inference_logs_ = sensor; }
   void set_main_logs(text_sensor::TextSensor *sensor) { main_logs_ = sensor; }
 
+#ifdef USE_WEB_SERVER
+  void set_web_server(web_server_base::WebServerBase *web_server);
+#endif
+
 /** ########### PROTECTED ############# **/
  protected:
   // sensor::Sensor *confidence_sensor_{nullptr};  ///< Sensor for confidence values
@@ -203,12 +208,12 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   int camera_width_{0};                      ///< Camera image width in pixels
   int camera_height_{0};                     ///< Camera image height in pixels
   std::string pixel_format_{"RGB888"};       ///< Camera pixel format
-  float confidence_threshold_{0.7f};         ///< Minimum confidence threshold for valid readings
+  float confidence_threshold_{0.85f};         ///< Minimum confidence threshold for valid readings
   size_t tensor_arena_size_requested_{50 * 1024};  ///< Requested tensor arena size
   std::string model_type_{"default"};        ///< Model type identifier
   bool allow_negative_rates_{false};         ///< Whether to allow negative rate changes
   int max_absolute_diff_{100};               ///< Maximum absolute difference allowed between readings
-  int rotation_{0};                          ///< Rotation in degrees (0, 90, 180, 270)
+  float rotation_{0.0f};                          ///< Rotation in degrees (clockwise)
 
 
   // State variables
@@ -228,6 +233,10 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
   esp32_camera::ESP32Camera *camera_{nullptr}; ///< Camera component reference
   bool debug_mode_ = false;                  ///< Debug mode flag
+
+#ifdef USE_WEB_SERVER
+  web_server_base::WebServerBase *web_server_{nullptr};
+#endif
 
   // Component instances
   tflite_micro_helper::MemoryManager memory_manager_;             ///< Memory management utilities

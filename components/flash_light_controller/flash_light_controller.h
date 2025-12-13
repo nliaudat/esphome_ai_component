@@ -14,6 +14,8 @@ class FlashLightController : public Component {
   void set_flash_light(light::LightState *flash_light);
   void set_flash_pre_time(uint32_t pre_time) { flash_pre_time_ = pre_time; }
   void set_flash_post_time(uint32_t post_time) { flash_post_time_ = post_time; }
+  uint32_t get_flash_pre_time() const { return flash_pre_time_; }
+  uint32_t get_flash_post_time() const { return flash_post_time_; }
   
   using CaptureCallback = std::function<void()>;
   
@@ -33,14 +35,14 @@ class FlashLightController : public Component {
   
   bool is_active() const { return is_active_; }
 
+  void enable_flash();
+  void disable_flash();
+
  protected:
   light::LightState *flash_light_{nullptr};
   uint32_t flash_pre_time_{5000};
   uint32_t flash_post_time_{2000};
   bool is_active_{false};
-  
-  void enable_flash();
-  void disable_flash();
 };
 
 }  // namespace flash_light_controller
