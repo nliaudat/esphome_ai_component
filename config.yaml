@@ -20,6 +20,9 @@ external_components:
 ############## General configuration
 
 substitutions:
+  # Global switch for memory debugging
+  debug_memory_enabled: "true"
+
 
   name: s3cam-tflite #no special caracters
   friendly_name: "S3 camera tflite"
@@ -72,6 +75,7 @@ esp32_camera_utils:
     height: 88 #  multiple of 4 and 4:3 proportions with width for best quality
   # rotation: "5" # 0, 90, 180, 270
   enable_rotation: false
+  debug_memory: ${debug_memory_enabled}
 
 # optional : flash light at taking image
 flash_light_controller:
@@ -81,6 +85,7 @@ flash_light_controller:
   flash_post_time: 2000ms # 2 seconds after update
   debug: true
 
+
 meter_reader_tflite:
   id: meter_reader
   camera_id: ${id_prefix}espcam
@@ -88,8 +93,12 @@ meter_reader_tflite:
 
   update_interval: 60s
   debug: true
+
   debug_image: false # static embedded image (debug.jpg)
   debug_image_out_serial: false
+  
+  debug_memory: ${debug_memory_enabled}
+
   
   # Image Rotation (required for preview to show rotated digits)
   # rotation: "90"

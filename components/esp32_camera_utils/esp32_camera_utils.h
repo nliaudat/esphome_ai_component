@@ -3,7 +3,9 @@
 #include "esphome/components/esp32_camera/esp32_camera.h"
 #include "camera_window_control.h"
 #include "image_processor.h"
+#include "esphome/components/sensor/sensor.h"
 #include <memory>
+
 #include <string>
 
 namespace esphome {
@@ -45,6 +47,12 @@ class Esp32CameraUtils : public Component {
   // Image rotation configuration (0, 90, 180, 270 degrees clockwise)
   void set_rotation(int rotation) { rotation_ = rotation; }
 
+#ifdef DEBUG_ESP32_CAMERA_UTILS_MEMORY
+  void set_camera_buffer_size_sensor(sensor::Sensor *s) { camera_buffer_size_sensor_ = s; }
+  void set_camera_free_psram_sensor(sensor::Sensor *s) { camera_free_psram_sensor_ = s; }
+#endif
+
+
  protected:
   int offset_x_{0};
   int offset_y_{0};
@@ -68,7 +76,14 @@ class Esp32CameraUtils : public Component {
   
   // Stored config template for reinitialization
   ImageProcessorConfig last_config_template_;
+
   bool has_processor_config_{false};
+
+#ifdef DEBUG_ESP32_CAMERA_UTILS_MEMORY
+  sensor::Sensor *camera_buffer_size_sensor_{nullptr};
+  sensor::Sensor *camera_free_psram_sensor_{nullptr};
+#endif
+
 };
 
 }  // namespace esp32_camera_utils

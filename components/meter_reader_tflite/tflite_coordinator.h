@@ -50,7 +50,14 @@ class TFLiteCoordinator {
   int get_input_width() const { return model_handler_.get_input_width(); }
   int get_input_height() const { return model_handler_.get_input_height(); }
   int get_input_channels() const { return model_handler_.get_input_channels(); }
+
   size_t get_arena_peak_bytes() const { return model_handler_.get_arena_used_bytes(); }
+  // Aliases for consistency
+  size_t get_arena_used_bytes() const { return model_handler_.get_arena_used_bytes(); }
+  size_t get_tensor_arena_size() const { return tensor_arena_size_requested_; }
+  size_t get_tensor_arena_size_actual() const { return tensor_arena_allocation_.actual_size; }
+  size_t get_model_size_bytes() const { return model_length_; }
+
   
   // Debug
   void report_memory_status();

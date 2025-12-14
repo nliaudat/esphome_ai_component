@@ -3,7 +3,7 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 import os
 import zlib
-from esphome.const import CONF_ID, CONF_MODEL, CONF_ROTATION
+from esphome.const import CONF_ID, CONF_MODEL, CONF_ROTATION, CONF_NAME, CONF_DISABLED_BY_DEFAULT, CONF_INTERNAL, CONF_ICON, CONF_FORCE_UPDATE
 from esphome.core import CORE, HexInt
 from esphome.components import esp32, sensor, text_sensor
 
@@ -24,6 +24,8 @@ CONF_RAW_DATA_ID = 'raw_data_id'
 CONF_DEBUG = 'debug'
 CONF_DEBUG_IMAGE = 'debug_image'
 CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL = 'debug_image_out_serial'
+CONF_DEBUG_MEMORY = 'debug_memory'
+
 # CONF_MODEL_TYPE = 'model_type' 
 CONF_ROTATION = 'rotation'
 CONF_PREVIEW = 'preview_camera'
@@ -82,6 +84,12 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_DEBUG, default=False): cv.boolean, 
     cv.Optional(CONF_DEBUG_IMAGE, default=False): cv.boolean, 
     cv.Optional(CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL, default=False): cv.boolean,
+    cv.Optional(CONF_DEBUG_MEMORY, default=False): cv.boolean,
+    cv.Optional("tensor_arena_size_sensor"): cv.use_id(sensor.Sensor),
+    cv.Optional("tensor_arena_used_sensor"): cv.use_id(sensor.Sensor),
+    cv.Optional("process_free_heap_sensor"): cv.use_id(sensor.Sensor),
+    cv.Optional("process_free_psram_sensor"): cv.use_id(sensor.Sensor),
+
     cv.Optional(CONF_FLASH_LIGHT_CONTROLLER): cv.use_id(flash_light_controller.FlashLightController),
     cv.Optional(CONF_CROP_ZONES): cv.use_id(globals.GlobalsComponent),
     # cv.Optional(CONF_CAMERA_WINDOW): cv.Any(
@@ -208,7 +216,7 @@ async def to_code(config):
                          rotation_conf = conf["rotation"]
                          break
                          
-    print(f"DEBUG_ROTATION_CHECK: Final rotation value is '{rotation_conf}'")
+    # print(f"DEBUG_ROTATION_CHECK: Final rotation value is '{rotation_conf}'")
     
     # Ensure it's a float
     try:
@@ -261,6 +269,49 @@ async def to_code(config):
      
     if config.get(CONF_GENERATE_PREVIEW, False):
         cg.add(var.set_generate_preview(True))
+        
+    if config.get(CONF_DEBUG_MEMORY, False):
+        cg.add_define("DEBUG_METER_READER_MEMORY")
+        
+        # Helper to create and register a sensor
+        async def create_sensor(name, unit, accuracy_decimals=0, icon="mdi:memory"):
+            # Create a manual ID for the new sensor
+            sens_id = cv.declare_id(sensor.Sensor)(f"{config[CONF_ID]}_{name}")
+            sens_conf = {
+                CONF_ID: sens_id,
+                CONF_NAME: name.replace("_", " ").title(),
+                CONF_DISABLED_BY_DEFAULT: False,
+                CONF_INTERNAL: False,
+                CONF_ICON: icon,
+                CONF_FORCE_UPDATE: False,
+            }
+            
+            # sens = await sensor.new_sensor(sens_conf)
+            # Use cg.new_Pvariable logic directly if new_sensor continues to fail on missing keys?
+            # No, new_sensor calls setup_entity which needs these keys.
+            sens = await sensor.new_sensor(sens_conf)
+            
+            cg.add(sens.set_unit_of_measurement(unit))
+            cg.add(sens.set_accuracy_decimals(accuracy_decimals))
+            # Icon is set via config now
+            return sens
+
+        # Tensor Arena Size
+        s = await create_sensor("tensor_arena_size", "B", 0)
+        cg.add(var.set_tensor_arena_size_sensor(s))
+        
+        # Tensor Arena Used
+        s = await create_sensor("tensor_arena_used", "B", 0)
+        cg.add(var.set_tensor_arena_used_sensor(s))
+        
+        # Process Free Heap
+        s = await create_sensor("process_free_heap", "B", 0)
+        cg.add(var.set_process_free_heap_sensor(s))
+        
+        # Process Free PSRAM
+        s = await create_sensor("process_free_psram", "B", 0)
+        cg.add(var.set_process_free_psram_sensor(s))
+
 
     # if CONF_PREVIEW in config:
     #     preview_conf = config[CONF_PREVIEW]

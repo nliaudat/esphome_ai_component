@@ -2,7 +2,8 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import esp32
 import esphome.components.esp32_camera as esp32_camera
-from esphome.const import CONF_ID, CONF_OFFSET_X, CONF_OFFSET_Y, CONF_WIDTH, CONF_HEIGHT
+from esphome.const import CONF_ID, CONF_OFFSET_X, CONF_OFFSET_Y, CONF_WIDTH, CONF_HEIGHT, CONF_NAME, CONF_DISABLED_BY_DEFAULT, CONF_INTERNAL, CONF_ICON, CONF_FORCE_UPDATE
+from esphome.components import sensor
 from esphome.core import CORE
 
 
@@ -24,6 +25,8 @@ ROTATION_OPTIONS = {
     "270": 270,
 }
 
+CONF_DEBUG_MEMORY = 'debug_memory'
+
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(Esp32CameraUtils),
@@ -37,6 +40,9 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("debug", default=False): cv.boolean,
     cv.Optional(CONF_ROTATION, default="0"): cv.one_of("0", "90", "180", "270"),
     cv.Optional("enable_rotation", default=False): cv.boolean,
+    cv.Optional(CONF_DEBUG_MEMORY, default=False): cv.boolean,
+    cv.Optional("camera_buffer_size_sensor"): cv.use_id(sensor.Sensor),
+    cv.Optional("camera_free_psram_sensor"): cv.use_id(sensor.Sensor),
 }).extend(cv.COMPONENT_SCHEMA)
 
 async def to_code(config):
@@ -70,4 +76,35 @@ async def to_code(config):
         
     if 'web_server' in CORE.config:
         cg.add_define("USE_WEB_SERVER")
+
+    if config.get(CONF_DEBUG_MEMORY, False):
+        cg.add_define("DEBUG_ESP32_CAMERA_UTILS_MEMORY")
+        
+        # Helper to create and register a sensor
+        async def create_sensor(name, unit, accuracy_decimals=0, icon="mdi:memory"):
+            # Create a manual ID for the new sensor
+            sens_id = cv.declare_id(sensor.Sensor)(f"{config[CONF_ID]}_{name}")
+            sens_conf = {
+                CONF_ID: sens_id,
+                CONF_NAME: name.replace("_", " ").title(),
+                CONF_DISABLED_BY_DEFAULT: False,
+                CONF_INTERNAL: False,
+                CONF_INTERNAL: False,
+                CONF_ICON: icon,
+                CONF_FORCE_UPDATE: False,
+            }
+            
+            sens = await sensor.new_sensor(sens_conf)
+            cg.add(sens.set_unit_of_measurement(unit))
+            cg.add(sens.set_accuracy_decimals(accuracy_decimals))
+            return sens
+
+        # Buffer Size
+        s = await create_sensor("camera_buffer_size", "B", 0)
+        cg.add(var.set_camera_buffer_size_sensor(s))
+        
+        # Free PSRAM
+        s = await create_sensor("camera_free_psram", "B", 0)
+        cg.add(var.set_camera_free_psram_sensor(s))
+
 

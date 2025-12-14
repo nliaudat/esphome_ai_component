@@ -57,7 +57,7 @@ bool FlashlightCoordinator::update_scheduling() {
              return true; // We initiated, so we are "busy" in a sense, or rather we handled it.
         } else {
              // Already running
-             ESP_LOGV(TAG, "Controller active");
+             ESP_LOGD(TAG, "Controller already active, skipping trigger");
              return true;
         }
     }

@@ -83,6 +83,10 @@ bool TFLiteCoordinator::load_model() {
              model_handler_.get_input_height(),
              model_handler_.get_input_channels());
 
+    #ifdef DEBUG_METER_READER_TFLITE
+    model_handler_.debug_model_architecture();
+    #endif
+
 
 
     return true;
@@ -134,7 +138,17 @@ bool TFLiteCoordinator::process_model_result(const esp32_camera_utils::ImageProc
     
     if (*confidence < 0.0001f) {
         ESP_LOGW(TAG, "Zero confidence detected");
-        // model_handler_.log_input_stats(); // Optional: could expose control for this
+        #ifdef DEBUG_METER_READER_TFLITE
+        model_handler_.log_input_stats();
+        #endif
+    } else {
+        #ifdef DEBUG_METER_READER_TFLITE
+        // Always log input stats for full debugging validation? 
+        // Or only on high debug level? Let's obey the user request "Restore all debug output"
+        // model_handler_.log_input_stats(); // This might be too spammy if 8 zones enabled.
+        // Maybe only if needed? The user complaint specifically mentioned tflite messages.
+        // Let's enable it behind the define.
+        #endif
     }
     return true;
 }
@@ -149,14 +163,22 @@ TFLiteCoordinator::ModelSpec TFLiteCoordinator::get_model_spec() const {
     spec.normalize = model_handler_.get_config().normalize;
     spec.input_order = model_handler_.get_config().input_order;
     
-    // Determine input type
+    // Determine input type by checking tensor size
+    // Float32 = W*H*C*4, Uint8 = W*H*C*1
     TfLiteTensor* input = ((tflite_micro_helper::ModelHandler&)model_handler_).input_tensor(); 
     
-    if (input && input->type == kTfLiteFloat32) {
+    size_t num_elements = spec.input_width * spec.input_height * spec.input_channels;
+    
+    if (input && input->bytes == num_elements * 4) {
         spec.input_type = 1; // Float
     } else {
-        spec.input_type = 0; // Uint8
+        spec.input_type = 0; // Uint8 (or fallback)
     }
+    
+    ESP_LOGD(TAG, "Model Spec: %dx%dx%d InputBytes=%zu Type=%d", 
+             spec.input_width, spec.input_height, spec.input_channels, 
+             input ? input->bytes : 0, spec.input_type);
+
     return spec;
 }
 

@@ -1,6 +1,7 @@
 #include "meter_reader_tflite.h"
-#include "esphome/core/log.h"
-#include "esphome/core/hal.h"
+#include "esphome/core/application.h"
+
+#include <esp_heap_caps.h>
 #include <numeric>
 
 #ifdef USE_WEB_SERVER
@@ -24,33 +25,53 @@ void MeterReaderTFLite::setup() {
     // 2. Load Model
     // Load model first to ensure we can retrieve input specifications for camera configuration.
         
-    this->set_timeout(30000, [this]() {
+    // 2. Load Model
+    // Load model first to ensure we can retrieve input specifications for camera configuration.
+    ESP_LOGI(TAG, "Model loading will begin in 5 seconds...");
+    // Reduced timeout to 5s from 30s to speed up boot availability
+    this->set_timeout(5000, [this]() {
+         ESP_LOGI(TAG, "Starting model loading...");
          if (!tflite_coord_.load_model()) {
              mark_failed(); return;
          }
          
          // After model loaded, we have input specs. Update CameraCoord.
          auto spec = tflite_coord_.get_model_spec();
+         
+         // Map input type: 
+         // spec.input_type: 1=Float, 0=Uint8 (from TFLiteCoord)
+         // camera/image_processor: 0=Float, 1=Uint8 (ImageProcessorInputType)
+         int processor_input_type = (spec.input_type == 1) ? 0 : 1;
+         
          camera_coord_.update_image_processor_config(
              spec.input_width, 
              spec.input_height, 
              spec.input_channels,
-             spec.input_type,
+             processor_input_type,
              spec.normalize,
              spec.input_order
          );
          
-         // Setup Web Server Preview
-         #ifdef USE_WEB_SERVER
-         #ifdef DEV_ENABLE_ROTATION
-         if (web_server_) {
-             web_server_->add_handler(new esphome::esp32_camera_utils::PreviewWebHandler([this]() {
-                 return this->get_preview_image();
-             }));
-         }
-         #endif
-         #endif
-    });
+          // Setup Web Server Preview
+          #ifdef USE_WEB_SERVER
+          #ifdef DEV_ENABLE_ROTATION
+          if (web_server_) {
+              web_server_->add_handler(new esphome::esp32_camera_utils::PreviewWebHandler([this]() {
+                  return this->get_preview_image();
+              }));
+          }
+          #endif
+          #endif
+
+          // Publish static memory stats
+          #ifdef DEBUG_METER_READER_MEMORY
+          if (tensor_arena_size_sensor_) {
+              // We need a getter for requested size in TFLiteCoord
+              // Assuming get_tensor_arena_size_requested() exists or we add it
+              tensor_arena_size_sensor_->publish_state(tflite_coord_.get_tensor_arena_size()); 
+          }
+          #endif
+     });
     
     // 3. Setup Validation
     ValueValidator::ValidationConfig val_conf;
@@ -61,6 +82,13 @@ void MeterReaderTFLite::setup() {
     
     // 4. Setup Camera Callback
     // Register callback on the global camera instance.
+    
+    // 5. Setup Flashlight Coordinator Callback
+    flashlight_coord_.set_request_frame_callback([this](){
+        this->frame_requested_ = true;
+        this->last_request_time_ = millis();
+        ESP_LOGD(TAG, "Frame requested via coordinator callback");
+    });
 }
 
 void MeterReaderTFLite::set_camera(esp32_camera::ESP32Camera *camera) {
@@ -76,12 +104,15 @@ void MeterReaderTFLite::set_camera(esp32_camera::ESP32Camera *camera) {
 }
 
 void MeterReaderTFLite::update() {
+    ESP_LOGD(TAG, "Update triggered (Interval cycle)");
     if (crop_zone_handler_.has_global_zones_changed()) {
         crop_zone_handler_.apply_global_zones();
     }
     
-    // Delegate flash/scheduling to FlashlightCoordinator
-    if (pause_processing_) return;
+    if (pause_processing_) {
+        ESP_LOGD(TAG, "Processing paused, skipping update");
+        return;
+    }
     
     // The flashlight coordinator returns true if it is handling the cycle (scheduling or waiting)
     bool busy = flashlight_coord_.update_scheduling();
@@ -90,6 +121,8 @@ void MeterReaderTFLite::update() {
         // Normal cycle
          if (!frame_available_ && !frame_requested_) {
              frame_requested_ = true;
+             last_request_time_ = millis();
+             ESP_LOGD(TAG, "Requesting frame (Continuous/No-Flash)");
          } else if (frame_available_) {
              process_available_frame();
          }
@@ -97,10 +130,16 @@ void MeterReaderTFLite::update() {
 }
 
 void MeterReaderTFLite::loop() {
+    // Watchdog: If frame requested but not arrived for 15s, reset state
+    if (frame_requested_ && (millis() - last_request_time_ > 15000)) {
+        ESP_LOGW(TAG, "Frame request timed out (15s)! Resetting state.");
+        frame_requested_ = false;
+        // Check if we need to force reset camera or just continue
+    }
+
     if (frame_available_ && !processing_frame_) {
         process_available_frame();
     }
-    // Timeout logic could go here or in a coordinator
 }
 
 void MeterReaderTFLite::process_available_frame() {
@@ -117,6 +156,12 @@ void MeterReaderTFLite::process_available_frame() {
 
 void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> frame) {
     if (pause_processing_) return;
+
+    if (!tflite_coord_.is_model_loaded()) {
+        ESP_LOGW(TAG, "Skipping frame - Model not loaded yet");
+        return;
+    }
+
     
     // Preview Logic (Rotation)
     #ifdef DEV_ENABLE_ROTATION
@@ -143,27 +188,58 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
 
     // Inference
     auto zones = crop_zone_handler_.get_zones();
-    if (zones.empty()) zones.push_back({0,0, camera_coord_.get_width(), camera_coord_.get_height()});
-    
-
+    ESP_LOGI(TAG, "Processing Image: Found %d crop zones", zones.size());
     
     // Process frame -> buffers
     auto processed_buffers = camera_coord_.process_frame(frame, zones);
     
     // Buffers -> Inference
+    
+    // Capture Peak Memory State *during* processing (buffers allocated)
+    #ifdef DEBUG_METER_READER_MEMORY
+    if (process_free_heap_sensor_) process_free_heap_sensor_->publish_state(heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+    if (process_free_psram_sensor_) process_free_psram_sensor_->publish_state(heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    #endif
+
     auto results = tflite_coord_.run_inference(processed_buffers);
+    
+    #ifdef DEBUG_METER_READER_MEMORY
+    if (tensor_arena_used_sensor_) {
+          tensor_arena_used_sensor_->publish_state(tflite_coord_.get_arena_used_bytes());
+    }
+    #endif
+
     
     // Collect readings
     std::vector<float> readings, confidences;
+    int digit_index = 0;
     for (const auto& res : results) {
         if (res.success) {
+            ESP_LOGD(TAG, "Digit %d: %.0f (%.2f)", digit_index, res.value, res.confidence);
             readings.push_back(res.value);
             confidences.push_back(res.confidence);
+        } else {
+             ESP_LOGW(TAG, "Digit %d: Failed to infer", digit_index);
         }
+        digit_index++;
     }
     
     if (!readings.empty()) {
-        float final_val = combine_readings(readings);
+        // Construct string for logging and text sensor
+        std::string result_str;
+        for (float r : readings) {
+            result_str += std::to_string((int)round(r) % 10);
+        }
+        
+        ESP_LOGI(TAG, "Inference Result: %s", result_str.c_str());
+        if (inference_logs_) {
+            inference_logs_->publish_state(result_str);
+        }
+
+        float final_val = 0.0f;
+        // String is guaranteed to be digits, so direct conversion is safe(r)
+        final_val = std::stof(result_str);
+
         float avg_conf = std::accumulate(confidences.begin(), confidences.end(), 0.0f) / confidences.size();
         
         float validated_val = final_val;
@@ -214,6 +290,7 @@ void MeterReaderTFLite::capture_preview() {
     request_preview_ = true;
     flashlight_coord_.capture_preview_sequence([this](){
         frame_requested_ = true;
+        last_request_time_ = millis();
     });
 }
 std::shared_ptr<camera::CameraImage> MeterReaderTFLite::get_preview_image() {
@@ -269,7 +346,10 @@ bool MeterReaderTFLite::set_camera_window(int offset_x, int offset_y, int width,
 MeterReaderTFLite::~MeterReaderTFLite() {} 
 
 void MeterReaderTFLite::force_flash_inference() {
-    flashlight_coord_.force_inference([this](){ frame_requested_ = true; });
+    flashlight_coord_.force_inference([this](){ 
+        frame_requested_ = true; 
+        last_request_time_ = millis();
+    });
 }
 
 // Debug Handlers

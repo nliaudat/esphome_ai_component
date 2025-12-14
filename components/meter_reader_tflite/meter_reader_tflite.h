@@ -110,6 +110,14 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_inference_logs(text_sensor::TextSensor *sensor) { inference_logs_ = sensor; }
   void set_main_logs(text_sensor::TextSensor *sensor) { main_logs_ = sensor; }
 
+#ifdef DEBUG_METER_READER_MEMORY
+  void set_tensor_arena_size_sensor(sensor::Sensor *s) { tensor_arena_size_sensor_ = s; }
+  void set_tensor_arena_used_sensor(sensor::Sensor *s) { tensor_arena_used_sensor_ = s; }
+  void set_process_free_heap_sensor(sensor::Sensor *s) { process_free_heap_sensor_ = s; }
+  void set_process_free_psram_sensor(sensor::Sensor *s) { process_free_psram_sensor_ = s; }
+#endif
+
+
 #ifdef USE_WEB_SERVER
   void set_web_server(web_server_base::WebServerBase *web_server);
 #endif
@@ -150,7 +158,16 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   sensor::Sensor *value_sensor_{nullptr};
   sensor::Sensor *confidence_sensor_{nullptr};
   text_sensor::TextSensor *inference_logs_{nullptr};
+
   text_sensor::TextSensor *main_logs_{nullptr};
+
+#ifdef DEBUG_METER_READER_MEMORY
+  sensor::Sensor *tensor_arena_size_sensor_{nullptr};
+  sensor::Sensor *tensor_arena_used_sensor_{nullptr};
+  sensor::Sensor *process_free_heap_sensor_{nullptr};
+  sensor::Sensor *process_free_psram_sensor_{nullptr};
+#endif
+
 
   // Helper
   void process_available_frame();

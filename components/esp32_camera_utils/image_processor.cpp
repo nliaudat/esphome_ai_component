@@ -24,6 +24,11 @@
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
 
+// Bring in global config defines if not already present
+#ifdef DEBUG_METER_READER_TFLITE
+#define DEBUG_ESP32_CAMERA_UTILS
+#endif
+
 namespace esphome {
 namespace esp32_camera_utils {
 
@@ -51,7 +56,7 @@ static const char *const TAG = "ImageProcessor";
 #endif
 
 // Debug macros for image processing analysis (restored from legacy code)
-#ifdef DEBUG_ESP32_CAMERA_UTILS
+#if defined(DEBUG_ESP32_CAMERA_UTILS) || defined(DEBUG_METER_READER_TFLITE)
 #define DEBUG_ZONE_INFO(zone, crop_w, crop_h, model_w, model_h) \
     ESP_LOGI(TAG, "ZONE: [%d,%d,%d,%d] -> %dx%d -> %dx%d", \
              zone.x1, zone.y1, zone.x2, zone.y2, \
@@ -406,7 +411,15 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
   }
 
   if (zones.empty()) {
-    CropZone full_zone{0, 0, config_.camera_width, config_.camera_height};
+    int w = config_.camera_width;
+    int h = config_.camera_height;
+    
+    // Attempt to get actual dimensions if JPEG to avoid "Out of Bounds" on windowed images
+    if (config_.pixel_format == "JPEG") {
+        get_jpeg_dimensions(image->get_data_buffer(), image->get_data_length(), w, h);
+    }
+
+    CropZone full_zone{0, 0, w, h};
     ProcessResult result = process_zone(image, full_zone);
     if (result.data) {
       results.push_back(std::move(result));
@@ -419,6 +432,9 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
     for (size_t i = 0; i < zones.size(); i++) {
       ProcessResult result = process_zone(image, zones[i]);
       if (result.data) {
+        #ifdef DEBUG_ESP32_CAMERA_UTILS
+        DEBUG_ZONE_INFO(zones[i], (zones[i].x2 - zones[i].x1), (zones[i].y2 - zones[i].y1), config_.model_width, config_.model_height);
+        #endif
         results.push_back(std::move(result));
       } else {
         all_zones_successful = false;
@@ -943,6 +959,12 @@ bool ImageProcessor::process_rgb888_crop_and_scale_to_float32(
             arrange_channels(&float_output[dst_pos], r, g, b, channels, normalize);
         }
     }
+    
+    #ifdef DEBUG_ESP32_CAMERA_UTILS
+    DEBUG_FIRST_PIXELS(float_output, model_width * model_height * channels, channels);
+    DEBUG_CHANNEL_ORDER(float_output, model_width * model_height * channels, channels);
+    #endif
+
     return true;
 }
 
@@ -972,6 +994,13 @@ bool ImageProcessor::process_rgb888_crop_and_scale_to_uint8(
             arrange_channels(&output_buffer[dst_pos], r, g, b, channels);
         }
     }
+
+    #ifdef DEBUG_ESP32_CAMERA_UTILS
+    // Cast to float for common macro or create int version? Macro uses %.1f so it expects float or castable.
+    // Let's just manually log for uint8
+    // Or just rely on zone info. 
+    #endif
+
     return true;
 }
 
