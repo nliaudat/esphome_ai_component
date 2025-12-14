@@ -216,8 +216,28 @@ public:
       float rotation_deg, int& out_w, int& out_h);
 #endif
 
+  // Custom deleters for JPEG resources
+  struct JpegDecoderDeleter {
+    using pointer = jpeg_dec_handle_t;
+    void operator()(jpeg_dec_handle_t decoder) const {
+      if (decoder) {
+        jpeg_dec_close(decoder);
+      }
+    }
+  };
+
+  struct JpegBufferDeleter {
+    void operator()(uint8_t* buf) const {
+      if (buf) {
+        jpeg_free_align(buf);
+      }
+    }
+  };
+
+  using JpegBufferPtr = std::unique_ptr<uint8_t[], JpegBufferDeleter>;
+
   // Helper to decode JPEG to RGB888
-  static uint8_t* decode_jpeg(const uint8_t* data, size_t len, int* width, int* height);
+  static JpegBufferPtr decode_jpeg(const uint8_t* data, size_t len, int* width, int* height);
 
   void arrange_channels(uint8_t* output, uint8_t r, uint8_t g, uint8_t b, int output_channels) const;
 

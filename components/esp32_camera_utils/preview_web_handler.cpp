@@ -70,13 +70,16 @@ void PreviewWebHandler::handleRequest(web_server_idf::AsyncWebServerRequest *req
       return;
   }
 
+  // RAII for jpeg_buf
+  struct FreeDeleter {
+      void operator()(uint8_t* p) const { free(p); }
+  };
+  std::unique_ptr<uint8_t, FreeDeleter> jpeg_buf_ptr(jpeg_buf);
+
   // Send the converted JPEG
-  // beginResponse will copy the buffer content so we can free our local jpeg_buf
+  // beginResponse will copy the buffer content so we can free our local jpeg_buf (via RAII)
   web_server_idf::AsyncWebServerResponse *response = request->beginResponse(200, "image/jpeg", (const uint8_t*)jpeg_buf, jpeg_len);
   request->send(response);
-  
-  // Free the buffer allocated by fmt2jpg
-  free(jpeg_buf);
   
   ESP_LOGD(TAG, "Serving converted JPEG preview (%u bytes)", jpeg_len);
 }
