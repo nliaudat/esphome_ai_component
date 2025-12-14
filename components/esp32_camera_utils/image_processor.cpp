@@ -51,7 +51,7 @@ static const char *const TAG = "ImageProcessor";
 #endif
 
 // Debug macros for image processing analysis (restored from legacy code)
-#ifdef DEBUG_ESP32_CAMERA_UTILS
+#if defined(DEBUG_ESP32_CAMERA_UTILS) || defined(DEBUG_METER_READER_TFLITE)
 #define DEBUG_ZONE_INFO(zone, crop_w, crop_h, model_w, model_h) \
     ESP_LOGI(TAG, "ZONE: [%d,%d,%d,%d] -> %dx%d -> %dx%d", \
              zone.x1, zone.y1, zone.x2, zone.y2, \
@@ -131,72 +131,126 @@ bool ImageProcessor::get_jpeg_dimensions(const uint8_t *data, size_t len, int &w
     return false;
 }
 
+
+uint8_t* ImageProcessor::decode_jpeg(const uint8_t* data, size_t len, int* width, int* height) {
+    if (!data || len == 0) return nullptr;
+
+    int w, h;
+    if (!get_jpeg_dimensions(data, len, w, h)) {
+         return nullptr;
+    }
+    if (width) *width = w;
+    if (height) *height = h;
+
+    jpeg_dec_config_t decode_config = DEFAULT_JPEG_DEC_CONFIG();
+    decode_config.output_type = JPEG_PIXEL_FORMAT_RGB888;
+    decode_config.scale.width = w;
+    decode_config.scale.height = h;
+    decode_config.clipper.width = w;
+    decode_config.clipper.height = h;
+    decode_config.rotate = JPEG_ROTATE_0D;
+    decode_config.block_enable = false;
+
+    jpeg_dec_handle_t decoder = nullptr;
+    if (jpeg_dec_open(&decode_config, &decoder) != JPEG_ERR_OK) {
+        return nullptr;
+    }
+
+    size_t out_size = w * h * 3;
+    uint8_t* out_buf = (uint8_t*)jpeg_calloc_align(out_size, 16);
+    if (!out_buf) {
+        jpeg_dec_close(decoder);
+        return nullptr;
+    }
+
+    jpeg_dec_io_t io = {0};
+    io.inbuf = const_cast<uint8_t*>(data);
+    io.inbuf_len = len;
+    io.inbuf_remain = len;
+    io.outbuf = out_buf;
+    io.out_size = out_size;
+
+    jpeg_dec_header_info_t header_info;
+    if (jpeg_dec_parse_header(decoder, &io, &header_info) != JPEG_ERR_OK) {
+        jpeg_free_align(out_buf);
+        jpeg_dec_close(decoder);
+        return nullptr;
+    }
+
+    if (jpeg_dec_process(decoder, &io) != JPEG_ERR_OK) {
+        jpeg_free_align(out_buf);
+        jpeg_dec_close(decoder);
+        return nullptr;
+    }
+
+    jpeg_dec_close(decoder);
+    return out_buf;
+}
+
 #ifdef DEV_ENABLE_ROTATION
 std::shared_ptr<camera::CameraImage> ImageProcessor::generate_rotated_preview(
     std::shared_ptr<camera::CameraImage> source, 
-    float rotation) {
+    float rotation, int width, int height) {
     
     if (!source) return nullptr;
 
     const uint8_t *data = source->get_data_buffer();
     size_t len = source->get_data_length();
     
-    // Attempt to get dimensions
-    int src_w = 640; 
-    int src_h = 480; 
-    
+    // 1. Determine dimensions (prefer JPEG header)
+    int src_w = width; 
+    int src_h = height; 
     int jpeg_w, jpeg_h;
     if (get_jpeg_dimensions(data, len, jpeg_w, jpeg_h)) {
         src_w = jpeg_w;
         src_h = jpeg_h;
     } 
 
-    ImageProcessorConfig preview_config;
-    preview_config.camera_width = src_w;
-    preview_config.camera_height = src_h;
-    preview_config.pixel_format = "JPEG"; 
-
-    // Calculate bounding box for arbitrary rotation
-    float rads = rotation * M_PI / 180.0f;
-    float abs_cos = std::abs(std::cos(rads));
-    float abs_sin = std::abs(std::sin(rads));
-    
-    int new_w = static_cast<int>(src_w * abs_cos + src_h * abs_sin);
-    int new_h = static_cast<int>(src_w * abs_sin + src_h * abs_cos);
-
-    preview_config.model_width = new_w;
-    preview_config.model_height = new_h;
-    preview_config.model_channels = 3; 
-    preview_config.rotation = rotation;
-    
-    preview_config.input_type = kInputTypeUInt8; 
-    preview_config.normalize = false; 
-    preview_config.input_order = "BGR";
-    
-    ImageProcessor processor(preview_config);
-    
-    // We request the full "new" image area as the zone
-    CropZone full_image_zone = {0, 0, new_w, new_h};
-    std::vector<CropZone> zones = {full_image_zone};
-    std::vector<ImageProcessor::ProcessResult> results = processor.split_image_in_zone(source, zones);
-
-    if (!results.empty() && results[0].data && results[0].size > 0) {
-        ImageProcessor::ProcessResult &result = results[0];
-        
-        pixformat_t preview_format = PIXFORMAT_RGB888;
-        if (preview_config.model_channels == 1) {
-            preview_format = PIXFORMAT_GRAYSCALE;
-        }
-
-        return std::shared_ptr<RotatedPreviewImage>(new RotatedPreviewImage(
-            std::move(result.data), result.size,
-            new_w, new_h,
-            preview_format
-        ));
+    // 2. Decode JPEG to RGB888
+    int dec_w = 0, dec_h = 0;
+    uint8_t* rgb_data = decode_jpeg(data, len, &dec_w, &dec_h);
+    if (!rgb_data) {
+        // Fallback: If not JPEG or decode failed, we can't process (preview assumes JPEG input mostly)
+        // If we want to support raw input, we would need to check source format here.
+        // For now, consistent with previous behavior which forced "JPEG" config.
+        ESP_LOGW(TAG, "Preview: Failed to decode input image (requires JPEG)");
+        return nullptr;
     }
     
-    ESP_LOGW(TAG, "Failed to generate rotated preview image.");
-    return nullptr;
+    // 3. Calculate new dimensions and allocate output
+    float rads = rotation * M_PI / 180.0f;
+    // Calculate new bounding box
+    int new_w = static_cast<int>(dec_w * std::abs(std::cos(rads)) + dec_h * std::abs(std::sin(rads)));
+    int new_h = static_cast<int>(dec_w * std::abs(std::sin(rads)) + dec_h * std::abs(std::cos(rads)));
+
+    size_t out_size = new_w * new_h * 3;
+    UniqueBufferPtr out_buffer = allocate_image_buffer(out_size);
+    
+    if (!out_buffer) {
+        ESP_LOGE(TAG, "Preview: Failed to allocate output buffer (%zu bytes)", out_size);
+        jpeg_free_align(rgb_data);
+        return nullptr;
+    }
+
+    // 4. Rotate
+    int final_w, final_h;
+    bool success = apply_software_rotation(rgb_data, out_buffer->get(), 
+                                         dec_w, dec_h, 3, 
+                                         rotation, final_w, final_h);
+    
+    jpeg_free_align(rgb_data); // Free intermediate buffer
+
+    if (!success) {
+        ESP_LOGW(TAG, "Preview: Rotation failed");
+        return nullptr;
+    }
+
+    // 5. Return wrapped result
+    return std::shared_ptr<RotatedPreviewImage>(new RotatedPreviewImage(
+        std::move(out_buffer), out_size,
+        final_w, final_h,
+        PIXFORMAT_RGB888
+    ));
 }
 #endif
 
@@ -352,7 +406,15 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
   }
 
   if (zones.empty()) {
-    CropZone full_zone{0, 0, config_.camera_width, config_.camera_height};
+    int w = config_.camera_width;
+    int h = config_.camera_height;
+    
+    // Attempt to get actual dimensions if JPEG to avoid "Out of Bounds" on windowed images
+    if (config_.pixel_format == "JPEG") {
+        get_jpeg_dimensions(image->get_data_buffer(), image->get_data_length(), w, h);
+    }
+
+    CropZone full_zone{0, 0, w, h};
     ProcessResult result = process_zone(image, full_zone);
     if (result.data) {
       results.push_back(std::move(result));
@@ -365,6 +427,9 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
     for (size_t i = 0; i < zones.size(); i++) {
       ProcessResult result = process_zone(image, zones[i]);
       if (result.data) {
+        #ifdef DEBUG_ESP32_CAMERA_UTILS
+        DEBUG_ZONE_INFO(zones[i], (zones[i].x2 - zones[i].x1), (zones[i].y2 - zones[i].y1), config_.model_width, config_.model_height);
+        #endif
         results.push_back(std::move(result));
       } else {
         all_zones_successful = false;
@@ -499,70 +564,28 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
         ESP_LOGW(TAG, "Failed to parse JPEG dimensions, using config");
     }
 
-    jpeg_dec_config_t decode_config = DEFAULT_JPEG_DEC_CONFIG();
+    int dec_w = 0, dec_h = 0;
+    uint8_t* full_image_buf = decode_jpeg(jpeg_data, jpeg_size, &dec_w, &dec_h);
+    
+    if (!full_image_buf) {
+        stats_.jpeg_decoding_errors++;
+        return false;
+    }
+
+    // Update with authoritative dimensions
+    jpeg_width = dec_w;
+    jpeg_height = dec_h;
+
     int crop_width = zone.x2 - zone.x1;
     int crop_height = zone.y2 - zone.y1;
 
-    // Validate zone against ACTUAL image dimensions, not config
-    // This allows processing of images that don't match config (e.g. debug images or windowed captures)
+    // Validate zone against ACTUAL image dimensions
     if (zone.x1 < 0 || zone.y1 < 0 || 
         zone.x2 > jpeg_width || zone.y2 > jpeg_height) {
         ESP_LOGE(TAG, "Crop zone (%d,%d -> %d,%d) out of bounds for actual image (%dx%d) - Config: %dx%d",
                  zone.x1, zone.y1, zone.x2, zone.y2, jpeg_width, jpeg_height,
                  config_.camera_width, config_.camera_height);
-        return false;
-    }
-
-    decode_config.output_type = JPEG_PIXEL_FORMAT_RGB888;
-    decode_config.scale.width = static_cast<uint16_t>(jpeg_width);
-    decode_config.scale.height = static_cast<uint16_t>(jpeg_height);
-    decode_config.clipper.width = static_cast<uint16_t>(jpeg_width);
-    decode_config.clipper.height = static_cast<uint16_t>(jpeg_height);
-    
-    // 1. Decode (Unrotated)
-    decode_config.rotate = JPEG_ROTATE_0D;
-    decode_config.block_enable = false;
-    
-    jpeg_dec_handle_t decoder = nullptr;
-    jpeg_error_t ret = jpeg_dec_open(&decode_config, &decoder);
-    
-    if (ret != JPEG_ERR_OK) {
-        stats_.jpeg_decoding_errors++;
-        return false;
-    }
-
-    size_t full_image_size = jpeg_width * jpeg_height * 3;
-    uint8_t* full_image_buf = (uint8_t*)jpeg_calloc_align(full_image_size, 16);
-    if (!full_image_buf) {
-        ESP_LOGE(TAG, "Failed to allocate full_image_buf: %zu bytes", full_image_size);
-        jpeg_dec_close(decoder);
-        return false;
-    }
-
-    jpeg_dec_io_t io;
-    memset(&io, 0, sizeof(io));
-    io.inbuf = const_cast<uint8_t*>(jpeg_data);
-    io.inbuf_len = jpeg_size;
-    io.inbuf_remain = jpeg_size;
-    io.outbuf = full_image_buf;
-    io.out_size = full_image_size;
-
-    jpeg_dec_header_info_t header_info;
-    ret = jpeg_dec_parse_header(decoder, &io, &header_info);
-    if (ret != JPEG_ERR_OK) {
         jpeg_free_align(full_image_buf);
-        jpeg_dec_close(decoder);
-        stats_.jpeg_decoding_errors++;
-        return false;
-    }
-    
-    ret = jpeg_dec_process(decoder, &io);
-    // Cleanup decoder immediately to free internal resources
-    jpeg_dec_close(decoder); 
-    
-    if (ret != JPEG_ERR_OK) {
-        jpeg_free_align(full_image_buf);
-        stats_.jpeg_decoding_errors++;
         return false;
     }
 
@@ -651,7 +674,6 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
 
     return scale_success;
 
-    return scale_success;
 }
 
 ImageProcessor::ProcessResult ImageProcessor::process_zone(
@@ -825,11 +847,10 @@ bool ImageProcessor::process_raw_zone_to_buffer(
         int bytes_per_pixel = config_.model_channels * element_size;
         
         // rotate temp_buffer (scale_width x scale_height) -> output_buffer (model_width x model_height)
+        int rotated_w, rotated_h;
         success = apply_software_rotation(temp_buffer, output_buffer, 
                                         scale_width, scale_height, 
-                                        bytes_per_pixel, config_.rotation, config_.model_width, config_.model_height); // Updated sig requires ref out vars, but here we expect out to be model size?
-                                        // Wait, my signature for apply_software_rotation changed to: 
-                                        // bool apply_software_rotation(const uint8_t*, uint8_t*, int, int, int, float, int&, int&)
+                                        bytes_per_pixel, config_.rotation, rotated_w, rotated_h);
     }
     #endif
     
@@ -933,6 +954,12 @@ bool ImageProcessor::process_rgb888_crop_and_scale_to_float32(
             arrange_channels(&float_output[dst_pos], r, g, b, channels, normalize);
         }
     }
+    
+    #ifdef DEBUG_ESP32_CAMERA_UTILS
+    DEBUG_FIRST_PIXELS(float_output, model_width * model_height * channels, channels);
+    DEBUG_CHANNEL_ORDER(float_output, model_width * model_height * channels, channels);
+    #endif
+
     return true;
 }
 
@@ -962,6 +989,13 @@ bool ImageProcessor::process_rgb888_crop_and_scale_to_uint8(
             arrange_channels(&output_buffer[dst_pos], r, g, b, channels);
         }
     }
+
+    #ifdef DEBUG_ESP32_CAMERA_UTILS
+    // Cast to float for common macro or create int version? Macro uses %.1f so it expects float or castable.
+    // Let's just manually log for uint8
+    // Or just rely on zone info. 
+    #endif
+
     return true;
 }
 

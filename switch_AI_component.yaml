@@ -16,6 +16,78 @@ switch:
             id(meter_reader)->set_pause_processing(false);
           }
 
+  - platform: template
+    name: "Allow Negative Rates"
+    id: allow_negative_rates_switch
+    icon: "mdi:minus-circle-off"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - lambda: |-
+          if (id(meter_reader) != nullptr) {
+            id(meter_reader)->set_allow_negative_rates(true);
+          }
+    turn_off_action:
+      - lambda: |-
+          if (id(meter_reader) != nullptr) {
+            id(meter_reader)->set_allow_negative_rates(false);
+          }
+
+  - platform: template
+    name: "Debug Memory"
+    id: debug_memory_switch
+    icon: "mdi:memory"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON # Assuming default enabled via yaml
+    turn_on_action:
+      - lambda: |-
+          if (id(meter_reader) != nullptr) {
+            id(meter_reader)->set_debug_memory_enabled(true);
+          }
+    turn_off_action:
+      - lambda: |-
+          if (id(meter_reader) != nullptr) {
+            id(meter_reader)->set_debug_memory_enabled(false);
+          }
+
+  - platform: template
+    name: "Component Debug Mode"
+    id: component_debug_mode_switch
+    icon: "mdi:bug"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    turn_on_action:
+      - lambda: |-
+          #ifdef DEBUG_METER_READER_TFLITE
+            if (id(meter_reader) != nullptr) {
+               id(meter_reader)->set_debug_mode(true);
+            }
+          #endif
+    turn_off_action:
+      - lambda: |-
+           #ifdef DEBUG_METER_READER_TFLITE
+             if (id(meter_reader) != nullptr) {
+                id(meter_reader)->set_debug_mode(false);
+             }
+           #endif
+
+  - platform: template
+    name: "Camera Window Enabled"
+    id: camera_window_enabled_switch
+    icon: "mdi:crop-free"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - lambda: |-
+          if (id(meter_reader) != nullptr) {
+            id(meter_reader)->set_camera_window_configured(true);
+          }
+    turn_off_action:
+      - lambda: |-
+          if (id(meter_reader) != nullptr) {
+            id(meter_reader)->set_camera_window_configured(false);
+          }
+
 button:
   - platform: template
     name: "Force AI inference"

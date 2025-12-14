@@ -159,7 +159,7 @@ private:
   std::mutex processing_mutex_;
   int bytes_per_pixel_{0};
 
-  UniqueBufferPtr allocate_image_buffer(size_t size);
+  static UniqueBufferPtr allocate_image_buffer(size_t size);
   bool validate_buffer_size(size_t required, size_t available, const char* context) const;
   bool validate_input_image(std::shared_ptr<camera::CameraImage> image) const;
   
@@ -205,16 +205,19 @@ public:
    */
   static std::shared_ptr<camera::CameraImage> generate_rotated_preview(
       std::shared_ptr<camera::CameraImage> source, 
-      float rotation);
+      float rotation, int width, int height);
 
   // ... (existing declarations)
   
   // Software rotation for arbitrary angles
-  bool apply_software_rotation(
+  static bool apply_software_rotation(
       const uint8_t* input, uint8_t* output,
       int src_w, int src_h, int bytes_per_pixel,
       float rotation_deg, int& out_w, int& out_h);
 #endif
+
+  // Helper to decode JPEG to RGB888
+  static uint8_t* decode_jpeg(const uint8_t* data, size_t len, int* width, int* height);
 
   void arrange_channels(uint8_t* output, uint8_t r, uint8_t g, uint8_t b, int output_channels) const;
 

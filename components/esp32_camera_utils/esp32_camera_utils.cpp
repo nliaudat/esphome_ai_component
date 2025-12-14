@@ -1,5 +1,6 @@
 #include "esp32_camera_utils.h"
 #include "esphome/core/log.h"
+#include <esp_heap_caps.h>
 
 namespace esphome {
 namespace esp32_camera_utils {
@@ -88,6 +89,13 @@ void Esp32CameraUtils::reinitialize_image_processor(const ImageProcessorConfig& 
         image_processor_ = std::make_unique<ImageProcessor>(config);
         ESP_LOGI(TAG, "ImageProcessor initialized with dimensions: %dx%d, format: %s",
                  camera_width_, camera_height_, pixel_format_.c_str());
+
+        #ifdef DEBUG_ESP32_CAMERA_UTILS_MEMORY
+        if (camera_buffer_size_sensor_ && image_processor_) {
+            camera_buffer_size_sensor_->publish_state(image_processor_->get_required_buffer_size());
+        }
+        #endif
+
     } else {
         ESP_LOGW(TAG, "Cannot initialize ImageProcessor: Invalid camera dimensions");
     }
@@ -146,6 +154,14 @@ bool Esp32CameraUtils::process_zone(std::shared_ptr<camera::CameraImage> frame, 
         return false;
     }
 
+    #ifdef DEBUG_ESP32_CAMERA_UTILS_MEMORY
+    // We update sensors here too as this is the "native" path, but also allow manual updates
+    if (camera_free_psram_sensor_) {
+        camera_free_psram_sensor_->publish_state(heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    }
+    #endif
+
+
     // Translate global crop zone to local window coordinates
     CropZone local_zone = zone;
     
@@ -185,6 +201,17 @@ bool Esp32CameraUtils::process_zone(std::shared_ptr<camera::CameraImage> frame, 
     }
 
     return image_processor_->process_zone_to_buffer(frame, local_zone, output_buffer, output_size);
+}
+
+void Esp32CameraUtils::update_memory_sensors() {
+    #ifdef DEBUG_ESP32_CAMERA_UTILS_MEMORY
+    if (camera_free_psram_sensor_) {
+        camera_free_psram_sensor_->publish_state(heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    }
+    if (camera_buffer_size_sensor_ && image_processor_) {
+        camera_buffer_size_sensor_->publish_state(image_processor_->get_required_buffer_size());
+    }
+    #endif
 }
 
 }  // namespace esp32_camera_utils

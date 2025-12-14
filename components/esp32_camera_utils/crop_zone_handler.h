@@ -28,6 +28,11 @@ class CropZoneHandler {
       crop_zones_global_ = global_var;
       if (crop_zones_global_) {
           last_global_value_ = crop_zones_global_->value();
+          // Apply immediately on startup
+          std::string val = crop_zones_global_->value();
+          if (!val.empty() && val != "[]") {
+              parse_zones(val);
+          }
       }
   }
   
