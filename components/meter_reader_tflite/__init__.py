@@ -389,3 +389,18 @@ async def to_code(config):
     if "main_logs" in config:
         main_logs = await cg.get_variable(config["main_logs"])
         cg.add(var.set_main_logs(main_logs))
+
+    # Find esp32_camera_utils instance to allow updating its helper sensors
+    camera_utils_id = None
+    if 'esp32_camera_utils' in CORE.config:
+        conf = CORE.config['esp32_camera_utils']
+        # Handle list if multiple instances (though usually singleton or first one)
+        if isinstance(conf, list) and len(conf) > 0:
+            conf = conf[0]
+            
+        if CONF_ID in conf:
+            camera_utils_id = conf[CONF_ID]
+
+    if camera_utils_id:
+        utils_var = await cg.get_variable(camera_utils_id)
+        cg.add(var.set_esp32_camera_utils(utils_var))

@@ -47,6 +47,9 @@ class Esp32CameraUtils : public Component {
   // Image rotation configuration (0, 90, 180, 270 degrees clockwise)
   void set_rotation(int rotation) { rotation_ = rotation; }
 
+  // Manually trigger sensor updates
+  void update_memory_sensors();
+
 #ifdef DEBUG_ESP32_CAMERA_UTILS_MEMORY
   void set_camera_buffer_size_sensor(sensor::Sensor *s) { camera_buffer_size_sensor_ = s; }
   void set_camera_free_psram_sensor(sensor::Sensor *s) { camera_free_psram_sensor_ = s; }

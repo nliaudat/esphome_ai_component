@@ -24,11 +24,6 @@
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
 
-// Bring in global config defines if not already present
-#ifdef DEBUG_METER_READER_TFLITE
-#define DEBUG_ESP32_CAMERA_UTILS
-#endif
-
 namespace esphome {
 namespace esp32_camera_utils {
 

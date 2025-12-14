@@ -13,6 +13,14 @@ namespace meter_reader_tflite {
 
 static const char *const TAG = "meter_reader_tflite";
 
+#ifdef DEBUG_METER_READER_TFLITE
+#define DURATION_START(name) uint32_t start_time = millis();
+#define DURATION_END(name) ESP_LOGD(TAG, "%s took %u ms", name, millis() - start_time)
+#else
+#define DURATION_START(name)
+#define DURATION_END(name)
+#endif
+
 void MeterReaderTFLite::setup() {
     ESP_LOGI(TAG, "Setting up Meter Reader TFLite (Refactored)...");
     
@@ -52,6 +60,37 @@ void MeterReaderTFLite::setup() {
              spec.input_order
          );
          
+         // Sync Esp32CameraUtils if present (for sensors)
+         if (esp32_camera_utils_) {
+              // Ensure it knows current dimensions
+              esp32_camera_utils_->set_camera_image_format(
+                  camera_coord_.get_width(),
+                  camera_coord_.get_height(),
+                  camera_coord_.get_format()
+              );
+              
+              esp32_camera_utils::ImageProcessorConfig config;
+              config.camera_width = camera_coord_.get_width();
+              config.camera_height = camera_coord_.get_height();
+              config.pixel_format = camera_coord_.get_format();
+              config.model_width = spec.input_width;
+              config.model_height = spec.input_height;
+              config.model_channels = spec.input_channels;
+              
+              switch((int)rotation_) {
+                  case 90:  config.rotation = esp32_camera_utils::ROTATION_90;  break;
+                  case 180: config.rotation = esp32_camera_utils::ROTATION_180; break;
+                  case 270: config.rotation = esp32_camera_utils::ROTATION_270; break;
+                  default:  config.rotation = esp32_camera_utils::ROTATION_0;   break;
+              }
+              
+              config.input_type = (esp32_camera_utils::ImageProcessorInputType)processor_input_type;
+              config.normalize = spec.normalize;
+              config.input_order = spec.input_order;
+              
+              esp32_camera_utils_->reinitialize_image_processor(config);
+         }
+         
           // Setup Web Server Preview
           #ifdef USE_WEB_SERVER
           #ifdef DEV_ENABLE_ROTATION
@@ -60,9 +99,19 @@ void MeterReaderTFLite::setup() {
                   return this->get_preview_image();
               }));
           }
+          if (web_server_) {
+              web_server_->add_handler(new esphome::esp32_camera_utils::PreviewWebHandler([this]() {
+                  return this->get_preview_image();
+              }));
+          }
           #endif
           #endif
 
+          // Print debug info on success (legacy behavior)
+          #ifdef DEBUG_METER_READER_TFLITE
+          this->print_debug_info();
+          #endif
+          
           // Publish static memory stats
           #ifdef DEBUG_METER_READER_MEMORY
           if (tensor_arena_size_sensor_) {
@@ -79,6 +128,10 @@ void MeterReaderTFLite::setup() {
     val_conf.max_absolute_diff = max_absolute_diff_;
     output_validator_.set_config(val_conf);
     output_validator_.setup();
+    
+    ESP_LOGI(TAG, "Output validation configured - AllowNegativeRates: %s, MaxAbsoluteDiff: %d",
+             val_conf.allow_negative_rates ? "YES" : "NO", 
+             val_conf.max_absolute_diff);
     
     // 4. Setup Camera Callback
     // Register callback on the global camera instance.
@@ -108,7 +161,12 @@ void MeterReaderTFLite::update() {
     if (crop_zone_handler_.has_global_zones_changed()) {
         crop_zone_handler_.apply_global_zones();
     }
+    // Trigger updates for external camera utils sensors if available
+    if (esp32_camera_utils_) {
+        esp32_camera_utils_->update_memory_sensors();
+    }
     
+    // 2. Crop Zones Processing
     if (pause_processing_) {
         ESP_LOGD(TAG, "Processing paused, skipping update");
         return;
@@ -156,6 +214,8 @@ void MeterReaderTFLite::process_available_frame() {
 
 void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> frame) {
     if (pause_processing_) return;
+
+    DURATION_START("Total Processing");
 
     if (!tflite_coord_.is_model_loaded()) {
         ESP_LOGW(TAG, "Skipping frame - Model not loaded yet");
@@ -225,31 +285,44 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     }
     
     if (!readings.empty()) {
-        // Construct string for logging and text sensor
-        std::string result_str;
-        for (float r : readings) {
-            result_str += std::to_string((int)round(r) % 10);
-        }
-        
-        ESP_LOGI(TAG, "Inference Result: %s", result_str.c_str());
-        if (inference_logs_) {
-            inference_logs_->publish_state(result_str);
-        }
-
-        float final_val = 0.0f;
-        // String is guaranteed to be digits, so direct conversion is safe(r)
-        final_val = std::stof(result_str);
+        // Use helper to combine readings and log details (matches legacy behavior)
+        float final_val = combine_readings(readings);
 
         float avg_conf = std::accumulate(confidences.begin(), confidences.end(), 0.0f) / confidences.size();
         
         float validated_val = final_val;
         bool valid = validate_and_update_reading(final_val, avg_conf, validated_val);
-        
+
+        if (inference_logs_) {
+             // Publish to inference logs text sensor
+             char inference_log[150];
+             snprintf(inference_log, sizeof(inference_log),
+                      "Reading: %.1f -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%%)",
+                      final_val, validated_val, valid ? "yes" : "no",
+                      avg_conf * 100.0f, confidence_threshold_ * 100.0f);
+             inference_logs_->publish_state(inference_log);
+        }
+
         if (valid && avg_conf >= confidence_threshold_) {
+             // Removed checking of inference_log char buffer availability to match legacy cleanly
+             ESP_LOGI(TAG, "Reading: %.1f -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%%)", 
+                final_val, validated_val, valid ? "yes" : "no", 
+                avg_conf * 100.0f, confidence_threshold_ * 100.0f);
+             
              if (value_sensor_) value_sensor_->publish_state(validated_val);
              if (confidence_sensor_) confidence_sensor_->publish_state(avg_conf * 100.0f);
+             
+             ESP_LOGI(TAG, "Reading published - valid and confidence threshold met");
+        } else {
+             ESP_LOGI(TAG, "Reading: %.1f -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%%)", 
+                final_val, validated_val, valid ? "yes" : "no", 
+                avg_conf * 100.0f, confidence_threshold_ * 100.0f);
+             ESP_LOGW(TAG, "Reading NOT published - %s", 
+                     !valid ? "validation failed" : "confidence below threshold");
         }
     }
+    
+    DURATION_END("Total Processing");
 }
 
 void MeterReaderTFLite::set_crop_zones(const std::string &zones_json) {
@@ -305,9 +378,46 @@ void MeterReaderTFLite::update_preview_image(std::shared_ptr<camera::CameraImage
 
 // Logic Helpers
 float MeterReaderTFLite::combine_readings(const std::vector<float>& readings) {
-    std::string s;
-    for (float r : readings) s += std::to_string((int)round(r) % 10);
-    return std::stof(s);
+    std::string digit_string;
+    
+    ESP_LOGI(TAG, "Processing %d readings:", readings.size());
+    
+    // Convert each reading to integer digit and handle wrap-around
+    for (size_t i = 0; i < readings.size(); i++) {
+        int digit = static_cast<int>(round(readings[i]));
+        
+        // Handle wrap-around for original models (like Python script)
+        if (digit == 10) {
+            digit = 0;
+            ESP_LOGD(TAG, "Zone %d: Raw=%.1f -> Rounded=10 -> Wrapped to 0", 
+                    i + 1, readings[i]);
+        } else {
+            ESP_LOGD(TAG, "Zone %d: Raw=%.1f -> Rounded=%d", 
+                    i + 1, readings[i], digit);
+        }
+        
+        digit_string += std::to_string(digit);
+    }
+    
+    ESP_LOGI(TAG, "Concatenated digit string: %s", digit_string.c_str());
+    
+    std::string readings_str;
+    for (const auto& reading : readings) {
+      if (!readings_str.empty()) {
+        readings_str += ", ";
+      }
+      char buffer[16];
+      snprintf(buffer, sizeof(buffer), "%.1f", reading);
+      readings_str += buffer;
+    }
+    ESP_LOGD(TAG, "Raw readings: [%s]", readings_str.c_str());
+    
+    float combined_value = 0.0f;
+    // Guaranteed to be numeric string from logic above
+    combined_value = std::stof(digit_string);
+    
+    ESP_LOGI(TAG, "Final combined value: %.0f", combined_value);
+    return combined_value;
 }
 
 bool MeterReaderTFLite::validate_and_update_reading(float raw, float conf, float& val) {

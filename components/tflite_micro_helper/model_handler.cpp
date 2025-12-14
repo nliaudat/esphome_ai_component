@@ -81,6 +81,26 @@ bool ModelHandler::load_model_with_arena(const uint8_t *model_data, size_t model
     return false;
   }
   
+#ifdef DEBUG_TFLITE_MICRO_HELPER
+    // Check TFLite magic number
+    if (model_size >= 8) {
+      ESP_LOGI(TAG, "First 8 bytes: %02X %02X %02X %02X %02X %02X %02X %02X",
+               model_data[0], model_data[1], model_data[2], model_data[3],
+               model_data[4], model_data[5], model_data[6], model_data[7]);
+      
+      // TFLite magic number should be: XX 00 00 00 54 46 4C 33
+      if (model_data[1] == 0x00 && model_data[2] == 0x00 && model_data[3] == 0x00 &&
+          model_data[4] == 0x54 && model_data[5] == 0x46 &&
+          model_data[6] == 0x4C && model_data[7] == 0x33) {
+        ESP_LOGI(TAG, "Valid TFLite magic number found (version byte: 0x%02X)", model_data[0]);
+      } else {
+        ESP_LOGE(TAG, "Invalid TFLite magic number");
+        // Don't return false here if we want to try anyway, but legacy returned matches this block
+        return false; 
+      }
+    }
+#endif
+
   config_ = config;
   
     // For PROGMEM data, we need to handle it specially

@@ -14,6 +14,7 @@
 #include "debug_coordinator.h"
 
 #include "esphome/components/esp32_camera_utils/crop_zone_handler.h"
+#include "esphome/components/esp32_camera_utils/esp32_camera_utils.h"
 #include "value_validator.h"
 
 #ifdef USE_WEB_SERVER
@@ -108,8 +109,10 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
   // Logs
   void set_inference_logs(text_sensor::TextSensor *sensor) { inference_logs_ = sensor; }
-  void set_main_logs(text_sensor::TextSensor *sensor) { main_logs_ = sensor; }
+  void set_main_logs(text_sensor::TextSensor *main_logs) { main_logs_ = main_logs; }
 
+  void set_esp32_camera_utils(esp32_camera_utils::Esp32CameraUtils *utils) { esp32_camera_utils_ = utils; }
+  
 #ifdef DEBUG_METER_READER_MEMORY
   void set_tensor_arena_size_sensor(sensor::Sensor *s) { tensor_arena_size_sensor_ = s; }
   void set_tensor_arena_used_sensor(sensor::Sensor *s) { tensor_arena_used_sensor_ = s; }
@@ -130,6 +133,8 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 #endif
 
  protected:
+  esp32_camera_utils::Esp32CameraUtils *esp32_camera_utils_{nullptr};
+
   // Coordinators
   TFLiteCoordinator tflite_coord_;
   CameraCoordinator camera_coord_;
