@@ -210,7 +210,7 @@ public:
   // ... (existing declarations)
   
   // Software rotation for arbitrary angles
-  static bool apply_software_rotation(
+  [[nodiscard]] static bool apply_software_rotation(
       const uint8_t* input, uint8_t* output,
       int src_w, int src_h, int bytes_per_pixel,
       float rotation_deg, int& out_w, int& out_h);
@@ -237,7 +237,10 @@ public:
   using JpegBufferPtr = std::unique_ptr<uint8_t[], JpegBufferDeleter>;
 
   // Helper to decode JPEG to RGB888
-  static JpegBufferPtr decode_jpeg(const uint8_t* data, size_t len, int* width, int* height);
+  [[nodiscard]] static JpegBufferPtr decode_jpeg(const uint8_t* data, size_t len, int* width, int* height);
+
+  // Allocates a buffer suitable for JPEG operations (16-byte aligned)
+  [[nodiscard]] static JpegBufferPtr allocate_jpeg_buffer(size_t size);
 
   void arrange_channels(uint8_t* output, uint8_t r, uint8_t g, uint8_t b, int output_channels) const;
 

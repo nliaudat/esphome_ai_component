@@ -75,14 +75,14 @@ void MeterReaderTFLite::setup() {
               config.model_height = spec.input_height;
               config.model_channels = spec.input_channels;
               
-              switch((int)rotation_) {
+              switch(static_cast<int>(rotation_)) {
                   case 90:  config.rotation = esp32_camera_utils::ROTATION_90;  break;
                   case 180: config.rotation = esp32_camera_utils::ROTATION_180; break;
                   case 270: config.rotation = esp32_camera_utils::ROTATION_270; break;
                   default:  config.rotation = esp32_camera_utils::ROTATION_0;   break;
               }
               
-              config.input_type = (esp32_camera_utils::ImageProcessorInputType)processor_input_type;
+              config.input_type = static_cast<esp32_camera_utils::ImageProcessorInputType>(processor_input_type);
               config.normalize = spec.normalize;
               config.input_order = spec.input_order;
               
@@ -416,10 +416,10 @@ float MeterReaderTFLite::combine_readings(const std::vector<float>& readings) {
 }
 
 bool MeterReaderTFLite::validate_and_update_reading(float raw, float conf, float& val) {
-    int ival = (int)raw;
+    int ival = static_cast<int>(raw);
     int oval = ival;
     bool valid = output_validator_.validate_reading(ival, conf, oval);
-    val = (float)oval;
+    val = static_cast<float>(oval);
     return valid;
 }
 

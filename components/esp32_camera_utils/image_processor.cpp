@@ -376,6 +376,13 @@ ImageProcessor::UniqueBufferPtr ImageProcessor::allocate_image_buffer(size_t siz
     return std::make_unique<TrackedBuffer>(ptr, is_spiram, is_aligned);
 }
 
+ImageProcessor::JpegBufferPtr ImageProcessor::allocate_jpeg_buffer(size_t size) {
+    // We use jpeg_calloc_align because the deleter (JpegBufferDeleter) calls jpeg_free_align.
+    // 16-byte alignment is standard for ESP JPEG lib.
+    uint8_t* ptr = (uint8_t*)jpeg_calloc_align(size, 16);
+    return JpegBufferPtr(ptr);
+}
+
 size_t ImageProcessor::get_required_buffer_size() const {
     if (config_.input_type == kInputTypeFloat32) {
         return config_.model_width * config_.model_height * config_.model_channels * sizeof(float);
