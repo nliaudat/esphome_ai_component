@@ -62,12 +62,23 @@ meter_reader_tflite:
   flash_light_controller: my_flash_controller
   crop_zones_global: my_crop_zones
   
-  # Image Rotation
+  # Image Rotation (Dev)
   rotation: "90" # Options: "0", "90", "180", "270"
 ```
 
 > [!NOTE]
 > **Rotation behavior**: The `rotation` setting only affects the AI processing. The internal webserver and Home Assistant live view will likely remain unrotated (sideways) as the camera hardware only supports 180° flips. This is normal behavior.
+
+### 3. Runtime Configuration (Home Assistant)
+
+Most parameters are now exposed to Home Assistant for real-time adjustment without recompiling:
+
+*   **Calibration**: Camera Window (Offset X/Y, Width, Height)
+*   **Timing**: Flash Pre/Post times, Update Interval
+*   **Debug**: Toggle debug logging and image generation
+*   **Settings**: Meter units and thresholds
+
+These entities normally appear under the device in Home Assistant.
 
 
 ## ✨ Key Features
@@ -79,7 +90,7 @@ meter_reader_tflite:
 - **🎯 Multi-Zone Processing**: Process multiple regions of interest
 - **🔧 Flexible Configuration**: Support for various model types and input formats
 - **🐛 Advanced Debugging**: Real-time image analysis and model output inspection
-- **🔄 Image Rotation**: Full support for 0°, 90°, 180°, 270° rotation on both JPEG and Raw formats (via `esp32_camera_utils`).
+- **🔄 Image Rotation (Dev)**: Full support for 0°, 90°, 180°, 270° rotation on both JPEG and Raw formats (via `esp32_camera_utils`).
 
 ## 🎯 Use Cases
 

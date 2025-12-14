@@ -29,6 +29,9 @@ substitutions:
   id_prefix: "s3_cam_tflite" #if you have more than one board, it could be usefull to remane all the "id:prefix_xxxx" with a decicaded prefix
   revision: "1.2"
   
+  # Meter settings
+  meter_unit: "L" # Unit of measurement for the meter (e.g. m³, kWh, L) (https://developers.home-assistant.io/docs/core/entity/sensor/https://developers.home-assistant.io/docs/core/entity/sensor/)
+  
   # camera
   camera_pixel_format: JPEG # (cropping implementation is faster with RGB888 format) | Displays: RGB565, RGB888 | Cameras: YUV422, YUV420, RAW | Efficiency: Grayscale, YUV420, JPEG
   camera_resolution: 640x480 #800x600 #640x480 #https://esphome.io/components/esp32_camera.html
