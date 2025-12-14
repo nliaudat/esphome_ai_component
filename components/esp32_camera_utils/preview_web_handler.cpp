@@ -74,7 +74,7 @@ void PreviewWebHandler::handleRequest(web_server_idf::AsyncWebServerRequest *req
   struct FreeDeleter {
       void operator()(uint8_t* p) const { free(p); }
   };
-  std::unique_ptr<uint8_t, FreeDeleter> jpeg_buf_ptr(jpeg_buf);
+  std::unique_ptr<uint8_t[], FreeDeleter> jpeg_buf_ptr(jpeg_buf);
 
   // Send the converted JPEG
   // beginResponse will copy the buffer content so we can free our local jpeg_buf (via RAII)

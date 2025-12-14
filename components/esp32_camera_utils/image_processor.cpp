@@ -156,7 +156,7 @@ ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t* data, s
         return nullptr;
     }
     // RAII for decoder
-    std::unique_ptr<void, JpegDecoderDeleter> decoder(decoder_handle);
+    std::unique_ptr<struct jpeg_dec_s, JpegDecoderDeleter> decoder(decoder_handle);
 
     size_t out_size = w * h * 3;
     uint8_t* raw_buf = (uint8_t*)jpeg_calloc_align(out_size, 16);
