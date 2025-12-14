@@ -3,7 +3,7 @@ sensor:
   - platform: template
     name: "Meter Reading"
     id: meter_value
-    unit_of_measurement: "units"
+    unit_of_measurement: "${meter_unit}"
     accuracy_decimals: 0
     icon: "mdi:counter"
     # update_interval: 30s

@@ -132,7 +132,7 @@ bool ImageProcessor::get_jpeg_dimensions(const uint8_t *data, size_t len, int &w
 }
 
 
-uint8_t* ImageProcessor::decode_jpeg(const uint8_t* data, size_t len, int* width, int* height) {
+ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t* data, size_t len, int* width, int* height) {
     if (!data || len == 0) return nullptr;
 
     int w, h;
@@ -151,39 +151,37 @@ uint8_t* ImageProcessor::decode_jpeg(const uint8_t* data, size_t len, int* width
     decode_config.rotate = JPEG_ROTATE_0D;
     decode_config.block_enable = false;
 
-    jpeg_dec_handle_t decoder = nullptr;
-    if (jpeg_dec_open(&decode_config, &decoder) != JPEG_ERR_OK) {
+    jpeg_dec_handle_t decoder_handle = nullptr;
+    if (jpeg_dec_open(&decode_config, &decoder_handle) != JPEG_ERR_OK) {
         return nullptr;
     }
+    // RAII for decoder
+    std::unique_ptr<void, JpegDecoderDeleter> decoder(decoder_handle);
 
     size_t out_size = w * h * 3;
-    uint8_t* out_buf = (uint8_t*)jpeg_calloc_align(out_size, 16);
-    if (!out_buf) {
-        jpeg_dec_close(decoder);
+    uint8_t* raw_buf = (uint8_t*)jpeg_calloc_align(out_size, 16);
+    if (!raw_buf) {
         return nullptr;
     }
+    // RAII for buffer
+    JpegBufferPtr out_buf(raw_buf);
 
     jpeg_dec_io_t io = {0};
     io.inbuf = const_cast<uint8_t*>(data);
     io.inbuf_len = len;
     io.inbuf_remain = len;
-    io.outbuf = out_buf;
+    io.outbuf = out_buf.get();
     io.out_size = out_size;
 
     jpeg_dec_header_info_t header_info;
-    if (jpeg_dec_parse_header(decoder, &io, &header_info) != JPEG_ERR_OK) {
-        jpeg_free_align(out_buf);
-        jpeg_dec_close(decoder);
+    if (jpeg_dec_parse_header(decoder_handle, &io, &header_info) != JPEG_ERR_OK) {
         return nullptr;
     }
 
-    if (jpeg_dec_process(decoder, &io) != JPEG_ERR_OK) {
-        jpeg_free_align(out_buf);
-        jpeg_dec_close(decoder);
+    if (jpeg_dec_process(decoder_handle, &io) != JPEG_ERR_OK) {
         return nullptr;
     }
 
-    jpeg_dec_close(decoder);
     return out_buf;
 }
 
@@ -208,7 +206,7 @@ std::shared_ptr<camera::CameraImage> ImageProcessor::generate_rotated_preview(
 
     // 2. Decode JPEG to RGB888
     int dec_w = 0, dec_h = 0;
-    uint8_t* rgb_data = decode_jpeg(data, len, &dec_w, &dec_h);
+    JpegBufferPtr rgb_data = decode_jpeg(data, len, &dec_w, &dec_h);
     if (!rgb_data) {
         // Fallback: If not JPEG or decode failed, we can't process (preview assumes JPEG input mostly)
         // If we want to support raw input, we would need to check source format here.
@@ -228,18 +226,15 @@ std::shared_ptr<camera::CameraImage> ImageProcessor::generate_rotated_preview(
     
     if (!out_buffer) {
         ESP_LOGE(TAG, "Preview: Failed to allocate output buffer (%zu bytes)", out_size);
-        jpeg_free_align(rgb_data);
         return nullptr;
     }
 
     // 4. Rotate
     int final_w, final_h;
-    bool success = apply_software_rotation(rgb_data, out_buffer->get(), 
+    bool success = apply_software_rotation(rgb_data.get(), out_buffer->get(), 
                                          dec_w, dec_h, 3, 
                                          rotation, final_w, final_h);
     
-    jpeg_free_align(rgb_data); // Free intermediate buffer
-
     if (!success) {
         ESP_LOGW(TAG, "Preview: Rotation failed");
         return nullptr;
@@ -565,7 +560,7 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
     }
 
     int dec_w = 0, dec_h = 0;
-    uint8_t* full_image_buf = decode_jpeg(jpeg_data, jpeg_size, &dec_w, &dec_h);
+    JpegBufferPtr full_image_buf = decode_jpeg(jpeg_data, jpeg_size, &dec_w, &dec_h);
     
     if (!full_image_buf) {
         stats_.jpeg_decoding_errors++;
@@ -585,15 +580,14 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
         ESP_LOGE(TAG, "Crop zone (%d,%d -> %d,%d) out of bounds for actual image (%dx%d) - Config: %dx%d",
                  zone.x1, zone.y1, zone.x2, zone.y2, jpeg_width, jpeg_height,
                  config_.camera_width, config_.camera_height);
-        jpeg_free_align(full_image_buf);
         return false;
     }
 
     // 2. Handle Rotation (Software - Arbitrary)
-    uint8_t* processing_buf = full_image_buf;
+    uint8_t* processing_buf = full_image_buf.get();
     int proc_width = jpeg_width;
     int proc_height = jpeg_height;
-    bool rotated_allocated = false;
+    UniqueBufferPtr rotated_buffer_storage;
 
     #ifdef DEV_ENABLE_ROTATION
     if (std::abs(config_.rotation) > 0.01f) {
@@ -601,7 +595,6 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
         // Allocate buffer for rotated image with new bounding box
         int out_w = 0, out_h = 0;
         
-        // Call rotation helper - it handles allocation logic if we want, but here we do it manually
         // First calculate size
         float rads = config_.rotation * M_PI / 180.0f;
         float abs_cos = std::abs(std::cos(rads));
@@ -610,16 +603,17 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
         out_h = static_cast<int>(jpeg_width * abs_sin + jpeg_height * abs_cos);
         
         size_t rotated_size = out_w * out_h * 3;
-        uint8_t* rotated_buf = (uint8_t*)malloc(rotated_size);
+        rotated_buffer_storage = allocate_image_buffer(rotated_size);
         
-        if (!rotated_buf) {
+        if (!rotated_buffer_storage) {
             ESP_LOGE(TAG, "Failed to allocate rotation buffer: %zu bytes", rotated_size);
-            jpeg_free_align(full_image_buf);
             return false;
         }
         
+        uint8_t* rotated_buf = rotated_buffer_storage->get();
+
         // Use helper to Rotate: Full -> Rotated
-        bool rot_success = apply_software_rotation(full_image_buf, rotated_buf, 
+        bool rot_success = apply_software_rotation(full_image_buf.get(), rotated_buf, 
                                                  jpeg_width, jpeg_height, 
                                                  3, config_.rotation, out_w, out_h); 
         
@@ -628,15 +622,12 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
             proc_width = out_w;
             proc_height = out_h;
             
-            // Clean up original decode buffer
-            jpeg_free_align(full_image_buf);
+            // Clean up original decode buffer early to save memory
+            full_image_buf.reset();
             
             processing_buf = rotated_buf;
-            rotated_allocated = true;
         } else {
             ESP_LOGE(TAG, "Software rotation failed");
-            free(rotated_buf);
-            jpeg_free_align(full_image_buf);
             return false;
         }
     }
@@ -664,13 +655,8 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
     if (!scale_success) {
         ESP_LOGE(TAG, "Scaling failed.");
     }
-
-    // Cleanup
-    if (rotated_allocated) {
-        free(processing_buf);
-    } else {
-        jpeg_free_align(processing_buf);
-    }
+    
+    // Cleanup handled by RAII (rotated_buffer_storage and full_image_buf)
 
     return scale_success;
 
@@ -783,7 +769,7 @@ bool ImageProcessor::process_raw_zone_to_buffer(
     
     bool needs_rotation = (config_.rotation != ROTATION_0);
     uint8_t* target_buffer = output_buffer;
-    uint8_t* temp_buffer = nullptr;
+    UniqueBufferPtr temp_buffer_storage;
 
     #ifdef DEV_ENABLE_ROTATION
     if (needs_rotation && (config_.rotation == ROTATION_90 || config_.rotation == ROTATION_270)) {
@@ -792,12 +778,12 @@ bool ImageProcessor::process_raw_zone_to_buffer(
     
     // If rotating, we need a temporary buffer for the unrotated scaled image
     if (needs_rotation) {
-        temp_buffer = (uint8_t*)malloc(output_buffer_size);
-        if (!temp_buffer) {
+        temp_buffer_storage = allocate_image_buffer(output_buffer_size);
+        if (!temp_buffer_storage) {
             ESP_LOGE(TAG, "Failed to allocate temp buffer for rotation");
             return false;
         }
-        target_buffer = temp_buffer;
+        target_buffer = temp_buffer_storage->get();
     }
     #endif
     
@@ -835,7 +821,6 @@ bool ImageProcessor::process_raw_zone_to_buffer(
                 target_buffer, scale_width, scale_height, config_.model_channels, config_.camera_width);
         }
     } else {
-        if (temp_buffer) free(temp_buffer);
         return false;
     }
 
@@ -848,15 +833,13 @@ bool ImageProcessor::process_raw_zone_to_buffer(
         
         // rotate temp_buffer (scale_width x scale_height) -> output_buffer (model_width x model_height)
         int rotated_w, rotated_h;
-        success = apply_software_rotation(temp_buffer, output_buffer, 
+        success = apply_software_rotation(target_buffer, output_buffer, 
                                         scale_width, scale_height, 
                                         bytes_per_pixel, config_.rotation, rotated_w, rotated_h);
     }
     #endif
     
-    if (temp_buffer) {
-        free(temp_buffer);
-    }
+    // cleanup automatic via UniqueBufferPtr
 
     return success;
 }
