@@ -272,6 +272,7 @@ async def to_code(config):
         
     if config.get(CONF_DEBUG_MEMORY, False):
         cg.add_define("DEBUG_METER_READER_MEMORY")
+        cg.add(var.set_debug_memory_enabled(True))
         
         # Helper to create and register a sensor
         async def create_sensor(name, unit, accuracy_decimals=0, icon="mdi:memory"):

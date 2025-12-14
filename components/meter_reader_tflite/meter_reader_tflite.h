@@ -118,6 +118,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_tensor_arena_used_sensor(sensor::Sensor *s) { tensor_arena_used_sensor_ = s; }
   void set_process_free_heap_sensor(sensor::Sensor *s) { process_free_heap_sensor_ = s; }
   void set_process_free_psram_sensor(sensor::Sensor *s) { process_free_psram_sensor_ = s; }
+  void set_debug_memory_enabled(bool enabled) { debug_memory_enabled_ = enabled; }
 #endif
 
 
@@ -158,6 +159,8 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   int max_absolute_diff_{100};
   float rotation_{0.0f};
   bool generate_preview_{false};
+  bool debug_memory_enabled_{false}; // Runtime flag
+  bool window_active_{false};
 
   // Sensor Refs
   sensor::Sensor *value_sensor_{nullptr};

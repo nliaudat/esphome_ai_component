@@ -119,7 +119,7 @@ meter_reader_tflite:
   value_sensor: meter_value
   confidence_sensor: meter_confidence
   inference_logs: inference_logs
-  # main_logs: main_logs
+  main_logs: main_logs
 
   
 
@@ -137,6 +137,7 @@ packages:
   sensor_AI_component: !include sensor_AI_component.yaml
   globals_AI_component: !include globals_AI_component.yaml ## where to set your crop zones
   text_sensor_AI_component: !include text_sensor_AI_component.yaml
+  number_AI_component: !include number_AI_component.yaml
   api_AI_component: !include api_AI_component.yaml
   
   # camera configs

@@ -30,14 +30,12 @@ void MeterReaderTFLite::setup() {
         mark_failed(); return;
     }
     
+
     // 2. Load Model
     // Load model first to ensure we can retrieve input specifications for camera configuration.
-        
-    // 2. Load Model
-    // Load model first to ensure we can retrieve input specifications for camera configuration.
-    ESP_LOGI(TAG, "Model loading will begin in 5 seconds...");
-    // Reduced timeout to 5s from 30s to speed up boot availability
-    this->set_timeout(5000, [this]() {
+    ESP_LOGI(TAG, "Model loading will begin in 10 seconds...");
+    // Increased delay to 10s to ensure WiFi logger captures these startup logs
+    this->set_timeout(10000, [this]() {
          ESP_LOGI(TAG, "Starting model loading...");
          if (!tflite_coord_.load_model()) {
              mark_failed(); return;
@@ -94,11 +92,6 @@ void MeterReaderTFLite::setup() {
           // Setup Web Server Preview
           #ifdef USE_WEB_SERVER
           #ifdef DEV_ENABLE_ROTATION
-          if (web_server_) {
-              web_server_->add_handler(new esphome::esp32_camera_utils::PreviewWebHandler([this]() {
-                  return this->get_preview_image();
-              }));
-          }
           if (web_server_) {
               web_server_->add_handler(new esphome::esp32_camera_utils::PreviewWebHandler([this]() {
                   return this->get_preview_image();
@@ -257,14 +250,16 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     
     // Capture Peak Memory State *during* processing (buffers allocated)
     #ifdef DEBUG_METER_READER_MEMORY
-    if (process_free_heap_sensor_) process_free_heap_sensor_->publish_state(heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
-    if (process_free_psram_sensor_) process_free_psram_sensor_->publish_state(heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    if (debug_memory_enabled_) {
+        if (process_free_heap_sensor_) process_free_heap_sensor_->publish_state(heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+        if (process_free_psram_sensor_) process_free_psram_sensor_->publish_state(heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    }
     #endif
 
     auto results = tflite_coord_.run_inference(processed_buffers);
     
     #ifdef DEBUG_METER_READER_MEMORY
-    if (tensor_arena_used_sensor_) {
+    if (debug_memory_enabled_ && tensor_arena_used_sensor_) {
           tensor_arena_used_sensor_->publish_state(tflite_coord_.get_arena_used_bytes());
     }
     #endif
@@ -429,27 +424,56 @@ bool MeterReaderTFLite::validate_and_update_reading(float raw, float conf, float
 }
 
 // Window Control
-void MeterReaderTFLite::set_camera_window_offset_x(int x) { camera_coord_.set_window_config(x, -1, -1, -1); }
-void MeterReaderTFLite::set_camera_window_offset_y(int y) { camera_coord_.set_window_config(-1, y, -1, -1); }
-void MeterReaderTFLite::set_camera_window_width(int w) { camera_coord_.set_window_config(-1, -1, w, -1); }
-void MeterReaderTFLite::set_camera_window_height(int h) { camera_coord_.set_window_config(-1, -1, -1, h); }
+void MeterReaderTFLite::set_camera_window_offset_x(int x) { 
+    camera_coord_.set_window_config(x, -1, -1, -1); 
+    if (window_active_) camera_coord_.apply_window();
+}
+void MeterReaderTFLite::set_camera_window_offset_y(int y) { 
+    camera_coord_.set_window_config(-1, y, -1, -1); 
+    if (window_active_) camera_coord_.apply_window();
+}
+void MeterReaderTFLite::set_camera_window_width(int w) { 
+    camera_coord_.set_window_config(-1, -1, w, -1); 
+    if (window_active_) camera_coord_.apply_window();
+}
+void MeterReaderTFLite::set_camera_window_height(int h) { 
+    camera_coord_.set_window_config(-1, -1, -1, h); 
+    if (window_active_) camera_coord_.apply_window();
+}
 void MeterReaderTFLite::set_camera_window_configured(bool c) { 
+    window_active_ = c;
     if (c) {
         // Trigger window application logic now that configuration is complete.
         if (camera_coord_.apply_window()) {
              ESP_LOGD(TAG, "Window configuration applied successfully.");
         } else {
              ESP_LOGW(TAG, "Failed to apply window configuration.");
+             window_active_ = false; // Revert if failed
         }
+    } else {
+        reset_camera_window();
     }
 }
 
 bool MeterReaderTFLite::reset_camera_window() {
-    return camera_coord_.reset_window();
+    bool success = camera_coord_.reset_window();
+    // Only clear active flag if reset successful (or forced?) 
+    // Usually reset should imply back to full frame
+    if (success) {
+         window_active_ = false;
+         // Note: We do NOT clear the stored config values in CameraCoord, so user can re-enable later.
+    }
+    return success;
 }
 
 bool MeterReaderTFLite::set_camera_window(int offset_x, int offset_y, int width, int height) {
-    return camera_coord_.set_window(offset_x, offset_y, width, height);
+     bool success = camera_coord_.set_window(offset_x, offset_y, width, height);
+     if (success) {
+         window_active_ = true;
+         // Also update the stored config so partial setters work later
+         camera_coord_.set_window_config(offset_x, offset_y, width, height);
+     }
+     return success;
 }
 
 // Destructor

@@ -1,0 +1,123 @@
+number:
+  - platform: template
+    name: "Max Absolute Difference"
+    id: max_absolute_diff
+    min_value: 0
+    max_value: 2000
+    step: 1
+    initial_value: 100
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          if (id(meter_reader) != nullptr) {
+            id(meter_reader)->set_max_absolute_diff((int)x);
+          }
+
+  - platform: template
+    name: "Update Interval (s)"
+    id: meter_update_interval
+    unit_of_measurement: "s"
+    min_value: 1
+    max_value: 3600
+    step: 1
+    initial_value: 60
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          if (id(meter_reader) != nullptr) {
+            id(meter_reader)->set_update_interval((uint32_t)(x * 1000));
+          }
+
+  - platform: template
+    name: "Flash Pre-Time"
+    id: flash_pre_time_setting
+    unit_of_measurement: "ms"
+    min_value: 0
+    max_value: 10000
+    step: 100
+    initial_value: 7000
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          if (id(flash_controller) != nullptr) {
+            id(flash_controller)->set_flash_pre_time((uint32_t)x);
+          }
+
+  - platform: template
+    name: "Flash Post-Time"
+    id: flash_post_time_setting
+    unit_of_measurement: "ms"
+    min_value: 0
+    max_value: 5000
+    step: 100
+    initial_value: 2000
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          if (id(flash_controller) != nullptr) {
+            id(flash_controller)->set_flash_post_time((uint32_t)x);
+          }
+          
+  - platform: template
+    name: "Camera Window Offset X"
+    id: cam_window_offset_x
+    min_value: 0
+    max_value: 1600
+    step: 4
+    initial_value: 0
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          if (id(meter_reader) != nullptr) {
+            id(meter_reader)->set_camera_window_offset_x((int)x);
+          }
+
+  - platform: template
+    name: "Camera Window Offset Y"
+    id: cam_window_offset_y
+    min_value: 0
+    max_value: 1200
+    step: 4
+    initial_value: 0
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          if (id(meter_reader) != nullptr) {
+            id(meter_reader)->set_camera_window_offset_y((int)x);
+          }
+          
+  - platform: template
+    name: "Camera Window Width"
+    id: cam_window_width
+    min_value: 32
+    max_value: 1600
+    step: 4
+    initial_value: 640
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          if (id(meter_reader) != nullptr) {
+            id(meter_reader)->set_camera_window_width((int)x);
+          }
+
+  - platform: template
+    name: "Camera Window Height"
+    id: cam_window_height
+    min_value: 32
+    max_value: 1200
+    step: 4
+    initial_value: 480
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          if (id(meter_reader) != nullptr) {
+            id(meter_reader)->set_camera_window_height((int)x);
+          }
