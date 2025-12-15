@@ -50,6 +50,8 @@ CONF_CAMERA_WINDOW = 'camera_window'
 
 CONF_ALLOW_NEGATIVE_RATES = 'allow_negative_rates'
 CONF_MAX_ABSOLUTE_DIFF = 'max_absolute_diff'
+CONF_FRAME_REQUEST_TIMEOUT = 'frame_request_timeout'
+CONF_HIGH_CONFIDENCE_THRESHOLD = 'high_confidence_threshold'
 
 meter_reader_tflite_ns = cg.esphome_ns.namespace('meter_reader_tflite')
 MeterReaderTFLite = meter_reader_tflite_ns.class_('MeterReaderTFLite', cg.PollingComponent)
@@ -107,6 +109,8 @@ CONFIG_SCHEMA = cv.Schema({
     # cv.Optional(CONF_AUTO_CAMERA_WINDOW, default=False): cv.boolean,
     cv.Optional(CONF_ALLOW_NEGATIVE_RATES, default=False): cv.boolean,
     cv.Optional(CONF_MAX_ABSOLUTE_DIFF, default=100): cv.positive_int,
+    cv.Optional(CONF_FRAME_REQUEST_TIMEOUT, default=15000): cv.int_range(min=1000, max=60000),
+    cv.Optional(CONF_HIGH_CONFIDENCE_THRESHOLD, default=0.90): cv.float_range(min=0.5, max=1.0),
     cv.Optional("value_sensor"): cv.use_id(sensor.Sensor),
     cv.Optional("confidence_sensor"): cv.use_id(sensor.Sensor),
     cv.Optional("inference_logs"): cv.use_id(text_sensor.TextSensor),
@@ -383,6 +387,12 @@ async def to_code(config):
         cg.add(var.set_allow_negative_rates(config[CONF_ALLOW_NEGATIVE_RATES]))
     if CONF_MAX_ABSOLUTE_DIFF in config:
         cg.add(var.set_max_absolute_diff(config[CONF_MAX_ABSOLUTE_DIFF]))
+    
+    # Set timeout and threshold parameters
+    if CONF_FRAME_REQUEST_TIMEOUT in config:
+        cg.add(var.set_frame_request_timeout(config[CONF_FRAME_REQUEST_TIMEOUT]))
+    if CONF_HIGH_CONFIDENCE_THRESHOLD in config:
+        cg.add(var.set_high_confidence_threshold(config[CONF_HIGH_CONFIDENCE_THRESHOLD]))
     
 
     

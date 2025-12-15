@@ -136,6 +136,8 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   // Validation
   void set_allow_negative_rates(bool allow) { allow_negative_rates_ = allow; }
   void set_max_absolute_diff(int max_diff) { max_absolute_diff_ = max_diff; }
+  void set_frame_request_timeout(uint32_t ms) { frame_request_timeout_ms_ = ms; }
+  void set_high_confidence_threshold(float threshold) { high_confidence_threshold_ = threshold; }
 
   // Pause
   void set_pause_processing(bool pause) { pause_processing_.store(pause); }
@@ -211,6 +213,8 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   float confidence_threshold_{0.85f};
   bool allow_negative_rates_{false};
   int max_absolute_diff_{100};
+  uint32_t frame_request_timeout_ms_{15000};
+  float high_confidence_threshold_{0.90f};
   float rotation_{0.0f};
   bool generate_preview_{false};
   bool debug_memory_enabled_{false}; // Runtime flag

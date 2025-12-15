@@ -13,6 +13,9 @@ namespace meter_reader_tflite {
 
 static const char *const TAG = "meter_reader_tflite";
 
+// Named constants for better readability (compile-time only)
+static constexpr uint32_t MODEL_LOAD_DELAY_MS = 10000;
+
 #ifdef DEBUG_METER_READER_TFLITE
 #define DURATION_START(name) uint32_t start_time = millis();
 #define DURATION_END(name) ESP_LOGD(TAG, "%s took %u ms", name, millis() - start_time)
@@ -33,10 +36,9 @@ void MeterReaderTFLite::setup() {
 
     // 2. Load Model
     // Load model first to ensure we can retrieve input specifications for camera configuration.
-    ESP_LOGI(TAG, "Model loading will begin in 10 seconds...");
-    // Increased delay to 10s to ensure WiFi logger captures these startup logs
-    this->set_timeout(10000, [this]() {
-         ESP_LOGI(TAG, "Starting model loading...");
+    ESP_LOGI(TAG, "Model loading will begin in %u ms...", MODEL_LOAD_DELAY_MS);
+    // Delayed to ensure WiFi logger captures these startup logs
+    this->set_timeout(MODEL_LOAD_DELAY_MS, [this]() {
          ESP_LOGI(TAG, "Starting model loading...");
          esphome::App.feed_wdt(); // Feed before potentially long load
          if (!tflite_coord_.load_model()) {
@@ -120,12 +122,14 @@ void MeterReaderTFLite::setup() {
     ValueValidator::ValidationConfig val_conf;
     val_conf.allow_negative_rates = allow_negative_rates_;
     val_conf.max_absolute_diff = max_absolute_diff_;
+    val_conf.high_confidence_threshold = high_confidence_threshold_;
     output_validator_.set_config(val_conf);
     output_validator_.setup();
     
-    ESP_LOGI(TAG, "Output validation configured - AllowNegativeRates: %s, MaxAbsoluteDiff: %d",
+    ESP_LOGI(TAG, "Output validation configured - AllowNegativeRates: %s, MaxAbsoluteDiff: %d, HighConfThreshold: %.2f",
              val_conf.allow_negative_rates ? "YES" : "NO", 
-             val_conf.max_absolute_diff);
+             val_conf.max_absolute_diff,
+             val_conf.high_confidence_threshold);
     
     // 4. Setup Camera Callback
     // Register callback on the global camera instance.
@@ -233,9 +237,9 @@ void MeterReaderTFLite::update() {
 void MeterReaderTFLite::loop() {
     if (this->is_failed()) return;
 
-    // Watchdog: If frame requested but not arrived for 15s, reset state
-    if (frame_requested_ && (millis() - last_request_time_ > 15000)) {
-        ESP_LOGW(TAG, "Frame request timed out (15s)! Resetting state.");
+    // Watchdog: If frame requested but not arrived, reset state
+    if (frame_requested_ && (millis() - last_request_time_ > frame_request_timeout_ms_)) {
+        ESP_LOGW(TAG, "Frame request timed out (%u ms)! Resetting state.", frame_request_timeout_ms_);
         frame_requested_ = false;
         // Check if we need to force reset camera or just continue
     }
@@ -453,9 +457,7 @@ void MeterReaderTFLite::set_model(const uint8_t *model, size_t length) { tflite_
 
 void MeterReaderTFLite::set_camera_image_format(int w, int h, const std::string &fmt) {
     camera_coord_.set_config(w, h, fmt);
-    // TFLite coord also needs to know to init processor
-    camera_coord_.set_config(w, h, fmt);
-    // Needed? 
+    // Update ImageProcessor config if model is loaded 
     if (tflite_coord_.is_model_loaded()) {
          auto spec = tflite_coord_.get_model_spec();
          camera_coord_.update_image_processor_config(
@@ -599,7 +601,23 @@ bool MeterReaderTFLite::set_camera_window(int offset_x, int offset_y, int width,
 }
 
 // Destructor
-MeterReaderTFLite::~MeterReaderTFLite() {} 
+MeterReaderTFLite::~MeterReaderTFLite() {
+#ifdef SUPPORT_DOUBLE_BUFFERING
+    // Clean up FreeRTOS resources
+    if (inference_task_handle_) {
+        vTaskDelete(inference_task_handle_);
+        inference_task_handle_ = nullptr;
+    }
+    if (input_queue_) {
+        vQueueDelete(input_queue_);
+        input_queue_ = nullptr;
+    }
+    if (output_queue_) {
+        vQueueDelete(output_queue_);
+        output_queue_ = nullptr;
+    }
+#endif
+} 
 
 void MeterReaderTFLite::set_update_interval(uint32_t ms) {
     ESP_LOGI(TAG, "Setting update interval: %u ms", ms);

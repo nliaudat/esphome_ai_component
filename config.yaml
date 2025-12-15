@@ -128,7 +128,9 @@ meter_reader_tflite:
   inference_logs: inference_logs
   main_logs: main_logs
 
-  
+  ### Advanced parameters
+  # frame_request_timeout: 15000  # ms (1000-60000)
+  # high_confidence_threshold: 0.90  # (0.5-1.0)
 
 
 packages:

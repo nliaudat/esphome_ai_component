@@ -62,6 +62,7 @@ class ValueValidator {
     float max_rate_change{0.15f}; // 15% maximum change per reading
     bool enable_smart_validation{true};
     int smart_validation_window{5};
+    float high_confidence_threshold{0.90f}; // Threshold for validation override
   };
 
   void setup();
