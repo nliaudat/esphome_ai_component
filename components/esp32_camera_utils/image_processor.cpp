@@ -1178,6 +1178,7 @@ bool ImageProcessor::apply_software_rotation(
         out_w = height;
         out_h = width;
         for (int y = 0; y < height; y++) {
+            esphome::App.feed_wdt();
             for (int x = 0; x < width; x++) {
                 // 90 deg: (x, y) -> (height - 1 - y, x)
                 int src_idx = (y * width + x) * bytes_per_pixel;
@@ -1193,6 +1194,7 @@ bool ImageProcessor::apply_software_rotation(
         out_w = width;
         out_h = height;
         for (int y = 0; y < height; y++) {
+            esphome::App.feed_wdt();
             for (int x = 0; x < width; x++) {
                 // 180 deg: (x, y) -> (width - 1 - x, height - 1 - y)
                 int src_idx = (y * width + x) * bytes_per_pixel;
@@ -1208,6 +1210,7 @@ bool ImageProcessor::apply_software_rotation(
         out_w = height;
         out_h = width;
         for (int y = 0; y < height; y++) {
+            esphome::App.feed_wdt();
             for (int x = 0; x < width; x++) {
                 // 270 deg: (x, y) -> (y, width - 1 - x)
                 int src_idx = (y * width + x) * bytes_per_pixel;
@@ -1219,13 +1222,7 @@ bool ImageProcessor::apply_software_rotation(
     }
     
     // Fallback for arbitrary rotation (Nearest Neighbor) if needed or return false if strict
-    // For now, implementing simple center rotation could be complex, 
-    // maybe just return false allowing only 90 step rotations for this fix?
-    // The header promised "Arbitrary", but let's stick to fixing the compilation first.
-    // Given the task is just "fix compile errors" and functionality was 90 deg steps.
-    // I will log and fail for non-step rotations for now, or implement a naive NN.
-    // Let's implement naive NN to match the header promise slightly.
-    
+   
     // Calculate new dimensions (bounding box)
     float rads = rot * M_PI / 180.0f;
     float c = std::cos(rads);
@@ -1242,6 +1239,7 @@ bool ImageProcessor::apply_software_rotation(
     int ncy = out_h / 2;
 
     for (int y = 0; y < out_h; y++) {
+        esphome::App.feed_wdt();
         for (int x = 0; x < out_w; x++) {
             // Reverse map:
             // x_src = (x - ncx)*c + (y - ncy)*s + cx

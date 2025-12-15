@@ -37,6 +37,8 @@ void MeterReaderTFLite::setup() {
     // Increased delay to 10s to ensure WiFi logger captures these startup logs
     this->set_timeout(10000, [this]() {
          ESP_LOGI(TAG, "Starting model loading...");
+         ESP_LOGI(TAG, "Starting model loading...");
+         esphome::App.feed_wdt(); // Feed before potentially long load
          if (!tflite_coord_.load_model()) {
              mark_failed(); return;
          }
@@ -181,6 +183,8 @@ void MeterReaderTFLite::update() {
 }
 
 void MeterReaderTFLite::loop() {
+    if (this->is_failed()) return;
+
     // Watchdog: If frame requested but not arrived for 15s, reset state
     if (frame_requested_ && (millis() - last_request_time_ > 15000)) {
         ESP_LOGW(TAG, "Frame request timed out (15s)! Resetting state.");
@@ -244,6 +248,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     ESP_LOGI(TAG, "Processing Image: Found %d crop zones", zones.size());
     
     // Process frame -> buffers
+    esphome::App.feed_wdt();
     auto processed_buffers = camera_coord_.process_frame(frame, zones);
     
     // Buffers -> Inference
