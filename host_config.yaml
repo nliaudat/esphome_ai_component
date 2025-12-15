@@ -1,0 +1,39 @@
+esphome:
+  name: host-test
+  build_path: .esphome/build/host_test
+
+host:
+
+
+external_components:
+  - source: components
+    components: [ meter_reader_tflite, tflite_micro_helper, esp32_camera_utils, flash_light_controller ]
+
+logger:
+
+# Mock sensors needed for components
+sensor:
+  - platform: template
+    name: "Mock Sensor"
+    id: mock_sensor
+    
+text_sensor:
+  - platform: template
+    name: "Mock Text"
+    id: mock_text
+
+meter_reader_tflite:
+  id: meter_reader
+  camera_id: mock_cam 
+  model: "digit_recognizer_v4_10cls_GRAY.tflite"
+  debug_image: true # Required for host to have an image source
+  
+  # Link outputs
+  value_sensor: mock_sensor
+  inference_logs: mock_text
+  
+  # Disable ESP32 specific hardware 
+  # (Requires code changes to respect this)
+
+# Required by dependencies
+tflite_micro_helper:
