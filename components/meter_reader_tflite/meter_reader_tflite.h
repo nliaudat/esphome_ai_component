@@ -247,6 +247,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
 #ifdef SUPPORT_DOUBLE_BUFFERING
   // Double Buffering / Multithreading
+ public:
   struct InferenceJob {
       std::shared_ptr<camera::CameraImage> frame; // Keep managed
       std::vector<esp32_camera_utils::ImageProcessor::ProcessResult> crops;

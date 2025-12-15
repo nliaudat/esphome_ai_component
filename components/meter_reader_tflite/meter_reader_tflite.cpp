@@ -13,6 +13,70 @@ namespace meter_reader_tflite {
 
 static const char *const TAG = "meter_reader_tflite";
 
+#ifdef SUPPORT_DOUBLE_BUFFERING
+// Simple fixed-size object pools for InferenceJob and InferenceResult
+using InferenceJob = MeterReaderTFLite::InferenceJob;
+using InferenceResult = MeterReaderTFLite::InferenceResult;
+
+static constexpr size_t INFERENCE_POOL_SIZE = 4;
+static InferenceJob inference_job_pool[INFERENCE_POOL_SIZE];
+static bool inference_job_used[INFERENCE_POOL_SIZE] = {false};
+static InferenceResult inference_result_pool[INFERENCE_POOL_SIZE];
+static bool inference_result_used[INFERENCE_POOL_SIZE] = {false};
+
+static InferenceJob* allocate_inference_job() {
+  for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
+    if (!inference_job_used[i]) {
+      inference_job_used[i] = true;
+      inference_job_pool[i].frame = nullptr;
+      inference_job_pool[i].crops.clear();
+      inference_job_pool[i].start_time = 0;
+      return &inference_job_pool[i];
+    }
+  }
+  ESP_LOGW(TAG, "InferenceJob pool exhausted – allocating on heap");
+  return new InferenceJob();
+}
+
+static void free_inference_job(InferenceJob* job) {
+  for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
+    if (job == &inference_job_pool[i]) {
+      inference_job_used[i] = false;
+      return;
+    }
+  }
+  delete job;
+}
+
+static InferenceResult* allocate_inference_result() {
+  for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
+    if (!inference_result_used[i]) {
+      inference_result_used[i] = true;
+      inference_result_pool[i].inference_time = 0;
+      inference_result_pool[i].success = false;
+      inference_result_pool[i].readings.clear();
+      inference_result_pool[i].probabilities.clear();
+      return &inference_result_pool[i];
+    }
+  }
+  ESP_LOGW(TAG, "InferenceResult pool exhausted – allocating on heap");
+  return new InferenceResult();
+}
+
+static void free_inference_result(InferenceResult* res) {
+  for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
+    if (res == &inference_result_pool[i]) {
+      inference_result_used[i] = false;
+      return;
+    }
+  }
+  delete res;
+}
+#endif
+
+
+
+
 // Named constants for better readability (compile-time only)
 static constexpr uint32_t MODEL_LOAD_DELAY_MS = 10000;
 
@@ -173,22 +237,6 @@ void MeterReaderTFLite::setup() {
     // Only if user requested GRAYSCALE in config (we can't easily check the template sub here, 
     // but we know we just failed to set it in YAML).
     // Let's check the global pixel format config if feasible, or just force it if the model is V4 GRAY.
-    // Better: Helper function later. For now, let's leave it as JPEG default and rely on decoding 
-    // UNLESS the user explicitly uncommented the force block below.
-    // Actually, I'll add a runtime check:
-    /*
-    sensor_t *s = esp_camera_sensor_get();
-    if (s != nullptr) {
-        ESP_LOGI(TAG, "Forcing camera to GRAYSCALE for V4 GRAY model efficiency");
-        s->set_pixformat(s, PIXFORMAT_GRAYSCALE);
-        // Note: This relies on the buffer being large enough, which it is (JPEG buffer > Gray buffer usually)
-    }
-    */
-    // Users reported typically we can't switch FB format on the fly easily without re-init.
-    // So for this session, I will accept JPEG input and decode it. 
-    // Zero-Decode (Phase 3.3) requires the YAML support or a custom component fork.
-    // I will NOT inject risky code that might crash the driver.
-    // I will stick to fixing the compilation errors.
 }
 
 void MeterReaderTFLite::set_camera(esp32_camera::ESP32Camera *camera) {
@@ -285,7 +333,7 @@ void MeterReaderTFLite::loop() {
             }
             
             // Cleanup
-            delete res_ptr;
+            free_inference_result(res_ptr);
             
             // Request next frame if configured?
             // Original logic: loop requests if continuous? 
@@ -356,14 +404,14 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
         return;
     }
     
-    InferenceJob* job = new InferenceJob();
+    InferenceJob* job = allocate_inference_job();
     job->frame = frame; // Keep alive
     job->crops = std::move(processed_buffers);
     job->start_time = millis();
     
     if (xQueueSend(input_queue_, &job, 0) != pdTRUE) {
         ESP_LOGW(TAG, "Inference Queue Full - Dropping Frame");
-        delete job;
+        free_inference_job(job);
         processing_frame_ = false;
     }
     // Return immediately, loop() will handle result
@@ -688,7 +736,7 @@ void MeterReaderTFLite::inference_task(void *arg) {
             // Note: queues are thread safe.
             auto tflite_results = self->tflite_coord_.run_inference(job->crops);
             
-            InferenceResult* res = new InferenceResult();
+            InferenceResult* res = allocate_inference_result();
             res->inference_time = millis() - start;
             res->success = true;
             
@@ -698,12 +746,12 @@ void MeterReaderTFLite::inference_task(void *arg) {
             }
             
             // Clean up job inputs
-            delete job;
+            free_inference_job(job);
             
             // Send back
             if (xQueueSend(self->output_queue_, &res, 100 / portTICK_PERIOD_MS) != pdTRUE) {
                 // Main loop stuck? Drop result.
-                delete res;
+                free_inference_result(res);
             }
         }
     }
