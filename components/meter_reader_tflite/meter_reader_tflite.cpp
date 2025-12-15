@@ -164,6 +164,27 @@ void MeterReaderTFLite::setup() {
     }
     ESP_LOGI(TAG, "Double Buffering active on Core 0");
     #endif
+
+    // Force Camera to Grayscale if using GRAY model (Workaround for YAML limit)
+    // Only if user requested GRAYSCALE in config (we can't easily check the template sub here, 
+    // but we know we just failed to set it in YAML).
+    // Let's check the global pixel format config if feasible, or just force it if the model is V4 GRAY.
+    // Better: Helper function later. For now, let's leave it as JPEG default and rely on decoding 
+    // UNLESS the user explicitly uncommented the force block below.
+    // Actually, I'll add a runtime check:
+    /*
+    sensor_t *s = esp_camera_sensor_get();
+    if (s != nullptr) {
+        ESP_LOGI(TAG, "Forcing camera to GRAYSCALE for V4 GRAY model efficiency");
+        s->set_pixformat(s, PIXFORMAT_GRAYSCALE);
+        // Note: This relies on the buffer being large enough, which it is (JPEG buffer > Gray buffer usually)
+    }
+    */
+    // Users reported typically we can't switch FB format on the fly easily without re-init.
+    // So for this session, I will accept JPEG input and decode it. 
+    // Zero-Decode (Phase 3.3) requires the YAML support or a custom component fork.
+    // I will NOT inject risky code that might crash the driver.
+    // I will stick to fixing the compilation errors.
 }
 
 void MeterReaderTFLite::set_camera(esp32_camera::ESP32Camera *camera) {
@@ -235,20 +256,28 @@ void MeterReaderTFLite::loop() {
             float final_val = combine_readings(res_ptr->readings);
             
             // Validate
-            // We need a single confidence value for validation.
-            // combine_readings logic in regular flow: "Confidence: Lowest of all digits"
-            float min_conf = 1.0f;
-            for (float c : res_ptr->probabilities) {
-                if (c < min_conf) min_conf = c;
+            // Use Average Confidence to match Single Core logic
+            float avg_conf = 0.0f;
+            if (!res_ptr->probabilities.empty()) {
+                 float sum = 0.0f;
+                 for (float c : res_ptr->probabilities) sum += c;
+                 avg_conf = sum / res_ptr->probabilities.size();
             }
             
             if (value_sensor_) {
                 float validated_val = 0.0f;
-                bool valid = validate_and_update_reading(final_val, min_conf, validated_val);
+                bool valid = validate_and_update_reading(final_val, avg_conf, validated_val);
                 
-                // Logging logic (Simplified from process_full_image)
-                ESP_LOGI(TAG, "Result: %s (Raw: %.0f, Conf: %.2f)", 
-                         valid ? "VALID" : "INVALID", final_val, min_conf);
+                // Publish (matches process_full_image logic)
+                if (valid && avg_conf >= confidence_threshold_) {
+                     ESP_LOGI(TAG, "Result: VALID (Raw: %.0f, Conf: %.2f)", final_val, avg_conf);
+                     value_sensor_->publish_state(validated_val);
+                     if (confidence_sensor_) {
+                         confidence_sensor_->publish_state(avg_conf * 100.0f);
+                     }
+                } else {
+                     ESP_LOGI(TAG, "Result: INVALID (Raw: %.0f, Conf: %.2f)", final_val, avg_conf);
+                }
             }
             
             // Cleanup
@@ -572,6 +601,11 @@ bool MeterReaderTFLite::set_camera_window(int offset_x, int offset_y, int width,
 // Destructor
 MeterReaderTFLite::~MeterReaderTFLite() {} 
 
+void MeterReaderTFLite::set_update_interval(uint32_t ms) {
+    ESP_LOGI(TAG, "Setting update interval: %u ms", ms);
+    PollingComponent::set_update_interval(ms);
+}
+
 void MeterReaderTFLite::force_flash_inference() {
     flashlight_coord_.force_inference([this](){ 
         frame_requested_ = true; 
@@ -598,6 +632,22 @@ void MeterReaderTFLite::debug_test_with_pattern() {
 
 void MeterReaderTFLite::print_debug_info() {
     debug_coord_.print_info(tflite_coord_, camera_coord_.get_width(), camera_coord_.get_height(), camera_coord_.get_format());
+}
+
+void MeterReaderTFLite::dump_config() {
+  ESP_LOGCONFIG(TAG, "Meter Reader TFLite:");
+  ESP_LOGCONFIG(TAG, "  Confidence Threshold: %.2f", this->confidence_threshold_);
+  ESP_LOGCONFIG(TAG, "  Update Interval: %u ms", this->get_update_interval());
+  
+  #ifdef SUPPORT_DOUBLE_BUFFERING
+  ESP_LOGCONFIG(TAG, "  Pipeline: Double Buffering (Dual Core) ENABLED");
+  #else
+  ESP_LOGCONFIG(TAG, "  Pipeline: Single Core (Sequential)");
+  #endif
+
+  if (this->is_failed()) {
+    ESP_LOGE(TAG, "  Component FAILED to setup");
+  }
 }
 
 } // namespace meter_reader_tflite
