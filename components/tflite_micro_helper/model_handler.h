@@ -43,10 +43,10 @@ struct ConfigTestResult {
 class ModelHandler {
  public:
   // High-level load model that handles memory allocation
-  bool load_model(const uint8_t *model_data, size_t model_size, const ModelConfig &config);
+  [[nodiscard]] bool load_model(const uint8_t *model_data, size_t model_size, const ModelConfig &config);
 
   // Low-level load model (kept for internal use or specific cases)
-  bool load_model_with_arena(const uint8_t *model_data, size_t model_size,
+  [[nodiscard]] bool load_model_with_arena(const uint8_t *model_data, size_t model_size,
                  uint8_t* tensor_arena, size_t tensor_arena_size,
                  const ModelConfig &config);
 

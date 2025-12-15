@@ -156,7 +156,7 @@ ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t* data, s
         return nullptr;
     }
     // RAII for decoder
-    std::unique_ptr<void, JpegDecoderDeleter> decoder(decoder_handle);
+    std::unique_ptr<struct jpeg_dec_s, JpegDecoderDeleter> decoder(decoder_handle);
 
     size_t out_size = w * h * 3;
     uint8_t* raw_buf = (uint8_t*)jpeg_calloc_align(out_size, 16);
@@ -208,9 +208,7 @@ std::shared_ptr<camera::CameraImage> ImageProcessor::generate_rotated_preview(
     int dec_w = 0, dec_h = 0;
     JpegBufferPtr rgb_data = decode_jpeg(data, len, &dec_w, &dec_h);
     if (!rgb_data) {
-        // Fallback: If not JPEG or decode failed, we can't process (preview assumes JPEG input mostly)
-        // If we want to support raw input, we would need to check source format here.
-        // For now, consistent with previous behavior which forced "JPEG" config.
+        // Fallback: If not JPEG or decode failed, we can't process
         ESP_LOGW(TAG, "Preview: Failed to decode input image (requires JPEG)");
         return nullptr;
     }
@@ -374,6 +372,13 @@ ImageProcessor::UniqueBufferPtr ImageProcessor::allocate_image_buffer(size_t siz
     if (!ptr) return nullptr;
     
     return std::make_unique<TrackedBuffer>(ptr, is_spiram, is_aligned);
+}
+
+ImageProcessor::JpegBufferPtr ImageProcessor::allocate_jpeg_buffer(size_t size) {
+    // We use jpeg_calloc_align because the deleter (JpegBufferDeleter) calls jpeg_free_align.
+    // 16-byte alignment is standard for ESP JPEG lib.
+    uint8_t* ptr = (uint8_t*)jpeg_calloc_align(size, 16);
+    return JpegBufferPtr(ptr);
 }
 
 size_t ImageProcessor::get_required_buffer_size() const {
@@ -974,9 +979,7 @@ bool ImageProcessor::process_rgb888_crop_and_scale_to_uint8(
     }
 
     #ifdef DEBUG_ESP32_CAMERA_UTILS
-    // Cast to float for common macro or create int version? Macro uses %.1f so it expects float or castable.
-    // Let's just manually log for uint8
-    // Or just rely on zone info. 
+    // Manual logging can be added here if needed
     #endif
 
     return true;
@@ -1171,6 +1174,7 @@ bool ImageProcessor::apply_software_rotation(
         out_w = height;
         out_h = width;
         for (int y = 0; y < height; y++) {
+            esphome::App.feed_wdt();
             for (int x = 0; x < width; x++) {
                 // 90 deg: (x, y) -> (height - 1 - y, x)
                 int src_idx = (y * width + x) * bytes_per_pixel;
@@ -1186,6 +1190,7 @@ bool ImageProcessor::apply_software_rotation(
         out_w = width;
         out_h = height;
         for (int y = 0; y < height; y++) {
+            esphome::App.feed_wdt();
             for (int x = 0; x < width; x++) {
                 // 180 deg: (x, y) -> (width - 1 - x, height - 1 - y)
                 int src_idx = (y * width + x) * bytes_per_pixel;
@@ -1201,6 +1206,7 @@ bool ImageProcessor::apply_software_rotation(
         out_w = height;
         out_h = width;
         for (int y = 0; y < height; y++) {
+            esphome::App.feed_wdt();
             for (int x = 0; x < width; x++) {
                 // 270 deg: (x, y) -> (y, width - 1 - x)
                 int src_idx = (y * width + x) * bytes_per_pixel;
@@ -1212,13 +1218,7 @@ bool ImageProcessor::apply_software_rotation(
     }
     
     // Fallback for arbitrary rotation (Nearest Neighbor) if needed or return false if strict
-    // For now, implementing simple center rotation could be complex, 
-    // maybe just return false allowing only 90 step rotations for this fix?
-    // The header promised "Arbitrary", but let's stick to fixing the compilation first.
-    // Given the task is just "fix compile errors" and functionality was 90 deg steps.
-    // I will log and fail for non-step rotations for now, or implement a naive NN.
-    // Let's implement naive NN to match the header promise slightly.
-    
+   
     // Calculate new dimensions (bounding box)
     float rads = rot * M_PI / 180.0f;
     float c = std::cos(rads);
@@ -1235,6 +1235,7 @@ bool ImageProcessor::apply_software_rotation(
     int ncy = out_h / 2;
 
     for (int y = 0; y < out_h; y++) {
+        esphome::App.feed_wdt();
         for (int x = 0; x < out_w; x++) {
             // Reverse map:
             // x_src = (x - ncx)*c + (y - ncy)*s + cx

@@ -352,18 +352,22 @@ ProcessedOutput ModelHandler::process_output(const float *output_data) const {
     return result;
   }
 
-  float min_val = *std::min_element(output_data, output_data + num_classes);
-  float max_val = *std::max_element(output_data, output_data + num_classes);
-  ESP_LOGD(TAG, "Output range: min=%.6f, max=%.6f", min_val, max_val);
-
+  // Single-pass statistics calculation
+  float min_val = output_data[0];
+  float max_val = output_data[0];
   int max_idx = 0;
-  float max_val_output = output_data[0];
+  
   for (int i = 1; i < num_classes; i++) {
-    if (output_data[i] > max_val_output) {
-      max_val_output = output_data[i];
-      max_idx = i;
+    float val = output_data[i];
+    if (val < min_val) min_val = val;
+    if (val > max_val) {
+        max_val = val;
+        max_idx = i;
     }
   }
+  
+  float max_val_output = max_val;
+  ESP_LOGD(TAG, "Output range: min=%.6f, max=%.6f", min_val, max_val);
 
   if (config_.output_processing == "direct_class") {
     result.value = static_cast<float>(max_idx);

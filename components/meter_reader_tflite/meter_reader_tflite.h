@@ -1,7 +1,9 @@
 #pragma once
 
 #include "esphome/core/component.h"
+#ifndef USE_HOST
 #include "esphome/components/esp32_camera/esp32_camera.h"
+#endif
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/light/light_state.h"
@@ -10,21 +12,69 @@
 // Coordinators
 #include "tflite_coordinator.h"
 #include "camera_coordinator.h"
+#ifdef USE_HOST
+  class FlashlightCoordinator {
+   public:
+    void setup(void*, void*, void*) {}
+    void set_timing(uint32_t, uint32_t) {}
+    void force_inference(std::function<void()>) {}
+    void capture_preview_sequence(std::function<void()>) {}
+  };
+#else
 #include "flashlight_coordinator.h"
+#endif
 #include "debug_coordinator.h"
 
+#ifdef USE_HOST
+namespace esphome { namespace esp32_camera_utils {
+  class Esp32CameraUtils {};
+  class CropZoneHandler { public: void update_zones(const std::string &s) {} };
+}}
+#else
 #include "esphome/components/esp32_camera_utils/crop_zone_handler.h"
 #include "esphome/components/esp32_camera_utils/esp32_camera_utils.h"
+#endif
 #include "value_validator.h"
 
 #ifdef USE_WEB_SERVER
 #include "esphome/components/web_server_base/web_server_base.h"
 #endif
 
-#include <atomic>
+#include <memory>
 #include <vector>
 #include <string>
-#include <memory>
+#include <atomic>
+
+// Check for Dual Core capability
+#if !defined(CONFIG_FREERTOS_UNICORE) && (portNUM_PROCESSORS > 1)
+    #define SUPPORT_DOUBLE_BUFFERING
+#endif
+
+#ifdef SUPPORT_DOUBLE_BUFFERING
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
+#endif
+
+#ifdef USE_HOST
+  // Mock ESP32 Camera definitions
+  namespace camera {
+    class CameraImage;
+    class CameraImageReader {
+    public:
+      virtual void set_image(std::shared_ptr<CameraImage> image) = 0;
+      virtual size_t available() const = 0;
+      virtual uint8_t *peek_data_buffer() = 0;
+      virtual void consume_data(size_t consumed) = 0;
+      virtual void return_image() = 0;
+    };
+  }
+  namespace esp32_camera {
+    class ESP32Camera;
+  }
+#else
+  #include "esphome/components/esp32_camera/esp32_camera.h"
+#endif
 
 namespace esphome {
 namespace meter_reader_tflite {
@@ -34,6 +84,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void setup() override;
   void update() override;
   void loop() override;
+  void dump_config() override;
   ~MeterReaderTFLite() override;
 
   float get_setup_priority() const override { return setup_priority::LATE; }
@@ -89,6 +140,9 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   // Pause
   void set_pause_processing(bool pause) { pause_processing_.store(pause); }
   bool get_pause_processing() const { return pause_processing_.load(); }
+
+  // Overrides
+  void set_update_interval(uint32_t ms);
 
   // Flashlight
   void set_flash_light(light::LightState* flash_light);
@@ -185,6 +239,27 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   
 #ifdef USE_WEB_SERVER
   web_server_base::WebServerBase *web_server_{nullptr};
+#endif
+
+#ifdef SUPPORT_DOUBLE_BUFFERING
+  // Double Buffering / Multithreading
+  struct InferenceJob {
+      std::shared_ptr<camera::CameraImage> frame; // Keep managed
+      std::vector<esp32_camera_utils::ImageProcessor::ProcessResult> crops;
+      uint32_t start_time;
+  };
+
+  struct InferenceResult {
+      std::vector<float> readings;
+      std::vector<float> probabilities; // Confidence
+      uint32_t inference_time;
+      bool success;
+  };
+
+  QueueHandle_t input_queue_{nullptr};
+  QueueHandle_t output_queue_{nullptr};
+  TaskHandle_t inference_task_handle_{nullptr};
+  static void inference_task(void *arg);
 #endif
 };
 

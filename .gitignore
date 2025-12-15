@@ -17,3 +17,5 @@ secrets.yaml
 /components/flash_light_controller/__pycache__
 /components/tflite_micro_helper/__pycache__
 
+.github/workflows/ci.yml
+.clang-format

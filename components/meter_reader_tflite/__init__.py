@@ -13,7 +13,11 @@ from esphome.components import globals
 import esphome.components.flash_light_controller as flash_light_controller
 
 CODEOWNERS = ["@nl"]
-DEPENDENCIES = ['esp32', 'tflite_micro_helper', 'esp32_camera_utils', 'flash_light_controller']
+if CORE.target_platform == "esp32":
+    DEPENDENCIES = ['esp32', 'tflite_micro_helper', 'esp32_camera_utils', 'flash_light_controller']
+else:
+    # On host, we mock utils and remove esp32 check
+    DEPENDENCIES = ['tflite_micro_helper']
 
 AUTO_LOAD = ['sensor']
 
@@ -69,7 +73,7 @@ def datasize_to_bytes(value):
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(MeterReaderTFLite),
     cv.Required(CONF_MODEL): cv.file_,
-    cv.Required(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera),
+    cv.Optional(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera) if CORE.target_platform == "esp32" else cv.string,
     # cv.Optional(CONF_MODEL_TYPE, default="class100-0180"): cv.string,  # Add model type selection
     cv.Optional(CONF_CONFIDENCE_THRESHOLD, default=0.85): cv.float_range(
         min=0.0, max=1.0
@@ -144,8 +148,14 @@ async def to_code(config):
     cg.add_global(cg.RawStatement('using namespace esphome::meter_reader_tflite;'))
     await cg.register_component(var, config)
 
-    cam = await cg.get_variable(config[CONF_CAMERA_ID])
-    cg.add(var.set_camera(cam))
+    if CORE.target_platform == "esp32":
+        cam = await cg.get_variable(config[CONF_CAMERA_ID])
+        cg.add(var.set_camera(cam))
+    else:
+        cg.add_define("USE_HOST_MOCK_CAMERA")
+        cg.add_define("USE_HOST")
+        # On host, we don't set a real camera object.
+        pass
     
     model_path = config[CONF_MODEL]
     model_filename = os.path.basename(model_path)
@@ -179,14 +189,16 @@ async def to_code(config):
     
     # Get camera resolution from substitutions
     width, height = 640, 480  # Defaults
-    if CORE.config["substitutions"].get("camera_resolution"):
-        res = CORE.config["substitutions"]["camera_resolution"]
+    substitutions = CORE.config.get("substitutions", {})
+    if substitutions.get("camera_resolution"):
+        res = substitutions["camera_resolution"]
         if 'x' in res:
             width, height = map(int, res.split('x'))
     
-    pixel_format = CORE.config["substitutions"].get("camera_pixel_format", "RGB888")
-    if pixel_format == "JPEG":   
-        cg.add(var.set_camera_image_format(width, height, pixel_format))
+            width, height = map(int, res.split('x'))
+    
+    pixel_format = substitutions.get("camera_pixel_format", "RGB888")
+    cg.add(var.set_camera_image_format(width, height, pixel_format))
     
     # Set image rotation
     # Priority 1: Check meter_reader_tflite specific rotation

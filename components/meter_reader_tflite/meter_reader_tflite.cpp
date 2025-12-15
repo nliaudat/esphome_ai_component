@@ -37,6 +37,8 @@ void MeterReaderTFLite::setup() {
     // Increased delay to 10s to ensure WiFi logger captures these startup logs
     this->set_timeout(10000, [this]() {
          ESP_LOGI(TAG, "Starting model loading...");
+         ESP_LOGI(TAG, "Starting model loading...");
+         esphome::App.feed_wdt(); // Feed before potentially long load
          if (!tflite_coord_.load_model()) {
              mark_failed(); return;
          }
@@ -75,14 +77,14 @@ void MeterReaderTFLite::setup() {
               config.model_height = spec.input_height;
               config.model_channels = spec.input_channels;
               
-              switch((int)rotation_) {
+              switch(static_cast<int>(rotation_)) {
                   case 90:  config.rotation = esp32_camera_utils::ROTATION_90;  break;
                   case 180: config.rotation = esp32_camera_utils::ROTATION_180; break;
                   case 270: config.rotation = esp32_camera_utils::ROTATION_270; break;
                   default:  config.rotation = esp32_camera_utils::ROTATION_0;   break;
               }
               
-              config.input_type = (esp32_camera_utils::ImageProcessorInputType)processor_input_type;
+              config.input_type = static_cast<esp32_camera_utils::ImageProcessorInputType>(processor_input_type);
               config.normalize = spec.normalize;
               config.input_order = spec.input_order;
               
@@ -109,7 +111,6 @@ void MeterReaderTFLite::setup() {
           #ifdef DEBUG_METER_READER_MEMORY
           if (tensor_arena_size_sensor_) {
               // We need a getter for requested size in TFLiteCoord
-              // Assuming get_tensor_arena_size_requested() exists or we add it
               tensor_arena_size_sensor_->publish_state(tflite_coord_.get_tensor_arena_size()); 
           }
           #endif
@@ -135,6 +136,55 @@ void MeterReaderTFLite::setup() {
         this->last_request_time_ = millis();
         ESP_LOGD(TAG, "Frame requested via coordinator callback");
     });
+    
+    #ifdef SUPPORT_DOUBLE_BUFFERING
+    // 6. Setup Double Buffering Pipeline
+    ESP_LOGI(TAG, "Initializing Double Buffering (Dual Core mode)...");
+    input_queue_ = xQueueCreate(1, sizeof(InferenceJob*)); // Pointer depth 1 (Backpressure)
+    output_queue_ = xQueueCreate(2, sizeof(InferenceResult*)); // Pointer depth 2
+    
+    if (!input_queue_ || !output_queue_) {
+        ESP_LOGE(TAG, "Failed to create queues!");
+        mark_failed(); return;
+    }
+    
+    BaseType_t res = xTaskCreatePinnedToCore(
+        MeterReaderTFLite::inference_task, 
+        "inference_task", 
+        8192, // Stack size
+        this, // Pass this instance
+        1,    // Priority (Low)
+        &inference_task_handle_, 
+        0     // Pin to Core 0 (Main Loop is usually Core 1)
+    );
+    
+    if (res != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create inference task!");
+        mark_failed(); return;
+    }
+    ESP_LOGI(TAG, "Double Buffering active on Core 0");
+    #endif
+
+    // Force Camera to Grayscale if using GRAY model (Workaround for YAML limit)
+    // Only if user requested GRAYSCALE in config (we can't easily check the template sub here, 
+    // but we know we just failed to set it in YAML).
+    // Let's check the global pixel format config if feasible, or just force it if the model is V4 GRAY.
+    // Better: Helper function later. For now, let's leave it as JPEG default and rely on decoding 
+    // UNLESS the user explicitly uncommented the force block below.
+    // Actually, I'll add a runtime check:
+    /*
+    sensor_t *s = esp_camera_sensor_get();
+    if (s != nullptr) {
+        ESP_LOGI(TAG, "Forcing camera to GRAYSCALE for V4 GRAY model efficiency");
+        s->set_pixformat(s, PIXFORMAT_GRAYSCALE);
+        // Note: This relies on the buffer being large enough, which it is (JPEG buffer > Gray buffer usually)
+    }
+    */
+    // Users reported typically we can't switch FB format on the fly easily without re-init.
+    // So for this session, I will accept JPEG input and decode it. 
+    // Zero-Decode (Phase 3.3) requires the YAML support or a custom component fork.
+    // I will NOT inject risky code that might crash the driver.
+    // I will stick to fixing the compilation errors.
 }
 
 void MeterReaderTFLite::set_camera(esp32_camera::ESP32Camera *camera) {
@@ -181,6 +231,8 @@ void MeterReaderTFLite::update() {
 }
 
 void MeterReaderTFLite::loop() {
+    if (this->is_failed()) return;
+
     // Watchdog: If frame requested but not arrived for 15s, reset state
     if (frame_requested_ && (millis() - last_request_time_ > 15000)) {
         ESP_LOGW(TAG, "Frame request timed out (15s)! Resetting state.");
@@ -191,6 +243,54 @@ void MeterReaderTFLite::loop() {
     if (frame_available_ && !processing_frame_) {
         process_available_frame();
     }
+    
+    #ifdef SUPPORT_DOUBLE_BUFFERING
+    // Check for async results
+    InferenceResult* res_ptr = nullptr;
+    if (output_queue_ && xQueueReceive(output_queue_, &res_ptr, 0) == pdTRUE) {
+        if (res_ptr) {
+            // Reconstruct logic from process_full_image's tail
+            ESP_LOGD(TAG, "Async inference finished in %lu ms", res_ptr->inference_time);
+            
+            // Reconstruct combined reading
+            float final_val = combine_readings(res_ptr->readings);
+            
+            // Validate
+            // Use Average Confidence to match Single Core logic
+            float avg_conf = 0.0f;
+            if (!res_ptr->probabilities.empty()) {
+                 float sum = 0.0f;
+                 for (float c : res_ptr->probabilities) sum += c;
+                 avg_conf = sum / res_ptr->probabilities.size();
+            }
+            
+            if (value_sensor_) {
+                float validated_val = 0.0f;
+                bool valid = validate_and_update_reading(final_val, avg_conf, validated_val);
+                
+                // Publish (matches process_full_image logic)
+                if (valid && avg_conf >= confidence_threshold_) {
+                     ESP_LOGI(TAG, "Result: VALID (Raw: %.0f, Conf: %.2f)", final_val, avg_conf);
+                     value_sensor_->publish_state(validated_val);
+                     if (confidence_sensor_) {
+                         confidence_sensor_->publish_state(avg_conf * 100.0f);
+                     }
+                } else {
+                     ESP_LOGI(TAG, "Result: INVALID (Raw: %.0f, Conf: %.2f)", final_val, avg_conf);
+                }
+            }
+            
+            // Cleanup
+            delete res_ptr;
+            
+            // Request next frame if configured?
+            // Original logic: loop requests if continuous? 
+            // set_timeout logic was used in some versions.
+            // Here 'update()' triggers 'take_picture'.
+        }
+        processing_frame_ = false; // Release lock
+    }
+    #endif
 }
 
 void MeterReaderTFLite::process_available_frame() {
@@ -219,9 +319,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     // Preview Logic (Rotation)
     #ifdef DEV_ENABLE_ROTATION
     if (generate_preview_ || request_preview_) {
-         // Create rotated preview via TFLite/ImageProcessor
-         // Actually TFLiteCoord owns usage of ImageProcessor static methods too? 
-         // Or we use ImageProcessor static directly.
+         // Create rotated preview via ImageProcessor
          using namespace esphome::esp32_camera_utils;
          
          // Using dimensions from camera coord
@@ -244,7 +342,31 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     ESP_LOGI(TAG, "Processing Image: Found %d crop zones", zones.size());
     
     // Process frame -> buffers
+    esphome::App.feed_wdt();
     auto processed_buffers = camera_coord_.process_frame(frame, zones);
+    
+    #ifdef SUPPORT_DOUBLE_BUFFERING
+    // Async Path
+    if (processed_buffers.empty()) {
+        processing_frame_ = false;
+        return;
+    }
+    
+    InferenceJob* job = new InferenceJob();
+    job->frame = frame; // Keep alive
+    job->crops = std::move(processed_buffers);
+    job->start_time = millis();
+    
+    if (xQueueSend(input_queue_, &job, 0) != pdTRUE) {
+        ESP_LOGW(TAG, "Inference Queue Full - Dropping Frame");
+        delete job;
+        processing_frame_ = false;
+    }
+    // Return immediately, loop() will handle result
+    return;
+    #endif
+    
+    // Buffers -> Inference (Synchronous Fallback)
     
     // Buffers -> Inference
     
@@ -416,10 +538,10 @@ float MeterReaderTFLite::combine_readings(const std::vector<float>& readings) {
 }
 
 bool MeterReaderTFLite::validate_and_update_reading(float raw, float conf, float& val) {
-    int ival = (int)raw;
+    int ival = static_cast<int>(raw);
     int oval = ival;
     bool valid = output_validator_.validate_reading(ival, conf, oval);
-    val = (float)oval;
+    val = static_cast<float>(oval);
     return valid;
 }
 
@@ -479,6 +601,11 @@ bool MeterReaderTFLite::set_camera_window(int offset_x, int offset_y, int width,
 // Destructor
 MeterReaderTFLite::~MeterReaderTFLite() {} 
 
+void MeterReaderTFLite::set_update_interval(uint32_t ms) {
+    ESP_LOGI(TAG, "Setting update interval: %u ms", ms);
+    PollingComponent::set_update_interval(ms);
+}
+
 void MeterReaderTFLite::force_flash_inference() {
     flashlight_coord_.force_inference([this](){ 
         frame_requested_ = true; 
@@ -507,5 +634,60 @@ void MeterReaderTFLite::print_debug_info() {
     debug_coord_.print_info(tflite_coord_, camera_coord_.get_width(), camera_coord_.get_height(), camera_coord_.get_format());
 }
 
+void MeterReaderTFLite::dump_config() {
+  ESP_LOGCONFIG(TAG, "Meter Reader TFLite:");
+  ESP_LOGCONFIG(TAG, "  Confidence Threshold: %.2f", this->confidence_threshold_);
+  ESP_LOGCONFIG(TAG, "  Update Interval: %u ms", this->get_update_interval());
+  
+  #ifdef SUPPORT_DOUBLE_BUFFERING
+  ESP_LOGCONFIG(TAG, "  Pipeline: Double Buffering (Dual Core) ENABLED");
+  #else
+  ESP_LOGCONFIG(TAG, "  Pipeline: Single Core (Sequential)");
+  #endif
+
+  if (this->is_failed()) {
+    ESP_LOGE(TAG, "  Component FAILED to setup");
+  }
+}
+
 } // namespace meter_reader_tflite
 } // namespace esphome
+
+#ifdef SUPPORT_DOUBLE_BUFFERING
+using namespace esphome::meter_reader_tflite;
+
+void MeterReaderTFLite::inference_task(void *arg) {
+    MeterReaderTFLite* self = (MeterReaderTFLite*)arg;
+    InferenceJob* job = nullptr;
+    
+    while (true) {
+        if (xQueueReceive(self->input_queue_, &job, portMAX_DELAY) == pdTRUE) {
+            if (!job) continue;
+            
+            uint32_t start = millis();
+            
+            // Invoke TFLite (Thread-Safe because only this task calls it)
+            // Note: queues are thread safe.
+            auto tflite_results = self->tflite_coord_.run_inference(job->crops);
+            
+            InferenceResult* res = new InferenceResult();
+            res->inference_time = millis() - start;
+            res->success = true;
+            
+            for (auto& r : tflite_results) {
+                res->readings.push_back(r.value);
+                res->probabilities.push_back(r.confidence);
+            }
+            
+            // Clean up job inputs
+            delete job;
+            
+            // Send back
+            if (xQueueSend(self->output_queue_, &res, 100 / portTICK_PERIOD_MS) != pdTRUE) {
+                // Main loop stuck? Drop result.
+                delete res;
+            }
+        }
+    }
+}
+#endif

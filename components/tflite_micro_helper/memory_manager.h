@@ -22,7 +22,7 @@ class MemoryManager {
     operator bool() const { return static_cast<bool>(data); }
   };
 
-  static AllocationResult allocate_tensor_arena(size_t requested_size);
+  [[nodiscard]] static AllocationResult allocate_tensor_arena(size_t requested_size);
   static void report_memory_status(size_t requested_size, 
                                  size_t allocated_size,
                                  size_t peak_usage,
