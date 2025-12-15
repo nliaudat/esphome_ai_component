@@ -208,9 +208,7 @@ std::shared_ptr<camera::CameraImage> ImageProcessor::generate_rotated_preview(
     int dec_w = 0, dec_h = 0;
     JpegBufferPtr rgb_data = decode_jpeg(data, len, &dec_w, &dec_h);
     if (!rgb_data) {
-        // Fallback: If not JPEG or decode failed, we can't process (preview assumes JPEG input mostly)
-        // If we want to support raw input, we would need to check source format here.
-        // For now, consistent with previous behavior which forced "JPEG" config.
+        // Fallback: If not JPEG or decode failed, we can't process
         ESP_LOGW(TAG, "Preview: Failed to decode input image (requires JPEG)");
         return nullptr;
     }
@@ -981,9 +979,7 @@ bool ImageProcessor::process_rgb888_crop_and_scale_to_uint8(
     }
 
     #ifdef DEBUG_ESP32_CAMERA_UTILS
-    // Cast to float for common macro or create int version? Macro uses %.1f so it expects float or castable.
-    // Let's just manually log for uint8
-    // Or just rely on zone info. 
+    // Manual logging can be added here if needed
     #endif
 
     return true;

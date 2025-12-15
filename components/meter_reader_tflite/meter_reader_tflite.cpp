@@ -111,7 +111,6 @@ void MeterReaderTFLite::setup() {
           #ifdef DEBUG_METER_READER_MEMORY
           if (tensor_arena_size_sensor_) {
               // We need a getter for requested size in TFLiteCoord
-              // Assuming get_tensor_arena_size_requested() exists or we add it
               tensor_arena_size_sensor_->publish_state(tflite_coord_.get_tensor_arena_size()); 
           }
           #endif
@@ -223,9 +222,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     // Preview Logic (Rotation)
     #ifdef DEV_ENABLE_ROTATION
     if (generate_preview_ || request_preview_) {
-         // Create rotated preview via TFLite/ImageProcessor
-         // Actually TFLiteCoord owns usage of ImageProcessor static methods too? 
-         // Or we use ImageProcessor static directly.
+         // Create rotated preview via ImageProcessor
          using namespace esphome::esp32_camera_utils;
          
          // Using dimensions from camera coord
