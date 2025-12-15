@@ -136,6 +136,34 @@ void MeterReaderTFLite::setup() {
         this->last_request_time_ = millis();
         ESP_LOGD(TAG, "Frame requested via coordinator callback");
     });
+    
+    #ifdef SUPPORT_DOUBLE_BUFFERING
+    // 6. Setup Double Buffering Pipeline
+    ESP_LOGI(TAG, "Initializing Double Buffering (Dual Core mode)...");
+    input_queue_ = xQueueCreate(1, sizeof(InferenceJob*)); // Pointer depth 1 (Backpressure)
+    output_queue_ = xQueueCreate(2, sizeof(InferenceResult*)); // Pointer depth 2
+    
+    if (!input_queue_ || !output_queue_) {
+        ESP_LOGE(TAG, "Failed to create queues!");
+        mark_failed(); return;
+    }
+    
+    BaseType_t res = xTaskCreatePinnedToCore(
+        MeterReaderTFLite::inference_task, 
+        "inference_task", 
+        8192, // Stack size
+        this, // Pass this instance
+        1,    // Priority (Low)
+        &inference_task_handle_, 
+        0     // Pin to Core 0 (Main Loop is usually Core 1)
+    );
+    
+    if (res != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create inference task!");
+        mark_failed(); return;
+    }
+    ESP_LOGI(TAG, "Double Buffering active on Core 0");
+    #endif
 }
 
 void MeterReaderTFLite::set_camera(esp32_camera::ESP32Camera *camera) {
@@ -194,6 +222,46 @@ void MeterReaderTFLite::loop() {
     if (frame_available_ && !processing_frame_) {
         process_available_frame();
     }
+    
+    #ifdef SUPPORT_DOUBLE_BUFFERING
+    // Check for async results
+    InferenceResult* res_ptr = nullptr;
+    if (output_queue_ && xQueueReceive(output_queue_, &res_ptr, 0) == pdTRUE) {
+        if (res_ptr) {
+            // Reconstruct logic from process_full_image's tail
+            ESP_LOGD(TAG, "Async inference finished in %lu ms", res_ptr->inference_time);
+            
+            // Reconstruct combined reading
+            float final_val = combine_readings(res_ptr->readings);
+            
+            // Validate
+            // We need a single confidence value for validation.
+            // combine_readings logic in regular flow: "Confidence: Lowest of all digits"
+            float min_conf = 1.0f;
+            for (float c : res_ptr->probabilities) {
+                if (c < min_conf) min_conf = c;
+            }
+            
+            if (value_sensor_) {
+                float validated_val = 0.0f;
+                bool valid = validate_and_update_reading(final_val, min_conf, validated_val);
+                
+                // Logging logic (Simplified from process_full_image)
+                ESP_LOGI(TAG, "Result: %s (Raw: %.0f, Conf: %.2f)", 
+                         valid ? "VALID" : "INVALID", final_val, min_conf);
+            }
+            
+            // Cleanup
+            delete res_ptr;
+            
+            // Request next frame if configured?
+            // Original logic: loop requests if continuous? 
+            // set_timeout logic was used in some versions.
+            // Here 'update()' triggers 'take_picture'.
+        }
+        processing_frame_ = false; // Release lock
+    }
+    #endif
 }
 
 void MeterReaderTFLite::process_available_frame() {
@@ -247,6 +315,29 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     // Process frame -> buffers
     esphome::App.feed_wdt();
     auto processed_buffers = camera_coord_.process_frame(frame, zones);
+    
+    #ifdef SUPPORT_DOUBLE_BUFFERING
+    // Async Path
+    if (processed_buffers.empty()) {
+        processing_frame_ = false;
+        return;
+    }
+    
+    InferenceJob* job = new InferenceJob();
+    job->frame = frame; // Keep alive
+    job->crops = std::move(processed_buffers);
+    job->start_time = millis();
+    
+    if (xQueueSend(input_queue_, &job, 0) != pdTRUE) {
+        ESP_LOGW(TAG, "Inference Queue Full - Dropping Frame");
+        delete job;
+        processing_frame_ = false;
+    }
+    // Return immediately, loop() will handle result
+    return;
+    #endif
+    
+    // Buffers -> Inference (Synchronous Fallback)
     
     // Buffers -> Inference
     
@@ -511,3 +602,42 @@ void MeterReaderTFLite::print_debug_info() {
 
 } // namespace meter_reader_tflite
 } // namespace esphome
+
+#ifdef SUPPORT_DOUBLE_BUFFERING
+using namespace esphome::meter_reader_tflite;
+
+void MeterReaderTFLite::inference_task(void *arg) {
+    MeterReaderTFLite* self = (MeterReaderTFLite*)arg;
+    InferenceJob* job = nullptr;
+    
+    while (true) {
+        if (xQueueReceive(self->input_queue_, &job, portMAX_DELAY) == pdTRUE) {
+            if (!job) continue;
+            
+            uint32_t start = millis();
+            
+            // Invoke TFLite (Thread-Safe because only this task calls it)
+            // Note: queues are thread safe.
+            auto tflite_results = self->tflite_coord_.run_inference(job->crops);
+            
+            InferenceResult* res = new InferenceResult();
+            res->inference_time = millis() - start;
+            res->success = true;
+            
+            for (auto& r : tflite_results) {
+                res->readings.push_back(r.value);
+                res->probabilities.push_back(r.confidence);
+            }
+            
+            // Clean up job inputs
+            delete job;
+            
+            // Send back
+            if (xQueueSend(self->output_queue_, &res, 100 / portTICK_PERIOD_MS) != pdTRUE) {
+                // Main loop stuck? Drop result.
+                delete res;
+            }
+        }
+    }
+}
+#endif

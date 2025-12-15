@@ -21,10 +21,21 @@
 #include "esphome/components/web_server_base/web_server_base.h"
 #endif
 
-#include <atomic>
+#include <memory>
 #include <vector>
 #include <string>
-#include <memory>
+#include <atomic>
+
+// Check for Dual Core capability
+#if !defined(CONFIG_FREERTOS_UNICORE) && (portNUM_PROCESSORS > 1)
+    #define SUPPORT_DOUBLE_BUFFERING
+#endif
+
+#ifdef SUPPORT_DOUBLE_BUFFERING
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
+#endif
 
 namespace esphome {
 namespace meter_reader_tflite {
@@ -185,6 +196,27 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   
 #ifdef USE_WEB_SERVER
   web_server_base::WebServerBase *web_server_{nullptr};
+#endif
+
+#ifdef SUPPORT_DOUBLE_BUFFERING
+  // Double Buffering / Multithreading
+  struct InferenceJob {
+      std::shared_ptr<camera::CameraImage> frame; // Keep managed
+      std::vector<esp32_camera_utils::ImageProcessor::ProcessResult> crops;
+      uint32_t start_time;
+  };
+
+  struct InferenceResult {
+      std::vector<float> readings;
+      std::vector<float> probabilities; // Confidence
+      uint32_t inference_time;
+      bool success;
+  };
+
+  QueueHandle_t input_queue_{nullptr};
+  QueueHandle_t output_queue_{nullptr};
+  TaskHandle_t inference_task_handle_{nullptr};
+  static void inference_task(void *arg);
 #endif
 };
 
