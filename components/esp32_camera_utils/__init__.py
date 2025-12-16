@@ -14,8 +14,10 @@ Esp32CameraUtils = esp32_camera_utils_ns.class_('Esp32CameraUtils', cg.Component
 
 CONF_CAMERA_WINDOW = 'camera_window'
 CONF_CAMERA_ID = 'camera_id'
-
 CONF_ROTATION = 'rotation'
+
+CONF_SCALER = 'scaler'
+CONF_CROPPER = 'cropper'
 
 # Rotation options mapping
 ROTATION_OPTIONS = {
@@ -41,6 +43,16 @@ CONFIG_SCHEMA = cv.Schema({
     # Allow arbitrary rotation (float), but also string for backward compat "90"
     cv.Optional(CONF_ROTATION, default=0.0): cv.float_,
     cv.Optional("enable_rotation", default=False): cv.boolean,
+    cv.Optional(CONF_SCALER): cv.Schema({
+        cv.Optional(CONF_WIDTH): cv.int_,
+        cv.Optional(CONF_HEIGHT): cv.int_,
+    }),
+    cv.Optional(CONF_CROPPER): cv.Schema({
+        cv.Optional(CONF_WIDTH): cv.int_,
+        cv.Optional(CONF_HEIGHT): cv.int_,
+        cv.Optional(CONF_OFFSET_X, default=0): cv.int_,
+        cv.Optional(CONF_OFFSET_Y, default=0): cv.int_,
+    }),
     cv.Optional("enable_scaler", default=True): cv.boolean,
     cv.Optional("enable_cropper", default=True): cv.boolean,
     cv.Optional("enable_drawing", default=True): cv.boolean,
@@ -76,11 +88,19 @@ async def to_code(config):
     if config.get("enable_rotation", False) or config[CONF_ROTATION] != 0:
          cg.add_define("USE_CAMERA_ROTATOR")
 
-    if config.get("enable_scaler", True):
+    if config.get("enable_scaler", True) or CONF_SCALER in config:
         cg.add_define("USE_CAMERA_SCALER")
+        if CONF_SCALER in config:
+            conf = config[CONF_SCALER]
+            if CONF_WIDTH in conf and CONF_HEIGHT in conf:
+                cg.add(var.set_scaler_config(conf[CONF_WIDTH], conf[CONF_HEIGHT]))
         
-    if config.get("enable_cropper", True):
+    if config.get("enable_cropper", True) or CONF_CROPPER in config:
         cg.add_define("USE_CAMERA_CROPPER")
+        if CONF_CROPPER in config:
+            conf = config[CONF_CROPPER]
+            if CONF_WIDTH in conf and CONF_HEIGHT in conf:
+                cg.add(var.set_cropper_config(conf[CONF_WIDTH], conf[CONF_HEIGHT], conf[CONF_OFFSET_X], conf[CONF_OFFSET_Y]))
         
     if config.get("enable_drawing", True):
         cg.add_define("USE_CAMERA_DRAWING")

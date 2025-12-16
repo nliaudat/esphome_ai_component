@@ -138,7 +138,12 @@ void MeterReaderTFLite::setup() {
               esp32_camera_utils::ImageProcessorConfig config;
               config.camera_width = camera_coord_.get_width();
               config.camera_height = camera_coord_.get_height();
-              config.pixel_format = camera_coord_.get_format();
+              // Determine format based on model input channels (Coordinator logic)
+              if (spec.input_channels == 1) {
+                  config.pixel_format = "GRAYSCALE";
+              } else {
+                  config.pixel_format = camera_coord_.get_format();
+              }
               config.model_width = spec.input_width;
               config.model_height = spec.input_height;
               config.model_channels = spec.input_channels;

@@ -133,7 +133,7 @@ bool ImageProcessor::get_jpeg_dimensions(const uint8_t *data, size_t len, int &w
 }
 
 
-ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t* data, size_t len, int* width, int* height) {
+ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t* data, size_t len, int* width, int* height, jpeg_pixel_format_t output_format) {
     if (!data || len == 0) return nullptr;
 
     int w, h;
@@ -144,7 +144,7 @@ ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t* data, s
     if (height) *height = h;
 
     jpeg_dec_config_t decode_config = DEFAULT_JPEG_DEC_CONFIG();
-    decode_config.output_type = JPEG_PIXEL_FORMAT_RGB888;
+    decode_config.output_type = output_format;
     decode_config.scale.width = w;
     decode_config.scale.height = h;
     decode_config.clipper.width = w;
@@ -159,7 +159,14 @@ ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t* data, s
     // RAII for decoder
     std::unique_ptr<struct jpeg_dec_s, JpegDecoderDeleter> decoder(decoder_handle);
 
-    size_t out_size = w * h * 3;
+    int channels = 3;
+    if (output_format == JPEG_PIXEL_FORMAT_GRAY) {
+        channels = 1;
+    } else if (output_format == JPEG_PIXEL_FORMAT_RGB565_LE || output_format == JPEG_PIXEL_FORMAT_RGB565_BE) {
+        channels = 2; // Actually 2 bytes, but distinct format
+    }
+    
+    size_t out_size = w * h * channels;
     uint8_t* raw_buf = (uint8_t*)jpeg_calloc_align(out_size, 16);
     if (!raw_buf) {
         return nullptr;
@@ -207,7 +214,7 @@ std::shared_ptr<camera::CameraImage> ImageProcessor::generate_rotated_preview(
 
     // 2. Decode JPEG to RGB888
     int dec_w = 0, dec_h = 0;
-    JpegBufferPtr rgb_data = decode_jpeg(data, len, &dec_w, &dec_h);
+    JpegBufferPtr rgb_data = decode_jpeg(data, len, &dec_w, &dec_h, JPEG_PIXEL_FORMAT_RGB888);
     if (!rgb_data) {
         // Fallback: If not JPEG or decode failed, we can't process
         ESP_LOGW(TAG, "Preview: Failed to decode input image (requires JPEG)");
@@ -568,8 +575,19 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
         ESP_LOGW(TAG, "Failed to parse JPEG dimensions, using config");
     }
 
+    // Determine decode format based on model needs
+    // If model needs 1 channel, we decode directly to GRAY to save memory/time
+    jpeg_pixel_format_t decode_format = JPEG_PIXEL_FORMAT_RGB888;
+    int decode_channels = 3;
+    
+    // Explicit grayscale request
+    if (config_.pixel_format == "GRAYSCALE") {
+        decode_format = JPEG_PIXEL_FORMAT_GRAY;
+        decode_channels = 1;
+    }
+
     int dec_w = 0, dec_h = 0;
-    JpegBufferPtr full_image_buf = decode_jpeg(jpeg_data, jpeg_size, &dec_w, &dec_h);
+    JpegBufferPtr full_image_buf = decode_jpeg(jpeg_data, jpeg_size, &dec_w, &dec_h, decode_format);
     
     if (!full_image_buf) {
         stats_.jpeg_decoding_errors++;
@@ -611,7 +629,7 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
         out_w = static_cast<int>(jpeg_width * abs_cos + jpeg_height * abs_sin);
         out_h = static_cast<int>(jpeg_width * abs_sin + jpeg_height * abs_cos);
         
-        size_t rotated_size = out_w * out_h * 3;
+        size_t rotated_size = out_w * out_h * decode_channels;
         rotated_buffer_storage = allocate_image_buffer(rotated_size);
         
         if (!rotated_buffer_storage) {
@@ -624,7 +642,7 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
         // Use helper to Rotate: Full -> Rotated
         bool rot_success = Rotator::perform_rotation(full_image_buf.get(), rotated_buf, 
                                                  jpeg_width, jpeg_height, 
-                                                 3, config_.rotation, out_w, out_h); 
+                                                 decode_channels, config_.rotation, out_w, out_h); 
         
         if (rot_success) {
             // Update processing context to new dimensions
@@ -649,16 +667,32 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
     
     bool scale_success = false;
     
-    if (config_.input_type == kInputTypeFloat32) {
-        scale_success = process_rgb888_crop_and_scale_to_float32(
-            processing_buf, zone, crop_width, crop_height,
-            output_buffer, config_.model_width, config_.model_height,
-            config_.model_channels, config_.normalize, stride);
-    } else if (config_.input_type == kInputTypeUInt8) {
-        scale_success = process_rgb888_crop_and_scale_to_uint8(
-            processing_buf, zone, crop_width, crop_height,
-            output_buffer, config_.model_width, config_.model_height,
-            config_.model_channels, stride);
+    if (decode_channels == 1) {
+        // Grayscale Path
+        if (config_.input_type == kInputTypeFloat32) {
+            scale_success = process_grayscale_crop_and_scale_to_float32(
+                processing_buf, zone, crop_width, crop_height,
+                output_buffer, config_.model_width, config_.model_height,
+                config_.model_channels, config_.normalize, stride);
+        } else if (config_.input_type == kInputTypeUInt8) {
+            scale_success = process_grayscale_crop_and_scale_to_uint8(
+                processing_buf, zone, crop_width, crop_height,
+                output_buffer, config_.model_width, config_.model_height,
+                config_.model_channels, stride);
+        }
+    } else {
+        // RGB Path (Default)
+        if (config_.input_type == kInputTypeFloat32) {
+            scale_success = process_rgb888_crop_and_scale_to_float32(
+                processing_buf, zone, crop_width, crop_height,
+                output_buffer, config_.model_width, config_.model_height,
+                config_.model_channels, config_.normalize, stride);
+        } else if (config_.input_type == kInputTypeUInt8) {
+            scale_success = process_rgb888_crop_and_scale_to_uint8(
+                processing_buf, zone, crop_width, crop_height,
+                output_buffer, config_.model_width, config_.model_height,
+                config_.model_channels, stride);
+        }
     }
     
     if (!scale_success) {

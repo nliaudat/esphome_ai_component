@@ -33,8 +33,8 @@ substitutions:
   meter_unit: "L" # Unit of measurement for the meter (e.g. m³, kWh, L) (https://developers.home-assistant.io/docs/core/entity/sensor/https://developers.home-assistant.io/docs/core/entity/sensor/)
   
   # camera
-  camera_pixel_format: JPEG # (cropping implementation is faster with RGB888 format) | Displays: RGB565, RGB888 | Cameras: YUV422, YUV420, RAW | Efficiency: Grayscale, YUV420, JPEG
-  # camera_pixel_format: GRAYSCALE 
+  # camera_pixel_format: JPEG # (cropping implementation is faster with RGB888 format) | Displays: RGB565, RGB888 | Cameras: YUV422, YUV420, RAW | Efficiency: Grayscale, YUV420, JPEG
+  camera_pixel_format: GRAYSCALE 
   camera_resolution: 640x480 #800x600 #640x480 #https://esphome.io/components/esp32_camera.html
   # camera_jpeg_quality: 10 # From 10 (best) to 63 (worst). | Must be 0 if non JPEG
   camera_jpeg_quality: 10
@@ -79,10 +79,24 @@ esp32_camera_utils:
     offset_y: 480 # multiple of 4
     width: 448 # multiple of 4 and 4:3 proportions with height for best quality
     height: 88 #  multiple of 4 and 4:3 proportions with width for best quality
-  rotation: 15 # 0, 90, 180, 270 (special case built-in "accelarated" for 90, 180, 270 )
+
   enable_rotation: true
-  enable_scaler: true
-  enable_cropper: true
+  rotation: 15 # 0, 90, 180, 270 (special case built-in "accelarated" for 90, 180, 270 )
+
+  
+  # enable_scaler: true
+  # scaler:
+  #   width: 640
+  #   height: 480
+    
+  # enable_cropper: true
+  # cropper:
+  #   width: 320
+  #   height: 240
+  #   offset_x: 0
+  #   offset_y: 0
+
+  
   enable_drawing: true
   debug_memory: ${debug_memory_enabled}
 

@@ -47,6 +47,21 @@ class Esp32CameraUtils : public Component {
   // Image rotation configuration (0, 90, 180, 270 degrees clockwise, or arbitrary)
   void set_rotation(float rotation) { rotation_ = rotation; }
 
+  // Modular feature configuration
+  void set_scaler_config(int width, int height) {
+    scaler_width_ = width;
+    scaler_height_ = height;
+    has_scaler_config_ = true;
+  }
+  
+  void set_cropper_config(int width, int height, int offset_x = 0, int offset_y = 0) {
+    cropper_width_ = width;
+    cropper_height_ = height;
+    cropper_offset_x_ = offset_x;
+    cropper_offset_y_ = offset_y;
+    has_cropper_config_ = true;
+  }
+
   // Manually trigger sensor updates
   void update_memory_sensors();
 
@@ -63,6 +78,16 @@ class Esp32CameraUtils : public Component {
   int height_{0};
   bool has_config_{false};
   float rotation_{0.0f};                          ///< Image rotation in degrees
+  
+  int scaler_width_{0};
+  int scaler_height_{0};
+  bool has_scaler_config_{false};
+  
+  int cropper_width_{0};
+  int cropper_height_{0};
+  int cropper_offset_x_{0};
+  int cropper_offset_y_{0};
+  bool has_cropper_config_{false};
   esp32_camera::ESP32Camera *camera_{nullptr};
   CameraWindowControl window_control_;
   

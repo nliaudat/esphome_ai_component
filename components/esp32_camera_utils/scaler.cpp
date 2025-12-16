@@ -4,6 +4,7 @@
 
 #include <cmath>
 #include <algorithm>
+#include "../tflite_micro_helper/debug_utils.h"
 
 namespace esphome {
 namespace esp32_camera_utils {
@@ -11,6 +12,7 @@ namespace esp32_camera_utils {
 // Optimized implementation using fixed-point math (Q16.16)
 bool Scaler::scale_rgb888_to_uint8(const uint8_t* src, int src_w, int src_h, 
                                    uint8_t* dst, int dst_w, int dst_h, int channels) {
+    DURATION_START();
     if (!src || !dst) return false;
 
     // Pre-calculate scale ratio in fixed point
@@ -42,11 +44,13 @@ bool Scaler::scale_rgb888_to_uint8(const uint8_t* src, int src_w, int src_h,
             }
         }
     }
+    DURATION_END("scale_rgb888_to_uint8");
     return true;
 }
 
 bool Scaler::scale_rgb888_to_float32(const uint8_t* src, int src_w, int src_h, 
                                      uint8_t* dst, int dst_w, int dst_h, int channels, bool normalize) {
+    DURATION_START();
     if (!src || !dst) return false;
 
     float* dst_float = reinterpret_cast<float*>(dst);
@@ -82,11 +86,13 @@ bool Scaler::scale_rgb888_to_float32(const uint8_t* src, int src_w, int src_h,
             }
         }
     }
+    DURATION_END("scale_rgb888_to_float32");
     return true;
 }
 
 bool Scaler::scale_nearest(const uint8_t* src, int src_w, int src_h, int src_channels,
                            uint8_t* dst, int dst_w, int dst_h) {
+    DURATION_START();
     if (!src || !dst) return false;
 
     uint32_t ratio_x = (src_w << FIXED_POINT_SHIFT) / dst_w;
@@ -108,6 +114,7 @@ bool Scaler::scale_nearest(const uint8_t* src, int src_w, int src_h, int src_cha
             dst_row += src_channels;
         }
     }
+    DURATION_END("scale_nearest");
     return true;
 }
 
@@ -115,7 +122,10 @@ bool Scaler::scale_bilinear(const uint8_t* src, int src_w, int src_h, int src_ch
                             uint8_t* dst, int dst_w, int dst_h) {
      // TODO: Implement Bilinear if higher quality needed. 
      // For now, defaulting to nearest as it's much faster on S3 without SIMD.
-     return scale_nearest(src, src_w, src_h, src_channels, dst, dst_w, dst_h);
+     DURATION_START();
+     bool res = scale_nearest(src, src_w, src_h, src_channels, dst, dst_w, dst_h);
+     DURATION_END("scale_bilinear");
+     return res;
 }
 
 }  // namespace esp32_camera_utils

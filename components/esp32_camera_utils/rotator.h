@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include "esphome/core/log.h"
+#include "../tflite_micro_helper/debug_utils.h"
 
 namespace esphome {
 namespace esp32_camera_utils {
@@ -67,6 +69,17 @@ inline bool Rotator::perform_rotation(const uint8_t* input, uint8_t* output,
                      int src_w, int src_h, int channels, 
                      float angle_deg, int out_w, int out_h) {
     if (!input || !output) return false;
+    
+    // We only log non-trivial rotations to avoid spam on pass-through
+    bool is_trivial = (std::abs(angle_deg) < 0.1f || std::abs(angle_deg - 360.0f) < 0.1f);
+    if (!is_trivial) {
+        DURATION_START();
+    } else {
+        // Still define start to avoid compilation errors if macro expands freely
+        #ifdef DURATION_START
+        DURATION_START(); 
+        #endif
+    }
 
     // Normalize rotation
     float rot = angle_deg;
@@ -77,8 +90,12 @@ inline bool Rotator::perform_rotation(const uint8_t* input, uint8_t* output,
     if (rot < 0.1f || rot > 359.9f) {
         size_t size = src_w * src_h * channels;
         memcpy(output, input, size);
+        if (!is_trivial) DURATION_END("perform_rotation_0");
+        else DURATION_END("perform_rotation_0_trivial");
         return true;
     }
+
+    static const char* TAG = "rotator"; // Needed for ESP_LOGD inside macro if not globally defined here
 
     // 90 degrees
     if (std::abs(rot - 90.0f) < 0.1f) {
@@ -99,6 +116,7 @@ inline bool Rotator::perform_rotation(const uint8_t* input, uint8_t* output,
                 }
             }
         }
+        DURATION_END("perform_rotation_90");
         return true;
     }
 
@@ -121,6 +139,7 @@ inline bool Rotator::perform_rotation(const uint8_t* input, uint8_t* output,
                 }
             }
         }
+        DURATION_END("perform_rotation_180");
         return true;
     }
 
@@ -143,6 +162,7 @@ inline bool Rotator::perform_rotation(const uint8_t* input, uint8_t* output,
                 }
             }
         }
+        DURATION_END("perform_rotation_270");
         return true;
     }
 
@@ -184,6 +204,7 @@ inline bool Rotator::perform_rotation(const uint8_t* input, uint8_t* output,
             }
         }
     }
+    DURATION_END("perform_rotation_arbitrary");
     return true;
 }
 

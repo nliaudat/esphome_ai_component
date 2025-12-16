@@ -50,6 +50,14 @@ struct ImageProcessorConfig {
   bool normalize; // For float32 conversion
   std::string input_order{"RGB"}; // "RGB" or "BGR"
   
+  // Custom module settings
+  int scaler_width{0};
+  int scaler_height{0};
+  int cropper_width{0};
+  int cropper_height{0};
+  int cropper_offset_x{0};
+  int cropper_offset_y{0};
+  
   bool validate() const {
     return camera_width > 0 && camera_height > 0 && !pixel_format.empty() &&
            model_width > 0 && model_height > 0 && model_channels > 0;
@@ -261,8 +269,8 @@ public:
 
   using JpegBufferPtr = std::unique_ptr<uint8_t[], JpegBufferDeleter>;
 
-  // Helper to decode JPEG to RGB888
-  [[nodiscard]] static JpegBufferPtr decode_jpeg(const uint8_t* data, size_t len, int* width, int* height);
+  // Helper to decode JPEG to RGB888 or Gray
+  [[nodiscard]] static JpegBufferPtr decode_jpeg(const uint8_t* data, size_t len, int* width, int* height, jpeg_pixel_format_t output_format = JPEG_PIXEL_FORMAT_RGB888);
 
   // Allocates a buffer suitable for JPEG operations (16-byte aligned)
   [[nodiscard]] static JpegBufferPtr allocate_jpeg_buffer(size_t size);

@@ -1,6 +1,7 @@
 #include "esp32_camera_utils.h"
 #include "esphome/core/log.h"
 #include <esp_heap_caps.h>
+#include "../tflite_micro_helper/debug_utils.h"
 
 namespace esphome {
 namespace esp32_camera_utils {
@@ -38,6 +39,7 @@ void Esp32CameraUtils::dump_config() {
 }
 
 bool Esp32CameraUtils::set_camera_window(int offset_x, int offset_y, int width, int height) {
+    DURATION_START();
     set_camera_window_config(offset_x, offset_y, width, height);
     bool success = window_control_.set_window(camera_, offset_x, offset_y, width, height);
     
@@ -50,6 +52,7 @@ bool Esp32CameraUtils::set_camera_window(int offset_x, int offset_y, int width, 
         }
         ESP_LOGI(TAG, "Camera window set to %dx%d. ImageProcessor updated.", width, height);
     }
+    DURATION_END("set_camera_window");
     return success;
 }
 
@@ -76,6 +79,7 @@ void Esp32CameraUtils::set_camera_image_format(int width, int height, const std:
 }
 
 void Esp32CameraUtils::reinitialize_image_processor(const ImageProcessorConfig& config_template) {
+    DURATION_START();
     last_config_template_ = config_template;
     has_processor_config_ = true;
 
@@ -85,6 +89,18 @@ void Esp32CameraUtils::reinitialize_image_processor(const ImageProcessorConfig& 
         config.camera_width = camera_width_;
         config.camera_height = camera_height_;
         config.pixel_format = pixel_format_;
+        
+        // Apply modular configs if present
+        if (has_scaler_config_) {
+            config.scaler_width = scaler_width_;
+            config.scaler_height = scaler_height_;
+        }
+        if (has_cropper_config_) {
+            config.cropper_width = cropper_width_;
+            config.cropper_height = cropper_height_;
+            config.cropper_offset_x = cropper_offset_x_;
+            config.cropper_offset_y = cropper_offset_y_;
+        }
         
         image_processor_ = std::make_unique<ImageProcessor>(config);
         ESP_LOGI(TAG, "ImageProcessor initialized with dimensions: %dx%d, format: %s",
@@ -99,6 +115,7 @@ void Esp32CameraUtils::reinitialize_image_processor(const ImageProcessorConfig& 
     } else {
         ESP_LOGW(TAG, "Cannot initialize ImageProcessor: Invalid camera dimensions");
     }
+    DURATION_END("reinitialize_image_processor");
 }
 
 bool Esp32CameraUtils::test_camera_after_reset() {
@@ -120,6 +137,7 @@ void Esp32CameraUtils::basic_camera_recovery() {
 }
 
 bool Esp32CameraUtils::reset_window(int &width, int &height) {
+    DURATION_START();
     if (!camera_) return false;
     
     bool success = window_control_.reset_to_full_frame_with_dimensions(
@@ -144,6 +162,7 @@ bool Esp32CameraUtils::reset_window(int &width, int &height) {
         ESP_LOGE(TAG, "Failed to reset camera window");
     }
     
+    DURATION_END("reset_window");
     return success;
 }
 
