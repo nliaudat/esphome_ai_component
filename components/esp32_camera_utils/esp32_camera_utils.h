@@ -44,8 +44,8 @@ class Esp32CameraUtils : public Component {
   bool process_zone(std::shared_ptr<camera::CameraImage> frame, const CropZone& zone, 
                    uint8_t* output_buffer, size_t output_size);
   
-  // Image rotation configuration (0, 90, 180, 270 degrees clockwise)
-  void set_rotation(int rotation) { rotation_ = rotation; }
+  // Image rotation configuration (0, 90, 180, 270 degrees clockwise, or arbitrary)
+  void set_rotation(float rotation) { rotation_ = rotation; }
 
   // Manually trigger sensor updates
   void update_memory_sensors();
@@ -62,7 +62,7 @@ class Esp32CameraUtils : public Component {
   int width_{0};
   int height_{0};
   bool has_config_{false};
-  int rotation_{0};                          ///< Image rotation in degrees (0, 90, 180, 270)
+  float rotation_{0.0f};                          ///< Image rotation in degrees
   esp32_camera::ESP32Camera *camera_{nullptr};
   CameraWindowControl window_control_;
   

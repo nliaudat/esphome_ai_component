@@ -23,6 +23,7 @@
 #include <cmath>
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
+#include "esphome/core/application.h"
 
 namespace esphome {
 namespace esp32_camera_utils {
@@ -185,7 +186,7 @@ ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t* data, s
     return out_buf;
 }
 
-#ifdef DEV_ENABLE_ROTATION
+#ifdef USE_CAMERA_ROTATOR
 std::shared_ptr<camera::CameraImage> ImageProcessor::generate_rotated_preview(
     std::shared_ptr<camera::CameraImage> source, 
     float rotation, int width, int height) {
@@ -214,10 +215,8 @@ std::shared_ptr<camera::CameraImage> ImageProcessor::generate_rotated_preview(
     }
     
     // 3. Calculate new dimensions and allocate output
-    float rads = rotation * M_PI / 180.0f;
-    // Calculate new bounding box
-    int new_w = static_cast<int>(dec_w * std::abs(std::cos(rads)) + dec_h * std::abs(std::sin(rads)));
-    int new_h = static_cast<int>(dec_w * std::abs(std::sin(rads)) + dec_h * std::abs(std::cos(rads)));
+    int new_w, new_h;
+    Rotator::get_rotated_dimensions(dec_w, dec_h, rotation, new_w, new_h);
 
     size_t out_size = new_w * new_h * 3;
     UniqueBufferPtr out_buffer = allocate_image_buffer(out_size);
@@ -229,7 +228,7 @@ std::shared_ptr<camera::CameraImage> ImageProcessor::generate_rotated_preview(
 
     // 4. Rotate
     int final_w, final_h;
-    bool success = apply_software_rotation(rgb_data.get(), out_buffer->get(), 
+    bool success = Rotator::perform_rotation(rgb_data.get(), out_buffer->get(), 
                                          dec_w, dec_h, 3, 
                                          rotation, final_w, final_h);
     
@@ -333,9 +332,9 @@ ImageProcessor::ImageProcessor(const ImageProcessorConfig &config)
              config_.camera_width, config_.camera_height, config_.pixel_format.c_str());
   }
   
-  #ifdef DEV_ENABLE_ROTATION
+  #ifdef USE_CAMERA_ROTATOR
   if (config_.rotation != ROTATION_0) {
-    ESP_LOGI(TAG, "Image rotation enabled: %d degrees clockwise", config_.rotation);
+    ESP_LOGI(TAG, "Image rotation enabled: %d degrees clockwise", (int)config_.rotation);
   }
   #endif
 
@@ -357,21 +356,26 @@ ImageProcessor::ImageProcessor(const ImageProcessorConfig &config)
 
 ImageProcessor::UniqueBufferPtr ImageProcessor::allocate_image_buffer(size_t size) {
     uint8_t* ptr = nullptr;
-    bool is_spiram = false;
-    bool is_aligned = false;
+    bool spiram = false;
     
-    // Try SPIRAM first
-    ptr = (uint8_t*)heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (ptr) {
-        is_spiram = true;
-    } else {
-        // Fallback to internal RAM
-        ptr = new (std::nothrow) uint8_t[size];
+    // Ensure 64-byte alignment for cache performance
+    // Default to SPIRAM for large buffers, fallback to internal
+    
+    // Try SPIRAM first if size is significant
+    if (size > 1024) {
+        ptr = (uint8_t*)heap_caps_aligned_alloc(64, size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (ptr) spiram = true;
+    }
+    
+    // Fallback to internal/default RAM
+    if (!ptr) {
+        ptr = (uint8_t*)heap_caps_aligned_alloc(64, size, MALLOC_CAP_8BIT);
+        spiram = false;
     }
     
     if (!ptr) return nullptr;
     
-    return std::make_unique<TrackedBuffer>(ptr, is_spiram, is_aligned);
+    return UniqueBufferPtr(new TrackedBuffer(ptr, spiram, false));
 }
 
 ImageProcessor::JpegBufferPtr ImageProcessor::allocate_jpeg_buffer(size_t size) {
@@ -468,7 +472,7 @@ bool ImageProcessor::process_zone_to_buffer(
     int max_w = config_.camera_width;
     int max_h = config_.camera_height;
     
-    #ifdef DEV_ENABLE_ROTATION
+    #ifdef USE_CAMERA_ROTATOR
     if (config_.pixel_format == "JPEG" && config_.rotation != ROTATION_0) {
         // Use preview config dimensions if available, as they represent the target rotation
         // But better: swap max_w/max_h if 90/270 rotation is active
@@ -594,7 +598,7 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
     int proc_height = jpeg_height;
     UniqueBufferPtr rotated_buffer_storage;
 
-    #ifdef DEV_ENABLE_ROTATION
+    #ifdef USE_CAMERA_ROTATOR
     if (std::abs(config_.rotation) > 0.01f) {
         
         // Allocate buffer for rotated image with new bounding box
@@ -618,7 +622,7 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
         uint8_t* rotated_buf = rotated_buffer_storage->get();
 
         // Use helper to Rotate: Full -> Rotated
-        bool rot_success = apply_software_rotation(full_image_buf.get(), rotated_buf, 
+        bool rot_success = Rotator::perform_rotation(full_image_buf.get(), rotated_buf, 
                                                  jpeg_width, jpeg_height, 
                                                  3, config_.rotation, out_w, out_h); 
         
@@ -709,7 +713,7 @@ bool ImageProcessor::validate_zone(const CropZone &zone) const {
     int max_h = config_.camera_height;
     
     // Calculate effective max dimensions after rotation
-    #ifdef DEV_ENABLE_ROTATION
+    #ifdef USE_CAMERA_ROTATOR
     if (config_.pixel_format == "JPEG" && std::abs(config_.rotation) > 0.01f) {
         float rads = config_.rotation * M_PI / 180.0f;
         float abs_cos = std::abs(std::cos(rads));
@@ -776,7 +780,7 @@ bool ImageProcessor::process_raw_zone_to_buffer(
     uint8_t* target_buffer = output_buffer;
     UniqueBufferPtr temp_buffer_storage;
 
-    #ifdef DEV_ENABLE_ROTATION
+#ifdef USE_CAMERA_ROTATOR
     if (needs_rotation && (config_.rotation == ROTATION_90 || config_.rotation == ROTATION_270)) {
         std::swap(scale_width, scale_height);
     }
@@ -857,6 +861,9 @@ bool ImageProcessor::scale_rgb888_to_float32(
     const uint8_t* src, int src_w, int src_h,
     uint8_t* dst, int dst_w, int dst_h, int channels, bool normalize) {
     
+#ifdef USE_CAMERA_SCALER
+    return Scaler::scale_rgb888_to_float32(src, src_w, src_h, dst, dst_w, dst_h, channels, normalize);
+#else
     float* dst_float = reinterpret_cast<float*>(dst);
     float scale_x = (float)src_w / dst_w;
     float scale_y = (float)src_h / dst_h;
@@ -881,12 +888,16 @@ bool ImageProcessor::scale_rgb888_to_float32(
         }
     }
     return true;
+#endif
 }
 
 bool ImageProcessor::scale_rgb888_to_uint8(
     const uint8_t* src, int src_w, int src_h,
     uint8_t* dst, int dst_w, int dst_h, int channels) {
     
+#ifdef USE_CAMERA_SCALER
+    return Scaler::scale_rgb888_to_uint8(src, src_w, src_h, dst, dst_w, dst_h, channels);
+#else
     float scale_x = (float)src_w / dst_w;
     float scale_y = (float)src_h / dst_h;
     
@@ -908,6 +919,7 @@ bool ImageProcessor::scale_rgb888_to_uint8(
         }
     }
     return true;
+#endif
 }
 
 // Stub implementations for other formats to save space, as they follow similar patterns
@@ -1154,6 +1166,10 @@ bool ImageProcessor::apply_software_rotation(
     int width, int height, int bytes_per_pixel,
     float rotation_deg, int& out_w, int& out_h) {
     
+#ifdef USE_CAMERA_ROTATOR
+    // Delegate to modular Rotator
+    return Rotator::rotate(input, output, width, height, bytes_per_pixel, rotation_deg, out_w, out_h);
+#else
     // Normalize rotation to 0-360 positive
     float rot = rotation_deg;
     while (rot < 0) rot += 360.0f;
@@ -1261,6 +1277,7 @@ bool ImageProcessor::apply_software_rotation(
     }
 
     return true;
+#endif
 }
 #endif
     

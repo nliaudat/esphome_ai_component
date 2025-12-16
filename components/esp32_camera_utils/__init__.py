@@ -38,8 +38,12 @@ CONFIG_SCHEMA = cv.Schema({
     }),
     cv.Optional(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera),
     cv.Optional("debug", default=False): cv.boolean,
-    cv.Optional(CONF_ROTATION, default="0"): cv.one_of("0", "90", "180", "270"),
+    # Allow arbitrary rotation (float), but also string for backward compat "90"
+    cv.Optional(CONF_ROTATION, default=0.0): cv.float_,
     cv.Optional("enable_rotation", default=False): cv.boolean,
+    cv.Optional("enable_scaler", default=True): cv.boolean,
+    cv.Optional("enable_cropper", default=True): cv.boolean,
+    cv.Optional("enable_drawing", default=True): cv.boolean,
     cv.Optional(CONF_DEBUG_MEMORY, default=False): cv.boolean,
     cv.Optional("camera_buffer_size_sensor"): cv.use_id(sensor.Sensor),
     cv.Optional("camera_free_psram_sensor"): cv.use_id(sensor.Sensor),
@@ -52,6 +56,7 @@ async def to_code(config):
     )
 
     cg.add_build_flag("-DUSE_ESP32_CAMERA_CONV")
+
     
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
@@ -64,12 +69,21 @@ async def to_code(config):
         cam = await cg.get_variable(config[CONF_CAMERA_ID])
         cg.add(var.set_camera(cam))
     
-    # Set image rotation (convert string to int)
-    rotation_value = ROTATION_OPTIONS.get(config[CONF_ROTATION], 0)
-    cg.add(var.set_rotation(rotation_value))
+    # Set image rotation
+    cg.add(var.set_rotation(config[CONF_ROTATION]))
     
-    if config.get("enable_rotation", False):
-        cg.add_define("DEV_ENABLE_ROTATION")
+    # Enable modular features
+    if config.get("enable_rotation", False) or config[CONF_ROTATION] != 0:
+         cg.add_define("USE_CAMERA_ROTATOR")
+
+    if config.get("enable_scaler", True):
+        cg.add_define("USE_CAMERA_SCALER")
+        
+    if config.get("enable_cropper", True):
+        cg.add_define("USE_CAMERA_CROPPER")
+        
+    if config.get("enable_drawing", True):
+        cg.add_define("USE_CAMERA_DRAWING")
 
     if config.get("debug", False):
         cg.add_define("DEBUG_ESP32_CAMERA_UTILS")
