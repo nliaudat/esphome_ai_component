@@ -1338,7 +1338,7 @@ bool ImageProcessor::apply_software_rotation(
     
 #ifdef USE_CAMERA_ROTATOR
     // Delegate to modular Rotator
-    return Rotator::rotate(input, output, width, height, bytes_per_pixel, rotation_deg, out_w, out_h);
+    return Rotator::perform_rotation(input, output, width, height, bytes_per_pixel, rotation_deg, out_w, out_h);
 #else
     // Normalize rotation to 0-360 positive
     float rot = rotation_deg;
