@@ -1,6 +1,7 @@
 #pragma once
 
 #include "esphome/core/component.h"
+#include "esphome/components/camera/camera.h"
 #ifndef USE_HOST
 #include "esphome/components/esp32_camera/esp32_camera.h"
 #endif
@@ -79,7 +80,7 @@ namespace esphome { namespace esp32_camera_utils {
 namespace esphome {
 namespace meter_reader_tflite {
 
-class MeterReaderTFLite : public PollingComponent, public camera::CameraImageReader {
+class MeterReaderTFLite : public PollingComponent, public camera::CameraImageReader, public camera::CameraListener {
  public:
   void setup() override;
   void update() override;
@@ -88,6 +89,9 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   ~MeterReaderTFLite() override;
 
   float get_setup_priority() const override { return setup_priority::LATE; }
+
+  // CameraListener
+  void on_camera_image(const std::shared_ptr<camera::CameraImage> &image) override;
 
   // CameraImageReader
   void set_image(std::shared_ptr<camera::CameraImage> image) override {};
@@ -110,12 +114,16 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   }
   
   void set_camera_image_format(int width, int height, const std::string &pixel_format); // -> CameraCoord & TFLite
-  void set_camera(esp32_camera::ESP32Camera *camera); // -> CameraCoord
+  void set_camera(camera::Camera *camera); // -> CameraCoord
+  
+  sensor::Sensor *get_value_sensor() const { return value_sensor_; }
+  sensor::Sensor *get_confidence_sensor() const { return confidence_sensor_; }
   
   void set_model_config(const std::string &model_type); // -> TFLite
   void set_rotation(float rotation) { rotation_ = rotation; } // Storage, passed to TFLite late
   
   void set_generate_preview(bool generate) { generate_preview_ = generate; }
+  void set_show_crop_areas(bool show) { show_crop_areas_ = show; }
 #ifdef DEV_ENABLE_ROTATION
   void take_preview_image();
   void capture_preview();
@@ -221,6 +229,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   float high_confidence_threshold_{0.90f};
   float rotation_{0.0f};
   bool generate_preview_{false};
+  bool show_crop_areas_{true};
   bool debug_memory_enabled_{false}; // Runtime flag
   bool window_active_{false};
 

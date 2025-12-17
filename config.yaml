@@ -28,7 +28,7 @@ substitutions:
   esphome_min_version: "2025.12.0"
 
   # Board Selection (Mutually Exclusive via substitutions)
-  ############## not ready yet
+  #### not ready yet
   # Set ONE to "true" and others to "false"
   # board_AI_On_The_Edge_Cam_Esp32_S3: "true"
   # board_freenove_esp32_s3_n8r8: "false"
@@ -158,7 +158,7 @@ meter_reader_tflite:
 
 
 packages:
-  # Board Configuration (Uncomment ONE)
+  # Board Configuration (Mutually Exclusive)
   - !include board_AI-On-The-Edge-Cam_Esp32-S3.yaml
   # - !include board_freenove_esp32-s3-n8r8.yaml
   # - !include board_Seeed_Studio_XIAO_ESP32-S3_sense.yaml

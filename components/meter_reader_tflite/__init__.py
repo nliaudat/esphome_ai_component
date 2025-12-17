@@ -117,6 +117,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("main_logs"): cv.use_id(text_sensor.TextSensor),
     cv.Optional(CONF_GENERATE_PREVIEW, default=False): cv.boolean,
     cv.Optional("enable_rotation", default=False): cv.boolean,
+    cv.Optional("show_crop_areas", default=True): cv.boolean,
     # cv.Optional(CONF_PREVIEW): camera_component.CAMERA_SCHEMA.extend({
     #     cv.GenerateID(): cv.declare_id(MeterPreviewCamera),
     # }),
@@ -187,6 +188,8 @@ async def to_code(config):
     # The actual size will be determined from model_config.h in the C++ code
     if CONF_TENSOR_ARENA_SIZE in config:
         cg.add(var.set_tensor_arena_size(config[CONF_TENSOR_ARENA_SIZE]))
+    if "show_crop_areas" in config:
+        cg.add(var.set_show_crop_areas(config["show_crop_areas"]))
     # else:
         # # Default will be handled in the C++ code based on model type from model_config.h
         # cg.add(var.set_tensor_arena_size(512 * 1024))  # 512KB default fallback

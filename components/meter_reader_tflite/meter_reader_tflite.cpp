@@ -244,17 +244,21 @@ void MeterReaderTFLite::setup() {
     // Let's check the global pixel format config if feasible, or just force it if the model is V4 GRAY.
 }
 
-void MeterReaderTFLite::set_camera(esp32_camera::ESP32Camera *camera) {
-    camera_coord_.set_camera(camera);
-    // Register callback
-    camera->add_image_callback([this](std::shared_ptr<camera::CameraImage> img) {
-        if (frame_requested_.load() && !processing_frame_.load()) {
-            pending_frame_ = img;
-            frame_available_.store(true);
-            frame_requested_.store(false);
-        }
-    });
+void MeterReaderTFLite::set_camera(camera::Camera *camera) { // -> CameraCoord callback
+    camera_coord_.set_camera((esp32_camera::ESP32Camera*)camera);
+    // Register listener
+    ESP_LOGD(TAG, "Registering CameraListener for MeterReaderTFLite");
+    camera->add_listener(this); 
 }
+
+void MeterReaderTFLite::on_camera_image(const std::shared_ptr<camera::CameraImage> &image) {
+    if (frame_requested_.load() && !processing_frame_.load()) {
+        pending_frame_ = image;
+        frame_available_.store(true);
+        frame_requested_.store(false);
+    }
+}
+
 
 void MeterReaderTFLite::update() {
     ESP_LOGD(TAG, "Update triggered (Interval cycle)");
@@ -416,7 +420,36 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
              frame, rotation_, camera_coord_.get_width(), camera_coord_.get_height());
              
          if (preview) {
-             update_preview_image(std::static_pointer_cast<RotatedPreviewImage>(preview));
+             // Cast to RotatedPreviewImage to access width/height
+             auto rotated_preview = std::static_pointer_cast<RotatedPreviewImage>(preview);
+
+             // Draw Crop Zones if enabled
+             if (show_crop_areas_) {
+                 auto zones = crop_zone_handler_.get_zones();
+                 uint8_t* buf = preview->get_data_buffer();
+                 int w = rotated_preview->get_width();
+                 int h = rotated_preview->get_height();
+                 // Assuming Preview is RGB565 or RGB888. DrawingUtils handles both?
+                 // DrawingUtils signatures take 'channels'.
+                 // We need to know the format of the preview.
+                 // ImageProcessor::generate_rotated_preview usually returns RGB565 for display.
+                 // Let's assume RGB565 (2 bytes) for now as that's standard for ESPHome Camera.
+                 
+                 // However, we should check pixel format if possible, but CameraImage usually abstracts it.
+                 // Safe bet: RGB565 is 2 channels. 
+                 
+                 // Color: Light Green (0x9FD3 or similar). 0x07E0 is pure green.
+                 uint16_t color = 0x07E0; 
+                 
+                 for (const auto& z : zones) {
+                     // Zones are in the same coordinate space as the preview (rotated)
+                     esphome::esp32_camera_utils::DrawingUtils::draw_rectangle(
+                         buf, z.x1, z.y1, z.x2 - z.x1, z.y2 - z.y1,
+                         w, h, 2, color
+                     );
+                 }
+             }
+             update_preview_image(preview);
          }
          
          if (request_preview_) {
