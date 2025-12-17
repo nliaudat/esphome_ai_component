@@ -33,7 +33,12 @@ api:
     
     - service: reset_camera_window
       then:
+        - lambda: 'id(meter_reader).reset_camera_window();'
+    
+    - service: trigger_inference
+      then:
         - lambda: 'id(meter_reader).force_flash_inference();'
+
     - service: start_flash_calibration
       then:
         - lambda: 'id(meter_reader).start_flash_calibration();'
