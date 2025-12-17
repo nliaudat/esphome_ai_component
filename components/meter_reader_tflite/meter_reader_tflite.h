@@ -295,6 +295,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
       std::vector<float> readings;
       std::vector<float> probabilities; // Confidence
       uint32_t inference_time;
+      uint32_t total_start_time;
       bool success;
   };
 
