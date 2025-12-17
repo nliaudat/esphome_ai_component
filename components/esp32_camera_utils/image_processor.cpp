@@ -416,40 +416,176 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
     return results;
   }
 
-  if (zones.empty()) {
-    int w = config_.camera_width;
-    int h = config_.camera_height;
-    
-    // Attempt to get actual dimensions if JPEG to avoid "Out of Bounds" on windowed images
-    if (config_.pixel_format == "JPEG") {
+  // Optimization: Decode and Rotate ONCE if multiple zones exist
+  // Only applies if format is JPEG (ProcessRaw is already efficient-ish, though strict raw doesn't allocate intermediate usually)
+  
+  std::vector<CropZone> effective_zones = zones;
+  if (effective_zones.empty()) {
+      // Create a full-frame zone if none provided
+      int w = config_.camera_width;
+      int h = config_.camera_height;
+      if (config_.pixel_format == "JPEG") {
         get_jpeg_dimensions(image->get_data_buffer(), image->get_data_length(), w, h);
-    }
-
-    CropZone full_zone{0, 0, w, h};
-    ProcessResult result = process_zone(image, full_zone);
-    if (result.data) {
-      results.push_back(std::move(result));
-    } else {
-      stats_.failed_frames++;
-    }
-  } else {
-    bool all_zones_successful = true;
-    
-    for (size_t i = 0; i < zones.size(); i++) {
-      ProcessResult result = process_zone(image, zones[i]);
-      if (result.data) {
-        #ifdef DEBUG_ESP32_CAMERA_UTILS
-        DEBUG_ZONE_INFO(zones[i], (zones[i].x2 - zones[i].x1), (zones[i].y2 - zones[i].y1), config_.model_width, config_.model_height);
-        #endif
-        results.push_back(std::move(result));
-      } else {
-        all_zones_successful = false;
       }
-    }
-    
-    if (!all_zones_successful) {
+      effective_zones.push_back({0, 0, w, h});
+  }
+
+  // Intermediate buffer state
+  JpegBufferPtr master_decoded_buffer; // Holds decoded JPEG or rotated raw
+  int master_width = config_.camera_width;
+  int master_height = config_.camera_height;
+  int master_channels = 3; 
+
+  bool use_master_buffer = false;
+  
+  // Decide if we should decode once
+  // Always true for JPEG to avoid N decodes
+  if (config_.pixel_format == "JPEG") {
+      use_master_buffer = true;
+      
+      const uint8_t *jpeg_data = image->get_data_buffer();
+      size_t jpeg_size = image->get_data_length();
+
+      // 1. Determine format
+      jpeg_pixel_format_t decode_format = JPEG_PIXEL_FORMAT_RGB888;
+      int decode_channels = 3;
+      if (config_.pixel_format == "GRAYSCALE") {
+          decode_format = JPEG_PIXEL_FORMAT_GRAY;
+          decode_channels = 1;
+      }
+      
+      // 2. Decode
+      int dec_w = 0, dec_h = 0;
+      master_decoded_buffer = decode_jpeg(jpeg_data, jpeg_size, &dec_w, &dec_h, decode_format);
+      if (!master_decoded_buffer) {
+          stats_.jpeg_decoding_errors++;
+          stats_.failed_frames++;
+          return results;
+      }
+      master_width = dec_w;
+      master_height = dec_h;
+      master_channels = decode_channels;
+
+      // 3. Rotate Master if needed
+      #ifdef USE_CAMERA_ROTATOR
+      if (std::abs(config_.rotation) > 0.01f) {
+           float rads = config_.rotation * M_PI / 180.0f;
+           float abs_cos = std::abs(std::cos(rads));
+           float abs_sin = std::abs(std::sin(rads));
+           int rot_w = static_cast<int>(master_width * abs_cos + master_height * abs_sin);
+           int rot_h = static_cast<int>(master_width * abs_sin + master_height * abs_cos);
+           
+           size_t rot_size = rot_w * rot_h * master_channels;
+           
+           // We use jpeg_calloc_align for consistency since master_decoded_buffer is JpegBufferPtr (uptr with free_align)
+           // Actually decode_jpeg returns a smart pointer compatible with jpeg_free_align.
+           uint8_t* raw_rot = (uint8_t*)jpeg_calloc_align(rot_size, 16);
+           if (raw_rot) {
+               bool rot_success = Rotator::perform_rotation(
+                   master_decoded_buffer.get(), raw_rot,
+                   master_width, master_height, master_channels,
+                   config_.rotation, rot_w, rot_h
+               );
+               
+               if (rot_success) {
+                   // Replace master buffer with rotated version
+                   master_decoded_buffer.reset(raw_rot);
+                   master_width = rot_w;
+                   master_height = rot_h;
+               } else {
+                   // Rotation failed, free raw_rot (managed by uptr if we assigned it, but we didn't yet)
+                   jpeg_free_align(raw_rot);
+                   ESP_LOGE(TAG, "Master rotation failed");
+                   // Proceed with unrotated? Or fail? Fail safe.
+                   return results;
+               }
+           } else {
+               ESP_LOGE(TAG, "Failed to allocate master rotation buffer");
+               return results;
+           }
+      }
+      #endif
+  }
+
+  // Process Zones from Master Buffer (or Source if not JPEG/Mastered)
+  bool all_zones_successful = true;
+  for (const auto& zone : effective_zones) {
+      ProcessResult result;
+      bool crop_success = false;
+      
+      size_t required_size = get_required_buffer_size();
+      if (required_size == 0) continue;
+      
+      UniqueBufferPtr out_buf = allocate_image_buffer(required_size);
+      if (!out_buf) {
+          all_zones_successful = false;
+          continue;
+      }
+
+      if (use_master_buffer) {
+          // Validate effective zone against master dimensions
+          if (zone.x1 >= 0 && zone.y1 >= 0 && zone.x2 <= master_width && zone.y2 <= master_height) {
+              // Extract from RAW master buffer
+              // We need a helper that takes raw buffer + dims instead of CameraImage
+              // We can adapt 'process_raw_zone_to_buffer' logic here inline or extract method
+              
+              int stride = master_width;
+              int crop_w = zone.x2 - zone.x1;
+              int crop_h = zone.y2 - zone.y1;
+              
+              if (master_channels == 1) {
+                  // Grayscale
+                   if (config_.input_type == kInputTypeFloat32) {
+                        crop_success = process_grayscale_crop_and_scale_to_float32(
+                            master_decoded_buffer.get(), zone, crop_w, crop_h,
+                            out_buf->get(), config_.model_width, config_.model_height,
+                            config_.model_channels, config_.normalize, stride);
+                   } else {
+                        crop_success = process_grayscale_crop_and_scale_to_uint8(
+                            master_decoded_buffer.get(), zone, crop_w, crop_h,
+                            out_buf->get(), config_.model_width, config_.model_height,
+                            config_.model_channels, stride);
+                   }
+              } else {
+                  // RGB
+                   if (config_.input_type == kInputTypeFloat32) {
+                        crop_success = process_rgb888_crop_and_scale_to_float32(
+                            master_decoded_buffer.get(), zone, crop_w, crop_h,
+                            out_buf->get(), config_.model_width, config_.model_height,
+                            config_.model_channels, config_.normalize, stride);
+                   } else {
+                        crop_success = process_rgb888_crop_and_scale_to_uint8(
+                            master_decoded_buffer.get(), zone, crop_w, crop_h,
+                            out_buf->get(), config_.model_width, config_.model_height,
+                            config_.model_channels, stride);
+                   }
+              }
+          } else {
+              ESP_LOGE(TAG, "Zone bounds error vs Master: [%d,%d->%d,%d] in %dx%d", 
+                  zone.x1, zone.y1, zone.x2, zone.y2, master_width, master_height);
+          }
+      } else {
+          // Legacy/Raw CameraImage path
+          if (process_raw_zone_to_buffer(image, zone, out_buf->get(), required_size)) {
+              crop_success = true;
+          }
+      }
+      
+      if (crop_success) {
+          result.data = std::move(out_buf);
+          result.size = required_size;
+          results.push_back(std::move(result));
+          
+          #ifdef DEBUG_ESP32_CAMERA_UTILS
+          DEBUG_ZONE_INFO(zone, (zone.x2 - zone.x1), (zone.y2 - zone.y1), config_.model_width, config_.model_height);
+          #endif
+      } else {
+          all_zones_successful = false;
+      }
+  }
+  
+  if (!all_zones_successful) {
       stats_.failed_frames++;
-    }
   }
   
   uint32_t processing_time = millis() - start_time;
