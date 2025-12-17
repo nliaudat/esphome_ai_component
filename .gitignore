@@ -19,3 +19,4 @@ secrets.yaml
 
 .github/workflows/ci.yml
 .clang-format
+test.yaml
