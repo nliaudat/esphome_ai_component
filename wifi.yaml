@@ -20,7 +20,7 @@ wifi:
     ssid: "${name} Flbck"
     password: !secret fallback_hotspot_password
     
-captive_portal:
+# captive_portal:
 
 sensor:
   - platform: wifi_signal

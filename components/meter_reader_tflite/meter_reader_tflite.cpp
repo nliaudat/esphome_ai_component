@@ -39,6 +39,10 @@ static InferenceJob* allocate_inference_job() {
 }
 
 static void free_inference_job(InferenceJob* job) {
+  // Release resources immediately to free up camera framebuffer
+  job->frame.reset(); 
+  job->crops.clear();
+
   for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
     if (job == &inference_job_pool[i]) {
       inference_job_used[i] = false;

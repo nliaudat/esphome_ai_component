@@ -39,8 +39,8 @@ substitutions:
   meter_unit: L # Unit of measurement for the meter (e.g. m³, kWh, L) (https://developers.home-assistant.io/docs/core/entity/sensor/https://developers.home-assistant.io/docs/core/entity/sensor/)
   
   # camera
-  # camera_pixel_format: JPEG # (cropping implementation is faster with RGB888 format) | Displays: RGB565, RGB888 | Cameras: YUV422, YUV420, RAW | Efficiency: Grayscale, YUV420, JPEG
-  camera_pixel_format: GRAYSCALE 
+  camera_pixel_format: JPEG # (cropping implementation is faster with RGB888 format) | Displays: RGB565, RGB888 | Cameras: YUV422, YUV420, RAW | Efficiency: Grayscale, YUV420, JPEG
+  # camera_pixel_format: GRAYSCALE 
   camera_resolution: 640x480 #800x600 #640x480 #https://esphome.io/components/esp32_camera.html
   # camera_jpeg_quality: 10 # From 10 (best) to 63 (worst). | Must be 0 if non JPEG
   camera_jpeg_quality: 10
@@ -86,8 +86,8 @@ esp32_camera_utils:
     width: 448 # multiple of 4 and 4:3 proportions with height for best quality
     height: 88 #  multiple of 4 and 4:3 proportions with width for best quality
 
-  enable_rotation: true
-  rotation: 15 # 0, 90, 180, 270 (special case built-in "accelarated" for 90, 180, 270 )
+  # enable_rotation: true
+  # rotation: 15 # 0, 90, 180, 270 (special case built-in "accelarated" for 90, 180, 270 )
 
   
   # enable_scaler: true
@@ -118,8 +118,8 @@ flash_light_controller:
 meter_reader_tflite:
   id: meter_reader
   camera_id: ${id_prefix}espcam
-  # model: "digit_recognizer_v4_10cls_RGB.tflite"
-  model: "digit_recognizer_v4_10cls_GRAY.tflite"
+  model: "digit_recognizer_v4_10cls_RGB.tflite"
+  # model: "digit_recognizer_v4_10cls_GRAY.tflite"
 
   update_interval: 60s
   debug: true
