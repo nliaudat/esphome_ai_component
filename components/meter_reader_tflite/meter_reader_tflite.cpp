@@ -81,11 +81,11 @@ static void free_inference_result(InferenceResult* res) {
 static constexpr uint32_t MODEL_LOAD_DELAY_MS = 10000;
 
 #ifdef DEBUG_METER_READER_TFLITE
-#define DURATION_START(name) uint32_t start_time = millis();
-#define DURATION_END(name) ESP_LOGD(TAG, "%s took %u ms", name, millis() - start_time)
+#define METER_DURATION_START(name) uint32_t start_time = millis();
+#define METER_DURATION_END(name) ESP_LOGD(TAG, "%s took %u ms", name, millis() - start_time)
 #else
-#define DURATION_START(name)
-#define DURATION_END(name)
+#define METER_DURATION_START(name)
+#define METER_DURATION_END(name)
 #endif
 
 void MeterReaderTFLite::setup() {
@@ -401,7 +401,7 @@ void MeterReaderTFLite::process_available_frame() {
 void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> frame) {
     if (pause_processing_) return;
 
-    DURATION_START("Total Processing");
+    METER_DURATION_START("Total Processing");
 
     if (!tflite_coord_.is_model_loaded()) {
         ESP_LOGW(TAG, "Skipping frame - Model not loaded yet");
@@ -654,7 +654,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
         }
     }
     
-    DURATION_END("Total Processing");
+    METER_DURATION_END("Total Processing");
 }
 
 void MeterReaderTFLite::set_crop_zones(const std::string &zones_json) {
