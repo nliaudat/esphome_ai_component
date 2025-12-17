@@ -196,7 +196,7 @@ int ValueValidator::apply_smart_validation(int new_reading, float confidence, fl
   // High confidence override: If confidence is very high (> 90%) AND greater than the previous confidence,
   // trust the reading even if it deviates significantly from history.
   // This solves getting stuck with a bad low-confidence reading in history.
-  if (confidence > 0.90f && confidence > last_confidence) {
+  if (confidence > config_.high_confidence_threshold && confidence > last_confidence) {
       bool is_plausible = is_digit_plausible(new_reading, last_valid_reading_);
       
       if (!is_plausible) {

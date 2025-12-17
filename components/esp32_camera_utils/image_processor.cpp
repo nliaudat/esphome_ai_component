@@ -23,6 +23,7 @@
 #include <cmath>
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
+#include "esphome/core/application.h"
 
 namespace esphome {
 namespace esp32_camera_utils {
@@ -132,7 +133,7 @@ bool ImageProcessor::get_jpeg_dimensions(const uint8_t *data, size_t len, int &w
 }
 
 
-ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t* data, size_t len, int* width, int* height) {
+ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t* data, size_t len, int* width, int* height, jpeg_pixel_format_t output_format) {
     if (!data || len == 0) return nullptr;
 
     int w, h;
@@ -143,7 +144,7 @@ ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t* data, s
     if (height) *height = h;
 
     jpeg_dec_config_t decode_config = DEFAULT_JPEG_DEC_CONFIG();
-    decode_config.output_type = JPEG_PIXEL_FORMAT_RGB888;
+    decode_config.output_type = output_format;
     decode_config.scale.width = w;
     decode_config.scale.height = h;
     decode_config.clipper.width = w;
@@ -158,7 +159,14 @@ ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t* data, s
     // RAII for decoder
     std::unique_ptr<struct jpeg_dec_s, JpegDecoderDeleter> decoder(decoder_handle);
 
-    size_t out_size = w * h * 3;
+    int channels = 3;
+    if (output_format == JPEG_PIXEL_FORMAT_GRAY) {
+        channels = 1;
+    } else if (output_format == JPEG_PIXEL_FORMAT_RGB565_LE || output_format == JPEG_PIXEL_FORMAT_RGB565_BE) {
+        channels = 2; // Actually 2 bytes, but distinct format
+    }
+    
+    size_t out_size = w * h * channels;
     uint8_t* raw_buf = (uint8_t*)jpeg_calloc_align(out_size, 16);
     if (!raw_buf) {
         return nullptr;
@@ -185,7 +193,7 @@ ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t* data, s
     return out_buf;
 }
 
-#ifdef DEV_ENABLE_ROTATION
+#ifdef USE_CAMERA_ROTATOR
 std::shared_ptr<camera::CameraImage> ImageProcessor::generate_rotated_preview(
     std::shared_ptr<camera::CameraImage> source, 
     float rotation, int width, int height) {
@@ -206,7 +214,7 @@ std::shared_ptr<camera::CameraImage> ImageProcessor::generate_rotated_preview(
 
     // 2. Decode JPEG to RGB888
     int dec_w = 0, dec_h = 0;
-    JpegBufferPtr rgb_data = decode_jpeg(data, len, &dec_w, &dec_h);
+    JpegBufferPtr rgb_data = decode_jpeg(data, len, &dec_w, &dec_h, JPEG_PIXEL_FORMAT_RGB888);
     if (!rgb_data) {
         // Fallback: If not JPEG or decode failed, we can't process
         ESP_LOGW(TAG, "Preview: Failed to decode input image (requires JPEG)");
@@ -214,10 +222,8 @@ std::shared_ptr<camera::CameraImage> ImageProcessor::generate_rotated_preview(
     }
     
     // 3. Calculate new dimensions and allocate output
-    float rads = rotation * M_PI / 180.0f;
-    // Calculate new bounding box
-    int new_w = static_cast<int>(dec_w * std::abs(std::cos(rads)) + dec_h * std::abs(std::sin(rads)));
-    int new_h = static_cast<int>(dec_w * std::abs(std::sin(rads)) + dec_h * std::abs(std::cos(rads)));
+    int new_w, new_h;
+    Rotator::get_rotated_dimensions(dec_w, dec_h, rotation, new_w, new_h);
 
     size_t out_size = new_w * new_h * 3;
     UniqueBufferPtr out_buffer = allocate_image_buffer(out_size);
@@ -229,7 +235,7 @@ std::shared_ptr<camera::CameraImage> ImageProcessor::generate_rotated_preview(
 
     // 4. Rotate
     int final_w, final_h;
-    bool success = apply_software_rotation(rgb_data.get(), out_buffer->get(), 
+    bool success = Rotator::perform_rotation(rgb_data.get(), out_buffer->get(), 
                                          dec_w, dec_h, 3, 
                                          rotation, final_w, final_h);
     
@@ -333,9 +339,9 @@ ImageProcessor::ImageProcessor(const ImageProcessorConfig &config)
              config_.camera_width, config_.camera_height, config_.pixel_format.c_str());
   }
   
-  #ifdef DEV_ENABLE_ROTATION
+  #ifdef USE_CAMERA_ROTATOR
   if (config_.rotation != ROTATION_0) {
-    ESP_LOGI(TAG, "Image rotation enabled: %d degrees clockwise", config_.rotation);
+    ESP_LOGI(TAG, "Image rotation enabled: %d degrees clockwise", (int)config_.rotation);
   }
   #endif
 
@@ -357,21 +363,26 @@ ImageProcessor::ImageProcessor(const ImageProcessorConfig &config)
 
 ImageProcessor::UniqueBufferPtr ImageProcessor::allocate_image_buffer(size_t size) {
     uint8_t* ptr = nullptr;
-    bool is_spiram = false;
-    bool is_aligned = false;
+    bool spiram = false;
     
-    // Try SPIRAM first
-    ptr = (uint8_t*)heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (ptr) {
-        is_spiram = true;
-    } else {
-        // Fallback to internal RAM
-        ptr = new (std::nothrow) uint8_t[size];
+    // Ensure 64-byte alignment for cache performance
+    // Default to SPIRAM for large buffers, fallback to internal
+    
+    // Try SPIRAM first if size is significant
+    if (size > 1024) {
+        ptr = (uint8_t*)heap_caps_aligned_alloc(64, size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (ptr) spiram = true;
+    }
+    
+    // Fallback to internal/default RAM
+    if (!ptr) {
+        ptr = (uint8_t*)heap_caps_aligned_alloc(64, size, MALLOC_CAP_8BIT);
+        spiram = false;
     }
     
     if (!ptr) return nullptr;
     
-    return std::make_unique<TrackedBuffer>(ptr, is_spiram, is_aligned);
+    return UniqueBufferPtr(new TrackedBuffer(ptr, spiram, false));
 }
 
 ImageProcessor::JpegBufferPtr ImageProcessor::allocate_jpeg_buffer(size_t size) {
@@ -405,40 +416,176 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
     return results;
   }
 
-  if (zones.empty()) {
-    int w = config_.camera_width;
-    int h = config_.camera_height;
-    
-    // Attempt to get actual dimensions if JPEG to avoid "Out of Bounds" on windowed images
-    if (config_.pixel_format == "JPEG") {
+  // Optimization: Decode and Rotate ONCE if multiple zones exist
+  // Only applies if format is JPEG (ProcessRaw is already efficient-ish, though strict raw doesn't allocate intermediate usually)
+  
+  std::vector<CropZone> effective_zones = zones;
+  if (effective_zones.empty()) {
+      // Create a full-frame zone if none provided
+      int w = config_.camera_width;
+      int h = config_.camera_height;
+      if (config_.pixel_format == "JPEG") {
         get_jpeg_dimensions(image->get_data_buffer(), image->get_data_length(), w, h);
-    }
-
-    CropZone full_zone{0, 0, w, h};
-    ProcessResult result = process_zone(image, full_zone);
-    if (result.data) {
-      results.push_back(std::move(result));
-    } else {
-      stats_.failed_frames++;
-    }
-  } else {
-    bool all_zones_successful = true;
-    
-    for (size_t i = 0; i < zones.size(); i++) {
-      ProcessResult result = process_zone(image, zones[i]);
-      if (result.data) {
-        #ifdef DEBUG_ESP32_CAMERA_UTILS
-        DEBUG_ZONE_INFO(zones[i], (zones[i].x2 - zones[i].x1), (zones[i].y2 - zones[i].y1), config_.model_width, config_.model_height);
-        #endif
-        results.push_back(std::move(result));
-      } else {
-        all_zones_successful = false;
       }
-    }
-    
-    if (!all_zones_successful) {
+      effective_zones.push_back({0, 0, w, h});
+  }
+
+  // Intermediate buffer state
+  JpegBufferPtr master_decoded_buffer; // Holds decoded JPEG or rotated raw
+  int master_width = config_.camera_width;
+  int master_height = config_.camera_height;
+  int master_channels = 3; 
+
+  bool use_master_buffer = false;
+  
+  // Decide if we should decode once
+  // Always true for JPEG to avoid N decodes
+  if (config_.pixel_format == "JPEG") {
+      use_master_buffer = true;
+      
+      const uint8_t *jpeg_data = image->get_data_buffer();
+      size_t jpeg_size = image->get_data_length();
+
+      // 1. Determine format
+      jpeg_pixel_format_t decode_format = JPEG_PIXEL_FORMAT_RGB888;
+      int decode_channels = 3;
+      if (config_.pixel_format == "GRAYSCALE") {
+          decode_format = JPEG_PIXEL_FORMAT_GRAY;
+          decode_channels = 1;
+      }
+      
+      // 2. Decode
+      int dec_w = 0, dec_h = 0;
+      master_decoded_buffer = decode_jpeg(jpeg_data, jpeg_size, &dec_w, &dec_h, decode_format);
+      if (!master_decoded_buffer) {
+          stats_.jpeg_decoding_errors++;
+          stats_.failed_frames++;
+          return results;
+      }
+      master_width = dec_w;
+      master_height = dec_h;
+      master_channels = decode_channels;
+
+      // 3. Rotate Master if needed
+      #ifdef USE_CAMERA_ROTATOR
+      if (std::abs(config_.rotation) > 0.01f) {
+           float rads = config_.rotation * M_PI / 180.0f;
+           float abs_cos = std::abs(std::cos(rads));
+           float abs_sin = std::abs(std::sin(rads));
+           int rot_w = static_cast<int>(master_width * abs_cos + master_height * abs_sin);
+           int rot_h = static_cast<int>(master_width * abs_sin + master_height * abs_cos);
+           
+           size_t rot_size = rot_w * rot_h * master_channels;
+           
+           // We use jpeg_calloc_align for consistency since master_decoded_buffer is JpegBufferPtr (uptr with free_align)
+           // Actually decode_jpeg returns a smart pointer compatible with jpeg_free_align.
+           uint8_t* raw_rot = (uint8_t*)jpeg_calloc_align(rot_size, 16);
+           if (raw_rot) {
+               bool rot_success = Rotator::perform_rotation(
+                   master_decoded_buffer.get(), raw_rot,
+                   master_width, master_height, master_channels,
+                   config_.rotation, rot_w, rot_h
+               );
+               
+               if (rot_success) {
+                   // Replace master buffer with rotated version
+                   master_decoded_buffer.reset(raw_rot);
+                   master_width = rot_w;
+                   master_height = rot_h;
+               } else {
+                   // Rotation failed, free raw_rot (managed by uptr if we assigned it, but we didn't yet)
+                   jpeg_free_align(raw_rot);
+                   ESP_LOGE(TAG, "Master rotation failed");
+                   // Proceed with unrotated? Or fail? Fail safe.
+                   return results;
+               }
+           } else {
+               ESP_LOGE(TAG, "Failed to allocate master rotation buffer");
+               return results;
+           }
+      }
+      #endif
+  }
+
+  // Process Zones from Master Buffer (or Source if not JPEG/Mastered)
+  bool all_zones_successful = true;
+  for (const auto& zone : effective_zones) {
+      ProcessResult result;
+      bool crop_success = false;
+      
+      size_t required_size = get_required_buffer_size();
+      if (required_size == 0) continue;
+      
+      UniqueBufferPtr out_buf = allocate_image_buffer(required_size);
+      if (!out_buf) {
+          all_zones_successful = false;
+          continue;
+      }
+
+      if (use_master_buffer) {
+          // Validate effective zone against master dimensions
+          if (zone.x1 >= 0 && zone.y1 >= 0 && zone.x2 <= master_width && zone.y2 <= master_height) {
+              // Extract from RAW master buffer
+              // We need a helper that takes raw buffer + dims instead of CameraImage
+              // We can adapt 'process_raw_zone_to_buffer' logic here inline or extract method
+              
+              int stride = master_width;
+              int crop_w = zone.x2 - zone.x1;
+              int crop_h = zone.y2 - zone.y1;
+              
+              if (master_channels == 1) {
+                  // Grayscale
+                   if (config_.input_type == kInputTypeFloat32) {
+                        crop_success = process_grayscale_crop_and_scale_to_float32(
+                            master_decoded_buffer.get(), zone, crop_w, crop_h,
+                            out_buf->get(), config_.model_width, config_.model_height,
+                            config_.model_channels, config_.normalize, stride);
+                   } else {
+                        crop_success = process_grayscale_crop_and_scale_to_uint8(
+                            master_decoded_buffer.get(), zone, crop_w, crop_h,
+                            out_buf->get(), config_.model_width, config_.model_height,
+                            config_.model_channels, stride);
+                   }
+              } else {
+                  // RGB
+                   if (config_.input_type == kInputTypeFloat32) {
+                        crop_success = process_rgb888_crop_and_scale_to_float32(
+                            master_decoded_buffer.get(), zone, crop_w, crop_h,
+                            out_buf->get(), config_.model_width, config_.model_height,
+                            config_.model_channels, config_.normalize, stride);
+                   } else {
+                        crop_success = process_rgb888_crop_and_scale_to_uint8(
+                            master_decoded_buffer.get(), zone, crop_w, crop_h,
+                            out_buf->get(), config_.model_width, config_.model_height,
+                            config_.model_channels, stride);
+                   }
+              }
+          } else {
+              ESP_LOGE(TAG, "Zone bounds error vs Master: [%d,%d->%d,%d] in %dx%d", 
+                  zone.x1, zone.y1, zone.x2, zone.y2, master_width, master_height);
+          }
+      } else {
+          // Legacy/Raw CameraImage path
+          if (process_raw_zone_to_buffer(image, zone, out_buf->get(), required_size)) {
+              crop_success = true;
+          }
+      }
+      
+      if (crop_success) {
+          result.data = std::move(out_buf);
+          result.size = required_size;
+          results.push_back(std::move(result));
+          
+          #ifdef DEBUG_ESP32_CAMERA_UTILS
+          DEBUG_ZONE_INFO(zone, (zone.x2 - zone.x1), (zone.y2 - zone.y1), config_.model_width, config_.model_height);
+          #endif
+      } else {
+          all_zones_successful = false;
+      }
+  }
+  
+  if (!all_zones_successful) {
       stats_.failed_frames++;
-    }
   }
   
   uint32_t processing_time = millis() - start_time;
@@ -468,7 +615,7 @@ bool ImageProcessor::process_zone_to_buffer(
     int max_w = config_.camera_width;
     int max_h = config_.camera_height;
     
-    #ifdef DEV_ENABLE_ROTATION
+    #ifdef USE_CAMERA_ROTATOR
     if (config_.pixel_format == "JPEG" && config_.rotation != ROTATION_0) {
         // Use preview config dimensions if available, as they represent the target rotation
         // But better: swap max_w/max_h if 90/270 rotation is active
@@ -564,8 +711,19 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
         ESP_LOGW(TAG, "Failed to parse JPEG dimensions, using config");
     }
 
+    // Determine decode format based on model needs
+    // If model needs 1 channel, we decode directly to GRAY to save memory/time
+    jpeg_pixel_format_t decode_format = JPEG_PIXEL_FORMAT_RGB888;
+    int decode_channels = 3;
+    
+    // Explicit grayscale request
+    if (config_.pixel_format == "GRAYSCALE") {
+        decode_format = JPEG_PIXEL_FORMAT_GRAY;
+        decode_channels = 1;
+    }
+
     int dec_w = 0, dec_h = 0;
-    JpegBufferPtr full_image_buf = decode_jpeg(jpeg_data, jpeg_size, &dec_w, &dec_h);
+    JpegBufferPtr full_image_buf = decode_jpeg(jpeg_data, jpeg_size, &dec_w, &dec_h, decode_format);
     
     if (!full_image_buf) {
         stats_.jpeg_decoding_errors++;
@@ -594,7 +752,7 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
     int proc_height = jpeg_height;
     UniqueBufferPtr rotated_buffer_storage;
 
-    #ifdef DEV_ENABLE_ROTATION
+    #ifdef USE_CAMERA_ROTATOR
     if (std::abs(config_.rotation) > 0.01f) {
         
         // Allocate buffer for rotated image with new bounding box
@@ -607,7 +765,7 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
         out_w = static_cast<int>(jpeg_width * abs_cos + jpeg_height * abs_sin);
         out_h = static_cast<int>(jpeg_width * abs_sin + jpeg_height * abs_cos);
         
-        size_t rotated_size = out_w * out_h * 3;
+        size_t rotated_size = out_w * out_h * decode_channels;
         rotated_buffer_storage = allocate_image_buffer(rotated_size);
         
         if (!rotated_buffer_storage) {
@@ -618,9 +776,9 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
         uint8_t* rotated_buf = rotated_buffer_storage->get();
 
         // Use helper to Rotate: Full -> Rotated
-        bool rot_success = apply_software_rotation(full_image_buf.get(), rotated_buf, 
+        bool rot_success = Rotator::perform_rotation(full_image_buf.get(), rotated_buf, 
                                                  jpeg_width, jpeg_height, 
-                                                 3, config_.rotation, out_w, out_h); 
+                                                 decode_channels, config_.rotation, out_w, out_h); 
         
         if (rot_success) {
             // Update processing context to new dimensions
@@ -645,16 +803,32 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
     
     bool scale_success = false;
     
-    if (config_.input_type == kInputTypeFloat32) {
-        scale_success = process_rgb888_crop_and_scale_to_float32(
-            processing_buf, zone, crop_width, crop_height,
-            output_buffer, config_.model_width, config_.model_height,
-            config_.model_channels, config_.normalize, stride);
-    } else if (config_.input_type == kInputTypeUInt8) {
-        scale_success = process_rgb888_crop_and_scale_to_uint8(
-            processing_buf, zone, crop_width, crop_height,
-            output_buffer, config_.model_width, config_.model_height,
-            config_.model_channels, stride);
+    if (decode_channels == 1) {
+        // Grayscale Path
+        if (config_.input_type == kInputTypeFloat32) {
+            scale_success = process_grayscale_crop_and_scale_to_float32(
+                processing_buf, zone, crop_width, crop_height,
+                output_buffer, config_.model_width, config_.model_height,
+                config_.model_channels, config_.normalize, stride);
+        } else if (config_.input_type == kInputTypeUInt8) {
+            scale_success = process_grayscale_crop_and_scale_to_uint8(
+                processing_buf, zone, crop_width, crop_height,
+                output_buffer, config_.model_width, config_.model_height,
+                config_.model_channels, stride);
+        }
+    } else {
+        // RGB Path (Default)
+        if (config_.input_type == kInputTypeFloat32) {
+            scale_success = process_rgb888_crop_and_scale_to_float32(
+                processing_buf, zone, crop_width, crop_height,
+                output_buffer, config_.model_width, config_.model_height,
+                config_.model_channels, config_.normalize, stride);
+        } else if (config_.input_type == kInputTypeUInt8) {
+            scale_success = process_rgb888_crop_and_scale_to_uint8(
+                processing_buf, zone, crop_width, crop_height,
+                output_buffer, config_.model_width, config_.model_height,
+                config_.model_channels, stride);
+        }
     }
     
     if (!scale_success) {
@@ -709,7 +883,7 @@ bool ImageProcessor::validate_zone(const CropZone &zone) const {
     int max_h = config_.camera_height;
     
     // Calculate effective max dimensions after rotation
-    #ifdef DEV_ENABLE_ROTATION
+    #ifdef USE_CAMERA_ROTATOR
     if (config_.pixel_format == "JPEG" && std::abs(config_.rotation) > 0.01f) {
         float rads = config_.rotation * M_PI / 180.0f;
         float abs_cos = std::abs(std::cos(rads));
@@ -776,7 +950,7 @@ bool ImageProcessor::process_raw_zone_to_buffer(
     uint8_t* target_buffer = output_buffer;
     UniqueBufferPtr temp_buffer_storage;
 
-    #ifdef DEV_ENABLE_ROTATION
+#ifdef USE_CAMERA_ROTATOR
     if (needs_rotation && (config_.rotation == ROTATION_90 || config_.rotation == ROTATION_270)) {
         std::swap(scale_width, scale_height);
     }
@@ -857,6 +1031,9 @@ bool ImageProcessor::scale_rgb888_to_float32(
     const uint8_t* src, int src_w, int src_h,
     uint8_t* dst, int dst_w, int dst_h, int channels, bool normalize) {
     
+#ifdef USE_CAMERA_SCALER
+    return Scaler::scale_rgb888_to_float32(src, src_w, src_h, dst, dst_w, dst_h, channels, normalize);
+#else
     float* dst_float = reinterpret_cast<float*>(dst);
     float scale_x = (float)src_w / dst_w;
     float scale_y = (float)src_h / dst_h;
@@ -881,12 +1058,16 @@ bool ImageProcessor::scale_rgb888_to_float32(
         }
     }
     return true;
+#endif
 }
 
 bool ImageProcessor::scale_rgb888_to_uint8(
     const uint8_t* src, int src_w, int src_h,
     uint8_t* dst, int dst_w, int dst_h, int channels) {
     
+#ifdef USE_CAMERA_SCALER
+    return Scaler::scale_rgb888_to_uint8(src, src_w, src_h, dst, dst_w, dst_h, channels);
+#else
     float scale_x = (float)src_w / dst_w;
     float scale_y = (float)src_h / dst_h;
     
@@ -908,6 +1089,7 @@ bool ImageProcessor::scale_rgb888_to_uint8(
         }
     }
     return true;
+#endif
 }
 
 // Stub implementations for other formats to save space, as they follow similar patterns
@@ -1154,6 +1336,10 @@ bool ImageProcessor::apply_software_rotation(
     int width, int height, int bytes_per_pixel,
     float rotation_deg, int& out_w, int& out_h) {
     
+#ifdef USE_CAMERA_ROTATOR
+    // Delegate to modular Rotator
+    return Rotator::perform_rotation(input, output, width, height, bytes_per_pixel, rotation_deg, out_w, out_h);
+#else
     // Normalize rotation to 0-360 positive
     float rot = rotation_deg;
     while (rot < 0) rot += 360.0f;
@@ -1261,6 +1447,7 @@ bool ImageProcessor::apply_software_rotation(
     }
 
     return true;
+#endif
 }
 #endif
     

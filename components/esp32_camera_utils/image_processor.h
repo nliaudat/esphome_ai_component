@@ -15,6 +15,11 @@
 #include "esphome/components/esp32_camera/esp32_camera.h"
 #include "crop_zone_handler.h"
 #include "esp_jpeg_dec.h"
+#include "drawing_utils.h"
+#include "scaler.h"
+#include "rotator.h"
+#include "cropper.h"
+#include "esp_heap_caps.h"
 
 namespace esphome {
 namespace esp32_camera_utils {
@@ -44,6 +49,14 @@ struct ImageProcessorConfig {
   ImageProcessorInputType input_type;
   bool normalize; // For float32 conversion
   std::string input_order{"RGB"}; // "RGB" or "BGR"
+  
+  // Custom module settings
+  int scaler_width{0};
+  int scaler_height{0};
+  int cropper_width{0};
+  int cropper_height{0};
+  int cropper_offset_x{0};
+  int cropper_offset_y{0};
   
   bool validate() const {
     return camera_width > 0 && camera_height > 0 && !pixel_format.empty() &&
@@ -89,6 +102,7 @@ class ImageProcessor {
           }
       }
       
+      
       // Prevent copying
       TrackedBuffer(const TrackedBuffer&) = delete;
       TrackedBuffer& operator=(const TrackedBuffer&) = delete;
@@ -104,7 +118,7 @@ class ImageProcessor {
               if (ptr) {
                   if (is_jpeg_aligned) jpeg_free_align(ptr);
                   else if (is_spiram) heap_caps_free(ptr);
-                  else delete[] ptr;
+                  else free(ptr); // Changed from delete[] for aligned alloc compatibility
               }
               ptr = other.ptr;
               is_spiram = other.is_spiram;
@@ -153,6 +167,25 @@ class ImageProcessor {
   
   size_t get_required_buffer_size() const;
 
+#ifdef USE_CAMERA_DRAWING
+  // Drawing primitives delegates
+  void draw_pixel(uint8_t* buffer, int x, int y, int w, int h, int channels, uint16_t color) {
+    DrawingUtils::draw_pixel(buffer, x, y, w, h, channels, color);
+  }
+  void draw_rectangle(uint8_t* buffer, int x, int y, int w, int h, int img_w, int img_h, int channels, uint16_t color) {
+    DrawingUtils::draw_rectangle(buffer, x, y, w, h, img_w, img_h, channels, color);
+  }
+  void draw_filled_rectangle(uint8_t* buffer, int x, int y, int w, int h, int img_w, int img_h, int channels, uint16_t color) {
+    DrawingUtils::draw_filled_rectangle(buffer, x, y, w, h, img_w, img_h, channels, color);
+  }
+  void draw_circle(uint8_t* buffer, int cx, int cy, int r, int img_w, int img_h, int channels, uint16_t color) {
+    DrawingUtils::draw_circle(buffer, cx, cy, r, img_w, img_h, channels, color);
+  }
+  void draw_filled_circle(uint8_t* buffer, int cx, int cy, int r, int img_w, int img_h, int channels, uint16_t color) {
+    DrawingUtils::draw_filled_circle(buffer, cx, cy, r, img_w, img_h, channels, color);
+  }
+#endif
+
 private:
   ImageProcessorConfig config_;
   ProcessingStats stats_;
@@ -199,7 +232,7 @@ public:
    */
   static bool get_jpeg_dimensions(const uint8_t *data, size_t len, int &width, int &height);
 
-#ifdef DEV_ENABLE_ROTATION
+#ifdef USE_CAMERA_ROTATOR
   /**
    * Generates a rotated preview image from a source image.
    */
@@ -236,8 +269,8 @@ public:
 
   using JpegBufferPtr = std::unique_ptr<uint8_t[], JpegBufferDeleter>;
 
-  // Helper to decode JPEG to RGB888
-  [[nodiscard]] static JpegBufferPtr decode_jpeg(const uint8_t* data, size_t len, int* width, int* height);
+  // Helper to decode JPEG to RGB888 or Gray
+  [[nodiscard]] static JpegBufferPtr decode_jpeg(const uint8_t* data, size_t len, int* width, int* height, jpeg_pixel_format_t output_format = JPEG_PIXEL_FORMAT_RGB888);
 
   // Allocates a buffer suitable for JPEG operations (16-byte aligned)
   [[nodiscard]] static JpegBufferPtr allocate_jpeg_buffer(size_t size);
@@ -258,7 +291,7 @@ public:
 #endif
 };
 
-#ifdef DEV_ENABLE_ROTATION
+#ifdef USE_CAMERA_ROTATOR
 // RotatedPreviewImage class moved here for shared usage
 class RotatedPreviewImage : public camera::CameraImage {
   using UniqueBufferPtr = esphome::esp32_camera_utils::ImageProcessor::UniqueBufferPtr;

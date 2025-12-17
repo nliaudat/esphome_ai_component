@@ -7,7 +7,7 @@
 esphome:
   name: ${name}
   friendly_name: ${friendly_name}
-  min_version: 2025.8.0
+  min_version: ${esphome_min_version}
   name_add_mac_suffix: False # this appends to 'name' NOT 'friendly_name'
   # on_loop:
     # - lambda: |-
@@ -139,7 +139,7 @@ light:
     chipset: ws2812
     name: "${name} Flash LED"
     id: ${id_prefix}flash
-    default_transition_length: 0s
+
     effects:
       - addressable_scan:
           name: "Scan Effect"

@@ -8,6 +8,10 @@ namespace meter_reader_tflite {
 
 static const char *const TAG = "camera_coordinator";
 
+// Camera stabilization delays (blocking - camera must be stable before returning)
+static constexpr uint32_t WINDOW_SET_STABILIZATION_MS = 500;
+static constexpr uint32_t WINDOW_RESET_STABILIZATION_MS = 1000;
+
 void CameraCoordinator::set_camera(esp32_camera::ESP32Camera* camera) {
     camera_ = camera;
 }
@@ -50,8 +54,9 @@ bool CameraCoordinator::set_window(int offset_x, int offset_y, int width, int he
         current_width_ = new_dims.first;
         current_height_ = new_dims.second;
         
-        // Stabilization
-        delay(500);
+        // Blocking delay required: camera must stabilize before returning success
+        // Cannot use set_timeout() as caller expects immediate result
+        delay(WINDOW_SET_STABILIZATION_MS);
         return true;
     }
     ESP_LOGE(TAG, "Failed to set camera window");
@@ -74,7 +79,7 @@ bool CameraCoordinator::reset_window() {
          
          if (success) {
              current_format_ = orig_format_;
-             delay(1000); // Stabilization
+             delay(WINDOW_RESET_STABILIZATION_MS); // Blocking: camera must stabilize
          }
     }
     

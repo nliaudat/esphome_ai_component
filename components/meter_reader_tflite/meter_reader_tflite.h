@@ -1,6 +1,7 @@
 #pragma once
 
 #include "esphome/core/component.h"
+#include "esphome/components/camera/camera.h"
 #ifndef USE_HOST
 #include "esphome/components/esp32_camera/esp32_camera.h"
 #endif
@@ -79,7 +80,7 @@ namespace esphome { namespace esp32_camera_utils {
 namespace esphome {
 namespace meter_reader_tflite {
 
-class MeterReaderTFLite : public PollingComponent, public camera::CameraImageReader {
+class MeterReaderTFLite : public PollingComponent, public camera::CameraImageReader, public camera::CameraListener {
  public:
   void setup() override;
   void update() override;
@@ -88,6 +89,9 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   ~MeterReaderTFLite() override;
 
   float get_setup_priority() const override { return setup_priority::LATE; }
+
+  // CameraListener
+  void on_camera_image(const std::shared_ptr<camera::CameraImage> &image) override;
 
   // CameraImageReader
   void set_image(std::shared_ptr<camera::CameraImage> image) override {};
@@ -110,12 +114,16 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   }
   
   void set_camera_image_format(int width, int height, const std::string &pixel_format); // -> CameraCoord & TFLite
-  void set_camera(esp32_camera::ESP32Camera *camera); // -> CameraCoord
+  void set_camera(camera::Camera *camera); // -> CameraCoord
+  
+  sensor::Sensor *get_value_sensor() const { return value_sensor_; }
+  sensor::Sensor *get_confidence_sensor() const { return confidence_sensor_; }
   
   void set_model_config(const std::string &model_type); // -> TFLite
   void set_rotation(float rotation) { rotation_ = rotation; } // Storage, passed to TFLite late
   
   void set_generate_preview(bool generate) { generate_preview_ = generate; }
+  void set_show_crop_areas(bool show) { show_crop_areas_ = show; }
 #ifdef DEV_ENABLE_ROTATION
   void take_preview_image();
   void capture_preview();
@@ -136,6 +144,8 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   // Validation
   void set_allow_negative_rates(bool allow) { allow_negative_rates_ = allow; }
   void set_max_absolute_diff(int max_diff) { max_absolute_diff_ = max_diff; }
+  void set_frame_request_timeout(uint32_t ms) { frame_request_timeout_ms_ = ms; }
+  void set_high_confidence_threshold(float threshold) { high_confidence_threshold_ = threshold; }
 
   // Pause
   void set_pause_processing(bool pause) { pause_processing_.store(pause); }
@@ -150,6 +160,10 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_flash_pre_time(uint32_t ms);
   void set_flash_post_time(uint32_t ms);
   void force_flash_inference(); // Service
+
+  // Calibration
+  void start_flash_calibration();
+  bool is_calibrating() const { return calibration_.state != FlashCalibrationHandler::IDLE; }
 
   // Window Control
   void set_camera_window_offset_x(int x);
@@ -211,10 +225,37 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   float confidence_threshold_{0.85f};
   bool allow_negative_rates_{false};
   int max_absolute_diff_{100};
+  uint32_t frame_request_timeout_ms_{15000};
+  float high_confidence_threshold_{0.90f};
   float rotation_{0.0f};
   bool generate_preview_{false};
+  bool show_crop_areas_{true};
   bool debug_memory_enabled_{false}; // Runtime flag
   bool window_active_{false};
+
+  // Calibration
+  struct FlashCalibrationHandler {
+      enum State { IDLE, CALIBRATING_PRE, CALIBRATING_POST, FINISHED };
+      State state{IDLE};
+      uint32_t current_pre{0};
+      uint32_t current_post{0};
+      uint32_t best_pre{0};
+      uint32_t best_post{0};
+      float baseline_confidence{0.0f};
+      float best_confidence{0.0f};
+      uint32_t step_start_time{0};
+      
+      // Configuration
+      uint32_t start_pre{7000};
+      uint32_t end_pre{100};
+      uint32_t step_pre{500};
+      
+      uint32_t start_post{2000};
+      uint32_t end_post{0};
+      uint32_t step_post{200};
+  } calibration_;
+
+  void update_calibration(); 
 
   // Sensor Refs
   sensor::Sensor *value_sensor_{nullptr};
@@ -243,6 +284,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
 #ifdef SUPPORT_DOUBLE_BUFFERING
   // Double Buffering / Multithreading
+ public:
   struct InferenceJob {
       std::shared_ptr<camera::CameraImage> frame; // Keep managed
       std::vector<esp32_camera_utils::ImageProcessor::ProcessResult> crops;

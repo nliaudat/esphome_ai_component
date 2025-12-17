@@ -3,6 +3,22 @@
 
 api:
   services:
+    - service: get_meter_data
+      then:
+        - lambda: |-
+            auto val = id(meter_reader).get_value_sensor()->state;
+            auto conf = id(meter_reader).get_confidence_sensor()->state;
+            // auto valid = ... (if we had a validation accessor)
+            
+            // Construct JSON response
+            // "api.respond" automatically serializes the data
+            // api.respond({
+            //   {"value", val},
+            //   {"confidence", conf},
+            //   {"status", "ok"}
+            // });
+            ESP_LOGD("api", "Meter Data: Value=%.2f, Confidence=%.2f", val, conf);
+
     - service: set_crop_zones
       variables:
         zones: string
@@ -33,8 +49,15 @@ api:
     
     - service: reset_camera_window
       then:
-        - lambda: |-
-            id(meter_reader).reset_camera_window();
+        - lambda: 'id(meter_reader).reset_camera_window();'
+    
+    - service: trigger_inference
+      then:
+        - lambda: 'id(meter_reader).force_flash_inference();'
+
+    - service: start_flash_calibration
+      then:
+        - lambda: 'id(meter_reader).start_flash_calibration();'
 
 # button:
 #   - platform: template
