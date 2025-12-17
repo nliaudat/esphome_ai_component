@@ -167,7 +167,7 @@ light:
   - platform: status_led
     name: "${name} Flash LED"
     id: ${id_prefix}flash
-    default_transition_length: 0s
+
     icon: "mdi:alarm-light"
     restore_mode: ALWAYS_OFF
     pin: ${flash_led_pin}
