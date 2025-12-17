@@ -153,6 +153,10 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_flash_post_time(uint32_t ms);
   void force_flash_inference(); // Service
 
+  // Calibration
+  void start_flash_calibration();
+  bool is_calibrating() const { return calibration_.state != FlashCalibrationHandler::IDLE; }
+
   // Window Control
   void set_camera_window_offset_x(int x);
   void set_camera_window_offset_y(int y);
@@ -219,6 +223,30 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   bool generate_preview_{false};
   bool debug_memory_enabled_{false}; // Runtime flag
   bool window_active_{false};
+
+  // Calibration
+  struct FlashCalibrationHandler {
+      enum State { IDLE, CALIBRATING_PRE, CALIBRATING_POST, FINISHED };
+      State state{IDLE};
+      uint32_t current_pre{0};
+      uint32_t current_post{0};
+      uint32_t best_pre{0};
+      uint32_t best_post{0};
+      float baseline_confidence{0.0f};
+      float best_confidence{0.0f};
+      uint32_t step_start_time{0};
+      
+      // Configuration
+      uint32_t start_pre{7000};
+      uint32_t end_pre{100};
+      uint32_t step_pre{500};
+      
+      uint32_t start_post{2000};
+      uint32_t end_post{0};
+      uint32_t step_post{200};
+  } calibration_;
+
+  void update_calibration(); 
 
   // Sensor Refs
   sensor::Sensor *value_sensor_{nullptr};

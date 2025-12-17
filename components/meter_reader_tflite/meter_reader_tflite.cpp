@@ -271,6 +271,12 @@ void MeterReaderTFLite::update() {
         ESP_LOGD(TAG, "Processing paused, skipping update");
         return;
     }
+
+    // Calibration Cycle
+    if (is_calibrating()) {
+        update_calibration();
+        return; // Skip normal processing during calibration
+    }
     
     // The flashlight coordinator returns true if it is handling the cycle (scheduling or waiting)
     bool busy = flashlight_coord_.update_scheduling();
@@ -285,6 +291,32 @@ void MeterReaderTFLite::update() {
              process_available_frame();
          }
     }
+}
+
+void MeterReaderTFLite::start_flash_calibration() {
+    if (is_calibrating()) return;
+    
+    ESP_LOGI(TAG, "Starting Flash Calibration...");
+    calibration_.state = FlashCalibrationHandler::CALIBRATING_PRE;
+    calibration_.current_pre = calibration_.start_pre;
+    calibration_.current_post = calibration_.start_post; // Init
+    calibration_.baseline_confidence = 0.0f; // Will be set by first run
+    
+    // Override current settings
+    flashlight_coord_.set_timing(calibration_.current_pre, calibration_.current_post);
+    
+    if (inference_logs_) inference_logs_->publish_state("Starting Calibration: Phase 1 (Pre-Time)");
+    
+    // Trigger first step
+    force_flash_inference();
+}
+
+void MeterReaderTFLite::update_calibration() {
+    // This function is called every loop/update, but we mainly react to inference completion
+    // The inference completion logic (process_full_image) needs to know we are calibrating.
+    // Actually, force_flash_inference sets up a oneshot. 
+    // We need to wait for the result.
+    // The result is processed in process_full_image. We should capture the result there.
 }
 
 void MeterReaderTFLite::loop() {
@@ -493,6 +525,99 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
                 avg_conf * 100.0f, confidence_threshold_ * 100.0f);
              ESP_LOGW(TAG, "Reading NOT published - %s", 
                      !valid ? "validation failed" : "confidence below threshold");
+        }
+
+        // Calibration Logic Hook
+        if (is_calibrating()) {
+             char log_msg[100];
+             bool next_step = false;
+             
+             // 1. Establish Baseline (First run of Pre-Phase)
+             if (calibration_.baseline_confidence == 0.0f) {
+                 calibration_.baseline_confidence = avg_conf;
+                 calibration_.best_pre = calibration_.current_pre;
+                 calibration_.best_post = calibration_.current_post;
+                 calibration_.best_confidence = avg_conf; 
+                 snprintf(log_msg, sizeof(log_msg), "Baseline Conf: %.1f%%. Testing Pre: %u", avg_conf * 100.0f, calibration_.current_pre);
+                 next_step = true;
+             } else {
+                 // Check if worse
+                 if (avg_conf < (calibration_.baseline_confidence - 0.05f)) { // 5% drop threshold
+                     snprintf(log_msg, sizeof(log_msg), "Conf dropped to %.1f%% (Baseline %.1f%%). Step Failed.", avg_conf * 100.0f, calibration_.baseline_confidence * 100.0f);
+                     // Dropped too much, stop this phase or revert
+                     // For Pre Phase: Stop, use last good
+                     if (calibration_.state == FlashCalibrationHandler::CALIBRATING_PRE) {
+                         calibration_.state = FlashCalibrationHandler::CALIBRATING_POST;
+                         calibration_.current_pre = calibration_.best_pre; // Revert
+                         calibration_.current_post = calibration_.start_post; // Start Post phase
+                         snprintf(log_msg, sizeof(log_msg), "Pre-Phase Done. Best: %ums. Starting Post-Phase.", calibration_.best_pre);
+                     } else if (calibration_.state == FlashCalibrationHandler::CALIBRATING_POST) {
+                         calibration_.state = FlashCalibrationHandler::FINISHED;
+                         calibration_.current_post = calibration_.best_post; // Revert
+                         snprintf(log_msg, sizeof(log_msg), "Calibration Done! Best: Pre=%ums, Post=%ums", calibration_.best_pre, calibration_.best_post);
+                         if (inference_logs_) inference_logs_->publish_state(log_msg);
+                         // Don't trigger next step
+                     }
+                 } else {
+                     // Good result, store as best and continue
+                     calibration_.best_confidence = avg_conf; // Optionally update baseline? No, keep original baseline to prevent drift? Or update? Keep original generic baseline.
+                     if (calibration_.state == FlashCalibrationHandler::CALIBRATING_PRE) {
+                         calibration_.best_pre = calibration_.current_pre;
+                         snprintf(log_msg, sizeof(log_msg), "Pre-Time %ums OK (Wait 1s...)", calibration_.current_pre);
+                         next_step = true;
+                     } else {
+                         calibration_.best_post = calibration_.current_post;
+                         snprintf(log_msg, sizeof(log_msg), "Post-Time %ums OK (Wait 1s...)", calibration_.current_post);
+                         next_step = true;
+                     }
+                 }
+             }
+             ESP_LOGI(TAG, "%s", log_msg);
+             if (inference_logs_) inference_logs_->publish_state(log_msg);
+             
+             if (calibration_.state != FlashCalibrationHandler::FINISHED) { // && next_step logic
+                  // Advance parameters
+                  if (next_step) {
+                      if (calibration_.state == FlashCalibrationHandler::CALIBRATING_PRE) {
+                          if (calibration_.current_pre > (calibration_.end_pre + calibration_.step_pre)) {
+                              calibration_.current_pre -= calibration_.step_pre;
+                          } else {
+                              // Reached end of range
+                              calibration_.state = FlashCalibrationHandler::CALIBRATING_POST;
+                              calibration_.current_pre = calibration_.best_pre;
+                              calibration_.current_post = calibration_.start_post;
+                          }
+                      } else {
+                          if (calibration_.current_post > (calibration_.end_post + calibration_.step_post)) {
+                              calibration_.current_post -= calibration_.step_post;
+                          } else {
+                              calibration_.state = FlashCalibrationHandler::FINISHED;
+                          }
+                      }
+                      
+                      if (calibration_.state != FlashCalibrationHandler::FINISHED) {
+                           // Delay slightly before next flash?
+                           flashlight_coord_.set_timing(calibration_.current_pre, calibration_.current_post);
+                            // Simple delay or timeout?
+                           this->set_timeout(1000, [this](){
+                                force_flash_inference();
+                           });
+                      } else {
+                          // Finished at end of range
+                          char fin[100];
+                          snprintf(fin, sizeof(fin), "Done. Optimal: Pre=%ums, Post=%ums", calibration_.best_pre, calibration_.best_post);
+                          if (inference_logs_) inference_logs_->publish_state(fin);
+                      }
+                  } else {
+                       // Failed case logic above handles state transitions
+                       if (calibration_.state != FlashCalibrationHandler::FINISHED) {
+                             flashlight_coord_.set_timing(calibration_.current_pre, calibration_.current_post);
+                             this->set_timeout(1000, [this](){
+                                force_flash_inference();
+                             });
+                       }
+                  }
+             }
         }
     }
     
