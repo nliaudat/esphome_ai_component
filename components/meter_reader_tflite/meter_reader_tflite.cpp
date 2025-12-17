@@ -84,13 +84,8 @@ static void free_inference_result(InferenceResult* res) {
 // Named constants for better readability (compile-time only)
 static constexpr uint32_t MODEL_LOAD_DELAY_MS = 10000;
 
-#ifdef DEBUG_METER_READER_TFLITE
 #define METER_DURATION_START(name) uint32_t start_time = millis();
 #define METER_DURATION_END(name) ESP_LOGD(TAG, "%s took %u ms", name, millis() - start_time)
-#else
-#define METER_DURATION_START(name)
-#define METER_DURATION_END(name)
-#endif
 
 void MeterReaderTFLite::setup() {
     ESP_LOGI(TAG, "Setting up Meter Reader TFLite (Refactored)...");

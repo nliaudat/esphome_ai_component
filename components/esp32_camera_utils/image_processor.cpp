@@ -31,7 +31,6 @@ namespace esp32_camera_utils {
 static const char *const TAG = "ImageProcessor";
 
 // Duration logging macros for performance profiling
-#ifdef DEBUG_DURATION
 #ifdef DURATION_START
 #undef DURATION_START
 #endif
@@ -40,16 +39,6 @@ static const char *const TAG = "ImageProcessor";
 #undef DURATION_END
 #endif
 #define DURATION_END(func) ESP_LOGD(TAG, "%s duration: %lums", func, millis() - duration_start_)
-#else
-#ifdef DURATION_START
-#undef DURATION_START
-#endif
-#define DURATION_START()
-#ifdef DURATION_END
-#undef DURATION_END
-#endif
-#define DURATION_END(func)
-#endif
 
 // Debug macros for image processing analysis (restored from legacy code)
 #if defined(DEBUG_ESP32_CAMERA_UTILS) || defined(DEBUG_METER_READER_TFLITE)
