@@ -84,13 +84,8 @@ static void free_inference_result(InferenceResult* res) {
 // Named constants for better readability (compile-time only)
 static constexpr uint32_t MODEL_LOAD_DELAY_MS = 10000;
 
-#ifdef DEBUG_METER_READER_TFLITE
 #define METER_DURATION_START(name) uint32_t start_time = millis();
 #define METER_DURATION_END(name) ESP_LOGD(TAG, "%s took %u ms", name, millis() - start_time)
-#else
-#define METER_DURATION_START(name)
-#define METER_DURATION_END(name)
-#endif
 
 void MeterReaderTFLite::setup() {
     ESP_LOGI(TAG, "Setting up Meter Reader TFLite (Refactored)...");
@@ -347,7 +342,8 @@ void MeterReaderTFLite::loop() {
     if (output_queue_ && xQueueReceive(output_queue_, &res_ptr, 0) == pdTRUE) {
         if (res_ptr) {
             // Reconstruct logic from process_full_image's tail
-            ESP_LOGD(TAG, "Async inference finished in %lu ms", res_ptr->inference_time);
+            ESP_LOGD(TAG, "Async inference finished in %lu ms (Total: %lu ms)", 
+                     res_ptr->inference_time, millis() - res_ptr->total_start_time);
             
             // Reconstruct combined reading
             float final_val = combine_readings(res_ptr->readings);
@@ -481,8 +477,11 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     InferenceJob* job = allocate_inference_job();
     job->frame = frame; // Keep alive
     job->crops = std::move(processed_buffers);
-    job->start_time = millis();
+    // Use the start_time from METER_DURATION_START (defined at start of function)
+    job->start_time = start_time; 
     
+    ESP_LOGD(TAG, "Preprocessing took %u ms", millis() - start_time);
+
     if (xQueueSend(input_queue_, &job, 0) != pdTRUE) {
         ESP_LOGW(TAG, "Inference Queue Full - Dropping Frame");
         free_inference_job(job);
@@ -905,6 +904,7 @@ void MeterReaderTFLite::inference_task(void *arg) {
             
             InferenceResult* res = allocate_inference_result();
             res->inference_time = millis() - start;
+            res->total_start_time = job->start_time;
             res->success = true;
             
             for (auto& r : tflite_results) {

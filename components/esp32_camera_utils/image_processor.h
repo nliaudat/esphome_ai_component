@@ -94,10 +94,8 @@ class ImageProcessor {
           if (ptr) {
               if (is_jpeg_aligned) {
                   jpeg_free_align(ptr);
-              } else if (is_spiram) {
-                  heap_caps_free(ptr);
               } else {
-                  delete[] ptr;
+                  heap_caps_free(ptr);
               }
           }
       }
@@ -117,8 +115,7 @@ class ImageProcessor {
           if (this != &other) {
               if (ptr) {
                   if (is_jpeg_aligned) jpeg_free_align(ptr);
-                  else if (is_spiram) heap_caps_free(ptr);
-                  else free(ptr); // Changed from delete[] for aligned alloc compatibility
+                  else heap_caps_free(ptr);
               }
               ptr = other.ptr;
               is_spiram = other.is_spiram;
