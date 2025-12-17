@@ -20,17 +20,23 @@ external_components:
 ############## General configuration
 
 substitutions:
-  # Global switch for memory debugging
-  debug_memory_enabled: "true"
-
 
   name: s3cam-tflite #no special caracters
   friendly_name: "S3 camera tflite"
   id_prefix: "s3_cam_tflite" #if you have more than one board, it could be usefull to remane all the "id:prefix_xxxx" with a decicaded prefix
   revision: "1.2"
+  esphome_min_version: "2025.12.0"
+
+  # Board Selection (Mutually Exclusive via substitutions)
+  ############## not ready yet
+  # Set ONE to "true" and others to "false"
+  # board_AI_On_The_Edge_Cam_Esp32_S3: "true"
+  # board_freenove_esp32_s3_n8r8: "false"
+  # board_Seeed_Studio_XIAO_ESP32_S3_sense: "false"
+  # board_generic_esp32_s3_n16r8: "false"
   
   # Meter settings
-  meter_unit: "L" # Unit of measurement for the meter (e.g. m³, kWh, L) (https://developers.home-assistant.io/docs/core/entity/sensor/https://developers.home-assistant.io/docs/core/entity/sensor/)
+  meter_unit: L # Unit of measurement for the meter (e.g. m³, kWh, L) (https://developers.home-assistant.io/docs/core/entity/sensor/https://developers.home-assistant.io/docs/core/entity/sensor/)
   
   # camera
   # camera_pixel_format: JPEG # (cropping implementation is faster with RGB888 format) | Displays: RGB565, RGB888 | Cameras: YUV422, YUV420, RAW | Efficiency: Grayscale, YUV420, JPEG
@@ -43,11 +49,11 @@ substitutions:
   camera_idle_framerate: 0.2fps
       
   #time
-  TZ: "Europe/Zurich" #timezone
-  reboot_days_of_week: "MON"
-  reboot_hours: "5"
-  reboot_minutes: "0"
-  reboot_seconds: "0"
+  TZ: Europe/Zurich #timezone
+  reboot_days_of_week: MON
+  reboot_hours: 5
+  reboot_minutes: 0
+  reboot_seconds: 0
 
   
 preferences:
@@ -95,10 +101,10 @@ esp32_camera_utils:
   #   height: 240
   #   offset_x: 0
   #   offset_y: 0
-
   
-  enable_drawing: true
-  debug_memory: ${debug_memory_enabled}
+  # enable_drawing: true
+
+  debug_memory: true
 
 # optional : flash light at taking image
 flash_light_controller:
@@ -121,7 +127,7 @@ meter_reader_tflite:
   debug_image: false # static embedded image (debug.jpg)
   debug_image_out_serial: false
   
-  debug_memory: ${debug_memory_enabled}
+  debug_memory: true
 
   
   # Image Rotation (required for preview to show rotated digits)
@@ -131,6 +137,7 @@ meter_reader_tflite:
   # Preview of what the AI sees (Rotated Live Cam)
   # Set to true to enable continuous updates, or false for on-demand only (via button)
   generate_preview: false
+  # show_crop_areas: true # Draw boxes on preview
 
 
 
@@ -151,43 +158,35 @@ meter_reader_tflite:
 
 
 packages:
+  # Board Configuration (Uncomment ONE)
+  - !include board_AI-On-The-Edge-Cam_Esp32-S3.yaml
+  # - !include board_freenove_esp32-s3-n8r8.yaml
+  # - !include board_Seeed_Studio_XIAO_ESP32-S3_sense.yaml
+  # - !include board_generic_esp32-s3-n16r8.yaml
 
-  # board choice
-  # board: !include board_freenove_esp32-s3-n8r8.yaml
-  board: !include board_AI-On-The-Edge-Cam_Esp32-S3.yaml
-  # board: !include board_Seeed_Studio_XIAO_ESP32-S3_sense.yaml
-  debug: !include debug_board.yaml
+  - !include debug_board.yaml
   
   # AI components
-  switch_AI_component: !include switch_AI_component.yaml
-  sensor_AI_component: !include sensor_AI_component.yaml
-  globals_AI_component: !include globals_AI_component.yaml ## where to set your crop zones
-  text_sensor_AI_component: !include text_sensor_AI_component.yaml
-  number_AI_component: !include number_AI_component.yaml
-  button_AI_component: !include button_AI_component.yaml
-  api_AI_component: !include api_AI_component.yaml
+  - !include switch_AI_component.yaml
+  - !include sensor_AI_component.yaml
+  - !include globals_AI_component.yaml
+  - !include text_sensor_AI_component.yaml
+  - !include number_AI_component.yaml
+  - !include button_AI_component.yaml
+  - !include api_AI_component.yaml
   
   # camera configs
-  camera_options: !include camera_options.yaml
-  esp32_camera: !include esp32_camera.yaml
-  # camera_webserver: !include camera_webserver.yaml
+  - !include camera_options.yaml
+  - !include esp32_camera.yaml
+  # - !include camera_webserver.yaml
   
   # network choice
-  wifi: !include wifi.yaml
-  # lan: !include lan.yaml # only for AI-On-The-Edge-Cam_Esp32-S3.yaml + wifi must be disabled
+  - !include wifi.yaml
+  # !include lan.yaml # only for AI-On-The-Edge-Cam_Esp32-S3.yaml + wifi must be disabled
   
   # others
-  globals: !include globals.yaml
-  switch_others: !include switch_others.yaml
-  sensor_others: !include sensor_others.yaml
-  logger: !include logger.yaml 
-  time: !include time.yaml
-
-
-
-
-
-
-
-
-
+  - !include globals.yaml
+  - !include switch_others.yaml
+  - !include sensor_others.yaml
+  - !include logger.yaml 
+  - !include time.yaml
