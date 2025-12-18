@@ -5,25 +5,30 @@ text_sensor:
   - platform: debug
     device:
       name: "Device Info"
+      entity_category: diagnostic
     reset_reason:
       name: "Reset Reason"
-    entity_category: diagnostic
+      entity_category: diagnostic
 
 sensor:
   - platform: debug
     free:
       name: "Heap Free"
+      entity_category: diagnostic
     # fragmentation:
       # name: "Heap Fragmentation"
     block:
       name: "Heap Max Block"
+      entity_category: diagnostic
     loop_time:
       name: "Loop Time"
+      entity_category: diagnostic
     psram:
       name: "Free PSRAM"
+      entity_category: diagnostic
     cpu_frequency:
       name: "CPU Frequency"
-    entity_category: diagnostic
+      entity_category: diagnostic
 
 
 
@@ -37,7 +42,6 @@ sensor:
     device_class: temperature
     state_class: measurement
     icon: "mdi:thermometer"
-    icon: "mdi:thermometer"
     update_interval: 5s
     entity_category: diagnostic
 
@@ -48,7 +52,6 @@ sensor:
     unit_of_measurement: "B"
     device_class: data_size
     state_class: measurement
-    icon: "mdi:memory"
     icon: "mdi:memory"
     update_interval: 5s
     entity_category: diagnostic
@@ -62,7 +65,6 @@ sensor:
     device_class: data_size
     state_class: measurement
     icon: "mdi:memory"
-    icon: "mdi:memory"
     update_interval: 5s
     entity_category: diagnostic
     lambda: |-
@@ -75,7 +77,6 @@ sensor:
     device_class: data_size
     state_class: measurement
     icon: "mdi:memory"
-    icon: "mdi:memory"
     update_interval: 5s
     entity_category: diagnostic
     lambda: |-
@@ -87,7 +88,6 @@ sensor:
     unit_of_measurement: "%"
     device_class: battery
     state_class: measurement
-    icon: "mdi:memory"
     icon: "mdi:memory"
     update_interval: 5s
     entity_category: diagnostic
@@ -107,7 +107,6 @@ sensor:
     device_class: data_size
     state_class: measurement
     icon: "mdi:memory"
-    icon: "mdi:memory"
     update_interval: 5s
     entity_category: diagnostic
     lambda: |-
@@ -123,7 +122,6 @@ sensor:
     unit_of_measurement: "B"
     device_class: data_size
     state_class: measurement
-    icon: "mdi:memory"
     icon: "mdi:memory"
     update_interval: 5s
     entity_category: diagnostic
@@ -141,7 +139,6 @@ sensor:
     device_class: data_size
     state_class: measurement
     icon: "mdi:memory"
-    icon: "mdi:memory"
     update_interval: 5s
     entity_category: diagnostic
     lambda: |-
@@ -157,7 +154,6 @@ sensor:
     unit_of_measurement: "%"
     device_class: battery
     state_class: measurement
-    icon: "mdi:memory"
     icon: "mdi:memory"
     update_interval: 5s
     entity_category: diagnostic
