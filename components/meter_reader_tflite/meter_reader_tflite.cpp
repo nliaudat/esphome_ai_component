@@ -386,7 +386,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
 
     
     // Preview Logic (Rotation)
-    #ifdef DEV_ENABLE_ROTATION
+    #if defined(DEV_ENABLE_ROTATION) && defined(USE_CAMERA_ROTATOR)
     if (generate_preview_ || request_preview_) {
          // Create rotated preview via ImageProcessor
          using namespace esphome::esp32_camera_utils;
