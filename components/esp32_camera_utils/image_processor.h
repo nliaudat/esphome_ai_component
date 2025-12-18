@@ -160,6 +160,13 @@ class ImageProcessor {
       uint8_t* output_buffer,
       size_t output_buffer_size);
 
+  // Rotation helper
+  bool apply_software_rotation(const uint8_t* src, uint8_t* dst, int width, int height, int channels, float angle, int& new_width, int& new_height);
+
+  /*
+   * Validate zone boundaries
+   */
+
   bool validate_zone(const CropZone &zone) const;
   
   size_t get_required_buffer_size() const;
