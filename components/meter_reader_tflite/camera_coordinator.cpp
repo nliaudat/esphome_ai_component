@@ -9,8 +9,9 @@ namespace meter_reader_tflite {
 static const char *const TAG = "camera_coordinator";
 
 // Camera stabilization delays (blocking - camera must be stable before returning)
-static constexpr uint32_t WINDOW_SET_STABILIZATION_MS = 500;
-static constexpr uint32_t WINDOW_RESET_STABILIZATION_MS = 1000;
+// Reduced from 500/1000ms after testing showed modern sensors stabilize faster
+static constexpr uint32_t WINDOW_SET_STABILIZATION_MS = 100;
+static constexpr uint32_t WINDOW_RESET_STABILIZATION_MS = 200;
 
 void CameraCoordinator::set_camera(esp32_camera::ESP32Camera* camera) {
     camera_ = camera;

@@ -24,6 +24,17 @@ void ReadingHistory::add_reading(int value, uint32_t timestamp, float confidence
   day_readings_.push_back(reading);
   
   cleanup_old_readings(timestamp);
+  
+  // Enforce absolute maximum limits to prevent memory bloat
+  const size_t MAX_HOUR_READINGS = 360;  // 6 per minute * 60 minutes
+  const size_t MAX_DAY_READINGS = 1440;  // 1 per minute * 60 * 24
+  
+  while (hour_readings_.size() > MAX_HOUR_READINGS) {
+      hour_readings_.pop_front();
+  }
+  while (day_readings_.size() > MAX_DAY_READINGS) {
+      day_readings_.pop_front();
+  }
 }
 
 int ReadingHistory::get_last_reading() const {
@@ -48,14 +59,15 @@ int ReadingHistory::get_hour_median() const {
     values.push_back(reading.value);
   }
   
-  std::sort(values.begin(), values.end());
-  size_t size = values.size();
+  size_t size = values.size();  
+  std::nth_element(values.begin(), values.begin() + size/2, values.end());
+  int median = values[size/2];
   
   if (size % 2 == 0) {
-    return (values[size/2 - 1] + values[size/2]) / 2;
-  } else {
-    return values[size/2];
+      auto max_it = std::max_element(values.begin(), values.begin() + size/2);
+      return (*max_it + median) / 2;
   }
+  return median;
 }
 
 int ReadingHistory::get_day_median() const {
@@ -66,14 +78,15 @@ int ReadingHistory::get_day_median() const {
     values.push_back(reading.value);
   }
   
-  std::sort(values.begin(), values.end());
   size_t size = values.size();
+  std::nth_element(values.begin(), values.begin() + size/2, values.end());
+  int median = values[size/2];
   
   if (size % 2 == 0) {
-    return (values[size/2 - 1] + values[size/2]) / 2;
-  } else {
-    return values[size/2];
+      auto max_it = std::max_element(values.begin(), values.begin() + size/2);
+      return (*max_it + median) / 2;
   }
+  return median;
 }
 
 std::vector<int> ReadingHistory::get_recent_readings(size_t count) const {

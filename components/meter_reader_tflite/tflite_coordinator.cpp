@@ -184,6 +184,12 @@ TFLiteCoordinator::ModelSpec TFLiteCoordinator::get_model_spec() const {
 
 void TFLiteCoordinator::report_memory_status() {
     size_t peak = model_handler_.get_arena_used_bytes();
+    
+    ESP_LOGI(TAG, "Tensor Arena: Size=%zu, Peak Used=%zu (%.1f%%)",
+             tensor_arena_allocation_.actual_size,
+             peak,
+             (peak * 100.0f) / tensor_arena_allocation_.actual_size);
+
     memory_manager_.report_memory_status(
         tensor_arena_size_requested_,
         tensor_arena_allocation_.actual_size,
