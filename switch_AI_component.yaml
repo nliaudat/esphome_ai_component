@@ -41,14 +41,18 @@ switch:
     restore_mode: RESTORE_DEFAULT_ON # Assuming default enabled via yaml
     turn_on_action:
       - lambda: |-
-          if (id(meter_reader) != nullptr) {
-            id(meter_reader)->set_debug_memory_enabled(true);
-          }
+          #ifdef DEBUG_METER_READER_MEMORY
+            if (id(meter_reader) != nullptr) {
+              id(meter_reader)->set_debug_memory_enabled(true);
+            }
+          #endif
     turn_off_action:
       - lambda: |-
-          if (id(meter_reader) != nullptr) {
-            id(meter_reader)->set_debug_memory_enabled(false);
-          }
+          #ifdef DEBUG_METER_READER_MEMORY
+            if (id(meter_reader) != nullptr) {
+              id(meter_reader)->set_debug_memory_enabled(false);
+            }
+          #endif
 
   - platform: template
     name: "Component Debug Mode"

@@ -5,21 +5,14 @@ import random
 import subprocess
 import shutil
 import time
+import threading
+import sys
 
 SOURCE_CONFIG = "config.yaml"
-TEST_CONFIG = "test.yaml"
-ITERATIONS = 20
+NUM_WORKERS = 3
+ITERATIONS_PER_WORKER = 2
 
-# Parameters to fuzz (Component -> [Keys])
-# We will use simple regex replacement looking for "key: value" under specific indentation blocks if possible,
-# or just globally if keys are unique enough.
-# Given the structure, some keys like 'debug' appear in multiple places.
-# We need to be careful to target specific blocks.
-
-# Structure: Component Name in YAML -> List of keys to toggle
-# Board keys for mutual exclusion 
-# Structure: Config Filenames for board packages
-# These local file names must match the include lines in config.yaml
+# Reusing fuzz logic from fuzz_build.py but adapted
 BOARD_KEYS = [
     "board_AI-On-The-Edge-Cam_Esp32-S3.yaml",
     "board_freenove_esp32-s3-n8r8.yaml",
@@ -28,13 +21,11 @@ BOARD_KEYS = [
 ]
 
 TARGETS = {
-    # "substitutions": BOARD_KEYS, # Removed, we toggle includes now
     "tflite_micro_helper": ["debug"],
     "esp32_camera_utils": ["debug", "enable_rotation", "debug_memory"], 
     "flash_light_controller": ["debug"],
-    "flash_light_controller": ["debug"],
     "meter_reader_tflite": ["debug", "debug_memory", "generate_preview", "enable_rotation", "allow_negative_rates", "debug_image", "debug_image_out_serial"],
-    "substitutions": ["camera_pixel_format"]
+    "substitutions": ["camera_pixel_format", "name"] # Added name
 }
 
 PARAM_CHOICES = {
@@ -45,13 +36,12 @@ def read_config():
     with open(SOURCE_CONFIG, "r") as f:
         return f.readlines()
 
-def randomize_config(lines):
+def randomize_config(lines, worker_id):
     new_lines = []
     current_component = None
     
     # Pre-select a board for this iteration
     selected_board = random.choice(BOARD_KEYS)
-    print(f"  [Board Selection] Selected: {selected_board}")
     
     for line in lines:
         original_line = line
@@ -91,68 +81,59 @@ def randomize_config(lines):
                     indent = match.group(1)
                     comment = match.group(3) if match.group(3) else ""
                     
-                    if key in PARAM_CHOICES:
+                    if key == "name" and current_component == "substitutions":
+                        # CRITICAL: Change name to ensure unique build path
+                        new_val = f"s3cam-tflite-fuzz-{worker_id}"
+                    elif key in PARAM_CHOICES:
                         new_val = random.choice(PARAM_CHOICES[key])
                     else:
                         new_val = "true" if random.choice([True, False]) else "false"
                          
                     new_lines.append(f"{indent}{key}: {new_val}{comment}\n")
-                    print(f"  [{current_component}] {key}: {new_val}")
                     modified = True
                     break
         
         if not modified:
             new_lines.append(original_line)
         
-    return new_lines
+    return new_lines, selected_board
 
-def run_fuzz():
-    print(f"Starting Fuzz Test: {ITERATIONS} iterations")
-    print(f"Source: {SOURCE_CONFIG}")
-    print(f"Target: {TEST_CONFIG}")
+def worker_task(worker_id):
+    os.makedirs("fuzz_logs", exist_ok=True)
+    target_file = f"fuzz_test_{worker_id}.yaml"
     
     lines = read_config()
     
-    # First, simple Copy for baseline (optional, but good to ensure write works)
-    # shutil.copyfile(SOURCE_CONFIG, TEST_CONFIG)
-    
-    results = []
-
-    for i in range(1, ITERATIONS + 1):
-        print(f"\n--- Iteration {i}/{ITERATIONS} ---")
+    for i in range(1, ITERATIONS_PER_WORKER + 1):
+        log_file = f"fuzz_logs/worker_{worker_id}_iter_{i}.log"
+        new_lines, board = randomize_config(lines, worker_id)
         
-        # Randomize
-        new_lines = randomize_config(lines)
-        with open(TEST_CONFIG, "w") as f:
+        with open(target_file, "w") as f:
             f.writelines(new_lines)
             
-        print("Generated test.yaml with random parameters.")
+        print(f"[Worker {worker_id}] Iter {i}: Board={board} -> Compiling...")
         
-        # Compile
         start_t = time.time()
-        # esphome compile test.yaml
-        cmd = ["esphome", "compile", TEST_CONFIG]
+        cmd = ["esphome", "compile", target_file]
         
-       
-        try:
-            print("Compiling...")
-            # Stream output directly to console so user sees everything
-            subprocess.run(cmd, check=True)
-            duration = time.time() - start_t
-            print(f"PASS ({duration:.1f}s)")
-            results.append((i, "PASS", duration))
-        except subprocess.CalledProcessError:
-            duration = time.time() - start_t
-            print(f"FAIL ({duration:.1f}s)")
-            # Error output is already printed to console by the subprocess
-            results.append((i, "FAIL", duration))
-
-    print("\n--- Summary ---")
-    for r in results:
-        print(f"Iter {r[0]}: {r[1]} ({r[2]:.1f}s)")
+        with open(log_file, "w") as log:
+            try:
+                subprocess.run(cmd, stdout=log, stderr=subprocess.STDOUT, check=True)
+                duration = time.time() - start_t
+                print(f"[Worker {worker_id}] Iter {i}: PASS ({duration:.1f}s)")
+            except subprocess.CalledProcessError:
+                duration = time.time() - start_t
+                print(f"[Worker {worker_id}] Iter {i}: FAIL ({duration:.1f}s) - See {log_file}")
 
 if __name__ == "__main__":
-    try:
-        run_fuzz()
-    except KeyboardInterrupt:
-        print("\nAborted.")
+    print(f"Starting Parallel Fuzz: {NUM_WORKERS} workers, {ITERATIONS_PER_WORKER} iters each.")
+    threads = []
+    for i in range(NUM_WORKERS):
+        t = threading.Thread(target=worker_task, args=(i,))
+        t.start()
+        threads.append(t)
+        
+    for t in threads:
+        t.join()
+        
+    print("All workers completed.")
