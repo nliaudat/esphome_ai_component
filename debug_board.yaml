@@ -7,6 +7,7 @@ text_sensor:
       name: "Device Info"
     reset_reason:
       name: "Reset Reason"
+    entity_category: diagnostic
 
 sensor:
   - platform: debug
@@ -22,6 +23,7 @@ sensor:
       name: "Free PSRAM"
     cpu_frequency:
       name: "CPU Frequency"
+    entity_category: diagnostic
 
 
 
@@ -35,7 +37,9 @@ sensor:
     device_class: temperature
     state_class: measurement
     icon: "mdi:thermometer"
+    icon: "mdi:thermometer"
     update_interval: 5s
+    entity_category: diagnostic
 
   # Memory sensors using correct ESP-IDF functions
   - platform: template
@@ -45,7 +49,9 @@ sensor:
     device_class: data_size
     state_class: measurement
     icon: "mdi:memory"
+    icon: "mdi:memory"
     update_interval: 5s
+    entity_category: diagnostic
     lambda: |-
       return heap_caps_get_free_size(MALLOC_CAP_8BIT);
 
@@ -56,7 +62,9 @@ sensor:
     device_class: data_size
     state_class: measurement
     icon: "mdi:memory"
+    icon: "mdi:memory"
     update_interval: 5s
+    entity_category: diagnostic
     lambda: |-
       return heap_caps_get_total_size(MALLOC_CAP_8BIT);
 
@@ -67,7 +75,9 @@ sensor:
     device_class: data_size
     state_class: measurement
     icon: "mdi:memory"
+    icon: "mdi:memory"
     update_interval: 5s
+    entity_category: diagnostic
     lambda: |-
       return heap_caps_get_total_size(MALLOC_CAP_8BIT) - heap_caps_get_free_size(MALLOC_CAP_8BIT);
 
@@ -78,7 +88,9 @@ sensor:
     device_class: battery
     state_class: measurement
     icon: "mdi:memory"
+    icon: "mdi:memory"
     update_interval: 5s
+    entity_category: diagnostic
     lambda: |-
       size_t total = heap_caps_get_total_size(MALLOC_CAP_8BIT);
       size_t free = heap_caps_get_free_size(MALLOC_CAP_8BIT);
@@ -95,7 +107,9 @@ sensor:
     device_class: data_size
     state_class: measurement
     icon: "mdi:memory"
+    icon: "mdi:memory"
     update_interval: 5s
+    entity_category: diagnostic
     lambda: |-
       #ifdef BOARD_HAS_PSRAM
         return heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
@@ -110,7 +124,9 @@ sensor:
     device_class: data_size
     state_class: measurement
     icon: "mdi:memory"
+    icon: "mdi:memory"
     update_interval: 5s
+    entity_category: diagnostic
     lambda: |-
       #ifdef BOARD_HAS_PSRAM
         return heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
@@ -125,7 +141,9 @@ sensor:
     device_class: data_size
     state_class: measurement
     icon: "mdi:memory"
+    icon: "mdi:memory"
     update_interval: 5s
+    entity_category: diagnostic
     lambda: |-
       #ifdef BOARD_HAS_PSRAM
         return heap_caps_get_total_size(MALLOC_CAP_SPIRAM) - heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
@@ -140,7 +158,9 @@ sensor:
     device_class: battery
     state_class: measurement
     icon: "mdi:memory"
+    icon: "mdi:memory"
     update_interval: 5s
+    entity_category: diagnostic
     lambda: |-
       #ifdef BOARD_HAS_PSRAM
         size_t total = heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
