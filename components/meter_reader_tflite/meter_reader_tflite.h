@@ -163,6 +163,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
   // Calibration
   void start_flash_calibration();
+  void update_calibration(float confidence);
   bool is_calibrating() const { return calibration_.state != FlashCalibrationHandler::IDLE; }
 
   // Window Control
