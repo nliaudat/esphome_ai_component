@@ -8,7 +8,7 @@ import time
 
 SOURCE_CONFIG = "config.yaml"
 TEST_CONFIG = "test.yaml"
-ITERATIONS = 4 
+ITERATIONS = 20
 
 # Parameters to fuzz (Component -> [Keys])
 # We will use simple regex replacement looking for "key: value" under specific indentation blocks if possible,
@@ -32,7 +32,13 @@ TARGETS = {
     "tflite_micro_helper": ["debug"],
     "esp32_camera_utils": ["debug", "enable_rotation", "debug_memory"], 
     "flash_light_controller": ["debug"],
-    "meter_reader_tflite": ["debug", "debug_memory", "generate_preview", "enable_rotation", "allow_negative_rates", "debug_image", "debug_image_out_serial"]
+    "flash_light_controller": ["debug"],
+    "meter_reader_tflite": ["debug", "debug_memory", "generate_preview", "enable_rotation", "allow_negative_rates", "debug_image", "debug_image_out_serial"],
+    "substitutions": ["camera_pixel_format"]
+}
+
+PARAM_CHOICES = {
+    "camera_pixel_format": ["JPEG", "RGB565", "RGB888", "YUV422", "YUV420", "RAW", "GRAYSCALE"]
 }
 
 def read_config():
@@ -85,10 +91,13 @@ def randomize_config(lines):
                     indent = match.group(1)
                     comment = match.group(3) if match.group(3) else ""
                     
-                    new_bool = "true" if random.choice([True, False]) else "false"
+                    if key in PARAM_CHOICES:
+                        new_val = random.choice(PARAM_CHOICES[key])
+                    else:
+                        new_val = "true" if random.choice([True, False]) else "false"
                          
-                    new_lines.append(f"{indent}{key}: {new_bool}{comment}\n")
-                    print(f"  [{current_component}] {key}: {new_bool}")
+                    new_lines.append(f"{indent}{key}: {new_val}{comment}\n")
+                    print(f"  [{current_component}] {key}: {new_val}")
                     modified = True
                     break
         
