@@ -110,8 +110,8 @@ esp32_camera_utils:
 flash_light_controller:
   id: flash_controller
   flash_light: ${id_prefix}flash
-  flash_pre_time: 7000ms # 7 seconds before update (time to stabilize)
-  flash_post_time: 2000ms # 2 seconds after update
+  flash_pre_time: 7000ms # 7 seconds before update (time to stabilize) (works with 4sec on my board)
+  flash_post_time: 2000ms # 2 seconds after update (works with 100ms on my board)
   debug: true
 
 
