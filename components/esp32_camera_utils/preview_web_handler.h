@@ -3,6 +3,7 @@
 
 
 #ifdef DEV_ENABLE_ROTATION
+#ifdef USE_WEB_SERVER
 #include "esphome/components/web_server_base/web_server_base.h"
 #include "esphome/components/esp32_camera_utils/image_processor.h"
 #include "esphome/core/log.h"
@@ -30,6 +31,7 @@ class PreviewWebHandler : public web_server_idf::AsyncWebHandler {
 
 }  // namespace esp32_camera_utils
 }  // namespace esphome
+#endif
 #endif
 
 

@@ -87,7 +87,7 @@ esp32_camera_utils:
     height: 88 #  multiple of 4 and 4:3 proportions with width for best quality
 
   # enable_rotation: true
-  # rotation: 15 # 0, 90, 180, 270 (special case built-in "accelarated" for 90, 180, 270 )
+  # rotation: 15 # 0, 90, 180, 270 (special case built-in "accelerated" for 90, 180, 270 )
 
   
   # enable_scaler: true
@@ -163,6 +163,9 @@ packages:
   # - !include board_freenove_esp32-s3-n8r8.yaml
   # - !include board_Seeed_Studio_XIAO_ESP32-S3_sense.yaml
   # - !include board_generic_esp32-s3-n16r8.yaml
+  # - !include board_wrover_kit.yaml
+  # - !include board_m5stack_psram.yaml
+  # - !include board_esp32cam_aithinker.yaml
 
   - !include debug_board.yaml
   

@@ -20,3 +20,5 @@ secrets.yaml
 .github/workflows/ci.yml
 .clang-format
 test.yaml
+/fuzz_logs
+fuzz_test_*.yaml

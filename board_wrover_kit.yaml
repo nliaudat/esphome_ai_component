@@ -1,0 +1,78 @@
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  min_version: ${esphome_min_version}
+  name_add_mac_suffix: False
+  project:
+    name: "nliaudat.meter-reader"
+    version: "${revision}.dev"
+  platformio_options:
+    board_build.f_flash: 80000000L
+    board_build.flash_mode: qio
+    # board_build.partitions: huge_app.csv
+    board_name: ESP32 Wrover Kit
+    board_build.extra_flags: 
+    - -DBOARD_HAS_PSRAM 
+    - -DTF_LITE_STATIC_MEMORY # for tflite micro
+    - -DTF_LITE_DISABLE_X86_NEON #for tflite micro
+    - -DESP_NN  #use hardware acceleration : https://github.com/espressif/esp-nn (only if using tflite)
+
+substitutions:
+  board: esp-wrover-kit
+  framework: esp-idf 
+
+  # Camera Pins
+  external_clock_pin: GPIO21
+  external_clock_frequency: 20MHz
+  i2c_pins_sda: GPIO26
+  i2c_pins_scl: GPIO27
+  data_pins:
+    - GPIO4   # CAM_D0
+    - GPIO5   # CAM_D1
+    - GPIO18  # CAM_D2
+    - GPIO19  # CAM_D3
+    - GPIO36  # CAM_D4
+    - GPIO39  # CAM_D5
+    - GPIO34  # CAM_D6
+    - GPIO35  # CAM_D7
+  vsync_pin: GPIO25
+  href_pin: GPIO23
+  pixel_clock_pin: GPIO22
+  
+  # Power Down / Reset (NC for Wrover Kit per defines.h)
+  camera_pwdn_pin: "-1"
+  camera_reset_pin: "-1"
+
+  # LED Pins
+  status_led_pin: GPIO33
+  flash_led_pin: GPIO12
+
+esp32:
+  board: ${board}
+  flash_size: 4MB
+  framework:
+    type: ${framework}
+    version: recommended
+    sdkconfig_options:
+      CONFIG_ESP32_SPIRAM_SUPPORT: y
+
+psram:
+  
+light:
+  - platform: binary
+    output: flash_light_output
+    name: "${name} Flash Light"
+    id: ${id_prefix}flash
+  - platform: binary
+    output: status_led_output
+    name: "${name} Status LED"
+    id: ${id_prefix}light
+
+output:
+  - platform: gpio
+    pin: ${flash_led_pin}
+    id: flash_light_output
+  - platform: gpio
+    pin: ${status_led_pin}
+    id: status_led_output
+    inverted: true

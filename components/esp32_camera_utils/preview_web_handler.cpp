@@ -1,6 +1,7 @@
 
 
 #ifdef DEV_ENABLE_ROTATION
+#ifdef USE_WEB_SERVER
 #include "preview_web_handler.h"
 #include <esp_camera.h>
 #include <img_converters.h>
@@ -86,6 +87,7 @@ void PreviewWebHandler::handleRequest(web_server_idf::AsyncWebServerRequest *req
 
 }  // namespace esp32_camera_utils
 }  // namespace esphome
+#endif
 #endif
 
 

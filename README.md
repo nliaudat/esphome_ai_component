@@ -152,7 +152,7 @@ external_components:
 New optimized models are available for digit recognition that significantly improve performance:
 
 *   **Source**: [nliaudat/digit_recognizer](https://github.com/nliaudat/digit_recognizer)
-*   **Performance**: Capable of full image processing and 8-digit inference in **less than 500 ms**.
+*   **Performance**: Capable of full image processing and 8-digit inference in **less than 270 ms**.
 
 These models are recommended for faster response times and lower power consumption.
 

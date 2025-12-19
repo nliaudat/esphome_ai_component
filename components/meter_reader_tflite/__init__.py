@@ -5,7 +5,7 @@ import os
 import zlib
 from esphome.const import CONF_ID, CONF_MODEL, CONF_ROTATION, CONF_NAME, CONF_DISABLED_BY_DEFAULT, CONF_INTERNAL, CONF_ICON, CONF_FORCE_UPDATE
 from esphome.core import CORE, HexInt
-from esphome.components import esp32, sensor, text_sensor
+from esphome.components import esp32, sensor, text_sensor, button
 
 import esphome.components.esp32_camera as esp32_camera
 from esphome.cpp_generator import RawExpression
@@ -34,6 +34,7 @@ CONF_DEBUG_MEMORY = 'debug_memory'
 CONF_ROTATION = 'rotation'
 CONF_PREVIEW = 'preview_camera'
 CONF_GENERATE_PREVIEW = 'generate_preview'
+CONF_START_FLASH_CALIBRATION_BUTTON = 'start_flash_calibration_button'
 
 # Rotation options mapping
 ROTATION_OPTIONS = {
@@ -115,6 +116,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("confidence_sensor"): cv.use_id(sensor.Sensor),
     cv.Optional("inference_logs"): cv.use_id(text_sensor.TextSensor),
     cv.Optional("main_logs"): cv.use_id(text_sensor.TextSensor),
+    cv.Optional(CONF_START_FLASH_CALIBRATION_BUTTON): cv.use_id(button.Button),
     cv.Optional(CONF_GENERATE_PREVIEW, default=False): cv.boolean,
     cv.Optional("enable_rotation", default=False): cv.boolean,
     cv.Optional("show_crop_areas", default=True): cv.boolean,
@@ -430,3 +432,10 @@ async def to_code(config):
     if camera_utils_id:
         utils_var = await cg.get_variable(camera_utils_id)
         cg.add(var.set_esp32_camera_utils(utils_var))
+    if CONF_START_FLASH_CALIBRATION_BUTTON in config:
+        b = await cg.get_variable(config[CONF_START_FLASH_CALIBRATION_BUTTON])
+        cg.add(b.set_on_press_callback(
+            cg.Lambda(
+                f"id({var.get_id()})->start_flash_calibration();"
+            )
+        ))
