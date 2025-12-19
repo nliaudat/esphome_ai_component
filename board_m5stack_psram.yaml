@@ -1,0 +1,78 @@
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  min_version: ${esphome_min_version}
+  name_add_mac_suffix: False
+  project:
+    name: "nliaudat.meter-reader"
+    version: "${revision}.dev"
+  platformio_options:
+    board_build.f_cpu: 240000000L
+    board_build.f_flash: 80000000L
+    # board_build.partitions: huge_app.csv
+    board_name: M5Stack Camera PSRAM
+    board_build.extra_flags: 
+    - -DBOARD_HAS_PSRAM 
+    - -DTF_LITE_STATIC_MEMORY # for tflite micro
+    - -DTF_LITE_DISABLE_X86_NEON #for tflite micro
+    - -DESP_NN  #use hardware acceleration : https://github.com/espressif/esp-nn (only if using tflite)
+
+substitutions:
+  board: m5stack-core-esp32
+  framework: esp-idf 
+
+  # Camera Pins
+  external_clock_pin: GPIO27
+  external_clock_frequency: 20MHz
+  i2c_pins_sda: GPIO25
+  i2c_pins_scl: GPIO23
+  data_pins:
+    - GPIO32  # CAM_D0
+    - GPIO35  # CAM_D1
+    - GPIO34  # CAM_D2
+    - GPIO5   # CAM_D3
+    - GPIO39  # CAM_D4
+    - GPIO18  # CAM_D5
+    - GPIO36  # CAM_D6
+    - GPIO19  # CAM_D7
+  vsync_pin: GPIO22
+  href_pin: GPIO26
+  pixel_clock_pin: GPIO21
+  
+  # Power Down / Reset
+  camera_pwdn_pin: "-1"
+  camera_reset_pin: GPIO15
+
+  # LED Pins
+  status_led_pin: GPIO33
+  flash_led_pin: GPIO4
+
+esp32:
+  board: ${board}
+  flash_size: 4MB # Typically 4MB, some models 16MB
+  framework:
+    type: ${framework}
+    version: recommended
+    sdkconfig_options:
+      CONFIG_ESP32_SPIRAM_SUPPORT: y
+
+psram:
+
+light:
+  - platform: binary
+    output: flash_light_output
+    name: "${name} Flash Light"
+    id: ${id_prefix}flash
+  - platform: binary
+    output: status_led_output
+    name: "${name} Status LED"
+    id: ${id_prefix}light
+
+output:
+  - platform: gpio
+    pin: ${flash_led_pin}
+    id: flash_light_output
+  - platform: gpio
+    pin: ${status_led_pin}
+    id: status_led_output
+    inverted: true
