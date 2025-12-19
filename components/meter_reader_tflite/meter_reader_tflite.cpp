@@ -820,6 +820,11 @@ void MeterReaderTFLite::inference_task(void *arg) {
 
 
 void MeterReaderTFLite::start_flash_calibration() {
+    if (!enable_flash_calibration_) {
+        ESP_LOGW(TAG, "Flash calibration is disabled in config");
+        if (main_logs_) main_logs_->publish_state("Flash calibration disabled");
+        return;
+    }
     ESP_LOGI(TAG, "Starting flash calibration...");
     if (main_logs_) main_logs_->publish_state("Starting flash calibration...");
 
@@ -846,6 +851,7 @@ void MeterReaderTFLite::start_flash_calibration() {
 }
 
 void MeterReaderTFLite::update_calibration(float confidence) {
+    if (!enable_flash_calibration_) return;
     if (!is_calibrating()) return;
 
     char log_msg[100];

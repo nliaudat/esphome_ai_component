@@ -110,8 +110,8 @@ esp32_camera_utils:
 flash_light_controller:
   id: flash_controller
   flash_light: ${id_prefix}flash
-  flash_pre_time: 7000ms # 7 seconds before update (time to stabilize) (works with 4sec on my board)
-  flash_post_time: 2000ms # 2 seconds after update (works with 100ms on my board)
+  flash_pre_time: 7000ms # 7 seconds before update (time to stabilize) (works with 5sec on my board)
+  flash_post_time: 200ms # 2 seconds after update (works with 100ms on my board)
   debug: true
 
 
@@ -151,6 +151,8 @@ meter_reader_tflite:
   confidence_sensor: meter_confidence
   inference_logs: inference_logs
   main_logs: main_logs
+  
+  enable_flash_calibration: false # still in dev
 
   ### Advanced parameters
   # frame_request_timeout: 15000  # ms (1000-60000)

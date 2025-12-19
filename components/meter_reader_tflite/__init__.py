@@ -120,6 +120,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_GENERATE_PREVIEW, default=False): cv.boolean,
     cv.Optional("enable_rotation", default=False): cv.boolean,
     cv.Optional("show_crop_areas", default=True): cv.boolean,
+    cv.Optional("enable_flash_calibration", default=False): cv.boolean,
     # cv.Optional(CONF_PREVIEW): camera_component.CAMERA_SCHEMA.extend({
     #     cv.GenerateID(): cv.declare_id(MeterPreviewCamera),
     # }),
@@ -439,3 +440,7 @@ async def to_code(config):
                 f"id({var.get_id()})->start_flash_calibration();"
             )
         ))
+
+    if config.get("enable_flash_calibration", False):
+         cg.add(var.set_enable_flash_calibration(True))
+

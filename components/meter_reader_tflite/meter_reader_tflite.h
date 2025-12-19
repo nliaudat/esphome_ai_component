@@ -160,6 +160,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_flash_pre_time(uint32_t ms);
   void set_flash_post_time(uint32_t ms);
   void force_flash_inference(); // Service
+  void set_enable_flash_calibration(bool enable) { enable_flash_calibration_ = enable; }
 
   // Calibration
   void start_flash_calibration();
@@ -233,6 +234,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   bool show_crop_areas_{true};
   bool debug_memory_enabled_{false}; // Runtime flag
   bool window_active_{false};
+  bool enable_flash_calibration_{false};
 
   // Calibration
   struct FlashCalibrationHandler {
