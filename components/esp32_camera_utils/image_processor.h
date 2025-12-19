@@ -160,12 +160,9 @@ class ImageProcessor {
       uint8_t* output_buffer,
       size_t output_buffer_size);
 
-  // Rotation helper
-  bool apply_software_rotation(const uint8_t* src, uint8_t* dst, int width, int height, int channels, float angle, int& new_width, int& new_height);
 
-  /*
-   * Validate zone boundaries
-   */
+
+  // Validate zone boundaries
 
   bool validate_zone(const CropZone &zone) const;
   
@@ -243,9 +240,9 @@ public:
   static std::shared_ptr<camera::CameraImage> generate_rotated_preview(
       std::shared_ptr<camera::CameraImage> source, 
       float rotation, int width, int height);
+#endif
 
-  // ... (existing declarations)
-  
+#if defined(USE_CAMERA_ROTATOR) || defined(DEV_ENABLE_ROTATION)
   // Software rotation for arbitrary angles
   [[nodiscard]] static bool apply_software_rotation(
       const uint8_t* input, uint8_t* output,
