@@ -335,6 +335,12 @@ void MeterReaderTFLite::loop() {
             // Reconstruct combined reading
             float final_val = combine_readings(res_ptr->readings);
             
+            #ifdef DEBUG_METER_READER_MEMORY
+            if (debug_memory_enabled_ && tensor_arena_used_sensor_) {
+                  tensor_arena_used_sensor_->publish_state(res_ptr->arena_used_bytes);
+            }
+            #endif
+
             // Validate
             // Use Average Confidence to match Single Core logic
             float avg_conf = 0.0f;
@@ -348,6 +354,16 @@ void MeterReaderTFLite::loop() {
                 float validated_val = 0.0f;
                 bool valid = validate_and_update_reading(final_val, avg_conf, validated_val);
                 
+                if (inference_logs_) {
+                     // Publish to inference logs text sensor
+                     char inference_log[150];
+                     snprintf(inference_log, sizeof(inference_log),
+                              "Reading: %.1f -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%%)",
+                              final_val, validated_val, valid ? "yes" : "no",
+                              avg_conf * 100.0f, confidence_threshold_ * 100.0f);
+                     inference_logs_->publish_state(inference_log);
+                }
+
                 // Publish (matches process_full_image logic)
                 if (valid && avg_conf >= confidence_threshold_) {
                      ESP_LOGI(TAG, "Result: VALID (Raw: %.0f, Conf: %.2f)", final_val, avg_conf);
@@ -796,6 +812,9 @@ void MeterReaderTFLite::inference_task(void *arg) {
             InferenceResult* res = allocate_inference_result();
             res->inference_time = millis() - start;
             res->total_start_time = job->start_time;
+            #ifdef DEBUG_METER_READER_MEMORY
+            res->arena_used_bytes = self->tflite_coord_.get_arena_used_bytes();
+            #endif
             res->success = true;
             
             for (auto& r : tflite_results) {

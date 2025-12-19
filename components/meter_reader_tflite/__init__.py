@@ -3,7 +3,7 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 import os
 import zlib
-from esphome.const import CONF_ID, CONF_MODEL, CONF_ROTATION, CONF_NAME, CONF_DISABLED_BY_DEFAULT, CONF_INTERNAL, CONF_ICON, CONF_FORCE_UPDATE
+from esphome.const import CONF_ID, CONF_MODEL, CONF_ROTATION, CONF_NAME, CONF_DISABLED_BY_DEFAULT, CONF_INTERNAL, CONF_ICON, CONF_FORCE_UPDATE, CONF_ENTITY_CATEGORY
 from esphome.core import CORE, HexInt
 from esphome.components import esp32, sensor, text_sensor, button
 
@@ -307,11 +307,10 @@ async def to_code(config):
                 CONF_INTERNAL: False,
                 CONF_ICON: icon,
                 CONF_FORCE_UPDATE: False,
+                CONF_ENTITY_CATEGORY: cv.entity_category("diagnostic"),
             }
             
             # sens = await sensor.new_sensor(sens_conf)
-            # Use cg.new_Pvariable logic directly if new_sensor continues to fail on missing keys?
-            # No, new_sensor calls setup_entity which needs these keys.
             sens = await sensor.new_sensor(sens_conf)
             
             cg.add(sens.set_unit_of_measurement(unit))
