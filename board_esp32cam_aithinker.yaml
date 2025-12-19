@@ -19,7 +19,7 @@ esphome:
 
 substitutions:
   board: esp32cam
-  framework: esp-idf 
+  framework: esp-idf
 
   # Camera Pins
   external_clock_pin: GPIO0

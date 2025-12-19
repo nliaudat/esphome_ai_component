@@ -22,3 +22,4 @@ secrets.yaml
 test.yaml
 /fuzz_logs
 fuzz_test_*.yaml
+wiki_boards.md

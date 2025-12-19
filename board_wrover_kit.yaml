@@ -19,7 +19,7 @@ esphome:
 
 substitutions:
   board: esp-wrover-kit
-  framework: esp-idf 
+  framework: esp-idf
 
   # Camera Pins
   external_clock_pin: GPIO21
