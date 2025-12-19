@@ -21,6 +21,4 @@ secrets.yaml
 .clang-format
 test.yaml
 /fuzz_logs
-fuzz_test_1.yaml
-fuzz_test_2.yaml
-fuzz_test_0.yaml
+fuzz_test_*.yaml
