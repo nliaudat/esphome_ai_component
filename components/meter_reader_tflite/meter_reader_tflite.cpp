@@ -8,6 +8,9 @@
 #include "esphome/components/esp32_camera_utils/preview_web_handler.h"
 #endif
 
+// Add missing include for DrawingUtils
+#include "esphome/components/esp32_camera_utils/drawing_utils.h"
+
 namespace esphome {
 namespace meter_reader_tflite {
 
@@ -83,6 +86,14 @@ static void free_inference_result(InferenceResult* res) {
 
 // Named constants for better readability (compile-time only)
 static constexpr uint32_t MODEL_LOAD_DELAY_MS = 10000;
+
+static constexpr uint32_t CALIBRATION_START_PRE_MS = 500;
+static constexpr uint32_t CALIBRATION_END_PRE_MS = 100;
+static constexpr uint32_t CALIBRATION_STEP_PRE_MS = 100;
+
+static constexpr uint32_t CALIBRATION_START_POST_MS = 500;
+static constexpr uint32_t CALIBRATION_END_POST_MS = 100;
+static constexpr uint32_t CALIBRATION_STEP_POST_MS = 100;
 
 #define METER_DURATION_START(name) uint32_t start_time = millis();
 #define METER_DURATION_END(name) ESP_LOGD(TAG, "%s took %u ms", name, millis() - start_time)
@@ -401,29 +412,22 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
 
              // Draw Crop Zones if enabled
              if (show_crop_areas_) {
+                 #ifdef USE_CAMERA_DRAWING
                  auto zones = crop_zone_handler_.get_zones();
                  uint8_t* buf = preview->get_data_buffer();
                  int w = rotated_preview->get_width();
                  int h = rotated_preview->get_height();
-                 // Assuming Preview is RGB565 or RGB888. DrawingUtils handles both?
-                 // DrawingUtils signatures take 'channels'.
-                 // We need to know the format of the preview.
-                 // ImageProcessor::generate_rotated_preview usually returns RGB565 for display.
-                 // Let's assume RGB565 (2 bytes) for now as that's standard for ESPHome Camera.
                  
-                 // However, we should check pixel format if possible, but CameraImage usually abstracts it.
-                 // Safe bet: RGB565 is 2 channels. 
-                 
-                 // Color: Light Green (0x9FD3 or similar). 0x07E0 is pure green.
-                 uint16_t color = 0x07E0; 
+                 // Assuming Preview is RGB565 (standard)
+                 uint16_t color = 0x07E0; // Light Green
                  
                  for (const auto& z : zones) {
-                     // Zones are in the same coordinate space as the preview (rotated)
                      esphome::esp32_camera_utils::DrawingUtils::draw_rectangle(
                          buf, z.x1, z.y1, z.x2 - z.x1, z.y2 - z.y1,
                          w, h, 2, color
                      );
                  }
+                 #endif
              }
              update_preview_image(preview);
          }
@@ -821,13 +825,13 @@ void MeterReaderTFLite::start_flash_calibration() {
 
     // Initialize/Reset Calibration State
     calibration_.state = FlashCalibrationHandler::CALIBRATING_PRE;
-    calibration_.start_pre = 500; // Start high
-    calibration_.end_pre = 100;   // End low
-    calibration_.step_pre = 100;
+    calibration_.start_pre = CALIBRATION_START_PRE_MS; 
+    calibration_.end_pre = CALIBRATION_END_PRE_MS;   
+    calibration_.step_pre = CALIBRATION_STEP_PRE_MS;
     
-    calibration_.start_post = 500;
-    calibration_.end_post = 100;
-    calibration_.step_post = 100;
+    calibration_.start_post = CALIBRATION_START_POST_MS;
+    calibration_.end_post = CALIBRATION_END_POST_MS;
+    calibration_.step_post = CALIBRATION_STEP_POST_MS;
 
     calibration_.current_pre = calibration_.start_pre;
     calibration_.current_post = calibration_.start_post; // Start with safe/long post
@@ -892,55 +896,38 @@ void MeterReaderTFLite::update_calibration(float confidence) {
     if (main_logs_) main_logs_->publish_state(log_msg);
     if (inference_logs_) inference_logs_->publish_state(log_msg);
     
-    if (calibration_.state != FlashCalibrationHandler::FINISHED) { // && next_step logic
-            // Advance parameters
-            if (next_step) {
-                if (calibration_.state == FlashCalibrationHandler::CALIBRATING_PRE) {
-                    if (calibration_.current_pre > (calibration_.end_pre + calibration_.step_pre)) {
-                        calibration_.current_pre -= calibration_.step_pre;
-                    } else {
-                        // Reached end of range
-                        calibration_.state = FlashCalibrationHandler::CALIBRATING_POST;
-                        calibration_.current_pre = calibration_.best_pre;
-                        calibration_.current_post = calibration_.start_post;
-                    }
-                } else {
-                    if (calibration_.current_post > (calibration_.end_post + calibration_.step_post)) {
-                        calibration_.current_post -= calibration_.step_post;
-                    } else {
-                        calibration_.state = FlashCalibrationHandler::FINISHED;
-                    }
-                }
-                
-                if (calibration_.state != FlashCalibrationHandler::FINISHED) {
-                    // Setting timing
-                    flashlight_coord_.set_timing(calibration_.current_pre, calibration_.current_post);
-                    this->set_timeout(1000, [this](){
-                        force_flash_inference();
-                    });
-                } else {
-                    // Finished at end of range
-                    char fin[100];
-                    snprintf(fin, sizeof(fin), "Done. Optimal: Pre=%ums, Post=%ums", calibration_.best_pre, calibration_.best_post);
-                    if (main_logs_) main_logs_->publish_state(fin);
-                    if (inference_logs_) inference_logs_->publish_state(fin);
-                    
-                    // Reset to IDLE so normal operation resumes
-                    calibration_.state = FlashCalibrationHandler::IDLE;
-                }
+    if (calibration_.state != FlashCalibrationHandler::FINISHED && next_step) {
+        // Advance parameters
+        if (calibration_.state == FlashCalibrationHandler::CALIBRATING_PRE) {
+            if (calibration_.current_pre > (calibration_.end_pre + calibration_.step_pre)) {
+                calibration_.current_pre -= calibration_.step_pre;
             } else {
-                // Failed case logic above handles state transitions
-                if (calibration_.state != FlashCalibrationHandler::FINISHED) {
-                        flashlight_coord_.set_timing(calibration_.current_pre, calibration_.current_post);
-                        this->set_timeout(1000, [this](){
-                        force_flash_inference();
-                        });
-                }
+                // Reached end of range
+                calibration_.state = FlashCalibrationHandler::CALIBRATING_POST;
+                calibration_.current_pre = calibration_.best_pre;
+                calibration_.current_post = calibration_.start_post;
             }
+        } else {
+            if (calibration_.current_post > (calibration_.end_post + calibration_.step_post)) {
+                calibration_.current_post -= calibration_.step_post;
+            } else {
+                calibration_.state = FlashCalibrationHandler::FINISHED;
+            }
+        }
     }
 
-    // Safety: Ensure we reset to IDLE if we finished anywhere above
-    if (calibration_.state == FlashCalibrationHandler::FINISHED) {
-        calibration_.state = FlashCalibrationHandler::IDLE;
+    if (calibration_.state != FlashCalibrationHandler::FINISHED) { 
+        flashlight_coord_.set_timing(calibration_.current_pre, calibration_.current_post); 
+        this->set_timeout(1000, [this](){ 
+            force_flash_inference(); 
+        }); 
+    } else { 
+        // Finished, do final logging 
+        char fin[100];
+        snprintf(fin, sizeof(fin), "Done. Optimal: Pre=%ums, Post=%ums", calibration_.best_pre, calibration_.best_post);
+        if (main_logs_) main_logs_->publish_state(fin);
+        if (inference_logs_) inference_logs_->publish_state(fin);
+
+        calibration_.state = FlashCalibrationHandler::IDLE; 
     }
 }
