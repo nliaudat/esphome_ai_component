@@ -2,7 +2,7 @@ esphome:
   name: ${name}
   friendly_name: ${friendly_name}
   min_version: ${esphome_min_version}
-  name_add_mac_suffix: False
+  name_add_mac_suffix: True
   project:
     name: "nliaudat.meter-reader"
     version: "${revision}.dev"
@@ -23,7 +23,7 @@ substitutions:
 
   # Camera Pins
   external_clock_pin: GPIO0
-  external_clock_frequency: 20MHz
+  external_clock_frequency: 10MHz
   i2c_pins_sda: GPIO26
   i2c_pins_scl: GPIO27
   data_pins:
