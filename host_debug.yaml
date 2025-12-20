@@ -2,12 +2,13 @@ esphome:
   name: host-test
   build_path: .esphome/build/host_test
 
-host:
 
+host:
+  mac_address: "02:00:00:00:00:00"
 
 external_components:
   - source: components
-    components: [ meter_reader_tflite, tflite_micro_helper, esp32_camera_utils, flash_light_controller ]
+    components: [ meter_reader_tflite, tflite_micro_helper ]
 
 logger:
 
@@ -16,17 +17,26 @@ sensor:
   - platform: template
     name: "Mock Sensor"
     id: mock_sensor
+    lambda: return 42.0;
     
+  # Mock memory sensors to prevent errors if referenced
+  - platform: template
+    name: "Mock Heap"
+    id: mock_heap
+    lambda: return 100000.0;
+
 text_sensor:
   - platform: template
     name: "Mock Text"
     id: mock_text
+    lambda: return std::string("Ready");
 
 meter_reader_tflite:
   id: meter_reader
   camera_id: mock_cam 
   model: "digit_recognizer_v4_10cls_GRAY.tflite"
   debug_image: true # Required for host to have an image source
+  debug: true
   
   # Link outputs
   value_sensor: mock_sensor
