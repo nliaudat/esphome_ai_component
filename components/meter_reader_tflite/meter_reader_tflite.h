@@ -47,8 +47,10 @@ namespace esphome { namespace esp32_camera_utils {
 #include <atomic>
 
 // Check for Dual Core capability
+#ifndef USE_HOST
 #if !defined(CONFIG_FREERTOS_UNICORE) && (portNUM_PROCESSORS > 1)
     #define SUPPORT_DOUBLE_BUFFERING
+#endif
 #endif
 
 #ifdef SUPPORT_DOUBLE_BUFFERING

@@ -1,7 +1,9 @@
 #include "meter_reader_tflite.h"
 #include "esphome/core/application.h"
 
+#ifdef ESP32
 #include <esp_heap_caps.h>
+#endif
 #include <numeric>
 
 #ifdef USE_WEB_SERVER
@@ -9,7 +11,9 @@
 #endif
 
 // Add missing include for DrawingUtils
+#ifndef USE_HOST
 #include "esphome/components/esp32_camera_utils/drawing_utils.h"
+#endif
 
 namespace esphome {
 namespace meter_reader_tflite {
@@ -56,6 +60,9 @@ static void free_inference_job(InferenceJob* job) {
 }
 
 static InferenceResult* allocate_inference_result() {
+#ifdef USE_HOST
+    return new InferenceResult();
+#else
   for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
     if (!inference_result_used[i]) {
       inference_result_used[i] = true;
@@ -68,6 +75,7 @@ static InferenceResult* allocate_inference_result() {
   }
   ESP_LOGW(TAG, "InferenceResult pool exhausted – allocating on heap");
   return new InferenceResult();
+#endif
 }
 
 static void free_inference_result(InferenceResult* res) {
@@ -221,6 +229,7 @@ void MeterReaderTFLite::setup() {
     });
     
     #ifdef SUPPORT_DOUBLE_BUFFERING
+    #ifdef ESP32
     // 6. Setup Double Buffering Pipeline
     ESP_LOGI(TAG, "Initializing Double Buffering (Dual Core mode)...");
     input_queue_ = xQueueCreate(1, sizeof(InferenceJob*)); // Pointer depth 1 (Backpressure)
@@ -246,6 +255,7 @@ void MeterReaderTFLite::setup() {
         mark_failed(); return;
     }
     ESP_LOGI(TAG, "Double Buffering active on Core 0");
+    #endif
     #endif
 
     // Force Camera to Grayscale if using GRAY model (Workaround for YAML limit)
@@ -426,9 +436,9 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
              // Cast to RotatedPreviewImage to access width/height
              auto rotated_preview = std::static_pointer_cast<RotatedPreviewImage>(preview);
 
-             // Draw Crop Zones if enabled
              if (show_crop_areas_) {
                  #ifdef USE_CAMERA_DRAWING
+                 #ifndef USE_HOST
                  auto zones = crop_zone_handler_.get_zones();
                  uint8_t* buf = preview->get_data_buffer();
                  int w = rotated_preview->get_width();
@@ -443,6 +453,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
                          w, h, 2, color
                      );
                  }
+                 #endif
                  #endif
              }
              update_preview_image(preview);
@@ -494,8 +505,10 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     // Capture Peak Memory State *during* processing (buffers allocated)
     #ifdef DEBUG_METER_READER_MEMORY
     if (debug_memory_enabled_) {
+        #ifdef ESP32
         if (process_free_heap_sensor_) process_free_heap_sensor_->publish_state(heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
         if (process_free_psram_sensor_) process_free_psram_sensor_->publish_state(heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+        #endif
     }
     #endif
 

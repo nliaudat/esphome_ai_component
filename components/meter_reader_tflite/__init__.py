@@ -10,7 +10,10 @@ from esphome.components import esp32, sensor, text_sensor, button
 import esphome.components.esp32_camera as esp32_camera
 from esphome.cpp_generator import RawExpression
 from esphome.components import globals
-import esphome.components.flash_light_controller as flash_light_controller
+try:
+    import esphome.components.flash_light_controller as flash_light_controller
+except ImportError:
+    flash_light_controller = None
 
 CODEOWNERS = ["@nl"]
 if CORE.target_platform == "esp32":
@@ -97,7 +100,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("process_free_heap_sensor"): cv.use_id(sensor.Sensor),
     cv.Optional("process_free_psram_sensor"): cv.use_id(sensor.Sensor),
 
-    cv.Optional(CONF_FLASH_LIGHT_CONTROLLER): cv.use_id(flash_light_controller.FlashLightController),
+    cv.Optional(CONF_FLASH_LIGHT_CONTROLLER): cv.use_id(flash_light_controller.FlashLightController) if flash_light_controller else cv.string,
     cv.Optional(CONF_CROP_ZONES): cv.use_id(globals.GlobalsComponent),
     # cv.Optional(CONF_CAMERA_WINDOW): cv.Any(
     # cv.Schema({  # Or detailed configuration
