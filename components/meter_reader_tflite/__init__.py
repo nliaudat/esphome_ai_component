@@ -3,14 +3,17 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 import os
 import zlib
-from esphome.const import CONF_ID, CONF_MODEL, CONF_ROTATION, CONF_NAME, CONF_DISABLED_BY_DEFAULT, CONF_INTERNAL, CONF_ICON, CONF_FORCE_UPDATE
+from esphome.const import CONF_ID, CONF_MODEL, CONF_ROTATION, CONF_NAME, CONF_DISABLED_BY_DEFAULT, CONF_INTERNAL, CONF_ICON, CONF_FORCE_UPDATE, CONF_ENTITY_CATEGORY
 from esphome.core import CORE, HexInt
 from esphome.components import esp32, sensor, text_sensor, button
 
 import esphome.components.esp32_camera as esp32_camera
 from esphome.cpp_generator import RawExpression
 from esphome.components import globals
-import esphome.components.flash_light_controller as flash_light_controller
+try:
+    import esphome.components.flash_light_controller as flash_light_controller
+except ImportError:
+    flash_light_controller = None
 
 CODEOWNERS = ["@nl"]
 if CORE.target_platform == "esp32":
@@ -97,7 +100,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("process_free_heap_sensor"): cv.use_id(sensor.Sensor),
     cv.Optional("process_free_psram_sensor"): cv.use_id(sensor.Sensor),
 
-    cv.Optional(CONF_FLASH_LIGHT_CONTROLLER): cv.use_id(flash_light_controller.FlashLightController),
+    cv.Optional(CONF_FLASH_LIGHT_CONTROLLER): cv.use_id(flash_light_controller.FlashLightController) if flash_light_controller else cv.string,
     cv.Optional(CONF_CROP_ZONES): cv.use_id(globals.GlobalsComponent),
     # cv.Optional(CONF_CAMERA_WINDOW): cv.Any(
     # cv.Schema({  # Or detailed configuration
@@ -120,6 +123,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_GENERATE_PREVIEW, default=False): cv.boolean,
     cv.Optional("enable_rotation", default=False): cv.boolean,
     cv.Optional("show_crop_areas", default=True): cv.boolean,
+    cv.Optional("enable_flash_calibration", default=False): cv.boolean,
     # cv.Optional(CONF_PREVIEW): camera_component.CAMERA_SCHEMA.extend({
     #     cv.GenerateID(): cv.declare_id(MeterPreviewCamera),
     # }),
@@ -306,11 +310,10 @@ async def to_code(config):
                 CONF_INTERNAL: False,
                 CONF_ICON: icon,
                 CONF_FORCE_UPDATE: False,
+                CONF_ENTITY_CATEGORY: cv.entity_category("diagnostic"),
             }
             
             # sens = await sensor.new_sensor(sens_conf)
-            # Use cg.new_Pvariable logic directly if new_sensor continues to fail on missing keys?
-            # No, new_sensor calls setup_entity which needs these keys.
             sens = await sensor.new_sensor(sens_conf)
             
             cg.add(sens.set_unit_of_measurement(unit))
@@ -439,3 +442,7 @@ async def to_code(config):
                 f"id({var.get_id()})->start_flash_calibration();"
             )
         ))
+
+    if config.get("enable_flash_calibration", False):
+         cg.add(var.set_enable_flash_calibration(True))
+

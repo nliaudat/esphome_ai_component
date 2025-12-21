@@ -1,7 +1,9 @@
 #include "meter_reader_tflite.h"
 #include "esphome/core/application.h"
 
+#ifdef ESP32
 #include <esp_heap_caps.h>
+#endif
 #include <numeric>
 
 #ifdef USE_WEB_SERVER
@@ -9,7 +11,9 @@
 #endif
 
 // Add missing include for DrawingUtils
+#ifndef USE_HOST
 #include "esphome/components/esp32_camera_utils/drawing_utils.h"
+#endif
 
 namespace esphome {
 namespace meter_reader_tflite {
@@ -56,6 +60,9 @@ static void free_inference_job(InferenceJob* job) {
 }
 
 static InferenceResult* allocate_inference_result() {
+#ifdef USE_HOST
+    return new InferenceResult();
+#else
   for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
     if (!inference_result_used[i]) {
       inference_result_used[i] = true;
@@ -68,6 +75,7 @@ static InferenceResult* allocate_inference_result() {
   }
   ESP_LOGW(TAG, "InferenceResult pool exhausted – allocating on heap");
   return new InferenceResult();
+#endif
 }
 
 static void free_inference_result(InferenceResult* res) {
@@ -221,6 +229,7 @@ void MeterReaderTFLite::setup() {
     });
     
     #ifdef SUPPORT_DOUBLE_BUFFERING
+    #ifdef ESP32
     // 6. Setup Double Buffering Pipeline
     ESP_LOGI(TAG, "Initializing Double Buffering (Dual Core mode)...");
     input_queue_ = xQueueCreate(1, sizeof(InferenceJob*)); // Pointer depth 1 (Backpressure)
@@ -246,6 +255,7 @@ void MeterReaderTFLite::setup() {
         mark_failed(); return;
     }
     ESP_LOGI(TAG, "Double Buffering active on Core 0");
+    #endif
     #endif
 
     // Force Camera to Grayscale if using GRAY model (Workaround for YAML limit)
@@ -335,6 +345,12 @@ void MeterReaderTFLite::loop() {
             // Reconstruct combined reading
             float final_val = combine_readings(res_ptr->readings);
             
+            #ifdef DEBUG_METER_READER_MEMORY
+            if (debug_memory_enabled_ && tensor_arena_used_sensor_) {
+                  tensor_arena_used_sensor_->publish_state(res_ptr->arena_used_bytes);
+            }
+            #endif
+
             // Validate
             // Use Average Confidence to match Single Core logic
             float avg_conf = 0.0f;
@@ -348,6 +364,16 @@ void MeterReaderTFLite::loop() {
                 float validated_val = 0.0f;
                 bool valid = validate_and_update_reading(final_val, avg_conf, validated_val);
                 
+                if (inference_logs_) {
+                     // Publish to inference logs text sensor
+                     char inference_log[150];
+                     snprintf(inference_log, sizeof(inference_log),
+                              "Reading: %.1f -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%%)",
+                              final_val, validated_val, valid ? "yes" : "no",
+                              avg_conf * 100.0f, confidence_threshold_ * 100.0f);
+                     inference_logs_->publish_state(inference_log);
+                }
+
                 // Publish (matches process_full_image logic)
                 if (valid && avg_conf >= confidence_threshold_) {
                      ESP_LOGI(TAG, "Result: VALID (Raw: %.0f, Conf: %.2f)", final_val, avg_conf);
@@ -410,9 +436,9 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
              // Cast to RotatedPreviewImage to access width/height
              auto rotated_preview = std::static_pointer_cast<RotatedPreviewImage>(preview);
 
-             // Draw Crop Zones if enabled
              if (show_crop_areas_) {
                  #ifdef USE_CAMERA_DRAWING
+                 #ifndef USE_HOST
                  auto zones = crop_zone_handler_.get_zones();
                  uint8_t* buf = preview->get_data_buffer();
                  int w = rotated_preview->get_width();
@@ -427,6 +453,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
                          w, h, 2, color
                      );
                  }
+                 #endif
                  #endif
              }
              update_preview_image(preview);
@@ -478,8 +505,10 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     // Capture Peak Memory State *during* processing (buffers allocated)
     #ifdef DEBUG_METER_READER_MEMORY
     if (debug_memory_enabled_) {
+        #ifdef ESP32
         if (process_free_heap_sensor_) process_free_heap_sensor_->publish_state(heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
         if (process_free_psram_sensor_) process_free_psram_sensor_->publish_state(heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+        #endif
     }
     #endif
 
@@ -796,6 +825,9 @@ void MeterReaderTFLite::inference_task(void *arg) {
             InferenceResult* res = allocate_inference_result();
             res->inference_time = millis() - start;
             res->total_start_time = job->start_time;
+            #ifdef DEBUG_METER_READER_MEMORY
+            res->arena_used_bytes = self->tflite_coord_.get_arena_used_bytes();
+            #endif
             res->success = true;
             
             for (auto& r : tflite_results) {
@@ -820,6 +852,11 @@ void MeterReaderTFLite::inference_task(void *arg) {
 
 
 void MeterReaderTFLite::start_flash_calibration() {
+    if (!enable_flash_calibration_) {
+        ESP_LOGW(TAG, "Flash calibration is disabled in config");
+        if (main_logs_) main_logs_->publish_state("Flash calibration disabled");
+        return;
+    }
     ESP_LOGI(TAG, "Starting flash calibration...");
     if (main_logs_) main_logs_->publish_state("Starting flash calibration...");
 
@@ -846,6 +883,7 @@ void MeterReaderTFLite::start_flash_calibration() {
 }
 
 void MeterReaderTFLite::update_calibration(float confidence) {
+    if (!enable_flash_calibration_) return;
     if (!is_calibrating()) return;
 
     char log_msg[100];

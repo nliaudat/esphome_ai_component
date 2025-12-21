@@ -14,10 +14,6 @@ Current Flow (likely): Sensor -> JPEG (Encoded) -> Transfer -> JPEG Decode (Soft
 Grayscale Flow: Sensor -> Gray (Raw) -> Transfer -> Resize -> Model.
 Savings: You completely eliminate the JPEG Decoding step, which is computationally expensive on the ESP32. You also reduce memory bandwidth if processing 1 byte/pixel vs 2 or 3.
 
-### implement arbitrary rotation
-- Support float rotation values (0-360 degrees)
-- Nearest Neighbor interpolation for preview images
-- Dynamic bounding box calculation
 
 ## done in order of make : 
 
@@ -40,6 +36,19 @@ Savings: You completely eliminate the JPEG Decoding step, which is computational
 - Fix input size mismatch error
 - Restore detailed debug logging
 
+### implement arbitrary rotation
+- Support float rotation values (0-360 degrees)
+- Nearest Neighbor interpolation for preview images
+- Dynamic bounding box calculation
+
+### add fuzz testing
+- Added `fuzz_parallel.py` and test cases
+- Helper scripts for robust testing
+
+### add web server support
+- Added `USE_WEB_SERVER` macro
+- Integration with `web_server` component
+
 ### expose configuration parameters
 - Debug logging for multiple components
 - Camera window parameters (offset_x, offset_y, width, height)
@@ -51,3 +60,19 @@ Savings: You completely eliminate the JPEG Decoding step, which is computational
 - Ensure update interval setting is respected and dynamically applied
 - Fix `number` component interaction
 - Ensure immediate effect on polling schedule
+
+### add new boards support
+- Added configurations for Seeed Studio XIAO ESP32S3, Freenove, etc.
+- Modularized board configurations
+
+### disable flash calibration
+- Added `enable_flash_calibration` config parameter (default false)
+- Guarded `start_flash_calibration` and `update_calibration` logic
+
+### fix debug sensors
+- Fixed `Tensor Arena Used` sensor update in double-buffering mode
+- Set `entity_category: diagnostic` for debug sensors
+
+### fix regressions
+- Guarded `arena_used_bytes` with `DEBUG_METER_READER_MEMORY`
+- Restored `inference_logs` update in async loop

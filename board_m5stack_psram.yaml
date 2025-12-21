@@ -19,7 +19,7 @@ esphome:
 
 substitutions:
   board: m5stack-core-esp32
-  framework: esp-idf 
+  framework: esp-idf
 
   # Camera Pins
   external_clock_pin: GPIO27
