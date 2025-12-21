@@ -21,9 +21,13 @@ external_components:
 
 substitutions:
 
-  name: s3cam-tflite #no special caracters
-  friendly_name: "S3 camera tflite"
-  id_prefix: "s3_cam_tflite" #if you have more than one board, it could be usefull to remane all the "id:prefix_xxxx" with a decicaded prefix
+  # name: s3cam-tflite #no special caracters
+  # friendly_name: "S3 camera tflite"
+  # id_prefix: "s3_cam_tflite" #if you have more than one board, it could be usefull to remane all the "id:prefix_xxxx" with a decicaded prefix
+  name: esp-cam-2mb #no special caracters
+  friendly_name: "esp-cam-2mb"
+  id_prefix: "esp_cam_2mb" #if you have more than one board, it could be usefull to remane all the "id:prefix_xxxx" with a decicaded prefix
+ 
   revision: "1.2"
   esphome_min_version: "2025.12.0"
 
@@ -80,11 +84,11 @@ esp32_camera_utils:
   camera_id: ${id_prefix}espcam
   debug: true
   ### zoom availale for OV2640, OV3660, OV5640, SC101IOT, SC030IOT from crop zones (explicit)
-  camera_window:  # can be set in http://[hassio]/developer-tools/action > esphome.[s3cam_tflite]_set_camera_window
-    offset_x: 928 # multiple of 4
-    offset_y: 480 # multiple of 4
-    width: 448 # multiple of 4 and 4:3 proportions with height for best quality
-    height: 88 #  multiple of 4 and 4:3 proportions with width for best quality
+  # camera_window:  # can be set in http://[hassio]/developer-tools/action > esphome.[s3cam_tflite]_set_camera_window
+  #   offset_x: 928 # multiple of 4
+  #   offset_y: 480 # multiple of 4
+  #   width: 448 # multiple of 4 and 4:3 proportions with height for best quality
+  #   height: 88 #  multiple of 4 and 4:3 proportions with width for best quality
 
   # enable_rotation: true
   # rotation: 15 # 0, 90, 180, 270 (special case built-in "accelerated" for 90, 180, 270 )

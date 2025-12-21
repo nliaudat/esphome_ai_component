@@ -2,7 +2,11 @@ esphome:
   name: ${name}
   friendly_name: ${friendly_name}
   min_version: ${esphome_min_version}
-  name_add_mac_suffix: True
+  name_add_mac_suffix: False
+  on_boot:
+    priority: 999.0
+    then:
+      - delay: 500ms
   project:
     name: "nliaudat.meter-reader"
     version: "${revision}.dev"
@@ -23,7 +27,7 @@ substitutions:
 
   # Camera Pins
   external_clock_pin: GPIO0
-  external_clock_frequency: 10MHz
+  external_clock_frequency: 20MHz
   i2c_pins_sda: GPIO26
   i2c_pins_scl: GPIO27
   data_pins:
@@ -50,12 +54,34 @@ substitutions:
 esp32:
   board: ${board}
   flash_size: 4MB
+  cpu_frequency: 240MHZ
   framework:
     type: ${framework}
     version: recommended
     sdkconfig_options:
       CONFIG_ESP32_SPIRAM_SUPPORT: y
-      CONFIG_ESP32_SPIRAM_SPEED_40M: y
+      # CONFIG_ESP32_SPIRAM_SPEED_40M: y
+      CONFIG_COMPILER_OPTIMIZATION_PERF: y
+      CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY: "y"
+      CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP: "y"
+      # CONFIG_BT_ALLOCATION_FROM_SPIRAM_FIRST: "y"
+      # CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
+      CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: "y"
+      CONFIG_MBEDTLS_SSL_PROTO_TLS1_3: "y"
+      CONFIG_FATFS_LFN_STACK: "y" # to support long file name in sdcard
+      CONFIG_TASK_WDT: "y" # prevents watchdog timeouts
+      CONFIG_TASK_WDT_TIMEOUT_S: "30" # prevents watchdog timeouts
+      CONFIG_TASK_WDT_CHECK_IDLE_TASK_CPU0: "n" # prevents watchdog timeouts
+      ### needed by new jpeg camera : https://github.com/esphome/esphome/pull/9496
+      CONFIG_SPIRAM_SUPPORT: y
+      CONFIG_SPIRAM_USE_CAPS_ALLOC: y
+      CONFIG_SPIRAM_USE_MALLOC: y
+      CONFIG_LOG_DEFAULT_LEVEL: "0" # prevents "ESP-IDF" Guru Meditation Error
+      CONFIG_CAMERA_TASK_STACK_SIZE: "4096"
+      #### testing 
+      CONFIG_ESP32_DEFAULT_CPU_FREQ_240: y
+      CONFIG_FREERTOS_HZ: "1000"
+
 
 psram:
 
