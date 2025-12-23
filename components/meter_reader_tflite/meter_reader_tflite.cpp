@@ -21,15 +21,62 @@ namespace meter_reader_tflite {
 static const char *const TAG = "meter_reader_tflite";
 
 #ifdef SUPPORT_DOUBLE_BUFFERING
-// Simple fixed-size object pools for InferenceJob and InferenceResult
+// Dynamic object pools for InferenceJob and InferenceResult
 using InferenceJob = MeterReaderTFLite::InferenceJob;
 using InferenceResult = MeterReaderTFLite::InferenceResult;
 
-static constexpr size_t INFERENCE_POOL_SIZE = 4;
-static InferenceJob inference_job_pool[INFERENCE_POOL_SIZE];
-static bool inference_job_used[INFERENCE_POOL_SIZE] = {false};
-static InferenceResult inference_result_pool[INFERENCE_POOL_SIZE];
-static bool inference_result_used[INFERENCE_POOL_SIZE] = {false};
+// Pool size determined at runtime based on available memory
+static size_t INFERENCE_POOL_SIZE = 4; // Will be adjusted in setup
+static constexpr size_t MIN_POOL_SIZE = 2;
+static constexpr size_t MAX_POOL_SIZE = 8;
+
+// Dynamic pool arrays (allocated at setup)
+static std::unique_ptr<InferenceJob[]> inference_job_pool;
+static std::unique_ptr<bool[]> inference_job_used;
+static std::unique_ptr<InferenceResult[]> inference_result_pool;
+static std::unique_ptr<bool[]> inference_result_used;
+
+// Pool efficiency statistics
+static std::atomic<uint32_t> pool_job_hits{0};
+static std::atomic<uint32_t> pool_job_misses{0};
+static std::atomic<uint32_t> pool_result_hits{0};
+static std::atomic<uint32_t> pool_result_misses{0};
+
+// Calculate optimal pool size based on available RAM
+// Conservative for ESP32, more aggressive for ESP32-S3 with PSRAM
+static size_t calculate_optimal_pool_size() {
+  size_t free_psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+  size_t free_internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+  size_t total_free = free_psram + free_internal;
+  
+  ESP_LOGD(TAG, "Memory available - PSRAM: %zu KB, Internal: %zu KB", 
+           free_psram / 1024, free_internal / 1024);
+  
+  // Each pool entry uses ~1-2KB (frame shared_ptr + crops vector + metadata)
+  // Strategy: Very conservative on ESP32, moderate on ESP32-S3
+  
+  if (free_psram > 4 * 1024 * 1024) {
+    // ESP32-S3 with >4MB PSRAM - can afford larger pool
+    ESP_LOGI(TAG, "High PSRAM detected, using MAX pool size");
+    return MAX_POOL_SIZE;
+  } else if (free_psram > 2 * 1024 * 1024) {
+    // ESP32-S3 with >2MB PSRAM - moderate pool
+    ESP_LOGI(TAG, "Moderate PSRAM detected, using 6-entry pool");
+    return 6;
+  } else if (free_internal > 200 * 1024) {
+    // ESP32 with good internal RAM - standard pool
+    ESP_LOGI(TAG, "Sufficient internal RAM, using 4-entry pool");
+    return 4;
+  } else if (free_internal > 150 * 1024) {
+    // ESP32 with limited RAM - conservative pool
+    ESP_LOGW(TAG, "Limited internal RAM, using 3-entry pool");
+    return 3;
+  } else {
+    // Very limited RAM - minimal pool
+    ESP_LOGW(TAG, "Low memory detected, using MIN pool size");
+    return MIN_POOL_SIZE;
+  }
+}
 
 static InferenceJob* allocate_inference_job() {
   for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
@@ -38,10 +85,17 @@ static InferenceJob* allocate_inference_job() {
       inference_job_pool[i].frame = nullptr;
       inference_job_pool[i].crops.clear();
       inference_job_pool[i].start_time = 0;
+      pool_job_hits++;
       return &inference_job_pool[i];
     }
   }
-  ESP_LOGW(TAG, "InferenceJob pool exhausted – allocating on heap");
+  
+  pool_job_misses++;
+  uint32_t total = pool_job_hits + pool_job_misses;
+  if (total > 0 && (total % 100 == 0)) {  // Log every 100 allocations
+    ESP_LOGW(TAG, "InferenceJob pool exhausted (efficiency: %.1f%%) – allocating on heap",
+             100.0f * pool_job_hits / total);
+  }
   return new InferenceJob();
 }
 
@@ -67,10 +121,17 @@ static InferenceResult* allocate_inference_result() {
       inference_result_pool[i].success = false;
       inference_result_pool[i].readings.clear();
       inference_result_pool[i].probabilities.clear();
+      pool_result_hits++;
       return &inference_result_pool[i];
     }
   }
-  ESP_LOGW(TAG, "InferenceResult pool exhausted – allocating on heap");
+  
+  pool_result_misses++;
+  uint32_t total = pool_result_hits + pool_result_misses;
+  if (total > 0 && (total % 100 == 0)) {  // Log every 100 allocations
+    ESP_LOGW(TAG, "InferenceResult pool exhausted (efficiency: %.1f%%) – allocating on heap",
+             100.0f * pool_result_hits / total);
+  }
   return new InferenceResult();
 }
 
@@ -84,6 +145,7 @@ static void free_inference_result(InferenceResult* res) {
   delete res;
 }
 #endif
+
 
 
 
@@ -224,9 +286,26 @@ void MeterReaderTFLite::setup() {
         ESP_LOGD(TAG, "Frame requested via coordinator callback");
     });
     
+    
     #ifdef SUPPORT_DOUBLE_BUFFERING
   
-    // 6. Setup Double Buffering Pipeline
+    // 6. Setup Inference Object Pools
+    INFERENCE_POOL_SIZE = calculate_optimal_pool_size();
+    ESP_LOGI(TAG, "Auto-configured inference pool size: %zu entries", INFERENCE_POOL_SIZE);
+    
+    // Allocate pools
+    inference_job_pool = std::make_unique<InferenceJob[]>(INFERENCE_POOL_SIZE);
+    inference_result_pool = std::make_unique<InferenceResult[]>(INFERENCE_POOL_SIZE);
+    inference_job_used = std::make_unique<bool[]>(INFERENCE_POOL_SIZE);
+    inference_result_used = std::make_unique<bool[]>(INFERENCE_POOL_SIZE);
+    
+    // Initialize used flags
+    for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
+        inference_job_used[i] = false;
+        inference_result_used[i] = false;
+    }
+    
+    // 7. Setup Double Buffering Pipeline
     ESP_LOGI(TAG, "Initializing Double Buffering (Dual Core mode)...");
     input_queue_ = xQueueCreate(1, sizeof(InferenceJob*)); // Pointer depth 1 (Backpressure)
     output_queue_ = xQueueCreate(2, sizeof(InferenceResult*)); // Pointer depth 2
@@ -386,6 +465,30 @@ void MeterReaderTFLite::loop() {
                      ESP_LOGI(TAG, "Result: INVALID (Raw: %.0f, Conf: %.2f)", final_val, avg_conf);
                 }
             }
+            
+            // Publish pool efficiency statistics
+            #ifdef DEBUG_METER_READER_MEMORY
+            static uint32_t last_pool_stats_publish = 0;
+            if (millis() - last_pool_stats_publish > 60000) {  // Every 60 seconds
+                last_pool_stats_publish = millis();
+                
+                if (pool_job_efficiency_sensor_) {
+                    uint32_t hits = pool_job_hits.load();
+                    uint32_t total = hits + pool_job_misses.load();
+                    if (total > 0) {
+                        pool_job_efficiency_sensor_->publish_state(100.0f * hits / total);
+                    }
+                }
+                
+                if (pool_result_efficiency_sensor_) {
+                    uint32_t hits = pool_result_hits.load();
+                    uint32_t total = hits + pool_result_misses.load();
+                    if (total > 0) {
+                        pool_result_efficiency_sensor_->publish_state(100.0f * hits / total);
+                    }
+                }
+            }
+            #endif
             
             // Cleanup
             free_inference_result(res_ptr);

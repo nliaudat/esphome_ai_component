@@ -99,6 +99,8 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("tensor_arena_used_sensor"): cv.use_id(sensor.Sensor),
     cv.Optional("process_free_heap_sensor"): cv.use_id(sensor.Sensor),
     cv.Optional("process_free_psram_sensor"): cv.use_id(sensor.Sensor),
+    cv.Optional("pool_job_efficiency_sensor"): cv.use_id(sensor.Sensor),
+    cv.Optional("pool_result_efficiency_sensor"): cv.use_id(sensor.Sensor),
 
     cv.Optional(CONF_FLASH_LIGHT_CONTROLLER): cv.use_id(flash_light_controller.FlashLightController) if flash_light_controller else cv.string,
     cv.Optional(CONF_CROP_ZONES): cv.use_id(globals.GlobalsComponent),
@@ -404,8 +406,27 @@ async def to_code(config):
         cg.add(var.set_frame_request_timeout(config[CONF_FRAME_REQUEST_TIMEOUT]))
     if CONF_HIGH_CONFIDENCE_THRESHOLD in config:
         cg.add(var.set_high_confidence_threshold(config[CONF_HIGH_CONFIDENCE_THRESHOLD]))
-    
+        
 
+    # Optional: Debug memory sensors
+    if "tensor_arena_size_sensor" in config:
+        sens = await cg.get_variable(config["tensor_arena_size_sensor"])
+        cg.add(var.set_tensor_arena_size_sensor(sens))
+    if "tensor_arena_used_sensor" in config:
+        sens = await cg.get_variable(config["tensor_arena_used_sensor"])
+        cg.add(var.set_tensor_arena_used_sensor(sens))
+    if "process_free_heap_sensor" in config:
+        sens = await cg.get_variable(config["process_free_heap_sensor"])
+        cg.add(var.set_process_free_heap_sensor(sens))
+    if "process_free_psram_sensor" in config:
+        sens = await cg.get_variable(config["process_free_psram_sensor"])
+        cg.add(var.set_process_free_psram_sensor(sens))
+    if "pool_job_efficiency_sensor" in config:
+        sens = await cg.get_variable(config["pool_job_efficiency_sensor"])
+        cg.add(var.set_pool_job_efficiency_sensor(sens))
+    if "pool_result_efficiency_sensor" in config:
+        sens = await cg.get_variable(config["pool_result_efficiency_sensor"])
+        cg.add(var.set_pool_result_efficiency_sensor(sens))
     
     
     if "value_sensor" in config:

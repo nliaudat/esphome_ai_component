@@ -148,6 +148,8 @@ meter_reader_tflite:
 
   value_sensor: ${id_prefix}_meter_value
   confidence_sensor: ${id_prefix}_meter_confidence
+  
+
   inference_logs: ${id_prefix}_inference_logs
   main_logs: ${id_prefix}_main_logs
   
@@ -158,6 +160,10 @@ meter_reader_tflite:
   ### Advanced parameters
   # frame_request_timeout: 15000  # ms (1000-60000)
   # high_confidence_threshold: 0.90  # (0.5-1.0)
+
+  # Pool efficiency monitoring (optional, requires DEBUG_METER_READER_MEMORY)
+  pool_job_efficiency_sensor: ${id_prefix}_pool_job_efficiency
+  pool_result_efficiency_sensor: ${id_prefix}_pool_result_efficiency
 
 
 packages:
