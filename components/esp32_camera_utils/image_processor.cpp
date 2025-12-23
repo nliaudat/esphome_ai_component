@@ -447,9 +447,33 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
 
   bool use_master_buffer = false;
   
+  // Memory Pressure Detection - Check available memory before deciding strategy
+  static constexpr size_t SPIRAM_RESERVE_THRESHOLD = 512 * 1024;  // 512KB reserve for PSRAM boards
+  static constexpr size_t INTERNAL_RESERVE_THRESHOLD = 100 * 1024; // 100KB reserve for non-PSRAM boards
+  
+  size_t free_spiram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+  size_t free_internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+  
+  bool low_memory = false;
+  if (free_spiram > 0) {
+      // PSRAM available - check if below threshold
+      low_memory = (free_spiram < SPIRAM_RESERVE_THRESHOLD);
+      if (low_memory) {
+          ESP_LOGW(TAG, "Low PSRAM detected (%zu KB free < %zu KB threshold), using zone-by-zone processing",
+                   free_spiram / 1024, SPIRAM_RESERVE_THRESHOLD / 1024);
+      }
+  } else {
+      // No PSRAM - check internal RAM (ESP32 without PSRAM)
+      low_memory = (free_internal < INTERNAL_RESERVE_THRESHOLD);
+      if (low_memory) {
+          ESP_LOGW(TAG, "Low internal RAM detected (%zu KB free < %zu KB threshold), using zone-by-zone processing",
+                   free_internal / 1024, INTERNAL_RESERVE_THRESHOLD / 1024);
+      }
+  }
+  
   // Decide if we should decode once
-  // Always true for JPEG to avoid N decodes
-  if (config_.pixel_format == "JPEG") {
+  // Use master buffer for JPEG if memory is available, otherwise process zone-by-zone
+  if (config_.pixel_format == "JPEG" && !low_memory) {
       use_master_buffer = true;
       
       const uint8_t *jpeg_data = image->get_data_buffer();
