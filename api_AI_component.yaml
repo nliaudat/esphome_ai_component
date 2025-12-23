@@ -6,8 +6,8 @@ api:
     - service: get_meter_data
       then:
         - lambda: |-
-            auto val = id(meter_reader).get_value_sensor()->state;
-            auto conf = id(meter_reader).get_confidence_sensor()->state;
+            auto val = id(${id_prefix}_meter_reader).get_value_sensor()->state;
+            auto conf = id(${id_prefix}_meter_reader).get_confidence_sensor()->state;
             // auto valid = ... (if we had a validation accessor)
             
             // Construct JSON response
@@ -24,11 +24,11 @@ api:
         zones: string
       then:
         - text_sensor.template.publish:
-            id: crop_zones_sensor
+            id: ${id_prefix}_crop_zones_sensor
             state: !lambda 'return zones;'
         - lambda: |-
-            id(crop_zones) = zones;  // Update global var
-            id(meter_reader).set_crop_zones(zones);
+            id(${id_prefix}_crop_zones) = zones;  // Update global var
+            id(${id_prefix}_meter_reader).set_crop_zones(zones);
             
     - service: set_camera_window
       variables:
@@ -39,7 +39,7 @@ api:
       then:
         - lambda: |-
             if (offset_x >= 0 && offset_y >= 0 && width > 0 && height > 0) {
-              id(meter_reader).set_camera_window(offset_x, offset_y, width, height);
+              id(${id_prefix}_meter_reader).set_camera_window(offset_x, offset_y, width, height);
             }
     
     # - service: auto_camera_window
@@ -49,23 +49,23 @@ api:
     
     - service: reset_camera_window
       then:
-        - lambda: 'id(meter_reader).reset_camera_window();'
+        - lambda: 'id(${id_prefix}_meter_reader).reset_camera_window();'
     
     - service: trigger_inference
       then:
-        - lambda: 'id(meter_reader).force_flash_inference();'
+        - lambda: 'id(${id_prefix}_meter_reader).force_flash_inference();'
 
     - service: start_flash_calibration
       then:
-        - lambda: 'id(meter_reader).start_flash_calibration();'
+        - lambda: 'id(${id_prefix}_meter_reader).start_flash_calibration();'
 
 # button:
 #   - platform: template
 #     name: "Take Preview Picture"
-#     id: take_preview_btn
+#     id: ${id_prefix}_take_preview_btn
 #     on_press:
 #       - lambda: |-
-#           id(meter_reader).capture_preview();
+#           id(${id_prefix}_meter_reader).capture_preview();
 
 
 

@@ -124,6 +124,9 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("enable_rotation", default=False): cv.boolean,
     cv.Optional("show_crop_areas", default=True): cv.boolean,
     cv.Optional("enable_flash_calibration", default=False): cv.boolean,
+
+    cv.Optional("total_inference_time_sensor"): cv.use_id(sensor.Sensor),
+    cv.Optional("debug_timing", default=False): cv.boolean,
     # cv.Optional(CONF_PREVIEW): camera_component.CAMERA_SCHEMA.extend({
     #     cv.GenerateID(): cv.declare_id(MeterPreviewCamera),
     # }),
@@ -445,4 +448,16 @@ async def to_code(config):
 
     if config.get("enable_flash_calibration", False):
         cg.add(var.set_enable_flash_calibration(True))
+
+    if config.get("debug_timing", False):
+        cg.add_define("DEBUG_METER_READER_TIMING")
+        cg.add(var.set_debug_timing(True))
+    else:
+        # Still define it to allow switch usage, just start disabled
+        cg.add_define("DEBUG_METER_READER_TIMING")
+        cg.add(var.set_debug_timing(False))
+
+    if "total_inference_time_sensor" in config:
+        s = await cg.get_variable(config["total_inference_time_sensor"])
+        cg.add(var.set_total_inference_time_sensor(s))
 

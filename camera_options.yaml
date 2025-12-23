@@ -5,48 +5,48 @@ switch:
 # on/off switch for Vertical Flip (my default = off, therefore: RESTORE_DEFAULT_OFF)
   - platform: template
     name: "Vertical Flip"
-    id: ${id_prefix}v_flip
+    id: ${id_prefix}_v_flip
     icon: mdi:swap-vertical
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
     turn_on_action:
       lambda: |-
-        id(${id_prefix}espcam).set_vertical_flip(true);
-        id(${id_prefix}espcam_update) = true;
+        id(${id_prefix}_espcam).set_vertical_flip(true);
+        id(${id_prefix}_espcam_update) = true;
     turn_off_action:
       lambda: |-
-        id(${id_prefix}espcam).set_vertical_flip(false);
-        id(${id_prefix}espcam_update) = true;
+        id(${id_prefix}_espcam).set_vertical_flip(false);
+        id(${id_prefix}_espcam_update) = true;
 # on/off switch for Horizontal Mirror (my default = on, therefore: RESTORE_DEFAULT_ON)
   - platform: template
     name: "Horizontal Mirror"
-    id: ${id_prefix}h_mirror
+    id: ${id_prefix}_h_mirror
     icon: mdi:reflect-horizontal
     restore_mode: RESTORE_DEFAULT_ON
     optimistic: true
     turn_on_action:
       lambda: |-
-        id(${id_prefix}espcam).set_horizontal_mirror(true);
-        id(${id_prefix}espcam_update) = true;
+        id(${id_prefix}_espcam).set_horizontal_mirror(true);
+        id(${id_prefix}_espcam_update) = true;
     turn_off_action:
       lambda: |-
-        id(${id_prefix}espcam).set_horizontal_mirror(false);
-        id(${id_prefix}espcam_update) = true;
+        id(${id_prefix}_espcam).set_horizontal_mirror(false);
+        id(${id_prefix}_espcam_update) = true;
 # on/off switch for Auto Exposure 2 (my default = off, therefore: RESTORE_DEFAULT_OFF)
   - platform: template
     name: "Auto Exposure 2"
-    id: ${id_prefix}aec_2
+    id: ${id_prefix}_aec_2
     icon: mdi:auto-fix
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
     turn_on_action:
       lambda: |-
-        id(${id_prefix}espcam).set_aec2(true);
-        id(${id_prefix}espcam_update) = true;
+        id(${id_prefix}_espcam).set_aec2(true);
+        id(${id_prefix}_espcam_update) = true;
     turn_off_action:
       lambda: |-
-        id(${id_prefix}espcam).set_aec2(false);
-        id(${id_prefix}espcam_update) = true;
+        id(${id_prefix}_espcam).set_aec2(false);
+        id(${id_prefix}_espcam_update) = true;
 
 # configure selects (aka dropdowns or option lists) for these parameters to make them available in HA
 select:
@@ -55,7 +55,7 @@ select:
 # I left this here in case it ever starts working
 #  - platform: template
 #    name: "Resolution"
-#    id: ${id_prefix}res
+#    id: ${id_prefix}_res
 #    options:
 #      - "160x120"
 #      - "176x144"
@@ -72,14 +72,14 @@ select:
 #    restore_value: True
 #    on_value:
 #      - lambda: |-
-#          id(${id_prefix}espcam).set_frame_size((esphome::esp32_camera::ESP32CameraFrameSize)id(${id_prefix}res).active_index().value());
+#          id(${id_prefix}_espcam).set_frame_size((esphome::esp32_camera::ESP32CameraFrameSize)id(${id_prefix}_res).active_index().value());
 #          // some function to change the frame_size
-#          id(${id_prefix}espcam_update) = true;
+#          id(${id_prefix}_espcam_update) = true;
 # Option list for Special Effects
   - platform: template
     name: "Special Effects"
     icon: mdi:filter
-    id: ${id_prefix}effect
+    id: ${id_prefix}_effect
     options:
       - "None"
       - "Negative"
@@ -92,12 +92,12 @@ select:
     optimistic: True
     on_value:
       lambda: |-
-        id(${id_prefix}espcam).set_special_effect((esphome::esp32_camera::ESP32SpecialEffect)id(${id_prefix}effect).active_index().value());
-        id(${id_prefix}espcam_update) = true;
+        id(${id_prefix}_espcam).set_special_effect((esphome::esp32_camera::ESP32SpecialEffect)id(${id_prefix}_effect).active_index().value());
+        id(${id_prefix}_espcam_update) = true;
 # Option List for White Balance
   - platform: template
     name: "White Balance Mode"
-    id: ${id_prefix}wb
+    id: ${id_prefix}_wb
     icon: mdi:white-balance-auto
     options:
       - "Auto"
@@ -109,12 +109,12 @@ select:
     optimistic: True
     on_value:
       lambda: |-
-        id(${id_prefix}espcam).set_wb_mode((esphome::esp32_camera::ESP32WhiteBalanceMode)id(${id_prefix}wb).active_index().value());
-        id(${id_prefix}espcam_update) = true;
+        id(${id_prefix}_espcam).set_wb_mode((esphome::esp32_camera::ESP32WhiteBalanceMode)id(${id_prefix}_wb).active_index().value());
+        id(${id_prefix}_espcam_update) = true;
 # Option list for AEC mode
   - platform: template
     name: "Auto Exposure Mode"
-    id: ${id_prefix}aec
+    id: ${id_prefix}_aec
     icon: mdi:auto-fix
     options:
       - "Manual"
@@ -125,12 +125,12 @@ select:
       lambda: |-
         // if you're looking closely, you may notice that AEC uses the Enum defined for Gain_control.
         // this is how it is defined in the component source code since they both only have "auto" & "manual"
-        id(${id_prefix}espcam).set_aec_mode((esphome::esp32_camera::ESP32GainControlMode)id(${id_prefix}aec).active_index().value());
-        id(${id_prefix}espcam_update) = true;
+        id(${id_prefix}_espcam).set_aec_mode((esphome::esp32_camera::ESP32GainControlMode)id(${id_prefix}_aec).active_index().value());
+        id(${id_prefix}_espcam_update) = true;
 # Option list for Gain Control Mode
   - platform: template
     name: "Gain Control Mode"
-    id: ${id_prefix}gc
+    id: ${id_prefix}_gc
     icon: mdi:auto-fix
     options:
       - "Manual"
@@ -139,12 +139,12 @@ select:
     optimistic: True
     on_value:
       lambda: |-
-        id(${id_prefix}espcam).set_agc_mode((esphome::esp32_camera::ESP32GainControlMode)id(${id_prefix}gc).active_index().value());
-        id(${id_prefix}espcam_update) = true;
+        id(${id_prefix}_espcam).set_agc_mode((esphome::esp32_camera::ESP32GainControlMode)id(${id_prefix}_gc).active_index().value());
+        id(${id_prefix}_espcam_update) = true;
 # Option list for Gain Ceiling (apparently this is somewhat equivilant to ISO settings)
   - platform: template
     name: "Gain Ceiling"
-    id: ${id_prefix}g_ceiling
+    id: ${id_prefix}_g_ceiling
     options:
       - "2x"
       - "4x"
@@ -157,8 +157,8 @@ select:
     optimistic: True
     on_value:
       lambda: |-
-        id(${id_prefix}espcam).set_agc_gain_ceiling((esphome::esp32_camera::ESP32AgcGainCeiling)id(${id_prefix}g_ceiling).active_index().value());
-        id(${id_prefix}espcam_update) = true;
+        id(${id_prefix}_espcam).set_agc_gain_ceiling((esphome::esp32_camera::ESP32AgcGainCeiling)id(${id_prefix}_g_ceiling).active_index().value());
+        id(${id_prefix}_espcam_update) = true;
 
 # configure number sliders for these parameters to make them available in HA
 number:
@@ -166,7 +166,7 @@ number:
 # they do not seem to make any difference to the image output
   - platform: template
     name: "Contrast"
-    id: ${id_prefix}contrast
+    id: ${id_prefix}_contrast
     icon: mdi:contrast-box
     min_value: -2
     max_value: 2
@@ -176,12 +176,12 @@ number:
     optimistic: True
     on_value:
       lambda: |-
-        id(${id_prefix}espcam).set_contrast(id(${id_prefix}contrast).state);
-        id(${id_prefix}espcam_update) = true;
+        id(${id_prefix}_espcam).set_contrast(id(${id_prefix}_contrast).state);
+        id(${id_prefix}_espcam_update) = true;
 # Number Slider for Brightness
   - platform: template
     name: "Brightness"
-    id: ${id_prefix}brightness
+    id: ${id_prefix}_brightness
     icon: mdi:brightness-6
     min_value: -2
     max_value: 2
@@ -191,12 +191,12 @@ number:
     optimistic: True
     on_value:
       lambda: |-
-        id(${id_prefix}espcam).set_brightness(id(${id_prefix}brightness).state);
-        id(${id_prefix}espcam_update) = true;
+        id(${id_prefix}_espcam).set_brightness(id(${id_prefix}_brightness).state);
+        id(${id_prefix}_espcam_update) = true;
 # Number Slider for Saturation
   - platform: template
     name: "Saturation"
-    id: ${id_prefix}saturation
+    id: ${id_prefix}_saturation
     icon: mdi:palette-outline
     min_value: -2
     max_value: 2
@@ -206,12 +206,12 @@ number:
     optimistic: True
     on_value:
       lambda: |-
-        id(${id_prefix}espcam).set_saturation(id(${id_prefix}saturation).state);
-        id(${id_prefix}espcam_update) = true;
+        id(${id_prefix}_espcam).set_saturation(id(${id_prefix}_saturation).state);
+        id(${id_prefix}_espcam_update) = true;
 # Number Slider for Gain Value
   - platform: template
     name: "Gain Value"
-    id: ${id_prefix}g_value
+    id: ${id_prefix}_g_value
     min_value: 0
     max_value: 30
     step: 1
@@ -220,12 +220,12 @@ number:
     optimistic: True
     on_value:
       lambda: |-
-        id(${id_prefix}espcam).set_agc_value(id(${id_prefix}g_value).state);
-        id(${id_prefix}espcam_update) = true;
+        id(${id_prefix}_espcam).set_agc_value(id(${id_prefix}_g_value).state);
+        id(${id_prefix}_espcam_update) = true;
 # Number slider for AE Level
   - platform: template
     name: "AE Level"
-    id: ${id_prefix}ae_level
+    id: ${id_prefix}_ae_level
     min_value: -2
     max_value: 2
     step: 1
@@ -234,13 +234,13 @@ number:
     optimistic: True
     on_value:
       lambda: |-
-        id(${id_prefix}espcam).set_ae_level(id(${id_prefix}ae_level).state);
-        id(${id_prefix}espcam_update) = true;
+        id(${id_prefix}_espcam).set_ae_level(id(${id_prefix}_ae_level).state);
+        id(${id_prefix}_espcam_update) = true;
 # Number Slider for AE Value (step set to 10)
 # I tried using steps of 1 (too fine to control) and 100 (to coarse for the values) and settled on 10
   - platform: template
     name: "AE Value"
-    id: ${id_prefix}ae_value
+    id: ${id_prefix}_ae_value
     min_value: 0
     max_value: 1200
     step: 10
@@ -249,7 +249,7 @@ number:
     optimistic: True
     on_value:
       lambda: |-
-        id(${id_prefix}espcam).set_aec_value(id(${id_prefix}ae_value).state);
-        id(${id_prefix}espcam_update) = true;
+        id(${id_prefix}_espcam).set_aec_value(id(${id_prefix}_ae_value).state);
+        id(${id_prefix}_espcam_update) = true;
 
 

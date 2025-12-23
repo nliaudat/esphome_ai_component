@@ -270,6 +270,7 @@ void MeterReaderTFLite::set_camera(camera::Camera *camera) { // -> CameraCoord c
 void MeterReaderTFLite::on_camera_image(const std::shared_ptr<camera::CameraImage> &image) {
     if (frame_requested_.load() && !processing_frame_.load()) {
         pending_frame_ = image;
+        pending_frame_acquisition_time_ = millis(); 
         frame_available_.store(true);
         frame_requested_.store(false);
     }
@@ -346,6 +347,10 @@ void MeterReaderTFLite::loop() {
                   // tensor_arena_used_sensor_->publish_state(res_ptr->arena_used_bytes);
             }
             #endif
+
+            if (total_inference_time_sensor_) {
+                total_inference_time_sensor_->publish_state(millis() - res_ptr->total_start_time);
+            }
 
             // Validate
             // Use Average Confidence to match Single Core logic
@@ -468,7 +473,18 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     
     // Process frame -> buffers
     esphome::App.feed_wdt();
+    
+    uint32_t preprocess_start = millis();
     auto processed_buffers = camera_coord_.process_frame(frame, zones);
+    
+    #ifdef DEBUG_METER_READER_TIMING
+    if (debug_timing_) {
+        // Acquisition: Time from Request (last_request_time_) to Arrival (pending_frame_acquisition_time_)
+        // Wait: Time from Arrival to Start of Processing (preprocess_start)
+        ESP_LOGI(TAG, "Image Acquisition took %u ms", pending_frame_acquisition_time_ - last_request_time_);
+        ESP_LOGI(TAG, "Preprocessing (Crop/Scale) took %u ms", millis() - preprocess_start);
+    }
+    #endif
     
     #ifdef SUPPORT_DOUBLE_BUFFERING
     // Async Path

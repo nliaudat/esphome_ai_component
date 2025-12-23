@@ -9,7 +9,7 @@ time:
     hours: ${reboot_hours}
     days_of_week: ${reboot_days_of_week} 
     then:
-      - switch.toggle: ${id_prefix}ctrl_reboot
+      - switch.toggle: ${id_prefix}_ctrl_reboot
 
 # interval:
   # - interval: ${maintenance_interval}

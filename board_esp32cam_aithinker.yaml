@@ -89,19 +89,19 @@ psram:
 
 light:
   - platform: binary
-    output: flash_light_output
+    output: ${id_prefix}_flash_light_output
     name: "${name} Flash Light"
-    id: ${id_prefix}flash
+    id: ${id_prefix}_flash
   - platform: binary
-    output: status_led_output
+    output: ${id_prefix}_status_led_output
     name: "${name} Status LED"
-    id: ${id_prefix}light
+    id: ${id_prefix}_light
 
 output:
   - platform: gpio
     pin: ${flash_led_pin}
-    id: flash_light_output
+    id: ${id_prefix}_flash_light_output
   - platform: gpio
     pin: ${status_led_pin}
-    id: status_led_output
+    id: ${id_prefix}_status_led_output
     inverted: true

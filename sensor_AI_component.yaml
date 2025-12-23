@@ -2,7 +2,7 @@
 sensor:
   - platform: template
     name: "Meter Reading"
-    id: meter_value
+    id: ${id_prefix}_meter_value
     unit_of_measurement: "${meter_unit}"
     accuracy_decimals: 0
     icon: "mdi:counter"
@@ -10,7 +10,7 @@ sensor:
     device_class: ${meter_device_class}
     # update_interval: 30s
     # lambda: |-
-      # auto reader = id(meter_reader);
+      # auto reader = id(${id_prefix}_meter_reader);
       # if (reader != nullptr) {
         # float reading = reader->get_last_reading();
         # float confidence = reader->get_last_confidence();
@@ -24,13 +24,13 @@ sensor:
 
   - platform: template
     name: "Meter Reading Confidence"
-    id: meter_confidence
+    id: ${id_prefix}_meter_confidence
     unit_of_measurement: "%"
     accuracy_decimals: 2
     icon: "mdi:percent"
     # update_interval: 30s
     # lambda: |-
-      # auto reader = id(meter_reader);
+      # auto reader = id(${id_prefix}_meter_reader);
       # if (reader != nullptr) {
         # float confidence = reader->get_last_confidence();
         # float reading = reader->get_last_reading();

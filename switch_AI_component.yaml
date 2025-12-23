@@ -1,104 +1,125 @@
 switch:      
   - platform: template
     name: "Pause AI processing"
-    id: pause_ai_processing
+    id: ${id_prefix}_pause_ai_processing
     icon: "mdi:pause"
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
     turn_on_action:
       - lambda: |-
-          if (id(meter_reader) != nullptr) {
-            id(meter_reader)->set_pause_processing(true);
+          if (id(${id_prefix}_meter_reader) != nullptr) {
+            id(${id_prefix}_meter_reader)->set_pause_processing(true);
           }
     turn_off_action:
       - lambda: |-
-          if (id(meter_reader) != nullptr) {
-            id(meter_reader)->set_pause_processing(false);
+          if (id(${id_prefix}_meter_reader) != nullptr) {
+            id(${id_prefix}_meter_reader)->set_pause_processing(false);
           }
 
   - platform: template
     name: "Allow Negative Rates"
-    id: allow_negative_rates_switch
+    id: ${id_prefix}_allow_negative_rates_switch
     icon: "mdi:minus-circle-off"
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
     turn_on_action:
       - lambda: |-
-          if (id(meter_reader) != nullptr) {
-            id(meter_reader)->set_allow_negative_rates(true);
+          if (id(${id_prefix}_meter_reader) != nullptr) {
+            id(${id_prefix}_meter_reader)->set_allow_negative_rates(true);
           }
     turn_off_action:
       - lambda: |-
-          if (id(meter_reader) != nullptr) {
-            id(meter_reader)->set_allow_negative_rates(false);
+          if (id(${id_prefix}_meter_reader) != nullptr) {
+            id(${id_prefix}_meter_reader)->set_allow_negative_rates(false);
           }
 
   - platform: template
     name: "Debug Memory"
-    id: debug_memory_switch
+    id: ${id_prefix}_debug_memory_switch
     icon: "mdi:memory"
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON # Assuming default enabled via yaml
     turn_on_action:
       - lambda: |-
           #ifdef DEBUG_METER_READER_MEMORY
-            if (id(meter_reader) != nullptr) {
-              id(meter_reader)->set_debug_memory_enabled(true);
+            if (id(${id_prefix}_meter_reader) != nullptr) {
+              id(${id_prefix}_meter_reader)->set_debug_memory_enabled(true);
             }
           #endif
     turn_off_action:
       - lambda: |-
           #ifdef DEBUG_METER_READER_MEMORY
-            if (id(meter_reader) != nullptr) {
-              id(meter_reader)->set_debug_memory_enabled(false);
+            if (id(${id_prefix}_meter_reader) != nullptr) {
+              id(${id_prefix}_meter_reader)->set_debug_memory_enabled(false);
             }
           #endif
 
   - platform: template
     name: "Component Debug Mode"
-    id: component_debug_mode_switch
+    id: ${id_prefix}_component_debug_mode_switch
     icon: "mdi:bug"
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON
     turn_on_action:
       - lambda: |-
           #ifdef DEBUG_METER_READER_TFLITE
-            if (id(meter_reader) != nullptr) {
-               id(meter_reader)->set_debug_mode(true);
+            if (id(${id_prefix}_meter_reader) != nullptr) {
+               id(${id_prefix}_meter_reader)->set_debug_mode(true);
             }
           #endif
     turn_off_action:
       - lambda: |-
            #ifdef DEBUG_METER_READER_TFLITE
-             if (id(meter_reader) != nullptr) {
-                id(meter_reader)->set_debug_mode(false);
+             if (id(${id_prefix}_meter_reader) != nullptr) {
+                id(${id_prefix}_meter_reader)->set_debug_mode(false);
+             }
+           #endif
+           
+  - platform: template
+    name: "Debug Timing"
+    id: ${id_prefix}_debug_timing_switch
+    icon: "mdi:clock-fast"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - lambda: |-
+          #ifdef DEBUG_METER_READER_TIMING
+            if (id(${id_prefix}_meter_reader) != nullptr) {
+               id(${id_prefix}_meter_reader)->set_debug_timing(true);
+            }
+          #endif
+    turn_off_action:
+      - lambda: |-
+           #ifdef DEBUG_METER_READER_TIMING
+             if (id(${id_prefix}_meter_reader) != nullptr) {
+                id(${id_prefix}_meter_reader)->set_debug_timing(false);
              }
            #endif
 
   - platform: template
     name: "Camera Window Enabled"
-    id: camera_window_enabled_switch
+    id: ${id_prefix}_camera_window_enabled_switch
     icon: "mdi:crop-free"
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
     turn_on_action:
       - lambda: |-
-          if (id(meter_reader) != nullptr) {
-            id(meter_reader)->set_camera_window_configured(true);
+          if (id(${id_prefix}_meter_reader) != nullptr) {
+            id(${id_prefix}_meter_reader)->set_camera_window_configured(true);
           }
     turn_off_action:
       - lambda: |-
-          if (id(meter_reader) != nullptr) {
-            id(meter_reader)->set_camera_window_configured(false);
+          if (id(${id_prefix}_meter_reader) != nullptr) {
+            id(${id_prefix}_meter_reader)->set_camera_window_configured(false);
           }
 
 button:
   - platform: template
     name: "Force AI inference"
-    id: force_ai_inference
+    id: ${id_prefix}_force_ai_inference
     icon: "mdi:arrow-top-bold-hexagon-outline"
     on_press:
       - lambda: |-
-          if (id(meter_reader) != nullptr) {
-            id(meter_reader)->force_flash_inference(); 
+          if (id(${id_prefix}_meter_reader) != nullptr) {
+            id(${id_prefix}_meter_reader)->force_flash_inference(); 
           }

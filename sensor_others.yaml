@@ -3,15 +3,15 @@ sensor:
     
   - platform: uptime
     name: "${friendly_name} Uptime"    
-    id: ${id_prefix}uptime_sensor
+    id: ${id_prefix}_uptime_sensor
     update_interval: 5min
     internal: true
     on_raw_value:
       then:
         - text_sensor.template.publish:
-            id: ${id_prefix}uptime_human
+            id: ${id_prefix}_uptime_human
             state: !lambda |-
-              int seconds = round(id(${id_prefix}uptime_sensor).raw_state);
+              int seconds = round(id(${id_prefix}_uptime_sensor).raw_state);
               int days = seconds / (24 * 3600);
               seconds = seconds % (24 * 3600);
               int hours = seconds / 3600;
@@ -34,7 +34,7 @@ sensor:
 text_sensor:  
   - platform: template
     name: "${friendly_name} uptime"
-    id: ${id_prefix}uptime_human
+    id: ${id_prefix}_uptime_human
     icon: mdi:clock-start  
     # web_server:
       # sorting_group_id: sorting_group_sensors

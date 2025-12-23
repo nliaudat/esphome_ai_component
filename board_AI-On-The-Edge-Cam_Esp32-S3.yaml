@@ -9,10 +9,10 @@ esphome:
   name_add_mac_suffix: False # this appends to 'name' NOT 'friendly_name'      
   on_loop:
     - lambda: |-
-          if (id(${id_prefix}espcam_update)) {
-            id(${id_prefix}espcam).update_camera_parameters();
-            if(id(${id_prefix}debug)) { id(${id_prefix}espcam).dump_config(); }
-            id(${id_prefix}espcam_update) = false;
+          if (id(${id_prefix}_espcam_update)) {
+            id(${id_prefix}_espcam).update_camera_parameters();
+            if(id(${id_prefix}_debug)) { id(${id_prefix}_espcam).dump_config(); }
+            id(${id_prefix}_espcam_update) = false;
           }
           
 # << if use_wifi == "true" >>
@@ -154,7 +154,7 @@ light:
     num_leds: 4
     chipset: ws2812
     name: "${name} Flash LED"
-    id: ${id_prefix}flash
+    id: ${id_prefix}_flash
 
     effects:
       - addressable_scan:
@@ -171,7 +171,7 @@ light:
           update_interval: 2s
   - platform: status_led
     name: "${name} Status LED"
-    id: ${id_prefix}light
+    id: ${id_prefix}_light
     icon: "mdi:alarm-light"
     restore_mode: ALWAYS_OFF
     pin: ${status_led_pin}
@@ -182,33 +182,33 @@ light:
 output:
   - platform: gpio
     pin: ${eth_enable_pin}
-    id: eth_power
+    id: ${id_prefix}_eth_power
     inverted: true
   - platform: gpio
     pin: ${per_enable_pin}
-    id: periph_power
+    id: ${id_prefix}_periph_power
     inverted: true
     
 switch:
   - platform: template
     name: "Ethernet Power"
-    id: eth_power_switch
+    id: ${id_prefix}_eth_power_switch
     icon: "mdi:ethernet"
     turn_on_action:
-      - output.turn_on: eth_power
+      - output.turn_on: ${id_prefix}_eth_power
       - delay: 500ms
     turn_off_action:
-      - output.turn_off: eth_power
+      - output.turn_off: ${id_prefix}_eth_power
 
   - platform: template
     name: "Peripheral Power"
-    id: periph_power_switch
+    id: ${id_prefix}_periph_power_switch
     icon: "mdi:camera"
     turn_on_action:
-      - output.turn_on: periph_power
+      - output.turn_on: ${id_prefix}_periph_power
       - delay: 1000ms
     turn_off_action:
-      - output.turn_off: periph_power
+      - output.turn_off: ${id_prefix}_periph_power
 
 ## only if wifi.yaml is enabled
   # - platform: template
