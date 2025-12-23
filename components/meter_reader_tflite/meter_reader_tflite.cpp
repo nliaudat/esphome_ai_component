@@ -493,6 +493,31 @@ void MeterReaderTFLite::loop() {
                     auto arena_stats = tflite_coord_.get_arena_stats();
                     arena_efficiency_sensor_->publish_state(arena_stats.efficiency);
                 }
+                
+                // Publish heap fragmentation
+                if (heap_fragmentation_sensor_) {
+                    multi_heap_info_t info;
+                    
+                    // Check PSRAM first (if available), fallback to internal RAM
+                    size_t free_psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+                    if (free_psram > 0) {
+                        // PSRAM available - measure PSRAM fragmentation
+                        heap_caps_get_info(&info, MALLOC_CAP_SPIRAM);
+                    } else {
+                        // No PSRAM - measure internal RAM fragmentation
+                        heap_caps_get_info(&info, MALLOC_CAP_INTERNAL);
+                    }
+                    
+                    // Calculate fragmentation: 100% - (largest_free_block / total_free * 100)
+                    // Lower is better. 0% = no fragmentation, 100% = highly fragmented
+                    float fragmentation = 0.0f;
+                    if (info.total_free_bytes > 0) {
+                        float efficiency = (float)info.largest_free_block / info.total_free_bytes;
+                        fragmentation = (1.0f - efficiency) * 100.0f;
+                    }
+                    
+                    heap_fragmentation_sensor_->publish_state(fragmentation);
+                }
             }
             #endif
             

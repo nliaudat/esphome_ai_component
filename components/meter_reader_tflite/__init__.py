@@ -101,6 +101,8 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("process_free_psram_sensor"): cv.use_id(sensor.Sensor),
     cv.Optional("pool_job_efficiency_sensor"): cv.use_id(sensor.Sensor),
     cv.Optional("pool_result_efficiency_sensor"): cv.use_id(sensor.Sensor),
+    cv.Optional("arena_efficiency_sensor"): cv.use_id(sensor.Sensor),
+    cv.Optional("heap_fragmentation_sensor"): cv.use_id(sensor.Sensor),
 
     cv.Optional(CONF_FLASH_LIGHT_CONTROLLER): cv.use_id(flash_light_controller.FlashLightController) if flash_light_controller else cv.string,
     cv.Optional(CONF_CROP_ZONES): cv.use_id(globals.GlobalsComponent),
@@ -427,6 +429,12 @@ async def to_code(config):
     if "pool_result_efficiency_sensor" in config:
         sens = await cg.get_variable(config["pool_result_efficiency_sensor"])
         cg.add(var.set_pool_result_efficiency_sensor(sens))
+    if "arena_efficiency_sensor" in config:
+        sens = await cg.get_variable(config["arena_efficiency_sensor"])
+        cg.add(var.set_arena_efficiency_sensor(sens))
+    if "heap_fragmentation_sensor" in config:
+        sens = await cg.get_variable(config["heap_fragmentation_sensor"])
+        cg.add(var.set_heap_fragmentation_sensor(sens))
     
     
     if "value_sensor" in config:

@@ -164,6 +164,8 @@ meter_reader_tflite:
   # Pool efficiency monitoring (optional, requires DEBUG_METER_READER_MEMORY)
   pool_job_efficiency_sensor: ${id_prefix}_pool_job_efficiency
   pool_result_efficiency_sensor: ${id_prefix}_pool_result_efficiency
+  arena_efficiency_sensor: ${id_prefix}_arena_efficiency
+  heap_fragmentation_sensor: ${id_prefix}_heap_fragmentation
 
 
 packages:
