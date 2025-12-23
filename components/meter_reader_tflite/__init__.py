@@ -444,5 +444,5 @@ async def to_code(config):
         ))
 
     if config.get("enable_flash_calibration", False):
-         cg.add(var.set_enable_flash_calibration(True))
+        cg.add(var.set_enable_flash_calibration(True))
 
