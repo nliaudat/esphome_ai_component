@@ -461,7 +461,7 @@ void MeterReaderTFLite::loop() {
                      for (size_t i = 0; i < res_ptr->probabilities.size(); i++) {
                          if (i > 0) conf_list += ", ";
                          char buf[8];
-                         snprintf(buf, sizeof(buf), "%.2f", res_ptr->probabilities[i]);
+                         snprintf(buf, sizeof(buf), "%.3f", res_ptr->probabilities[i]);
                          conf_list += buf;
                      }
                      conf_list += "]";
@@ -478,7 +478,7 @@ void MeterReaderTFLite::loop() {
                      for (size_t i = 0; i < res_ptr->probabilities.size(); i++) {
                          if (i > 0) conf_list += ", ";
                          char buf[8];
-                         snprintf(buf, sizeof(buf), "%.2f", res_ptr->probabilities[i]);
+                         snprintf(buf, sizeof(buf), "%.3f", res_ptr->probabilities[i]);
                          conf_list += buf;
                      }
                      conf_list += "]";
