@@ -153,6 +153,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_process_free_psram_sensor(sensor::Sensor *s) { process_free_psram_sensor_ = s; }
   void set_pool_job_efficiency_sensor(sensor::Sensor *s) { pool_job_efficiency_sensor_ = s; }
   void set_pool_result_efficiency_sensor(sensor::Sensor *s) { pool_result_efficiency_sensor_ = s; }
+  void set_arena_efficiency_sensor(sensor::Sensor *s) { arena_efficiency_sensor_ = s; }
   void set_debug_memory_enabled(bool enabled) { debug_memory_enabled_ = enabled; }
 #endif
 
@@ -243,6 +244,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   sensor::Sensor *process_free_psram_sensor_{nullptr};
   sensor::Sensor *pool_job_efficiency_sensor_{nullptr};
   sensor::Sensor *pool_result_efficiency_sensor_{nullptr};
+  sensor::Sensor *arena_efficiency_sensor_{nullptr};
 #endif
   
   sensor::Sensor *total_inference_time_sensor_{nullptr};

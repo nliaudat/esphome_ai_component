@@ -487,6 +487,12 @@ void MeterReaderTFLite::loop() {
                         pool_result_efficiency_sensor_->publish_state(100.0f * hits / total);
                     }
                 }
+                
+                // Publish arena efficiency
+                if (arena_efficiency_sensor_) {
+                    auto arena_stats = tflite_coord_.get_arena_stats();
+                    arena_efficiency_sensor_->publish_state(arena_stats.efficiency);
+                }
             }
             #endif
             
@@ -941,7 +947,7 @@ void MeterReaderTFLite::inference_task(void *arg) {
             res->inference_time = millis() - start;
             res->total_start_time = job->start_time;
             #ifdef DEBUG_METER_READER_MEMORY
-            // res->arena_used_bytes = self->tflite_coord_.get_arena_used_bytes();
+            res->arena_used_bytes = self->tflite_coord_.get_arena_used_bytes();
             #endif
             res->success = true;
             
