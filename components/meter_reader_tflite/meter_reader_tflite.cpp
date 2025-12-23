@@ -318,7 +318,7 @@ void MeterReaderTFLite::setup() {
     BaseType_t res = xTaskCreatePinnedToCore(
         MeterReaderTFLite::inference_task, 
         "inference_task", 
-        8192, // Stack size
+        16384, // Stack size
         this, // Pass this instance
         1,    // Priority (Low)
         &inference_task_handle_, 

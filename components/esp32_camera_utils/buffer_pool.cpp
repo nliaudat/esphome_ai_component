@@ -56,7 +56,8 @@ BufferPool::Buffer BufferPool::acquire(size_t size) {
   }
   
   // Pool full, return non-pooled buffer
-  ESP_LOGD(TAG, "Pool miss: allocated %zu bytes (pool full)", size);
+  saturation_misses_++;
+  ESP_LOGW(TAG, "Pool miss: allocated %zu bytes (pool full)", size);
   return {data, size, false};
 }
 
@@ -94,6 +95,10 @@ size_t BufferPool::get_total_allocations() const {
 size_t BufferPool::get_pool_size() const {
   std::lock_guard<std::mutex> lock(mutex_);
   return pool_.size();
+}
+
+size_t BufferPool::get_saturation_misses() const {
+  return saturation_misses_.load();
 }
 
 }  // namespace esp32_camera_utils

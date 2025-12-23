@@ -105,3 +105,6 @@ output:
     pin: ${status_led_pin}
     id: ${id_prefix}_status_led_output
     inverted: true
+
+esp32_camera:
+  power_down_pin: ${camera_pwdn_pin}
