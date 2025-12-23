@@ -512,7 +512,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     
     #ifdef DEBUG_METER_READER_MEMORY
     if (debug_memory_enabled_ && tensor_arena_used_sensor_) {
-          tensor_arena_used_sensor_->publish_state(tflite_coord_.get_arena_used_bytes());
+          // tensor_arena_used_sensor_->publish_state(tflite_coord_.get_arena_used_bytes());
     }
     #endif
 
