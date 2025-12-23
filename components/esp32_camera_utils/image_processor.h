@@ -19,6 +19,7 @@
 #include "scaler.h"
 #include "rotator.h"
 #include "cropper.h"
+#include "buffer_pool.h"
 #include "esp_heap_caps.h"
 
 namespace esphome {
@@ -84,15 +85,21 @@ class ImageProcessor {
   // Custom deleter for tracked buffers
   struct TrackedBuffer {
       uint8_t* ptr;
+      size_t size;  // Track size for pool release
       bool is_spiram;
       bool is_jpeg_aligned;
+      bool is_pooled;  // Track if buffer is from pool
       
-      TrackedBuffer(uint8_t* p = nullptr, bool spiram = false, bool aligned = false) 
-          : ptr(p), is_spiram(spiram), is_jpeg_aligned(aligned) {}
+      TrackedBuffer(uint8_t* p = nullptr, bool spiram = false, bool aligned = false, bool pooled = false, size_t sz = 0) 
+          : ptr(p), size(sz), is_spiram(spiram), is_jpeg_aligned(aligned), is_pooled(pooled) {}
           
       ~TrackedBuffer() {
           if (ptr) {
-              if (is_jpeg_aligned) {
+              if (is_pooled) {
+                  // Return to buffer pool
+                  BufferPool::Buffer buf{ptr, size, true};
+                  ImageProcessor::buffer_pool_.release(buf);
+              } else if (is_jpeg_aligned) {
                   jpeg_free_align(ptr);
               } else {
                   heap_caps_free(ptr);
@@ -107,19 +114,28 @@ class ImageProcessor {
       
       // Allow moving
       TrackedBuffer(TrackedBuffer&& other) noexcept 
-          : ptr(other.ptr), is_spiram(other.is_spiram), is_jpeg_aligned(other.is_jpeg_aligned) {
+          : ptr(other.ptr), size(other.size), is_spiram(other.is_spiram), 
+            is_jpeg_aligned(other.is_jpeg_aligned), is_pooled(other.is_pooled) {
           other.ptr = nullptr;
       }
       
       TrackedBuffer& operator=(TrackedBuffer&& other) noexcept {
           if (this != &other) {
               if (ptr) {
-                  if (is_jpeg_aligned) jpeg_free_align(ptr);
-                  else heap_caps_free(ptr);
+                  if (is_pooled) {
+                      BufferPool::Buffer buf{ptr, size, true};
+                      ImageProcessor::buffer_pool_.release(buf);
+                  } else if (is_jpeg_aligned) {
+                      jpeg_free_align(ptr);
+                  } else {
+                      heap_caps_free(ptr);
+                  }
               }
               ptr = other.ptr;
+              size = other.size;
               is_spiram = other.is_spiram;
               is_jpeg_aligned = other.is_jpeg_aligned;
+              is_pooled = other.is_pooled;
               other.ptr = nullptr;
           }
           return *this;
@@ -192,6 +208,9 @@ private:
   ProcessingStats stats_;
   std::mutex processing_mutex_;
   int bytes_per_pixel_{0};
+
+  // Static buffer pool shared across all ImageProcessor instances
+  static BufferPool buffer_pool_;
 
   static UniqueBufferPtr allocate_image_buffer(size_t size);
   bool validate_buffer_size(size_t required, size_t available, const char* context) const;

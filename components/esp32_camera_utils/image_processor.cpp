@@ -30,6 +30,9 @@ namespace esp32_camera_utils {
 
 static const char *const TAG = "ImageProcessor";
 
+// Static buffer pool instance (shared across all ImageProcessor instances)
+BufferPool ImageProcessor::buffer_pool_;
+
 // Duration logging macros for performance profiling
 #ifdef DURATION_START
 #undef DURATION_START
@@ -350,12 +353,28 @@ ImageProcessor::ImageProcessor(const ImageProcessorConfig &config)
   }
 }
 
+
 ImageProcessor::UniqueBufferPtr ImageProcessor::allocate_image_buffer(size_t size) {
+    // Use buffer pool for small/medium buffers (model inputs)
+    // Direct allocation for very large buffers (full frames)
+    static constexpr size_t POOL_SIZE_THRESHOLD = 50 * 1024; // 50KB
+    
+    if (size <= POOL_SIZE_THRESHOLD) {
+        // Try buffer pool first
+        auto pooled_buffer = buffer_pool_.acquire(size);
+        
+        if (pooled_buffer.data) {
+            // Successfully got buffer from pool
+            // TrackedBuffer(ptr, spiram, jpeg_aligned, pooled, size)
+            return UniqueBufferPtr(new TrackedBuffer(pooled_buffer.data, false, false, true, pooled_buffer.size));
+        }
+        // Pool acquisition failed, fall through to direct allocation
+        ESP_LOGW(TAG, "Buffer pool acquisition failed for %zu bytes, using direct allocation", size);
+    }
+    
+    // Direct allocation for large buffers or pool failure
     uint8_t* ptr = nullptr;
     bool spiram = false;
-    
-    // Ensure 64-byte alignment for cache performance
-    // Default to SPIRAM for large buffers, fallback to internal
     
     // Try SPIRAM first if size is significant
     if (size > 1024) {
@@ -371,7 +390,8 @@ ImageProcessor::UniqueBufferPtr ImageProcessor::allocate_image_buffer(size_t siz
     
     if (!ptr) return nullptr;
     
-    return UniqueBufferPtr(new TrackedBuffer(ptr, spiram, false));
+    // TrackedBuffer(ptr, spiram, jpeg_aligned, pooled, size)
+    return UniqueBufferPtr(new TrackedBuffer(ptr, spiram, false, false, size));
 }
 
 ImageProcessor::JpegBufferPtr ImageProcessor::allocate_jpeg_buffer(size_t size) {
