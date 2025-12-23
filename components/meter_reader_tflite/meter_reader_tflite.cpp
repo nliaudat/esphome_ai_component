@@ -1,9 +1,9 @@
 #include "meter_reader_tflite.h"
 #include "esphome/core/application.h"
 
-#ifdef ESP32
+
 #include <esp_heap_caps.h>
-#endif
+
 #include <numeric>
 
 #ifdef USE_WEB_SERVER
@@ -60,9 +60,6 @@ static void free_inference_job(InferenceJob* job) {
 }
 
 static InferenceResult* allocate_inference_result() {
-#ifdef USE_HOST
-    return new InferenceResult();
-#else
   for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
     if (!inference_result_used[i]) {
       inference_result_used[i] = true;
@@ -75,7 +72,6 @@ static InferenceResult* allocate_inference_result() {
   }
   ESP_LOGW(TAG, "InferenceResult pool exhausted – allocating on heap");
   return new InferenceResult();
-#endif
 }
 
 static void free_inference_result(InferenceResult* res) {
@@ -229,7 +225,7 @@ void MeterReaderTFLite::setup() {
     });
     
     #ifdef SUPPORT_DOUBLE_BUFFERING
-    #ifdef ESP32
+  
     // 6. Setup Double Buffering Pipeline
     ESP_LOGI(TAG, "Initializing Double Buffering (Dual Core mode)...");
     input_queue_ = xQueueCreate(1, sizeof(InferenceJob*)); // Pointer depth 1 (Backpressure)
@@ -256,7 +252,7 @@ void MeterReaderTFLite::setup() {
     }
     ESP_LOGI(TAG, "Double Buffering active on Core 0");
     #endif
-    #endif
+   
 
     // Force Camera to Grayscale if using GRAY model (Workaround for YAML limit)
     // Only if user requested GRAYSCALE in config (we can't easily check the template sub here, 
@@ -347,7 +343,7 @@ void MeterReaderTFLite::loop() {
             
             #ifdef DEBUG_METER_READER_MEMORY
             if (debug_memory_enabled_ && tensor_arena_used_sensor_) {
-                  tensor_arena_used_sensor_->publish_state(res_ptr->arena_used_bytes);
+                  // tensor_arena_used_sensor_->publish_state(res_ptr->arena_used_bytes);
             }
             #endif
 
@@ -505,10 +501,10 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     // Capture Peak Memory State *during* processing (buffers allocated)
     #ifdef DEBUG_METER_READER_MEMORY
     if (debug_memory_enabled_) {
-        #ifdef ESP32
+ 
         if (process_free_heap_sensor_) process_free_heap_sensor_->publish_state(heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
         if (process_free_psram_sensor_) process_free_psram_sensor_->publish_state(heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
-        #endif
+
     }
     #endif
 
@@ -826,7 +822,7 @@ void MeterReaderTFLite::inference_task(void *arg) {
             res->inference_time = millis() - start;
             res->total_start_time = job->start_time;
             #ifdef DEBUG_METER_READER_MEMORY
-            res->arena_used_bytes = self->tflite_coord_.get_arena_used_bytes();
+            // res->arena_used_bytes = self->tflite_coord_.get_arena_used_bytes();
             #endif
             res->success = true;
             
