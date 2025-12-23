@@ -1,3 +1,5 @@
+### enable power_down_pin in esp32_camera.yaml, this board needs it
+
 esphome:
   name: ${name}
   friendly_name: ${friendly_name}
