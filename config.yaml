@@ -41,6 +41,8 @@ substitutions:
   
   # Meter settings
   meter_unit: L # Unit of measurement for the meter (e.g. m³, kWh, L) (https://developers.home-assistant.io/docs/core/entity/sensor/https://developers.home-assistant.io/docs/core/entity/sensor/)
+  meter_device_class: water # device class for the meter (e.g. water, energy, gas)
+  meter_state_class: total_increasing # state class for the meter (e.g. total_increasing, total, measurement)
   
   # camera
   camera_pixel_format: JPEG # (cropping implementation is faster with RGB888 format) | Displays: RGB565, RGB888 | Cameras: YUV422, YUV420, RAW | Efficiency: Grayscale, YUV420, JPEG

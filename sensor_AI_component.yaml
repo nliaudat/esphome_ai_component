@@ -6,6 +6,8 @@ sensor:
     unit_of_measurement: "${meter_unit}"
     accuracy_decimals: 0
     icon: "mdi:counter"
+    state_class: ${meter_state_class}
+    device_class: ${meter_device_class}
     # update_interval: 30s
     # lambda: |-
       # auto reader = id(meter_reader);
