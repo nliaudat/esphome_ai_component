@@ -39,18 +39,18 @@ class TFLiteCoordinator {
   
   // Model management
   void set_model(const uint8_t *model, size_t length);
-  bool load_model();
-  bool is_model_loaded() const { return model_loaded_; }
+  [[nodiscard]] bool load_model();
+  [[nodiscard]] bool is_model_loaded() const { return model_loaded_; }
   
   // Inference
   using ProcessResult = esphome::esp32_camera_utils::ImageProcessor::ProcessResult;
   std::vector<InferenceResult> run_inference(const std::vector<ProcessResult>& processed_zones);
 
-  // Getters
-  ModelSpec get_model_spec() const;
-  int get_input_width() const { return model_handler_.get_input_width(); }
-  int get_input_height() const { return model_handler_.get_input_height(); }
-  int get_input_channels() const { return model_handler_.get_input_channels(); }
+  // Getters (const correctness with nodiscard)
+  [[nodiscard]] ModelSpec get_model_spec() const;
+  [[nodiscard]] int get_input_width() const { return model_handler_.get_input_width(); }
+  [[nodiscard]] int get_input_height() const { return model_handler_.get_input_height(); }
+  [[nodiscard]] int get_input_channels() const { return model_handler_.get_input_channels(); }
 
 
   // Arena Statistics for monitoring fragmentation
