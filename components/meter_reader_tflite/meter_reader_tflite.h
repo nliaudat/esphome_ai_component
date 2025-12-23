@@ -2,9 +2,7 @@
 
 #include "esphome/core/component.h"
 #include "esphome/components/camera/camera.h"
-#ifndef USE_HOST
 #include "esphome/components/esp32_camera/esp32_camera.h"
-#endif
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/light/light_state.h"
@@ -13,28 +11,11 @@
 // Coordinators
 #include "tflite_coordinator.h"
 #include "camera_coordinator.h"
-#ifdef USE_HOST
-  class FlashlightCoordinator {
-   public:
-    void setup(void*, void*, void*) {}
-    void set_timing(uint32_t, uint32_t) {}
-    void force_inference(std::function<void()>) {}
-    void capture_preview_sequence(std::function<void()>) {}
-  };
-#else
 #include "flashlight_coordinator.h"
-#endif
 #include "debug_coordinator.h"
 
-#ifdef USE_HOST
-namespace esphome { namespace esp32_camera_utils {
-  class Esp32CameraUtils {};
-  class CropZoneHandler { public: void update_zones(const std::string &s) {} };
-}}
-#else
 #include "esphome/components/esp32_camera_utils/crop_zone_handler.h"
 #include "esphome/components/esp32_camera_utils/esp32_camera_utils.h"
-#endif
 #include "value_validator.h"
 
 #ifdef USE_WEB_SERVER
@@ -47,10 +28,8 @@ namespace esphome { namespace esp32_camera_utils {
 #include <atomic>
 
 // Check for Dual Core capability
-#ifndef USE_HOST
 #if !defined(CONFIG_FREERTOS_UNICORE) && (portNUM_PROCESSORS > 1)
     #define SUPPORT_DOUBLE_BUFFERING
-#endif
 #endif
 
 #ifdef SUPPORT_DOUBLE_BUFFERING
@@ -59,25 +38,7 @@ namespace esphome { namespace esp32_camera_utils {
 #include "freertos/queue.h"
 #endif
 
-#ifdef USE_HOST
-  // Mock ESP32 Camera definitions
-  namespace camera {
-    class CameraImage;
-    class CameraImageReader {
-    public:
-      virtual void set_image(std::shared_ptr<CameraImage> image) = 0;
-      virtual size_t available() const = 0;
-      virtual uint8_t *peek_data_buffer() = 0;
-      virtual void consume_data(size_t consumed) = 0;
-      virtual void return_image() = 0;
-    };
-  }
-  namespace esp32_camera {
-    class ESP32Camera;
-  }
-#else
   #include "esphome/components/esp32_camera/esp32_camera.h"
-#endif
 
 namespace esphome {
 namespace meter_reader_tflite {

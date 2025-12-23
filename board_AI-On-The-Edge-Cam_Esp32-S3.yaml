@@ -89,6 +89,7 @@ substitutions:
   vsync_pin: GPIO6
   href_pin: GPIO7
   pixel_clock_pin: GPIO13
+
   
   # LED Pins
   status_led_pin: GPIO48
