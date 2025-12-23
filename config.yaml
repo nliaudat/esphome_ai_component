@@ -75,8 +75,8 @@ tflite_micro_helper:
   debug: true
 
 esp32_camera_utils:
-  id: camera_utils
-  camera_id: ${id_prefix}espcam
+  id: ${id_prefix}_camera_utils
+  camera_id: ${id_prefix}_espcam
   debug: true
   ### zoom availale for OV2640, OV3660, OV5640, SC101IOT, SC030IOT from crop zones (explicit)
   camera_window:  # can be set in http://[hassio]/developer-tools/action > esphome.[s3cam_tflite]_set_camera_window
@@ -107,26 +107,26 @@ esp32_camera_utils:
 
 # optional : flash light at taking image
 flash_light_controller:
-  id: flash_controller
-  flash_light: ${id_prefix}flash
+  id: ${id_prefix}_flash_controller
+  flash_light: ${id_prefix}_flash
   flash_pre_time: 7000ms # 7 seconds before update (time to stabilize) (works with 5sec on my board)
   flash_post_time: 200ms # 2 seconds after update (works with 100ms on my board)
   debug: true
 
 
 meter_reader_tflite:
-  id: meter_reader
-  camera_id: ${id_prefix}espcam
+  id: ${id_prefix}_meter_reader
+  camera_id: ${id_prefix}_espcam
   model: "digit_recognizer_v4_10cls_RGB.tflite"
   # model: "digit_recognizer_v4_10cls_GRAY.tflite"
 
   update_interval: 60s
-  debug: true
 
+  debug: true
   debug_image: false # static embedded image (debug.jpg)
   debug_image_out_serial: false
-  
   debug_memory: true
+  debug_timing: true
 
   
   # Image Rotation (required for preview to show rotated digits)
@@ -140,22 +140,32 @@ meter_reader_tflite:
 
 
 
-  crop_zones_global: crop_zones  # Reference the global variables set in globals_AI_component.yaml | To update, use http://[hassio]/developer-tools/action >esphome.[s3cam_tflite]_set_crop_zones | to get, use the tools>draw_regions.py
-  flash_light_controller: flash_controller
+  crop_zones_global: ${id_prefix}_crop_zones  # Reference the global variables set in globals_AI_component.yaml | To update, use http://[hassio]/developer-tools/action >esphome.[s3cam_tflite]_set_crop_zones | to get, use the tools>draw_regions.py
+  flash_light_controller: ${id_prefix}_flash_controller
   ### Enhanced validation parameters
   allow_negative_rates: false    # Prevent meter rollbacks
   max_absolute_diff: 300         # Maximum allowed absolute difference
 
-  value_sensor: meter_value
-  confidence_sensor: meter_confidence
-  inference_logs: inference_logs
-  main_logs: main_logs
+  value_sensor: ${id_prefix}_meter_value
+  confidence_sensor: ${id_prefix}_meter_confidence
+  
+
+  inference_logs: ${id_prefix}_inference_logs
+  main_logs: ${id_prefix}_main_logs
+  
+  
   
   enable_flash_calibration: false # still in dev
 
   ### Advanced parameters
   # frame_request_timeout: 15000  # ms (1000-60000)
   # high_confidence_threshold: 0.90  # (0.5-1.0)
+
+  # Pool efficiency monitoring (optional, requires DEBUG_METER_READER_MEMORY)
+  pool_job_efficiency_sensor: ${id_prefix}_pool_job_efficiency
+  pool_result_efficiency_sensor: ${id_prefix}_pool_result_efficiency
+  arena_efficiency_sensor: ${id_prefix}_arena_efficiency
+  heap_fragmentation_sensor: ${id_prefix}_heap_fragmentation
 
 
 packages:

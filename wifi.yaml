@@ -1,6 +1,6 @@
 
 wifi:
-  id: ${id_prefix}wifi_component
+  id: ${id_prefix}_wifi_component
   #use_address: floor-heating-controller-v2.local  #use if you want to change device name once.
   networks:
   - ssid: !secret wifi_ssid_1
@@ -27,7 +27,7 @@ sensor:
     name: "${friendly_name} WiFi Signal"
     update_interval: 60s
     entity_category: "diagnostic"
-    id: ${id_prefix}wifi_signal_db
+    id: ${id_prefix}_wifi_signal_db
     # web_server:
       # sorting_group_id: sorting_group_sensors
 

@@ -129,6 +129,9 @@ bool TFLiteCoordinator::process_model_result(const esp32_camera_utils::ImageProc
         return false;
     }
     
+    // Update arena stats cache after inference (for thread-safe Core 1 access)
+    update_arena_stats_cache();
+    
     TfLiteTensor* output_tensor = model_handler_.output_tensor();
     if (!output_tensor) return false;
     
@@ -196,6 +199,24 @@ void TFLiteCoordinator::report_memory_status() {
         peak,
         model_length_
     );
+}
+
+// Thread-safe: Returns cached arena stats (safe for Core 1 to call while Core 0 runs inference)
+TFLiteCoordinator::ArenaStats TFLiteCoordinator::get_arena_stats() const {
+    std::lock_guard<std::mutex> lock(arena_stats_mutex_);
+    return cached_arena_stats_;
+}
+
+// Call this after inference completes (from Core 0 inference task)
+void TFLiteCoordinator::update_arena_stats_cache() {
+    ArenaStats stats;
+    stats.total_size = tensor_arena_allocation_.actual_size;
+    stats.used_bytes = model_handler_.get_arena_used_bytes();
+    stats.wasted_bytes = (stats.total_size > stats.used_bytes) ? (stats.total_size - stats.used_bytes) : 0;
+    stats.efficiency = (stats.total_size > 0) ? (100.0f * stats.used_bytes / stats.total_size) : 0.0f;
+    
+    std::lock_guard<std::mutex> lock(arena_stats_mutex_);
+    cached_arena_stats_ = stats;
 }
 
 void TFLiteCoordinator::debug_test_parameters(const std::vector<std::vector<uint8_t>>& zone_data) {

@@ -5,7 +5,7 @@ switch:
   - platform: restart
     name: "${friendly_name} restart"
     icon: "mdi:restart"
-    id: ${id_prefix}ctrl_reboot    
+    id: ${id_prefix}_ctrl_reboot    
 
 
        

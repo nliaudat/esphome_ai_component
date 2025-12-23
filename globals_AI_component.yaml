@@ -1,5 +1,5 @@
 globals:
-  - id: crop_zones
+  - id: ${id_prefix}_crop_zones
     type: std::string
     # restore_value: true 
     max_restore_data_length: 254 

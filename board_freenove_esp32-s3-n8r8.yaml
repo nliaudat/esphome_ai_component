@@ -11,11 +11,11 @@ esphome:
   name_add_mac_suffix: False # this appends to 'name' NOT 'friendly_name'
   # on_loop:
     # - lambda: |-
-        # if(id(${id_prefix}wifi_component).is_connected()) {
-          # if (id(${id_prefix}espcam_update)) {
-            # id(${id_prefix}espcam).update_camera_parameters();
-            # if(id(${id_prefix}debug)) { id(${id_prefix}espcam).dump_config(); }
-            # id(${id_prefix}espcam_update) = false;
+        # if(id(${id_prefix}_wifi_component).is_connected()) {
+          # if (id(${id_prefix}_espcam_update)) {
+            # id(${id_prefix}_espcam).update_camera_parameters();
+            # if(id(${id_prefix}_debug)) { id(${id_prefix}_espcam).dump_config(); }
+            # id(${id_prefix}_espcam_update) = false;
           # }
         # }
 
@@ -138,7 +138,7 @@ light:
     num_leds: 1
     chipset: ws2812
     name: "${name} Flash LED"
-    id: ${id_prefix}flash
+    id: ${id_prefix}_flash
 
     effects:
       - addressable_scan:
@@ -155,7 +155,7 @@ light:
           update_interval: 2s
   - platform: status_led
     name: "${name} Status LED"
-    id: ${id_prefix}status_led
+    id: ${id_prefix}_status_led
     icon: "mdi:alarm-light"
     restore_mode: ALWAYS_OFF
     pin: ${status_led_pin}

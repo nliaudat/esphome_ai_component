@@ -99,6 +99,10 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("tensor_arena_used_sensor"): cv.use_id(sensor.Sensor),
     cv.Optional("process_free_heap_sensor"): cv.use_id(sensor.Sensor),
     cv.Optional("process_free_psram_sensor"): cv.use_id(sensor.Sensor),
+    cv.Optional("pool_job_efficiency_sensor"): cv.use_id(sensor.Sensor),
+    cv.Optional("pool_result_efficiency_sensor"): cv.use_id(sensor.Sensor),
+    cv.Optional("arena_efficiency_sensor"): cv.use_id(sensor.Sensor),
+    cv.Optional("heap_fragmentation_sensor"): cv.use_id(sensor.Sensor),
 
     cv.Optional(CONF_FLASH_LIGHT_CONTROLLER): cv.use_id(flash_light_controller.FlashLightController) if flash_light_controller else cv.string,
     cv.Optional(CONF_CROP_ZONES): cv.use_id(globals.GlobalsComponent),
@@ -124,6 +128,9 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("enable_rotation", default=False): cv.boolean,
     cv.Optional("show_crop_areas", default=True): cv.boolean,
     cv.Optional("enable_flash_calibration", default=False): cv.boolean,
+
+    cv.Optional("total_inference_time_sensor"): cv.use_id(sensor.Sensor),
+    cv.Optional("debug_timing", default=False): cv.boolean,
     # cv.Optional(CONF_PREVIEW): camera_component.CAMERA_SCHEMA.extend({
     #     cv.GenerateID(): cv.declare_id(MeterPreviewCamera),
     # }),
@@ -401,8 +408,33 @@ async def to_code(config):
         cg.add(var.set_frame_request_timeout(config[CONF_FRAME_REQUEST_TIMEOUT]))
     if CONF_HIGH_CONFIDENCE_THRESHOLD in config:
         cg.add(var.set_high_confidence_threshold(config[CONF_HIGH_CONFIDENCE_THRESHOLD]))
-    
+        
 
+    # Optional: Debug memory sensors
+    if "tensor_arena_size_sensor" in config:
+        sens = await cg.get_variable(config["tensor_arena_size_sensor"])
+        cg.add(var.set_tensor_arena_size_sensor(sens))
+    if "tensor_arena_used_sensor" in config:
+        sens = await cg.get_variable(config["tensor_arena_used_sensor"])
+        cg.add(var.set_tensor_arena_used_sensor(sens))
+    if "process_free_heap_sensor" in config:
+        sens = await cg.get_variable(config["process_free_heap_sensor"])
+        cg.add(var.set_process_free_heap_sensor(sens))
+    if "process_free_psram_sensor" in config:
+        sens = await cg.get_variable(config["process_free_psram_sensor"])
+        cg.add(var.set_process_free_psram_sensor(sens))
+    if "pool_job_efficiency_sensor" in config:
+        sens = await cg.get_variable(config["pool_job_efficiency_sensor"])
+        cg.add(var.set_pool_job_efficiency_sensor(sens))
+    if "pool_result_efficiency_sensor" in config:
+        sens = await cg.get_variable(config["pool_result_efficiency_sensor"])
+        cg.add(var.set_pool_result_efficiency_sensor(sens))
+    if "arena_efficiency_sensor" in config:
+        sens = await cg.get_variable(config["arena_efficiency_sensor"])
+        cg.add(var.set_arena_efficiency_sensor(sens))
+    if "heap_fragmentation_sensor" in config:
+        sens = await cg.get_variable(config["heap_fragmentation_sensor"])
+        cg.add(var.set_heap_fragmentation_sensor(sens))
     
     
     if "value_sensor" in config:
@@ -445,4 +477,16 @@ async def to_code(config):
 
     if config.get("enable_flash_calibration", False):
         cg.add(var.set_enable_flash_calibration(True))
+
+    if config.get("debug_timing", False):
+        cg.add_define("DEBUG_METER_READER_TIMING")
+        cg.add(var.set_debug_timing(True))
+    else:
+        # Still define it to allow switch usage, just start disabled
+        cg.add_define("DEBUG_METER_READER_TIMING")
+        cg.add(var.set_debug_timing(False))
+
+    if "total_inference_time_sensor" in config:
+        s = await cg.get_variable(config["total_inference_time_sensor"])
+        cg.add(var.set_total_inference_time_sensor(s))
 

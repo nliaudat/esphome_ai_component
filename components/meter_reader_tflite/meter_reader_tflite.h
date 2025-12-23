@@ -151,8 +151,15 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_tensor_arena_used_sensor(sensor::Sensor *s) { tensor_arena_used_sensor_ = s; }
   void set_process_free_heap_sensor(sensor::Sensor *s) { process_free_heap_sensor_ = s; }
   void set_process_free_psram_sensor(sensor::Sensor *s) { process_free_psram_sensor_ = s; }
+  void set_pool_job_efficiency_sensor(sensor::Sensor *s) { pool_job_efficiency_sensor_ = s; }
+  void set_pool_result_efficiency_sensor(sensor::Sensor *s) { pool_result_efficiency_sensor_ = s; }
+  void set_arena_efficiency_sensor(sensor::Sensor *s) { arena_efficiency_sensor_ = s; }
+  void set_heap_fragmentation_sensor(sensor::Sensor *s) { heap_fragmentation_sensor_ = s; }
   void set_debug_memory_enabled(bool enabled) { debug_memory_enabled_ = enabled; }
 #endif
+
+  void set_total_inference_time_sensor(sensor::Sensor *s) { total_inference_time_sensor_ = s; }
+  void set_debug_timing(bool enabled) { debug_timing_ = enabled; }
 
 
 #ifdef USE_WEB_SERVER
@@ -185,6 +192,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   std::atomic<bool> processing_frame_{false};
   std::shared_ptr<camera::CameraImage> pending_frame_{nullptr};
   uint32_t last_request_time_{0};
+  uint32_t pending_frame_acquisition_time_{0};
   
   // Config
   float confidence_threshold_{0.85f};
@@ -235,7 +243,14 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   sensor::Sensor *tensor_arena_used_sensor_{nullptr};
   sensor::Sensor *process_free_heap_sensor_{nullptr};
   sensor::Sensor *process_free_psram_sensor_{nullptr};
+  sensor::Sensor *pool_job_efficiency_sensor_{nullptr};
+  sensor::Sensor *pool_result_efficiency_sensor_{nullptr};
+  sensor::Sensor *arena_efficiency_sensor_{nullptr};
+  sensor::Sensor *heap_fragmentation_sensor_{nullptr};
 #endif
+  
+  sensor::Sensor *total_inference_time_sensor_{nullptr};
+  bool debug_timing_{false};
 
 
   // Helper

@@ -3,15 +3,15 @@
 i2c:
   sda: ${i2c_pins_sda}
   scl: ${i2c_pins_scl}
-  id: bus_camera
+  id: ${id_prefix}_bus_camera
 
 esp32_camera: 
-  id: ${id_prefix}espcam 
+  id: ${id_prefix}_espcam 
   name: ${friendly_name}_camera 
   external_clock:
     pin: ${external_clock_pin}
     frequency: ${external_clock_frequency}
-  i2c_id: bus_camera
+  i2c_id: ${id_prefix}_bus_camera
   data_pins: ${data_pins} 
   vsync_pin: ${vsync_pin} 
   href_pin: ${href_pin} 

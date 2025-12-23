@@ -166,3 +166,40 @@ sensor:
         }
       #endif
       return 0;
+
+  # Inference Pool Efficiency Monitoring
+  - platform: template
+    name: "${id_prefix} Inference Job Pool Efficiency"
+    id: ${id_prefix}_pool_job_efficiency
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
+    state_class: measurement
+    icon: "mdi:buffer"
+    entity_category: diagnostic
+
+  - platform: template
+    name: "${id_prefix} Inference Result Pool Efficiency"
+    id: ${id_prefix}_pool_result_efficiency
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
+    state_class: measurement
+    icon: "mdi:buffer"
+    entity_category: diagnostic
+
+  - platform: template
+    name: "${id_prefix} Arena Efficiency"
+    id: ${id_prefix}_arena_efficiency
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
+    state_class: measurement
+    icon: "mdi:chip"
+    entity_category: diagnostic
+
+  - platform: template
+    name: "${id_prefix} Heap Fragmentation"
+    id: ${id_prefix}_heap_fragmentation
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
+    state_class: measurement
+    icon: "mdi:memory"
+    entity_category: diagnostic

@@ -1,10 +1,10 @@
 button:
   - platform: template
     name: "Start Flash Calibration"
-    id: start_flash_calibration_btn
+    id: ${id_prefix}_start_flash_calibration_btn
     icon: "mdi:timer-sand"
     on_press:
       - lambda: |-
-          if (id(meter_reader) != nullptr) {
-            id(meter_reader)->start_flash_calibration(); 
+          if (id(${id_prefix}_meter_reader) != nullptr) {
+            id(${id_prefix}_meter_reader)->start_flash_calibration(); 
           }
