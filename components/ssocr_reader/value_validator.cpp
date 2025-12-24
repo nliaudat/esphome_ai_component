@@ -34,11 +34,15 @@ void ReadingHistory::add_reading(int value, uint32_t timestamp, float confidence
   size_t current_usage = (hour_readings_.size() + day_readings_.size()) * BYTES_PER_ENTRY;
   
   while (current_usage > max_history_size_bytes_ && !day_readings_.empty()) {
+      // If the oldest reading from day_readings is also in hour_readings, remove it.
+      if (!hour_readings_.empty() && hour_readings_.front().timestamp == day_readings_.front().timestamp) {
+          hour_readings_.pop_front();
+      }
+      
       // Remove from day readings (oldest)
       day_readings_.pop_front();
       
-      // Also check hour readings (though they should be subset of day, often redundant to check separate if time-bound)
-      // But we just recalc usage
+      // Recalculate usage
       current_usage = (hour_readings_.size() + day_readings_.size()) * BYTES_PER_ENTRY;
   }
   
