@@ -119,8 +119,10 @@ static InferenceResult* allocate_inference_result() {
       inference_result_used[i] = true;
       inference_result_pool[i].inference_time = 0;
       inference_result_pool[i].success = false;
-      inference_result_pool[i].readings.clear();
-      inference_result_pool[i].probabilities.clear();
+      // Force memory release by swapping with empty temporary, 
+      // ensuring no hidden capacity grows indefinitely in the pool.
+      std::vector<float>().swap(inference_result_pool[i].readings);
+      std::vector<float>().swap(inference_result_pool[i].probabilities);
       pool_result_hits++;
       return &inference_result_pool[i];
     }

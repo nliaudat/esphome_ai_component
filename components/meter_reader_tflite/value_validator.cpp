@@ -57,6 +57,17 @@ void ReadingHistory::add_reading(int value, uint32_t timestamp, float confidence
   while (day_readings_.size() > MAX_DAY_READINGS) {
       day_readings_.pop_front();
   }
+  // Check for abnormal growth
+  #ifdef DEBUG_METER_READER_MEMORY
+  static size_t last_log_time = 0;
+  if (millis() - last_log_time > 60000) {
+      last_log_time = millis();
+      ESP_LOGD(TAG, "History: %zu entries (%zu bytes est), Day: %zu, Hour: %zu", 
+              hour_readings_.size() + day_readings_.size(),
+              current_usage,
+              day_readings_.size(), hour_readings_.size());
+  }
+  #endif
 }
 
 int ReadingHistory::get_last_reading() const {

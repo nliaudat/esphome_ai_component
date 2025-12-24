@@ -33,6 +33,9 @@ static const char *const TAG = "ImageProcessor";
 // Static buffer pool instance (shared across all ImageProcessor instances)
 BufferPool ImageProcessor::buffer_pool_;
 
+// Initialize static member
+std::atomic<int32_t> ImageProcessor::TrackedBuffer::active_instances{0};
+
 // Duration logging macros for performance profiling
 #ifdef DURATION_START
 #undef DURATION_START
@@ -366,6 +369,13 @@ ImageProcessor::UniqueBufferPtr ImageProcessor::allocate_image_buffer(size_t siz
         if (pooled_buffer.data) {
             // Successfully got buffer from pool
             // TrackedBuffer(ptr, spiram, jpeg_aligned, pooled, size)
+            if (TrackedBuffer::active_instances > 5) {
+                // Periodically log if count gets high, or just log occasionally?
+                // Let's log if it's growing abnormally? No, let's just log on alloc for now if debug is on.
+                #ifdef DEBUG_ESP32_CAMERA_UTILS_MEMORY
+                ESP_LOGD(TAG, "Allocated pooled buffer. Active TrackedBuffers: %d", TrackedBuffer::active_instances.load() + 1);
+                #endif
+            }
             return UniqueBufferPtr(new TrackedBuffer(pooled_buffer.data, false, false, true, pooled_buffer.size));
         }
         // Pool acquisition failed, fall through to direct allocation
@@ -391,6 +401,9 @@ ImageProcessor::UniqueBufferPtr ImageProcessor::allocate_image_buffer(size_t siz
     if (!ptr) return nullptr;
     
     // TrackedBuffer(ptr, spiram, jpeg_aligned, pooled, size)
+    #ifdef DEBUG_ESP32_CAMERA_UTILS_MEMORY
+    ESP_LOGD(TAG, "Allocated direct buffer. Active TrackedBuffers: %d", TrackedBuffer::active_instances.load() + 1);
+    #endif
     return UniqueBufferPtr(new TrackedBuffer(ptr, spiram, false, false, size));
 }
 
