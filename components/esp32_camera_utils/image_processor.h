@@ -117,6 +117,10 @@ class ImageProcessor {
           : ptr(other.ptr), size(other.size), is_spiram(other.is_spiram), 
             is_jpeg_aligned(other.is_jpeg_aligned), is_pooled(other.is_pooled) {
           other.ptr = nullptr;
+          other.size = 0;
+          other.is_spiram = false;
+          other.is_jpeg_aligned = false;
+          other.is_pooled = false;
       }
       
       TrackedBuffer& operator=(TrackedBuffer&& other) noexcept {
@@ -136,8 +140,19 @@ class ImageProcessor {
               is_spiram = other.is_spiram;
               is_jpeg_aligned = other.is_jpeg_aligned;
               is_pooled = other.is_pooled;
-              other.ptr = nullptr;
           }
+          ptr = other.ptr;
+          size = other.size;
+          is_spiram = other.is_spiram;
+          is_jpeg_aligned = other.is_jpeg_aligned;
+          is_pooled = other.is_pooled;
+          
+          other.ptr = nullptr;
+          other.size = 0;
+          other.is_spiram = false;
+          other.is_jpeg_aligned = false;
+          other.is_pooled = false;
+
           return *this;
       }
       

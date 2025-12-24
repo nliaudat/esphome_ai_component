@@ -411,30 +411,17 @@ async def to_code(config):
         
 
     # Optional: Debug memory sensors
-    if "tensor_arena_size_sensor" in config:
-        sens = await cg.get_variable(config["tensor_arena_size_sensor"])
-        cg.add(var.set_tensor_arena_size_sensor(sens))
-    if "tensor_arena_used_sensor" in config:
-        sens = await cg.get_variable(config["tensor_arena_used_sensor"])
-        cg.add(var.set_tensor_arena_used_sensor(sens))
-    if "process_free_heap_sensor" in config:
-        sens = await cg.get_variable(config["process_free_heap_sensor"])
-        cg.add(var.set_process_free_heap_sensor(sens))
-    if "process_free_psram_sensor" in config:
-        sens = await cg.get_variable(config["process_free_psram_sensor"])
-        cg.add(var.set_process_free_psram_sensor(sens))
-    if "pool_job_efficiency_sensor" in config:
-        sens = await cg.get_variable(config["pool_job_efficiency_sensor"])
-        cg.add(var.set_pool_job_efficiency_sensor(sens))
-    if "pool_result_efficiency_sensor" in config:
-        sens = await cg.get_variable(config["pool_result_efficiency_sensor"])
-        cg.add(var.set_pool_result_efficiency_sensor(sens))
-    if "arena_efficiency_sensor" in config:
-        sens = await cg.get_variable(config["arena_efficiency_sensor"])
-        cg.add(var.set_arena_efficiency_sensor(sens))
-    if "heap_fragmentation_sensor" in config:
-        sens = await cg.get_variable(config["heap_fragmentation_sensor"])
-        cg.add(var.set_heap_fragmentation_sensor(sens))
+    sensor_keys = [
+        "tensor_arena_size_sensor", "tensor_arena_used_sensor",
+        "process_free_heap_sensor", "process_free_psram_sensor",
+        "pool_job_efficiency_sensor", "pool_result_efficiency_sensor",
+        "arena_efficiency_sensor", "heap_fragmentation_sensor",
+    ]
+    for key in sensor_keys:
+        if key in config:
+            sens = await cg.get_variable(config[key])
+            setter_name = f"set_{key}"
+            cg.add(getattr(var, setter_name)(sens))
     
     
     if "value_sensor" in config:
@@ -478,13 +465,8 @@ async def to_code(config):
     if config.get("enable_flash_calibration", False):
         cg.add(var.set_enable_flash_calibration(True))
 
-    if config.get("debug_timing", False):
-        cg.add_define("DEBUG_METER_READER_TIMING")
-        cg.add(var.set_debug_timing(True))
-    else:
-        # Still define it to allow switch usage, just start disabled
-        cg.add_define("DEBUG_METER_READER_TIMING")
-        cg.add(var.set_debug_timing(False))
+    cg.add_define("DEBUG_METER_READER_TIMING")
+    cg.add(var.set_debug_timing(config.get("debug_timing", False)))
 
     if "total_inference_time_sensor" in config:
         s = await cg.get_variable(config["total_inference_time_sensor"])

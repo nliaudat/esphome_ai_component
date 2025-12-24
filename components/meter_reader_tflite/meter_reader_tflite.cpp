@@ -318,7 +318,7 @@ void MeterReaderTFLite::setup() {
     BaseType_t res = xTaskCreatePinnedToCore(
         MeterReaderTFLite::inference_task, 
         "inference_task", 
-        8192, // Stack size
+        16384, // Stack size
         this, // Pass this instance
         1,    // Priority (Low)
         &inference_task_handle_, 
@@ -454,18 +454,18 @@ void MeterReaderTFLite::loop() {
                      inference_logs_->publish_state(inference_log);
                 }
 
+                // Build confidence list string
+                std::string conf_list = "[";
+                for (size_t i = 0; i < res_ptr->probabilities.size(); i++) {
+                    if (i > 0) conf_list += ", ";
+                    char buf[8];
+                    snprintf(buf, sizeof(buf), "%.3f", res_ptr->probabilities[i]);
+                    conf_list += buf;
+                }
+                conf_list += "]";
+
                 // Publish (matches process_full_image logic)
                 if (valid && avg_conf >= confidence_threshold_) {
-                     // Build confidence list string
-                     std::string conf_list = "[";
-                     for (size_t i = 0; i < res_ptr->probabilities.size(); i++) {
-                         if (i > 0) conf_list += ", ";
-                         char buf[8];
-                         snprintf(buf, sizeof(buf), "%.2f", res_ptr->probabilities[i]);
-                         conf_list += buf;
-                     }
-                     conf_list += "]";
-                     
                      ESP_LOGI(TAG, "Result: VALID (Raw: %.0f, Conf: %.3f, %s)", 
                               final_val, avg_conf, conf_list.c_str());
                      value_sensor_->publish_state(validated_val);
@@ -473,16 +473,6 @@ void MeterReaderTFLite::loop() {
                          confidence_sensor_->publish_state(avg_conf * 100.0f);
                      }
                 } else {
-                     // Build confidence list string
-                     std::string conf_list = "[";
-                     for (size_t i = 0; i < res_ptr->probabilities.size(); i++) {
-                         if (i > 0) conf_list += ", ";
-                         char buf[8];
-                         snprintf(buf, sizeof(buf), "%.2f", res_ptr->probabilities[i]);
-                         conf_list += buf;
-                     }
-                     conf_list += "]";
-                     
                      ESP_LOGI(TAG, "Result: INVALID (Raw: %.0f, Conf: %.3f, %s)", 
                               final_val, avg_conf, conf_list.c_str());
                 }
