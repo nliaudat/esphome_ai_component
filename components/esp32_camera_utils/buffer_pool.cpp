@@ -5,6 +5,7 @@ namespace esphome {
 namespace esp32_camera_utils {
 
 static const char *TAG = "BufferPool";
+static constexpr float OVERSIZE_THRESHOLD_FACTOR = 1.2f;
 
 BufferPool::Buffer BufferPool::acquire(size_t size) {
   std::lock_guard<std::mutex> lock(mutex_);
@@ -21,7 +22,7 @@ BufferPool::Buffer BufferPool::acquire(size_t size) {
   
   // Strategy 2: Try to reuse oversized slot (within 20% overhead)
   for (auto& slot : pool_) {
-    if (!slot.in_use && slot.size >= size && slot.size <= size * 1.2) {
+    if (!slot.in_use && slot.size >= size && slot.size <= size * OVERSIZE_THRESHOLD_FACTOR) {
       slot.in_use = true;
       hits_++;
       ESP_LOGV(TAG, "Pool hit: reusing %zu bytes for %zu bytes", slot.size, size);
