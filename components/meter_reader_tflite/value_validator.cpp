@@ -28,15 +28,15 @@ void ReadingHistory::add_reading(int value, uint32_t timestamp, float confidence
   // Enforce memory limit
   // Estimate size: deque overhead + item size * count
   // HistoricalReading is 12 bytes + deque node overhead (~16-32 bytes depending on platform/impl)
-  // Let's approximate roughly 48 bytes per entry total overhead to be safe
-  const size_t BYTES_PER_ENTRY = 48; 
+  // Let's approximate roughly 64 bytes per entry total overhead to be safe
+  const size_t BYTES_PER_ENTRY = 64; 
   
   size_t current_usage = (hour_readings_.size() + day_readings_.size()) * BYTES_PER_ENTRY;
   
   while (current_usage > max_history_size_bytes_ && !day_readings_.empty()) {
       // If the oldest reading from day_readings is also in hour_readings, remove it.
       // This works because hour_readings is a strict subset of time of day_readings
-      if (!hour_readings_.empty() && hour_readings_.front().timestamp == day_readings_.front().timestamp) {
+      if (!hour_readings_.empty() && hour_readings_.front().timestamp <= day_readings_.front().timestamp) {
           hour_readings_.pop_front();
       }
       
