@@ -31,6 +31,7 @@ class ReadingHistory {
 
   void setup();
   void add_reading(int value, uint32_t timestamp, float confidence);
+  void set_max_history_size_bytes(size_t size) { max_history_size_bytes_ = size; }
   
   int get_last_reading() const;
   float get_last_confidence() const;
@@ -46,6 +47,7 @@ class ReadingHistory {
  private:
   std::deque<HistoricalReading> hour_readings_;
   std::deque<HistoricalReading> day_readings_;
+  size_t max_history_size_bytes_{51200};
   
   void cleanup_old_readings(uint32_t current_timestamp);
 };
@@ -63,6 +65,7 @@ class ValueValidator {
     bool enable_smart_validation{true};
     int smart_validation_window{5};
     float high_confidence_threshold{0.90f}; // Threshold for validation override
+    size_t max_history_size_bytes{51200}; // 50KB limit for history buffer
   };
 
   void setup();
@@ -89,5 +92,5 @@ class ValueValidator {
   int calculate_digit_difference(int reading1, int reading2) const;
 };
 
-}  // namespace meter_reader_tflite
+}  // namespace ssocr_reader
 }  // namespace esphome

@@ -25,7 +25,24 @@ void ReadingHistory::add_reading(int value, uint32_t timestamp, float confidence
   
   cleanup_old_readings(timestamp);
   
-  // Enforce absolute maximum limits to prevent memory bloat
+  // Enforce memory limit
+  // Estimate size: deque overhead + item size * count
+  // HistoricalReading is 12 bytes + deque node overhead (~16-32 bytes depending on platform/impl)
+  // Let's approximate roughly 48 bytes per entry total overhead to be safe
+  const size_t BYTES_PER_ENTRY = 48; 
+  
+  size_t current_usage = (hour_readings_.size() + day_readings_.size()) * BYTES_PER_ENTRY;
+  
+  while (current_usage > max_history_size_bytes_ && !day_readings_.empty()) {
+      // Remove from day readings (oldest)
+      day_readings_.pop_front();
+      
+      // Also check hour readings (though they should be subset of day, often redundant to check separate if time-bound)
+      // But we just recalc usage
+      current_usage = (hour_readings_.size() + day_readings_.size()) * BYTES_PER_ENTRY;
+  }
+  
+  // Also enforce absolute limits just in case
   const size_t MAX_HOUR_READINGS = 360;  // 6 per minute * 60 minutes
   const size_t MAX_DAY_READINGS = 1440;  // 1 per minute * 60 * 24
   
@@ -123,6 +140,7 @@ void ReadingHistory::clear() {
 
 void ValueValidator::setup() {
   history_.setup();
+  history_.set_max_history_size_bytes(config_.max_history_size_bytes);
   last_valid_reading_ = 0;
   first_reading_ = true;
   last_good_values_.clear();
@@ -335,5 +353,5 @@ void ValueValidator::reset() {
   ESP_LOGI(TAG, "Value validator reset");
 }
 
-}  // namespace meter_reader_tflite
+}  // namespace ssocr_reader
 }  // namespace esphome

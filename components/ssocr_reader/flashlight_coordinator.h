@@ -57,5 +57,5 @@ class FlashlightCoordinator {
   void schedule_timeout(uint32_t ms, F&& f);
 };
 
-}  // namespace meter_reader_tflite
+}  // namespace ssocr_reader
 }  // namespace esphome
