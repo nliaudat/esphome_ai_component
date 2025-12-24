@@ -13,7 +13,7 @@ external_components:
   - source:
       type: local
       path: components 
-    components: [meter_reader_tflite, tflite_micro_helper, esp32_camera_utils, flash_light_controller] 
+    components: [meter_reader_tflite, tflite_micro_helper, esp32_camera_utils, flash_light_controller] #, ssocr_reader] 
       
 
 
@@ -169,6 +169,19 @@ meter_reader_tflite:
   pool_result_efficiency_sensor: ${id_prefix}_pool_result_efficiency
   arena_efficiency_sensor: ${id_prefix}_arena_efficiency
   heap_fragmentation_sensor: ${id_prefix}_heap_fragmentation
+
+# ssocr_reader:
+#   id: ssocr_main
+#   update_interval: 60s
+#   threshold_level: 128
+#   digit_count: 8
+#   # Adjust crop to focus EXACTLY on the digits
+#   crop_x: 0
+#   crop_y: 0
+#   crop_w: 0
+#   crop_h: 0
+#   value:
+#     name: "SSOCR Value"
 
 
 packages:
