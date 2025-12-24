@@ -131,5 +131,5 @@ void FlashlightCoordinator::capture_preview_sequence(std::function<void()> frame
     }
 }
 
-} // namespace meter_reader_tflite
+} // namespace ssocr_reader
 } // namespace esphome

@@ -335,5 +335,5 @@ void ValueValidator::reset() {
   ESP_LOGI(TAG, "Value validator reset");
 }
 
-}  // namespace meter_reader_tflite
+}  // namespace ssocr_reader
 }  // namespace esphome

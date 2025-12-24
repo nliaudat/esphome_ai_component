@@ -89,5 +89,5 @@ class ValueValidator {
   int calculate_digit_difference(int reading1, int reading2) const;
 };
 
-}  // namespace meter_reader_tflite
+}  // namespace ssocr_reader
 }  // namespace esphome

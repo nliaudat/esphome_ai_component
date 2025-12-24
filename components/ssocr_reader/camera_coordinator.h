@@ -78,5 +78,5 @@ class CameraCoordinator {
   bool window_configured_{false};
 };
 
-}  // namespace meter_reader_tflite
+}  // namespace ssocr_reader
 }  // namespace esphome

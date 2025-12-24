@@ -160,5 +160,5 @@ bool CameraCoordinator::apply_window() {
     return set_window(window_offset_x_, window_offset_y_, window_width_, window_height_);
 }
 
-} // namespace meter_reader_tflite
+} // namespace ssocr_reader
 } // namespace esphome
