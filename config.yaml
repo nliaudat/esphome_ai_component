@@ -170,7 +170,7 @@ meter_reader_tflite:
   arena_efficiency_sensor: ${id_prefix}_arena_efficiency
   heap_fragmentation_sensor: ${id_prefix}_heap_fragmentation
 
-# ssocr_reader:
+# ssocr_reader: #seven segment reader (dev) / do not if using meter_reader_tflite
 #   id: ssocr_main
 #   update_interval: 60s
 #   threshold_level: 128
