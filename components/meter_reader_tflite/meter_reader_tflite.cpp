@@ -392,6 +392,26 @@ void MeterReaderTFLite::update() {
         return; // Skip normal processing during calibration
     }
     
+    // Setup Mode: Flash always on, ignore scheduling
+    if (generate_preview_) {
+        // Ensure flash is on (redundant check but safe) but do NOT run scheduler
+        if (!flashlight_coord_.is_active()) {
+             // In case it was turned off by something else, force it back
+             flashlight_coord_.enable_flash();
+        }
+        
+        // Trigger frame request for preview update 
+        // (Similar to continuous mode but specifically for preview)
+        if (!frame_available_ && !frame_requested_) {
+             frame_requested_ = true;
+             last_request_time_ = millis();
+        } else if (frame_available_) {
+             process_available_frame();
+        }
+        return; // Skip standard scheduling
+    }
+
+    
     // The flashlight coordinator returns true if it is handling the cycle (scheduling or waiting)
     bool busy = flashlight_coord_.update_scheduling();
     
@@ -787,6 +807,19 @@ void MeterReaderTFLite::set_flash_light(light::LightState* light) {
 void MeterReaderTFLite::set_flash_controller(flash_light_controller::FlashLightController* c) {
     flashlight_coord_.setup(this, nullptr, c);
 }
+void MeterReaderTFLite::set_generate_preview(bool generate) { 
+    generate_preview_ = generate; 
+    
+    // Setup Mode Logic: Force light ON when preview is enabled
+    if (generate) {
+        ESP_LOGI(TAG, "Setup Mode (Preview) Enabled: Turning Flashlight ON");
+        flashlight_coord_.enable_flash();
+    } else {
+        ESP_LOGI(TAG, "Setup Mode (Preview) Disabled: Turning Flashlight OFF");
+        flashlight_coord_.disable_flash();
+    }
+}
+
 void MeterReaderTFLite::set_flash_pre_time(uint32_t ms) { flashlight_coord_.set_timing(ms, 2000); } // simplified
 void MeterReaderTFLite::set_flash_post_time(uint32_t ms) { flashlight_coord_.set_timing(5000, ms); }
 

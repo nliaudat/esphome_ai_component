@@ -86,7 +86,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_model_config(const std::string &model_type); // -> TFLite
   void set_rotation(float rotation) { rotation_ = rotation; } // Storage, passed to TFLite late
   
-  void set_generate_preview(bool generate) { generate_preview_ = generate; }
+  void set_generate_preview(bool generate);
   void set_show_crop_areas(bool show) { show_crop_areas_ = show; }
 #ifdef DEV_ENABLE_ROTATION
   void take_preview_image();
