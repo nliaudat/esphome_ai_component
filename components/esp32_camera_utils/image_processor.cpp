@@ -185,6 +185,25 @@ ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t* data, s
         return nullptr;
     }
 
+    // Fix for ESP32 JPEG decoder outputting BGR (Little Endian RGB) instead of RGB.
+    // The ESP32 hardware/software JPEG decoder typically outputs pixels in Little Endian format.
+    // For 24-bit RGB, this results in the byte order B-G-R in memory.
+    // Since our downstream processing (and the web preview) expects standard R-G-B order,
+    // we must perform an in-place swap of the Red (0) and Blue (2) channels.
+    // Source: Common ESP32 camera/JPEG behavior observed in ESP-IDF and Arduino implementations.
+    #ifdef ESP32
+    if (output_format == JPEG_PIXEL_FORMAT_RGB888) {
+        // Iterate through pixels and swap R (index 0) and B (index 2)
+        // BGR (Input) -> RGB (Output)
+        uint8_t* pixels = out_buf.get();
+        for (size_t i = 0; i < out_size; i += 3) {
+            uint8_t temp = pixels[i];     // B (from BGR)
+            pixels[i] = pixels[i+2];      // Move R to index 0
+            pixels[i+2] = temp;           // Move B to index 2
+        }
+    }
+    #endif
+
     return out_buf;
 }
 
