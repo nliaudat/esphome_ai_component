@@ -11,6 +11,23 @@ namespace tflite_micro_helper {
 
 static const char *const TAG = "ModelHandler";
 
+void ModelHandler::unload() {
+    interpreter_.reset();
+    tensor_arena_allocation_.data.reset();
+    tensor_arena_allocation_.actual_size = 0;
+    tensor_arena_size_requested_ = 0;
+    
+    // Reset state
+    config_ = ModelConfig{};
+    output_size_ = 0;
+    tflite_model_ = nullptr;
+    model_length_ = 0;
+    memory_manager_ = MemoryManager(); // Reset memory manager state if needed
+    resolver_.reset();
+    
+    ESP_LOGI(TAG, "Model unloaded and memory freed");
+}
+
 bool ModelHandler::load_model(const uint8_t *model_data, size_t model_size, const ModelConfig &config) {
     model_length_ = model_size;
     
@@ -128,7 +145,8 @@ bool ModelHandler::load_model_with_arena(const uint8_t *model_data, size_t model
     return false;
   }
 
-  static tflite::MicroMutableOpResolver<MAX_OPERATORS> resolver;
+  // Reset and allocate fresh resolver for this load cycle
+  resolver_ = std::make_unique<tflite::MicroMutableOpResolver<MAX_OPERATORS>>();
   
   ESP_LOGD(TAG, "Operator codes found in model:");
     for (size_t i = 0; i < tflite_model_->operator_codes()->size(); ++i) {
@@ -144,14 +162,14 @@ bool ModelHandler::load_model_with_arena(const uint8_t *model_data, size_t model
     required_ops.insert(op_code->builtin_code());
   }
 
-  if (!OpResolverManager::RegisterOps<MAX_OPERATORS>(resolver, required_ops, TAG)) {
+  if (!OpResolverManager::RegisterOps<MAX_OPERATORS>(*resolver_, required_ops, TAG)) {
     ESP_LOGE(TAG, "Failed to register operators");
     return false;
   }
 
   interpreter_ = std::make_unique<tflite::MicroInterpreter>(
       tflite_model_,
-      resolver,
+      *resolver_,
       tensor_arena,
       tensor_arena_size);
 

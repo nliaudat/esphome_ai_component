@@ -5,6 +5,7 @@
 #include "esphome/components/esp32_camera/esp32_camera.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
+#include "esphome/components/button/button.h"
 #include "esphome/components/light/light_state.h"
 #include "esphome/components/globals/globals_component.h"
 
@@ -146,6 +147,12 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
   void set_esp32_camera_utils(esp32_camera_utils::Esp32CameraUtils *utils) { esp32_camera_utils_ = utils; }
   
+  // Dynamic Resource Management
+  void unload_resources();
+  void reload_resources();
+  void set_unload_button(button::Button *b) { unload_button_ = b; }
+  void set_reload_button(button::Button *b) { reload_button_ = b; }
+  
 #ifdef DEBUG_METER_READER_MEMORY
   void set_tensor_arena_size_sensor(sensor::Sensor *s) { tensor_arena_size_sensor_ = s; }
   void set_tensor_arena_used_sensor(sensor::Sensor *s) { tensor_arena_used_sensor_ = s; }
@@ -251,6 +258,9 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   
   sensor::Sensor *total_inference_time_sensor_{nullptr};
   bool debug_timing_{false};
+  
+  button::Button *unload_button_{nullptr};
+  button::Button *reload_button_{nullptr};
 
 
   // Helper

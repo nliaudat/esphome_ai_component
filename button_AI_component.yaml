@@ -8,3 +8,13 @@ button:
           if (id(${id_prefix}_meter_reader) != nullptr) {
             id(${id_prefix}_meter_reader)->start_flash_calibration(); 
           }
+
+
+
+  - platform: template
+    name: "Unload AI components"
+    id: ${id_prefix}_unload_btn
+    
+  - platform: template
+    name: "Reload AI components"
+    id: ${id_prefix}_reload_btn
