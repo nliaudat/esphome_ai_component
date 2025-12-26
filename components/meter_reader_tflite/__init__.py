@@ -34,18 +34,10 @@ CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL = 'debug_image_out_serial'
 CONF_DEBUG_MEMORY = 'debug_memory'
 
 # CONF_MODEL_TYPE = 'model_type' 
-CONF_ROTATION = 'rotation'
 CONF_PREVIEW = 'preview_camera'
 CONF_GENERATE_PREVIEW = 'generate_preview'
 CONF_START_FLASH_CALIBRATION_BUTTON = 'start_flash_calibration_button'
 
-# Rotation options mapping
-ROTATION_OPTIONS = {
-    "0": 0,
-    "90": 90,
-    "180": 180,
-    "270": 270,
-}
 CONF_FLASH_LIGHT_CONTROLLER = 'flash_light_controller'
 
 CONF_CROP_ZONES = 'crop_zones_global'
@@ -86,7 +78,6 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_CONFIDENCE_THRESHOLD, default=0.85): cv.float_range(
         min=0.0, max=1.0
     ),
-    cv.Optional(CONF_ROTATION, default="0"): cv.float_range(min=0, max=360),
     # Make tensor_arena_size optional since it's now in model_config.h
     cv.Optional(CONF_TENSOR_ARENA_SIZE): cv.All( 
         datasize_to_bytes,
@@ -127,7 +118,6 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("main_logs"): cv.use_id(text_sensor.TextSensor),
     cv.Optional(CONF_START_FLASH_CALIBRATION_BUTTON): cv.use_id(button.Button),
     cv.Optional(CONF_GENERATE_PREVIEW, default=False): cv.boolean,
-    cv.Optional("enable_rotation", default=False): cv.boolean,
     cv.Optional("show_crop_areas", default=True): cv.boolean,
     cv.Optional("enable_flash_calibration", default=False): cv.boolean,
     cv.Optional(CONF_UNLOAD_BUTTON): cv.use_id(button.Button),
@@ -224,45 +214,23 @@ async def to_code(config):
     pixel_format = substitutions.get("camera_pixel_format", "RGB888")
     cg.add(var.set_camera_image_format(width, height, pixel_format))
     
-    # Set image rotation
-    # Priority 1: Check meter_reader_tflite specific rotation
-    rotation_value = 0.0
-    rotation_conf = config.get(CONF_ROTATION)
-    
-    # Priority 2: Check esp32_camera_utils configuration if not set locally or is "0" (str)
-    # Note: rotation_conf comes as string from one_of validator if we used that, but now it matches float?
-    # Actually validation below ensures it's float-compatible
-    
-    # But wait, we need to handle the fallback lookup
-    # Check if rotation is effectively 0
-    is_zero = False
-    try:
-        if float(rotation_conf) == 0:
-            is_zero = True
-    except:
-        pass
+    # Find esp32_camera_utils instance to allow updating its helper sensors and for rotation detection
+    camera_utils_id = None
+    if 'esp32_camera_utils' in CORE.config:
+        conf = CORE.config['esp32_camera_utils']
+        # Handle list if multiple instances (though usually singleton or first one)
+        if isinstance(conf, list) and len(conf) > 0:
+            conf = conf[0]
+            
+        if CONF_ID in conf:
+            camera_utils_id = conf[CONF_ID]
 
-    if is_zero:
-        # Search for esp32_camera_utils in top-level config
-        for comp_name, comp_config in CORE.config.items():
-            if comp_name.startswith("esp32_camera_utils"):
-                conf_list = comp_config if isinstance(comp_config, list) else [comp_config]
-                for conf in conf_list:
-                     if "rotation" in conf:
-                         rotation_conf = conf["rotation"]
-                         break
-                         
-    # print(f"DEBUG_ROTATION_CHECK: Final rotation value is '{rotation_conf}'")
-    
-    # Ensure it's a float
-    try:
-        rotation_value = float(rotation_conf)
-    except:
-        rotation_value = 0.0
+    if camera_utils_id:
+        utils_var = await cg.get_variable(camera_utils_id)
+        cg.add(var.set_esp32_camera_utils(utils_var))
 
-    cg.add(var.set_rotation(rotation_value))
-    
-    if config.get("enable_rotation", False):
+    # Auto-enable rotation if esp32_camera_utils is present
+    if camera_utils_id is not None:
         cg.add_define("DEV_ENABLE_ROTATION")
     
     cg.add_define("USE_SERVICE_DEBUG")
@@ -444,20 +412,7 @@ async def to_code(config):
         main_logs = await cg.get_variable(config["main_logs"])
         cg.add(var.set_main_logs(main_logs))
 
-    # Find esp32_camera_utils instance to allow updating its helper sensors
-    camera_utils_id = None
-    if 'esp32_camera_utils' in CORE.config:
-        conf = CORE.config['esp32_camera_utils']
-        # Handle list if multiple instances (though usually singleton or first one)
-        if isinstance(conf, list) and len(conf) > 0:
-            conf = conf[0]
-            
-        if CONF_ID in conf:
-            camera_utils_id = conf[CONF_ID]
 
-    if camera_utils_id:
-        utils_var = await cg.get_variable(camera_utils_id)
-        cg.add(var.set_esp32_camera_utils(utils_var))
     if CONF_START_FLASH_CALIBRATION_BUTTON in config:
         b = await cg.get_variable(config[CONF_START_FLASH_CALIBRATION_BUTTON])
         cg.add(b.set_on_press_callback(

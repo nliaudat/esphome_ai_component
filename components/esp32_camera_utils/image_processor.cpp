@@ -229,10 +229,11 @@ std::shared_ptr<camera::CameraImage> ImageProcessor::generate_rotated_preview(
     }
 
     // 4. Rotate
-    int final_w, final_h;
+    // Fix: perform_rotation takes output dims as input args, they are not output references to be filled.
+    // Use the calculating new_w/new_h from step 3.
     bool success = Rotator::perform_rotation(rgb_data.get(), out_buffer->get(), 
                                          dec_w, dec_h, 3, 
-                                         rotation, final_w, final_h);
+                                         rotation, new_w, new_h);
     
     if (!success) {
         ESP_LOGW(TAG, "Preview: Rotation failed");
@@ -242,7 +243,7 @@ std::shared_ptr<camera::CameraImage> ImageProcessor::generate_rotated_preview(
     // 5. Return wrapped result
     return std::shared_ptr<RotatedPreviewImage>(new RotatedPreviewImage(
         std::move(out_buffer), out_size,
-        final_w, final_h,
+        new_w, new_h,
         PIXFORMAT_RGB888
     ));
 }

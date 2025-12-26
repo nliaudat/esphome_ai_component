@@ -17,6 +17,23 @@ switch:
           }
 
   - platform: template
+    name: "Setup Mode (Preview)"
+    id: ${id_prefix}_setup_mode_preview
+    icon: "mdi:camera-cog"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - lambda: |-
+          if (id(${id_prefix}_meter_reader) != nullptr) {
+            id(${id_prefix}_meter_reader)->set_generate_preview(true);
+          }
+    turn_off_action:
+      - lambda: |-
+          if (id(${id_prefix}_meter_reader) != nullptr) {
+            id(${id_prefix}_meter_reader)->set_generate_preview(false);
+          }
+
+  - platform: template
     name: "Allow Negative Rates"
     id: ${id_prefix}_allow_negative_rates_switch
     icon: "mdi:minus-circle-off"
