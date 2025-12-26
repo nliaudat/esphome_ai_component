@@ -56,6 +56,8 @@ CONF_ALLOW_NEGATIVE_RATES = 'allow_negative_rates'
 CONF_MAX_ABSOLUTE_DIFF = 'max_absolute_diff'
 CONF_FRAME_REQUEST_TIMEOUT = 'frame_request_timeout'
 CONF_HIGH_CONFIDENCE_THRESHOLD = 'high_confidence_threshold'
+CONF_UNLOAD_BUTTON = 'unload_button'
+CONF_RELOAD_BUTTON = 'reload_button'
 
 meter_reader_tflite_ns = cg.esphome_ns.namespace('meter_reader_tflite')
 MeterReaderTFLite = meter_reader_tflite_ns.class_('MeterReaderTFLite', cg.PollingComponent)
@@ -128,6 +130,8 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("enable_rotation", default=False): cv.boolean,
     cv.Optional("show_crop_areas", default=True): cv.boolean,
     cv.Optional("enable_flash_calibration", default=False): cv.boolean,
+    cv.Optional(CONF_UNLOAD_BUTTON): cv.use_id(button.Button),
+    cv.Optional(CONF_RELOAD_BUTTON): cv.use_id(button.Button),
 
     cv.Optional("total_inference_time_sensor"): cv.use_id(sensor.Sensor),
     cv.Optional("debug_timing", default=False): cv.boolean,
@@ -471,4 +475,12 @@ async def to_code(config):
     if "total_inference_time_sensor" in config:
         s = await cg.get_variable(config["total_inference_time_sensor"])
         cg.add(var.set_total_inference_time_sensor(s))
+
+    if CONF_UNLOAD_BUTTON in config:
+        b = await cg.get_variable(config[CONF_UNLOAD_BUTTON])
+        cg.add(var.set_unload_button(b))
+    
+    if CONF_RELOAD_BUTTON in config:
+        b = await cg.get_variable(config[CONF_RELOAD_BUTTON])
+        cg.add(var.set_reload_button(b))
 

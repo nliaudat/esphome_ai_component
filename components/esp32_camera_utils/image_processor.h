@@ -90,10 +90,16 @@ class ImageProcessor {
       bool is_jpeg_aligned;
       bool is_pooled;  // Track if buffer is from pool
       
+      // Static counter for leak detection
+      static std::atomic<int32_t> active_instances;
+
       TrackedBuffer(uint8_t* p = nullptr, bool spiram = false, bool aligned = false, bool pooled = false, size_t sz = 0) 
-          : ptr(p), size(sz), is_spiram(spiram), is_jpeg_aligned(aligned), is_pooled(pooled) {}
+          : ptr(p), size(sz), is_spiram(spiram), is_jpeg_aligned(aligned), is_pooled(pooled) {
+          active_instances++;
+      }
           
       ~TrackedBuffer() {
+          active_instances--;
           if (ptr) {
               if (is_pooled) {
                   // Return to buffer pool
@@ -116,6 +122,9 @@ class ImageProcessor {
       TrackedBuffer(TrackedBuffer&& other) noexcept 
           : ptr(other.ptr), size(other.size), is_spiram(other.is_spiram), 
             is_jpeg_aligned(other.is_jpeg_aligned), is_pooled(other.is_pooled) {
+          // New instance created via move
+          active_instances++;
+
           other.ptr = nullptr;
           other.size = 0;
           other.is_spiram = false;
@@ -125,6 +134,10 @@ class ImageProcessor {
       
       TrackedBuffer& operator=(TrackedBuffer&& other) noexcept {
           if (this != &other) {
+              // Existing instance being overwritten - count stays same (1 destruction conceptually, 1 creation)
+              // Actually, simpler: this object stays alive, just changes ownership.
+              // So active_instances count does not change.
+              
               if (ptr) {
                   if (is_pooled) {
                       BufferPool::Buffer buf{ptr, size, true};
@@ -140,19 +153,13 @@ class ImageProcessor {
               is_spiram = other.is_spiram;
               is_jpeg_aligned = other.is_jpeg_aligned;
               is_pooled = other.is_pooled;
+              
+              other.ptr = nullptr;
+              other.size = 0;
+              other.is_spiram = false;
+              other.is_jpeg_aligned = false;
+              other.is_pooled = false;
           }
-          ptr = other.ptr;
-          size = other.size;
-          is_spiram = other.is_spiram;
-          is_jpeg_aligned = other.is_jpeg_aligned;
-          is_pooled = other.is_pooled;
-          
-          other.ptr = nullptr;
-          other.size = 0;
-          other.is_spiram = false;
-          other.is_jpeg_aligned = false;
-          other.is_pooled = false;
-
           return *this;
       }
       

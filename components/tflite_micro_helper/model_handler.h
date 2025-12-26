@@ -44,6 +44,9 @@ class ModelHandler {
  public:
   // High-level load model that handles memory allocation
   [[nodiscard]] bool load_model(const uint8_t *model_data, size_t model_size, const ModelConfig &config);
+  
+  // Unload model and free resources
+  void unload();
 
   // Low-level load model (kept for internal use or specific cases)
   [[nodiscard]] bool load_model_with_arena(const uint8_t *model_data, size_t model_size,
@@ -138,6 +141,8 @@ class ModelHandler {
   MemoryManager::AllocationResult tensor_arena_allocation_;
   size_t tensor_arena_size_requested_{0};
   size_t model_length_{0};
+  
+  std::unique_ptr<tflite::MicroMutableOpResolver<MAX_OPERATORS>> resolver_;
 };
 
 }  // namespace tflite_micro_helper

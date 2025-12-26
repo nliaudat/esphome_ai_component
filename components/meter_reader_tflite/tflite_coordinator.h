@@ -40,6 +40,7 @@ class TFLiteCoordinator {
   // Model management
   void set_model(const uint8_t *model, size_t length);
   [[nodiscard]] bool load_model();
+  void unload_model();
   [[nodiscard]] bool is_model_loaded() const { return model_loaded_; }
   
   // Inference

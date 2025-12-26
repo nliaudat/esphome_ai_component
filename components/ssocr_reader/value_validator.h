@@ -39,14 +39,13 @@ class ReadingHistory {
   int get_day_median() const;
   std::vector<int> get_recent_readings(size_t count) const;
   
-  size_t get_hour_count() const { return hour_readings_.size(); }
-  size_t get_day_count() const { return day_readings_.size(); }
+  size_t get_hour_count() const;
+  size_t get_day_count() const { return readings_.size(); }
   
   void clear();
 
  private:
-  std::deque<HistoricalReading> hour_readings_;
-  std::deque<HistoricalReading> day_readings_;
+  std::deque<HistoricalReading> readings_;
   size_t max_history_size_bytes_{51200};
   
   void cleanup_old_readings(uint32_t current_timestamp);

@@ -32,6 +32,16 @@ bool TFLiteCoordinator::allocate_tensor_arena() {
     return true;
 }
 
+void TFLiteCoordinator::unload_model() {
+    ESP_LOGI(TAG, "Unloading TFLite model and freeing arena");
+    model_handler_.unload();
+    model_loaded_ = false;
+    
+    // Clear arena stats
+    std::lock_guard<std::mutex> lock(arena_stats_mutex_);
+    cached_arena_stats_ = ArenaStats{};
+}
+
 bool TFLiteCoordinator::load_model() {
     ESP_LOGI(TAG, "Loading TFLite model...");
 

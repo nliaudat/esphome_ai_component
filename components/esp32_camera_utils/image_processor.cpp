@@ -33,6 +33,9 @@ static const char *const TAG = "ImageProcessor";
 // Static buffer pool instance (shared across all ImageProcessor instances)
 BufferPool ImageProcessor::buffer_pool_;
 
+// Initialize static member
+std::atomic<int32_t> ImageProcessor::TrackedBuffer::active_instances{0};
+
 // Duration logging macros for performance profiling
 #ifdef DURATION_START
 #undef DURATION_START
@@ -366,6 +369,13 @@ ImageProcessor::UniqueBufferPtr ImageProcessor::allocate_image_buffer(size_t siz
         if (pooled_buffer.data) {
             // Successfully got buffer from pool
             // TrackedBuffer(ptr, spiram, jpeg_aligned, pooled, size)
+            if (TrackedBuffer::active_instances > 5) {
+                // Periodically log if count gets high, or just log occasionally?
+                // Let's log if it's growing abnormally? No, let's just log on alloc for now if debug is on.
+                #ifdef DEBUG_ESP32_CAMERA_UTILS_MEMORY
+                ESP_LOGD(TAG, "Allocated pooled buffer. Active TrackedBuffers: %d", TrackedBuffer::active_instances.load() + 1);
+                #endif
+            }
             return UniqueBufferPtr(new TrackedBuffer(pooled_buffer.data, false, false, true, pooled_buffer.size));
         }
         // Pool acquisition failed, fall through to direct allocation
@@ -391,6 +401,9 @@ ImageProcessor::UniqueBufferPtr ImageProcessor::allocate_image_buffer(size_t siz
     if (!ptr) return nullptr;
     
     // TrackedBuffer(ptr, spiram, jpeg_aligned, pooled, size)
+    #ifdef DEBUG_ESP32_CAMERA_UTILS_MEMORY
+    ESP_LOGD(TAG, "Allocated direct buffer. Active TrackedBuffers: %d", TrackedBuffer::active_instances.load() + 1);
+    #endif
     return UniqueBufferPtr(new TrackedBuffer(ptr, spiram, false, false, size));
 }
 
@@ -1512,11 +1525,14 @@ void ImageProcessor::debug_log_image_stats(const uint8_t* data, size_t size,
              zero_count, size, (zero_count * 100.0f) / size);
              
     ESP_LOGD(TAG, "DEBUG %s first 10 values:", stage.c_str());
-    std::string values_str;
+    char buf[64]; // Sufficient for 10 * 4 chars ("255 ")
+    size_t offset = 0;
     for (int i = 0; i < std::min(10, (int)size); i++) {
-        values_str += std::to_string(data[i]) + " ";
+        int w = snprintf(buf + offset, sizeof(buf) - offset, "%u ", data[i]);
+        if (w < 0 || (size_t)w >= sizeof(buf) - offset) break;
+        offset += w;
     }
-    ESP_LOGD(TAG, "  %s", values_str.c_str());
+    ESP_LOGD(TAG, "  %s", buf);
 }
 
 void ImageProcessor::debug_log_float_stats(const float* data, size_t count,
@@ -1539,13 +1555,14 @@ void ImageProcessor::debug_log_float_stats(const float* data, size_t count,
     ESP_LOGD(TAG, "DEBUG %s: count=%zu, min=%.3f, max=%.3f, mean=%.3f",
              stage.c_str(), count, min_val, max_val, mean);
              
-    std::string values_str;
+    char buf[128]; // Sufficient for 10 * 8 chars ("1.234 ")
+    size_t offset = 0;
     for (int i = 0; i < std::min(10, (int)count); i++) {
-        char buf[16];
-        snprintf(buf, sizeof(buf), "%.3f ", data[i]);
-        values_str += buf;
+        int w = snprintf(buf + offset, sizeof(buf) - offset, "%.3f ", data[i]);
+        if (w < 0 || (size_t)w >= sizeof(buf) - offset) break;
+        offset += w;
     }
-    ESP_LOGD(TAG, "  %s", values_str.c_str());
+    ESP_LOGD(TAG, "  %s", buf);
 }
 
 void ImageProcessor::debug_log_image(const uint8_t* data, size_t size, 
@@ -1606,15 +1623,17 @@ void ImageProcessor::debug_output_zone_preview(const uint8_t* data,
     if (width > 64 || height > 64) return; // Too big for log
     
     ESP_LOGI(TAG, "PREVIEW:%s", zone_name.c_str());
+    char line[70]; // 64 chars + null
     for (int y = 0; y < height; y++) {
-        std::string line;
-        for (int x = 0; x < width; x++) {
+        int x;
+        for (x = 0; x < width; x++) {
             int pos = (y * width + x) * channels;
             uint8_t val = data[pos]; // Take first channel (or grayscale)
             char c = val > 128 ? '#' : '.';
-            line += c;
+            line[x] = c;
         }
-        ESP_LOGI(TAG, "%s", line.c_str());
+        line[x] = '\0';
+        ESP_LOGI(TAG, "%s", line);
     }
 }
 
@@ -1626,16 +1645,18 @@ void ImageProcessor::debug_output_float_preview(const float* data,
      if (width > 64 || height > 64) return;
      
      ESP_LOGI(TAG, "FLOAT_PREVIEW:%s", zone_name.c_str());
+     char line[70];
      for (int y = 0; y < height; y++) {
-        std::string line;
-        for (int x = 0; x < width; x++) {
+        int x;
+        for (x = 0; x < width; x++) {
             int pos = (y * width + x) * channels;
             float val = data[pos];
             if (normalized) val *= 255.0f;
             char c = val > 128.0f ? '#' : '.';
-            line += c;
+            line[x] = c;
         }
-        ESP_LOGI(TAG, "%s", line.c_str());
+        line[x] = '\0';
+        ESP_LOGI(TAG, "%s", line);
     }
 }
 #endif

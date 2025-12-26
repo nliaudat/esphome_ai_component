@@ -19,6 +19,8 @@ class CameraCoordinator {
   void set_config(int width, int height, const std::string& pixel_format);
   void set_rotation(float rot) { rotation_ = rot; }
   
+  void unload();
+
   // Image Processor
   void update_image_processor_config(int model_width, int model_height, int model_channels, 
                                      int input_type, bool normalize, const std::string& input_order);

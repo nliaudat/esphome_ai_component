@@ -115,6 +115,11 @@ bool CameraCoordinator::test_camera_after_reset(std::atomic<bool>& frame_availab
 
 
 
+void CameraCoordinator::unload() {
+    image_processor_.reset();
+    ESP_LOGI(TAG, "ImageProcessor unloaded");
+}
+
 void CameraCoordinator::update_image_processor_config(int model_width, int model_height, int model_channels, 
                                                       int input_type, bool normalize, const std::string& input_order) {
     esp32_camera_utils::ImageProcessorConfig config;

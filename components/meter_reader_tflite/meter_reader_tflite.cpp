@@ -119,8 +119,10 @@ static InferenceResult* allocate_inference_result() {
       inference_result_used[i] = true;
       inference_result_pool[i].inference_time = 0;
       inference_result_pool[i].success = false;
-      inference_result_pool[i].readings.clear();
-      inference_result_pool[i].probabilities.clear();
+      // Force memory release by swapping with empty temporary, 
+      // ensuring no hidden capacity grows indefinitely in the pool.
+      std::vector<float>().swap(inference_result_pool[i].readings);
+      std::vector<float>().swap(inference_result_pool[i].probabilities);
       pool_result_hits++;
       return &inference_result_pool[i];
     }
@@ -337,6 +339,13 @@ void MeterReaderTFLite::setup() {
     // Only if user requested GRAYSCALE in config (we can't easily check the template sub here, 
     // but we know we just failed to set it in YAML).
     // Let's check the global pixel format config if feasible, or just force it if the model is V4 GRAY.
+    // 8. Setup Dynamic Resource Buttons
+    if (unload_button_) {
+        unload_button_->add_on_press_callback([this]() { this->unload_resources(); });
+    }
+    if (reload_button_) {
+        reload_button_->add_on_press_callback([this]() { this->reload_resources(); });
+    }
 }
 
 void MeterReaderTFLite::set_camera(camera::Camera *camera) { // -> CameraCoord callback
@@ -1126,4 +1135,109 @@ void MeterReaderTFLite::update_calibration(float confidence) {
 
         calibration_.state = FlashCalibrationHandler::IDLE; 
     }
+}
+
+void MeterReaderTFLite::unload_resources() {
+    ESP_LOGI(TAG, "Unloading MeterReaderTFLite resources...");
+    
+    // 1. Pause processing
+    pause_processing_.store(true);
+    
+    // 2. Stop Flashlight (stop timers/sequences)
+    flashlight_coord_.disable_flash();
+    
+    // 3. Unload TFLite Model & Arena
+    tflite_coord_.unload_model();
+    
+    // 4. Unload Camera ImageProcessor
+    camera_coord_.unload();
+    
+    #ifdef SUPPORT_DOUBLE_BUFFERING
+    // 5. Free Object Pools
+    // These are static unique_ptrs in this compilation unit
+    inference_job_pool.reset();
+    inference_result_pool.reset();
+    inference_job_used.reset();
+    inference_result_used.reset();
+    #endif
+
+    // 6. Force Heap Collection/Debug
+    ESP_LOGI(TAG, "Resources unloaded. Heap status:");
+    heap_caps_check_integrity_all(true);
+    ESP_LOGI(TAG, "  Internal Free: %d bytes", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+    ESP_LOGI(TAG, "  SPIRAM Free: %d bytes", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+}
+
+void MeterReaderTFLite::reload_resources() {
+    ESP_LOGI(TAG, "Reloading MeterReaderTFLite resources...");
+    
+    #ifdef SUPPORT_DOUBLE_BUFFERING
+    // 1. Re-allocate Pools
+    INFERENCE_POOL_SIZE = calculate_optimal_pool_size();
+    inference_job_pool = std::make_unique<InferenceJob[]>(INFERENCE_POOL_SIZE);
+    inference_result_pool = std::make_unique<InferenceResult[]>(INFERENCE_POOL_SIZE);
+    inference_job_used = std::make_unique<bool[]>(INFERENCE_POOL_SIZE);
+    inference_result_used = std::make_unique<bool[]>(INFERENCE_POOL_SIZE);
+    
+    for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
+        inference_job_used[i] = false;
+        inference_result_used[i] = false;
+    }
+    #endif
+
+    // 2. Reload Model & Config
+    // Use timeout to schedule on main loop tick to avoid stack issues/recursion
+    this->set_timeout(100, [this]() {
+         if (!tflite_coord_.load_model()) {
+             ESP_LOGE(TAG, "Failed to reload model!");
+             return;
+         }
+         
+         // Update Camera Processor
+         auto spec = tflite_coord_.get_model_spec();
+         int processor_input_type = (spec.input_type == 1) ? 0 : 1;
+         
+         // Update Camera Coordinator
+         camera_coord_.update_image_processor_config(
+             spec.input_width, 
+             spec.input_height, 
+             spec.input_channels,
+             processor_input_type,
+             spec.normalize,
+             spec.input_order
+         );
+         
+         // Sync Utils if present
+         if (esp32_camera_utils_) {
+              esp32_camera_utils::ImageProcessorConfig config;
+              config.camera_width = camera_coord_.get_width();
+              config.camera_height = camera_coord_.get_height();
+              
+              if (spec.input_channels == 1) {
+                  config.pixel_format = "GRAYSCALE";
+              } else {
+                  config.pixel_format = camera_coord_.get_format();
+              }
+              config.model_width = spec.input_width;
+              config.model_height = spec.input_height;
+              config.model_channels = spec.input_channels;
+              
+              switch(static_cast<int>(rotation_)) {
+                  case 90:  config.rotation = esp32_camera_utils::ROTATION_90;  break;
+                  case 180: config.rotation = esp32_camera_utils::ROTATION_180; break;
+                  case 270: config.rotation = esp32_camera_utils::ROTATION_270; break;
+                  default:  config.rotation = esp32_camera_utils::ROTATION_0;   break;
+              }
+              
+              config.input_type = static_cast<esp32_camera_utils::ImageProcessorInputType>(processor_input_type);
+              config.normalize = spec.normalize;
+              config.input_order = spec.input_order;
+              
+              esp32_camera_utils_->reinitialize_image_processor(config);
+         }
+         
+         // Resume processing
+         pause_processing_.store(false);
+         ESP_LOGI(TAG, "Resources reloaded and processing resumed.");
+    });
 }

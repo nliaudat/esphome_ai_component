@@ -13,69 +13,77 @@ namespace meter_reader_tflite {
 static const char *const TAG = "value_validator";
 
 void ReadingHistory::setup() {
-  hour_readings_.clear();
-  day_readings_.clear();
+  readings_.clear();
 }
 
 void ReadingHistory::add_reading(int value, uint32_t timestamp, float confidence) {
   HistoricalReading reading{value, timestamp, confidence};
   
-  hour_readings_.push_back(reading);
-  day_readings_.push_back(reading);
+  readings_.push_back(reading);
   
   cleanup_old_readings(timestamp);
   
   // Enforce memory limit
-  // Estimate size: deque overhead + item size * count
-  // HistoricalReading is 12 bytes + deque node overhead (~16-32 bytes depending on platform/impl)
-  // Let's approximate roughly 48 bytes per entry total overhead to be safe
-  const size_t BYTES_PER_ENTRY = 48; 
+  // HistoricalReading is 12 bytes
+  // Deque node overhead is platform dependent, estimating ~16 bytes per entry average including block overhead
+  const size_t BYTES_PER_ENTRY = 28; 
   
-  size_t current_usage = (hour_readings_.size() + day_readings_.size()) * BYTES_PER_ENTRY;
+  size_t current_usage = readings_.size() * BYTES_PER_ENTRY;
   
-  while (current_usage > max_history_size_bytes_ && !day_readings_.empty()) {
-      // Remove from day readings (oldest)
-      day_readings_.pop_front();
-      
-      // Also check hour readings (though they should be subset of day, often redundant to check separate if time-bound)
-      // But we just recalc usage
-      current_usage = (hour_readings_.size() + day_readings_.size()) * BYTES_PER_ENTRY;
+  while (current_usage > max_history_size_bytes_ && !readings_.empty()) {
+      readings_.pop_front();
+      current_usage = readings_.size() * BYTES_PER_ENTRY;
   }
   
-  // Also enforce absolute limits just in case
-  const size_t MAX_HOUR_READINGS = 360;  // 6 per minute * 60 minutes
-  const size_t MAX_DAY_READINGS = 1440;  // 1 per minute * 60 * 24
+  // Also enforce absolute limits just in case (e.g. 24 hours * 60 minutes)
+  const size_t MAX_DAY_READINGS = 1440;
   
-  while (hour_readings_.size() > MAX_HOUR_READINGS) {
-      hour_readings_.pop_front();
+  while (readings_.size() > MAX_DAY_READINGS) {
+      readings_.pop_front();
   }
-  while (day_readings_.size() > MAX_DAY_READINGS) {
-      day_readings_.pop_front();
+
+  // Check for abnormal growth
+  #ifdef DEBUG_METER_READER_MEMORY
+  static size_t last_log_time = 0;
+  if (millis() - last_log_time > 60000) {
+      last_log_time = millis();
+      ESP_LOGD(TAG, "History: %zu entries (%zu bytes est)", 
+              readings_.size(),
+              current_usage);
   }
+  #endif
 }
 
 int ReadingHistory::get_last_reading() const {
-  if (!hour_readings_.empty()) {
-    return hour_readings_.back().value;
+  if (!readings_.empty()) {
+    return readings_.back().value;
   }
   return 0;
 }
 
 float ReadingHistory::get_last_confidence() const {
-  if (!hour_readings_.empty()) {
-    return hour_readings_.back().confidence;
+  if (!readings_.empty()) {
+    return readings_.back().confidence;
   }
   return 0.0f;
 }
 
 int ReadingHistory::get_hour_median() const {
-  if (hour_readings_.empty()) return 0;
+  if (readings_.empty()) return 0;
   
+  // Collect readings from the last hour
+  uint32_t now = readings_.back().timestamp;
+  uint32_t threshold = (now >= 3600000) ? (now - 3600000) : 0;
+
   std::vector<int> values;
-  for (const auto& reading : hour_readings_) {
-    values.push_back(reading.value);
+  // Iterate backwards to find recent readings efficiently
+  for (auto it = readings_.rbegin(); it != readings_.rend(); ++it) {
+      if (it->timestamp < threshold) break;
+      values.push_back(it->value);
   }
   
+  if (values.empty()) return 0;
+
   size_t size = values.size();  
   std::nth_element(values.begin(), values.begin() + size/2, values.end());
   int median = values[size/2];
@@ -88,10 +96,14 @@ int ReadingHistory::get_hour_median() const {
 }
 
 int ReadingHistory::get_day_median() const {
-  if (day_readings_.empty()) return 0;
+  if (readings_.empty()) return 0;
+  
+  // Use stride to avoid sorting massive vector if size is large?
+  // For < 1440 items, sorting is fine on ESP32 (couple of ms).
   
   std::vector<int> values;
-  for (const auto& reading : day_readings_) {
+  values.reserve(readings_.size());
+  for (const auto& reading : readings_) {
     values.push_back(reading.value);
   }
   
@@ -108,34 +120,41 @@ int ReadingHistory::get_day_median() const {
 
 std::vector<int> ReadingHistory::get_recent_readings(size_t count) const {
   std::vector<int> recent;
-  if (hour_readings_.empty()) return recent;
+  if (readings_.empty()) return recent;
   
-  size_t start_idx = (hour_readings_.size() > count) ? hour_readings_.size() - count : 0;
-  for (size_t i = start_idx; i < hour_readings_.size(); i++) {
-    recent.push_back(hour_readings_[i].value);
+  size_t start_idx = (readings_.size() > count) ? readings_.size() - count : 0;
+  for (size_t i = start_idx; i < readings_.size(); i++) {
+    recent.push_back(readings_[i].value);
   }
   
   return recent;
 }
 
 void ReadingHistory::cleanup_old_readings(uint32_t current_timestamp) {
-  const uint32_t HOUR_MS = 60 * 60 * 1000;
-  const uint32_t DAY_MS = 24 * HOUR_MS;
+  const uint32_t DAY_MS = 24 * 60 * 60 * 1000;
   
-  while (!hour_readings_.empty() && 
-         (current_timestamp - hour_readings_.front().timestamp) > HOUR_MS) {
-    hour_readings_.pop_front();
-  }
-  
-  while (!day_readings_.empty() && 
-         (current_timestamp - day_readings_.front().timestamp) > DAY_MS) {
-    day_readings_.pop_front();
+  while (!readings_.empty() && 
+         (current_timestamp - readings_.front().timestamp) > DAY_MS) {
+    readings_.pop_front();
   }
 }
 
+size_t ReadingHistory::get_hour_count() const {
+    if (readings_.empty()) return 0;
+    
+    uint32_t now = readings_.back().timestamp;
+    uint32_t threshold = (now >= 3600000) ? (now - 3600000) : 0;
+    
+    size_t count = 0;
+    for (auto it = readings_.rbegin(); it != readings_.rend(); ++it) {
+        if (it->timestamp < threshold) break;
+        count++;
+    }
+    return count;
+}
+
 void ReadingHistory::clear() {
-  hour_readings_.clear();
-  day_readings_.clear();
+  readings_.clear();
 }
 
 void ValueValidator::setup() {
