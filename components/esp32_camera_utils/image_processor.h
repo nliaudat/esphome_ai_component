@@ -15,6 +15,8 @@
 #include "esphome/components/esp32_camera/esp32_camera.h"
 #include "crop_zone_handler.h"
 #include "esp_jpeg_dec.h"
+#include "esp_jpeg_version.h" 
+
 #include "drawing_utils.h"
 #include "scaler.h"
 #include "rotator.h"

@@ -154,6 +154,12 @@ ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t* data, s
     // RAII for decoder
     std::unique_ptr<struct jpeg_dec_s, JpegDecoderDeleter> decoder(decoder_handle);
 
+    static bool version_logged = false;
+    if (!version_logged) {
+        // ESP_LOGI(TAG, "Using ESP_NEW_JPEG Library Version: %s", ESP_JPEG_VERION);
+        version_logged = true;
+    }
+
     int channels = 3;
     if (output_format == JPEG_PIXEL_FORMAT_GRAY) {
         channels = 1;
@@ -191,6 +197,10 @@ ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t* data, s
     // Since our downstream processing (and the web preview) expects standard R-G-B order,
     // we must perform an in-place swap of the Red (0) and Blue (2) channels.
     // Source: Common ESP32 camera/JPEG behavior observed in ESP-IDF and Arduino implementations.
+    // Fix for ESP32 JPEG decoder outputting BGR (Little Endian RGB) instead of RGB.
+    // DISABLING THIS FIX as it seems to cause incorrect BGR output observed by user. 
+    // Hypothesis: Decoder now outputs RGB correctly, so this swap breaks it.
+    /*
     #ifdef ESP32
     if (output_format == JPEG_PIXEL_FORMAT_RGB888) {
         // Iterate through pixels and swap R (index 0) and B (index 2)
@@ -214,6 +224,7 @@ ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t* data, s
         }
     }
     #endif
+    */
 
     return out_buf;
 }
@@ -588,6 +599,22 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
   // PREVIEW CACHING LOGIC
   const uint8_t* processing_source_ptr = nullptr;
   if (use_master_buffer && master_decoded_buffer) {
+        // Fix BGR -> RGB unconditionally for 3-channel
+        // Since we disabled the internal fix in decode_jpeg, we know we have specific BGR output to correct.
+        if (master_channels == 3) {
+            // ESP_LOGD(TAG, "ImageProcessor: Executing BGR->RGB Swap on %dx%d image", master_width, master_height);
+            uint8_t* raw_buf = master_decoded_buffer.get();
+            size_t pixel_count = master_width * master_height;
+            for (size_t i = 0; i < pixel_count; i++) {
+                size_t idx = i * 3;
+                uint8_t temp = raw_buf[idx];
+                raw_buf[idx] = raw_buf[idx + 2];
+                raw_buf[idx + 2] = temp;
+            }
+        } else {
+             // ESP_LOGW(TAG, "ImageProcessor: Skipping BGR->RGB Swap. Channels=%d", master_channels);
+        }
+
         if (config_.cache_preview_image) {
             uint8_t* raw = master_decoded_buffer.release();
             // Wrap in TrackedBuffer (jpeg aligned)
