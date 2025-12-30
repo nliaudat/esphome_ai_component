@@ -140,6 +140,7 @@ void CameraCoordinator::update_image_processor_config(int model_width, int model
     config.input_type = (esp32_camera_utils::ImageProcessorInputType)input_type;
     config.normalize = normalize;
     config.input_order = input_order;
+    config.cache_preview_image = enable_preview_;
 
     image_processor_ = std::make_unique<esp32_camera_utils::ImageProcessor>(config);
     ESP_LOGI(TAG, "ImageProcessor initialized in CameraCoord: %dx%d %s -> Model %dx%d", 

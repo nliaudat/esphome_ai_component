@@ -134,7 +134,7 @@ meter_reader_tflite:
 
   # Preview of what the AI sees (Rotated Live Cam)
   # Set to true to enable continuous updates, or false for on-demand only (via button)
-  generate_preview: false # need web_server: port: 80
+  generate_preview: false # need web_server: port: 80 (wait for update_interval to be reached)
   # show_crop_areas: true # Draw boxes on preview
 
 

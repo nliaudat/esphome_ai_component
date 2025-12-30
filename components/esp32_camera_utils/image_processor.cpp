@@ -581,7 +581,39 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
                return results;
            }
       }
+
       #endif
+  }
+
+  // PREVIEW CACHING LOGIC
+  const uint8_t* processing_source_ptr = nullptr;
+  if (use_master_buffer && master_decoded_buffer) {
+        if (config_.cache_preview_image) {
+            uint8_t* raw = master_decoded_buffer.release();
+            // Wrap in TrackedBuffer (jpeg aligned)
+            // Constructor: ptr, spiram, jpeg_aligned, pooled, size
+            // Note: size=0 is safe for free (jpeg_free_align doesn't need it), but checking track usage might be off.
+            // Using 0 for now as we don't easily know alloc size unless we track it from decode/alloc.
+            // Actually decode_jpeg allocates size = w*h*c roughly.
+            TrackedBuffer* tb = new TrackedBuffer(raw, false, true, false, 0);
+            UniqueBufferPtr uptr(tb);
+            
+            size_t buf_len = master_width * master_height * master_channels;
+            
+            // Create preview image
+             std::shared_ptr<RotatedPreviewImage> cached_img = std::make_shared<RotatedPreviewImage>(
+                std::move(uptr), 
+                buf_len,
+                master_width, master_height,
+                (master_channels == 1) ? PIXFORMAT_GRAYSCALE : PIXFORMAT_RGB888 
+            );
+            this->last_processed_image_ = cached_img;
+            processing_source_ptr = raw; // Still valid, owned by cached_img
+            ESP_LOGD(TAG, "ImageProcessor: Cached preview image. Ptr: %p", cached_img.get());
+        } else {
+             ESP_LOGD(TAG, "ImageProcessor: Preview caching DISABLED. Releasing buffer.");
+             processing_source_ptr = master_decoded_buffer.get();
+        }
   }
 
   // Process Zones from Master Buffer (or Source if not JPEG/Mastered)
@@ -614,12 +646,12 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
                   // Grayscale
                    if (config_.input_type == kInputTypeFloat32) {
                         crop_success = process_grayscale_crop_and_scale_to_float32(
-                            master_decoded_buffer.get(), zone, crop_w, crop_h,
+                            processing_source_ptr, zone, crop_w, crop_h,
                             out_buf->get(), config_.model_width, config_.model_height,
                             config_.model_channels, config_.normalize, stride);
                    } else {
                         crop_success = process_grayscale_crop_and_scale_to_uint8(
-                            master_decoded_buffer.get(), zone, crop_w, crop_h,
+                            processing_source_ptr, zone, crop_w, crop_h,
                             out_buf->get(), config_.model_width, config_.model_height,
                             config_.model_channels, stride);
                    }
@@ -627,12 +659,12 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
                   // RGB
                    if (config_.input_type == kInputTypeFloat32) {
                         crop_success = process_rgb888_crop_and_scale_to_float32(
-                            master_decoded_buffer.get(), zone, crop_w, crop_h,
+                            processing_source_ptr, zone, crop_w, crop_h,
                             out_buf->get(), config_.model_width, config_.model_height,
                             config_.model_channels, config_.normalize, stride);
                    } else {
                         crop_success = process_rgb888_crop_and_scale_to_uint8(
-                            master_decoded_buffer.get(), zone, crop_w, crop_h,
+                            processing_source_ptr, zone, crop_w, crop_h,
                             out_buf->get(), config_.model_width, config_.model_height,
                             config_.model_channels, stride);
                    }
@@ -865,7 +897,29 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
             // Clean up original decode buffer early to save memory
             full_image_buf.reset();
             
-            processing_buf = rotated_buf;
+            // Wrap in RotatedPreviewImage to keep it alive and accessible for preview ONLY if requested
+            if (config_.cache_preview_image) {
+                // We transfer ownership of the UniqueBufferPtr to the shared_ptr<RotatedPreviewImage>
+                std::shared_ptr<RotatedPreviewImage> cached_img = std::make_shared<RotatedPreviewImage>(
+                    std::move(rotated_buffer_storage), 
+                    rotated_size,
+                    out_w, out_h,
+                    (decode_channels == 1) ? PIXFORMAT_GRAYSCALE : PIXFORMAT_RGB888 
+                );
+                
+                this->last_processed_image_ = cached_img;
+                ESP_LOGD(TAG, "ImageProcessor: Cached preview image. Ptr: %p", cached_img.get());
+                
+                // Access raw pointer from cached image
+                processing_buf = cached_img->get_data_buffer();
+            } else {
+                ESP_LOGD(TAG, "ImageProcessor: Preview caching DISABLED. Releasing buffer.");
+                // No caching, just use the rotated buffer directly
+                // rotated_buffer_storage owns it, we just point processing_buf to it
+                // and it will be auto-released at end of scope unless we moved it (which we didn't here)
+                processing_buf = rotated_buffer_storage->get();
+            }
+            
         } else {
             ESP_LOGE(TAG, "Software rotation failed");
             return false;
