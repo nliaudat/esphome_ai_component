@@ -1,10 +1,12 @@
 
 
+#include "esphome/core/defines.h"
 #ifdef DEV_ENABLE_ROTATION
 #ifdef USE_WEB_SERVER
 #include "preview_web_handler.h"
 #include <esp_camera.h>
 #include <img_converters.h>
+#include <esp_heap_caps.h>
 
 
 namespace esphome {
@@ -62,7 +64,17 @@ void PreviewWebHandler::handleRequest(web_server_idf::AsyncWebServerRequest *req
   uint8_t *jpeg_buf = nullptr;
   size_t jpeg_len = 0;
   
+  // Debug: Log memory state before compression
+  size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+  size_t free_internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  size_t free_spiram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  
+  ESP_LOGI(TAG, "Preview Debug: Image %dx%d fmt=%d | Heap: Free=%u, Int=%u, SPI=%u", 
+           image->get_width(), image->get_height(), image->get_format(), 
+           free_heap, free_internal, free_spiram);
+
   // Use fmt2jpg from esp coversion lib
+  // Reverting to 80 for debug as requested, logs will show if OOM matches reduced memory
   bool converted = fmt2jpg(buf, len, image->get_width(), image->get_height(), image->get_format(), 80, &jpeg_buf, &jpeg_len);
   
   if (!converted || !jpeg_buf) {

@@ -46,6 +46,7 @@ class Esp32CameraUtils : public Component {
   
   // Image rotation configuration (0, 90, 180, 270 degrees clockwise, or arbitrary)
   void set_rotation(float rotation) { rotation_ = rotation; }
+  float get_rotation() const { return rotation_; }
 
   // Modular feature configuration
   void set_scaler_config(int width, int height) {

@@ -206,6 +206,10 @@ void MeterReaderTFLite::setup() {
          
          // Sync Esp32CameraUtils if present (for sensors)
          if (esp32_camera_utils_) {
+              // Sync rotation from Utils (Centralized Configuration)
+              this->rotation_ = esp32_camera_utils_->get_rotation();
+              ESP_LOGI(TAG, "Synced rotation from esp32_camera_utils: %.1f", this->rotation_);
+
               // Ensure it knows current dimensions
               esp32_camera_utils_->set_camera_image_format(
                   camera_coord_.get_width(),
@@ -376,7 +380,8 @@ void MeterReaderTFLite::update() {
     }
     
     // 2. Crop Zones Processing
-    if (pause_processing_) {
+    // If paused, we still might want to update preview if enabled
+    if (pause_processing_ && !generate_preview_ && !request_preview_) {
         ESP_LOGD(TAG, "Processing paused, skipping update");
         return;
     }
@@ -386,6 +391,26 @@ void MeterReaderTFLite::update() {
         // Calibration flash itself via inference results
         return; // Skip normal processing during calibration
     }
+    
+    // Setup Mode: Flash always on, ignore scheduling
+    if (generate_preview_) {
+        // Ensure flash is on (redundant check but safe) but do NOT run scheduler
+        if (!flashlight_coord_.is_active()) {
+             // In case it was turned off by something else, force it back
+             flashlight_coord_.enable_flash();
+        }
+        
+        // Trigger frame request for preview update 
+        // (Similar to continuous mode but specifically for preview)
+        if (!frame_available_ && !frame_requested_) {
+             frame_requested_ = true;
+             last_request_time_ = millis();
+        } else if (frame_available_) {
+             process_available_frame();
+        }
+        return; // Skip standard scheduling
+    }
+
     
     // The flashlight coordinator returns true if it is handling the cycle (scheduling or waiting)
     bool busy = flashlight_coord_.update_scheduling();
@@ -568,8 +593,6 @@ void MeterReaderTFLite::process_available_frame() {
 }
 
 void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> frame) {
-    if (pause_processing_) return;
-
     METER_DURATION_START("Total Processing");
 
     if (!tflite_coord_.is_model_loaded()) {
@@ -617,10 +640,21 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
          
          if (request_preview_) {
              request_preview_ = false;
-             return; // Skip inference
+             // If manual request, we might want to skip inference or let it flow. 
+             // Current logic returns. To keep behavior consistent but ensure preview is updated:
+             return; 
          }
     }
     #endif
+
+
+
+    if (pause_processing_) {
+        ESP_LOGI(TAG, "Setup Mode active: Skipping AI inference.");
+        return; 
+    } else {
+        ESP_LOGD(TAG, "Processing allowed: Starting inference.");
+    }
 
     // Inference
     auto zones = crop_zone_handler_.get_zones();
@@ -773,6 +807,19 @@ void MeterReaderTFLite::set_flash_light(light::LightState* light) {
 void MeterReaderTFLite::set_flash_controller(flash_light_controller::FlashLightController* c) {
     flashlight_coord_.setup(this, nullptr, c);
 }
+void MeterReaderTFLite::set_generate_preview(bool generate) { 
+    generate_preview_ = generate; 
+    
+    // Setup Mode Logic: Force light ON when preview is enabled
+    if (generate) {
+        ESP_LOGI(TAG, "Setup Mode (Preview) Enabled: Turning Flashlight ON");
+        flashlight_coord_.enable_flash();
+    } else {
+        ESP_LOGI(TAG, "Setup Mode (Preview) Disabled: Turning Flashlight OFF");
+        flashlight_coord_.disable_flash();
+    }
+}
+
 void MeterReaderTFLite::set_flash_pre_time(uint32_t ms) { flashlight_coord_.set_timing(ms, 2000); } // simplified
 void MeterReaderTFLite::set_flash_post_time(uint32_t ms) { flashlight_coord_.set_timing(5000, ms); }
 
@@ -793,6 +840,12 @@ std::shared_ptr<camera::CameraImage> MeterReaderTFLite::get_preview_image() {
 void MeterReaderTFLite::update_preview_image(std::shared_ptr<camera::CameraImage> image) {
     std::lock_guard<std::mutex> lock(preview_mutex_);
     last_preview_image_ = image;
+}
+#endif
+
+#ifdef USE_WEB_SERVER
+void MeterReaderTFLite::set_web_server(web_server_base::WebServerBase *web_server) {
+    web_server_ = web_server;
 }
 #endif
 

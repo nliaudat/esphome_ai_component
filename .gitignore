@@ -24,3 +24,6 @@ test.yaml
 fuzz_test_*.yaml
 wiki_boards.md
 /components/ssocr_reader/__pycache__
+config_coldwater.yaml
+analyze_heap.py
+heap_history.csv

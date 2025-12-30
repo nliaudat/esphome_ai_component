@@ -185,6 +185,25 @@ ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t* data, s
         return nullptr;
     }
 
+    // Fix for ESP32 JPEG decoder outputting BGR (Little Endian RGB) instead of RGB.
+    // The ESP32 hardware/software JPEG decoder typically outputs pixels in Little Endian format.
+    // For 24-bit RGB, this results in the byte order B-G-R in memory.
+    // Since our downstream processing (and the web preview) expects standard R-G-B order,
+    // we must perform an in-place swap of the Red (0) and Blue (2) channels.
+    // Source: Common ESP32 camera/JPEG behavior observed in ESP-IDF and Arduino implementations.
+    // #ifdef ESP32
+    // if (output_format == JPEG_PIXEL_FORMAT_RGB888) {
+    //     // Iterate through pixels and swap R (index 0) and B (index 2)
+    //     // BGR (Input) -> RGB (Output)
+    //     uint8_t* pixels = out_buf.get();
+    //     for (size_t i = 0; i < out_size; i += 3) {
+    //         uint8_t temp = pixels[i];     // B (from BGR)
+    //         pixels[i] = pixels[i+2];      // Move R to index 0
+    //         pixels[i+2] = temp;           // Move B to index 2
+    //     }
+    // }
+    // #endif
+
     return out_buf;
 }
 
@@ -229,10 +248,11 @@ std::shared_ptr<camera::CameraImage> ImageProcessor::generate_rotated_preview(
     }
 
     // 4. Rotate
-    int final_w, final_h;
+    // Fix: perform_rotation takes output dims as input args, they are not output references to be filled.
+    // Use the calculating new_w/new_h from step 3.
     bool success = Rotator::perform_rotation(rgb_data.get(), out_buffer->get(), 
                                          dec_w, dec_h, 3, 
-                                         rotation, final_w, final_h);
+                                         rotation, new_w, new_h);
     
     if (!success) {
         ESP_LOGW(TAG, "Preview: Rotation failed");
@@ -242,7 +262,7 @@ std::shared_ptr<camera::CameraImage> ImageProcessor::generate_rotated_preview(
     // 5. Return wrapped result
     return std::shared_ptr<RotatedPreviewImage>(new RotatedPreviewImage(
         std::move(out_buffer), out_size,
-        final_w, final_h,
+        new_w, new_h,
         PIXFORMAT_RGB888
     ));
 }

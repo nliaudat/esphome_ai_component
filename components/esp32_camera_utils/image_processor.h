@@ -95,12 +95,14 @@ class ImageProcessor {
 
       TrackedBuffer(uint8_t* p = nullptr, bool spiram = false, bool aligned = false, bool pooled = false, size_t sz = 0) 
           : ptr(p), size(sz), is_spiram(spiram), is_jpeg_aligned(aligned), is_pooled(pooled) {
-          active_instances++;
+          if (p) {
+              active_instances++;
+          }
       }
           
       ~TrackedBuffer() {
-          active_instances--;
           if (ptr) {
+              active_instances--;
               if (is_pooled) {
                   // Return to buffer pool
                   BufferPool::Buffer buf{ptr, size, true};
@@ -122,9 +124,8 @@ class ImageProcessor {
       TrackedBuffer(TrackedBuffer&& other) noexcept 
           : ptr(other.ptr), size(other.size), is_spiram(other.is_spiram), 
             is_jpeg_aligned(other.is_jpeg_aligned), is_pooled(other.is_pooled) {
-          // New instance created via move
-          active_instances++;
-
+          // Ownership transferred, no new allocation created
+          
           other.ptr = nullptr;
           other.size = 0;
           other.is_spiram = false;
@@ -139,6 +140,7 @@ class ImageProcessor {
               // So active_instances count does not change.
               
               if (ptr) {
+                  active_instances--;
                   if (is_pooled) {
                       BufferPool::Buffer buf{ptr, size, true};
                       ImageProcessor::buffer_pool_.release(buf);

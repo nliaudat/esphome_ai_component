@@ -1,3 +1,4 @@
+#include "esphome/core/defines.h"
 #include "drawing_utils.h"
 
 #ifdef USE_CAMERA_DRAWING
