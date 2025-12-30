@@ -20,7 +20,7 @@ esp32_camera:
 
   
   # reset_pin: ${camera_reset_pin}
-  # power_down_pin: ${camera_pwdn_pin} # needed for AiThinker ESP32-CAM
+  power_down_pin: ${camera_pwdn_pin} # needed for AiThinker ESP32-CAM
   # Image Settings
   # - these first 5 parameters can only be set by recompiling the code and uploading it to the esp32
   # - this is NOT a limitation of the esp32_camera component.

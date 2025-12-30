@@ -74,19 +74,29 @@ safe_mode:
 api:
   reboot_timeout: 0s # do not reboot if hassio connection is lost.
 
+globals:
+  - id: ${id_prefix}_crop_zones
+    type: std::string
+    max_restore_data_length: 254 
+    initial_value: "\"[]\""
+    
+    # #debug config 
+    # initial_value: '"[[9, 10, 49, 74], [64, 10, 104, 74], [118, 9, 158, 81], [173, 9, 213, 81], [230, 9, 270, 81], [286, 10, 326, 82], [339, 11, 379, 83], [394, 10, 434, 82]]"'
+    #    # Note: The outer quotes are escaped with single quotes + double quotes ("...")
+
 tflite_micro_helper:
-  debug: true
+  debug: false
 
 esp32_camera_utils:
   id: ${id_prefix}_camera_utils
   camera_id: ${id_prefix}_espcam
-  debug: true
+  debug: false
   ### zoom availale for OV2640, OV3660, OV5640, SC101IOT, SC030IOT from crop zones (explicit)
-  camera_window:  # can be set in http://[hassio]/developer-tools/action > esphome.[s3cam_tflite]_set_camera_window
-    offset_x: 928 # multiple of 4
-    offset_y: 480 # multiple of 4
-    width: 448 # multiple of 4 or 16 if rotation enabled and 4:3 proportions with height for best quality
-    height: 88 #  multiple of 4 or 16 if rotation enabled and 4:3 proportions with width for best quality
+  # camera_window:  # can be set in http://[hassio]/developer-tools/action > esphome.[s3cam_tflite]_set_camera_window
+  #   offset_x: 928 # multiple of 4
+  #   offset_y: 480 # multiple of 4
+  #   width: 448 # multiple of 4 or 16 if rotation enabled and 4:3 proportions with height for best quality
+  #   height: 88 #  multiple of 4 or 16 if rotation enabled and 4:3 proportions with width for best quality
 
   # enable_rotation: true
   # rotation: 270 # 0, 90, 180, 270 (special case built-in "accelerated" for 90, 180, 270 )
@@ -106,7 +116,7 @@ esp32_camera_utils:
   
   # enable_drawing: true
 
-  debug_memory: true
+  debug_memory: false
 
 # optional : flash light at taking image
 flash_light_controller:
@@ -114,7 +124,7 @@ flash_light_controller:
   flash_light: ${id_prefix}_flash
   flash_pre_time: 7000ms # 7 seconds before update (time to stabilize) (works with 5sec on my board)
   flash_post_time: 200ms # 2 seconds after update (works with 100ms on my board)
-  debug: true
+  debug: false
 
 
 meter_reader_tflite:
@@ -125,17 +135,17 @@ meter_reader_tflite:
 
   update_interval: 60s
 
-  debug: true
+  debug: false
   debug_image: false # static embedded image (debug.jpg)
   debug_image_out_serial: false
-  debug_memory: true
-  debug_timing: true
+  debug_memory: false
+  debug_timing: false
 
 
   # Preview of what the AI sees (Rotated Live Cam)
   # Set to true to enable continuous updates, or false for on-demand only (via button)
   generate_preview: false # need web_server: port: 80 (wait for update_interval to be reached)
-  # show_crop_areas: true # Draw boxes on preview
+  # show_crop_areas: true # DEV (not ready for production) Draw boxes on preview
 
 
 
@@ -154,17 +164,17 @@ meter_reader_tflite:
   
   
   
-  enable_flash_calibration: false # still in dev
+  # enable_flash_calibration: false # still in dev
 
   ### Advanced parameters
   # frame_request_timeout: 15000  # ms (1000-60000)
   # high_confidence_threshold: 0.90  # (0.5-1.0)
 
   # Pool efficiency monitoring (optional, requires DEBUG_METER_READER_MEMORY)
-  pool_job_efficiency_sensor: ${id_prefix}_pool_job_efficiency
-  pool_result_efficiency_sensor: ${id_prefix}_pool_result_efficiency
-  arena_efficiency_sensor: ${id_prefix}_arena_efficiency
-  heap_fragmentation_sensor: ${id_prefix}_heap_fragmentation
+  # pool_job_efficiency_sensor: ${id_prefix}_pool_job_efficiency
+  # pool_result_efficiency_sensor: ${id_prefix}_pool_result_efficiency
+  # arena_efficiency_sensor: ${id_prefix}_arena_efficiency
+  # heap_fragmentation_sensor: ${id_prefix}_heap_fragmentation
 
   unload_button: ${id_prefix}_unload_btn
   reload_button: ${id_prefix}_reload_btn
@@ -182,6 +192,8 @@ meter_reader_tflite:
 #   value:
 #     name: "SSOCR Value"
 
+# web_server: # needed if generate_preview: true
+  # port: 80
 
 packages:
   # Board Configuration (Mutually Exclusive)
@@ -190,15 +202,15 @@ packages:
   # - !include board_generic_esp32-s3-n16r8.yaml
   # - !include board_wrover_kit.yaml
   # - !include board_m5stack_psram.yaml
-  # - !include board_esp32cam_aithinker.yaml
+  # - !include board_esp32cam_aithinker.yaml #esp32_camera.yaml > power_down_pin must be enabled
   - !include board_AI-On-The-Edge-Cam_Esp32-S3.yaml
 
-  - !include debug_board.yaml
+  # - !include debug_board.yaml
   
   # AI components
   - !include switch_AI_component.yaml
   - !include sensor_AI_component.yaml
-  - !include globals_AI_component.yaml
+  # - !include globals_AI_component.yaml
   - !include text_sensor_AI_component.yaml
   - !include number_AI_component.yaml
   - !include button_AI_component.yaml

@@ -27,3 +27,7 @@ wiki_boards.md
 config_coldwater.yaml
 analyze_heap.py
 heap_history.csv
+config_hotwateryaml
+fuzz_build.py
+fuzz_build.py
+globals_AI_component.yaml
