@@ -195,6 +195,16 @@ void MeterReaderTFLite::setup() {
          // camera/image_processor: 0=Float, 1=Uint8 (ImageProcessorInputType)
          int processor_input_type = (spec.input_type == 1) ? 0 : 1;
          
+         // [MOVED] Sync Rotation FIRST
+         if (esp32_camera_utils_) {
+              // Sync rotation from Utils (Centralized Configuration)
+              this->rotation_ = esp32_camera_utils_->get_rotation();
+              ESP_LOGI(TAG, "Synced rotation from esp32_camera_utils: %.1f", this->rotation_);
+              
+              // Pass rotation to coordinator BEFORE updating processor config
+              camera_coord_.set_rotation(this->rotation_);
+         }
+         
          camera_coord_.update_image_processor_config(
              spec.input_width, 
              spec.input_height, 
@@ -204,13 +214,10 @@ void MeterReaderTFLite::setup() {
              spec.input_order
          );
          
-         // Sync Esp32CameraUtils if present (for sensors)
-         if (esp32_camera_utils_) {
-              // Sync rotation from Utils (Centralized Configuration)
-              this->rotation_ = esp32_camera_utils_->get_rotation();
-              ESP_LOGI(TAG, "Synced rotation from esp32_camera_utils: %.1f", this->rotation_);
+
 
               // Ensure it knows current dimensions
+         if (esp32_camera_utils_) {
               esp32_camera_utils_->set_camera_image_format(
                   camera_coord_.get_width(),
                   camera_coord_.get_height(),
