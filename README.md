@@ -152,7 +152,7 @@ external_components:
 New optimized models are available for digit recognition that significantly improve performance:
 
 *   **Source**: [nliaudat/digit_recognizer](https://github.com/nliaudat/digit_recognizer)
-*   **Performance**: Capable of full image processing and 8-digit inference in **less than 270 ms**.
+*   **Performance**: Capable of full image processing and 8-digit inference in **less than 270 ms** [esp32-S3] (2700 ms for legacy esp32).
 
 These models are recommended for faster response times and lower power consumption.
 
