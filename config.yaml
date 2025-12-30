@@ -134,7 +134,7 @@ meter_reader_tflite:
 
   # Preview of what the AI sees (Rotated Live Cam)
   # Set to true to enable continuous updates, or false for on-demand only (via button)
-  generate_preview: false # needed camera_webserver.yaml
+  generate_preview: false # need web_server: port: 80
   # show_crop_areas: true # Draw boxes on preview
 
 
@@ -207,7 +207,7 @@ packages:
   # camera configs
   - !include camera_options.yaml
   - !include esp32_camera.yaml
-  # - !include camera_webserver.yaml #needed if generate_preview: true
+  # - !include camera_webserver.yaml
   
   # network choice
   - !include wifi.yaml
