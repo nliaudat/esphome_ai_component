@@ -85,11 +85,11 @@ esp32_camera_utils:
   camera_window:  # can be set in http://[hassio]/developer-tools/action > esphome.[s3cam_tflite]_set_camera_window
     offset_x: 928 # multiple of 4
     offset_y: 480 # multiple of 4
-    width: 448 # multiple of 4 and 4:3 proportions with height for best quality
-    height: 88 #  multiple of 4 and 4:3 proportions with width for best quality
+    width: 448 # multiple of 4 or 16 if rotation enabled and 4:3 proportions with height for best quality
+    height: 88 #  multiple of 4 or 16 if rotation enabled and 4:3 proportions with width for best quality
 
   # enable_rotation: true
-  # rotation: 15 # 0, 90, 180, 270 (special case built-in "accelerated" for 90, 180, 270 )
+  # rotation: 270 # 0, 90, 180, 270 (special case built-in "accelerated" for 90, 180, 270 )
 
   
   # enable_scaler: true
@@ -134,7 +134,7 @@ meter_reader_tflite:
 
   # Preview of what the AI sees (Rotated Live Cam)
   # Set to true to enable continuous updates, or false for on-demand only (via button)
-  generate_preview: false # need web_server: port: 80
+  generate_preview: false # need web_server: port: 80 (wait for update_interval to be reached)
   # show_crop_areas: true # Draw boxes on preview
 
 

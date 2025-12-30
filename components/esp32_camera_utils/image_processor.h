@@ -15,6 +15,8 @@
 #include "esphome/components/esp32_camera/esp32_camera.h"
 #include "crop_zone_handler.h"
 #include "esp_jpeg_dec.h"
+#include "esp_jpeg_version.h" 
+
 #include "drawing_utils.h"
 #include "scaler.h"
 #include "rotator.h"
@@ -58,6 +60,8 @@ struct ImageProcessorConfig {
   int cropper_height{0};
   int cropper_offset_x{0};
   int cropper_offset_y{0};
+  
+  bool cache_preview_image{false}; // Optimization: Only cache master image if needed for preview
   
   bool validate() const {
     return camera_width > 0 && camera_height > 0 && !pixel_format.empty() &&
@@ -236,6 +240,9 @@ private:
   // Static buffer pool shared across all ImageProcessor instances
   static BufferPool buffer_pool_;
 
+  // Cached last valid master image (for preview reuse)
+  std::shared_ptr<camera::CameraImage> last_processed_image_;
+
   static UniqueBufferPtr allocate_image_buffer(size_t size);
   bool validate_buffer_size(size_t required, size_t available, const char* context) const;
   bool validate_input_image(std::shared_ptr<camera::CameraImage> image) const;
@@ -283,6 +290,12 @@ public:
   static std::shared_ptr<camera::CameraImage> generate_rotated_preview(
       std::shared_ptr<camera::CameraImage> source, 
       float rotation, int width, int height);
+
+  /**
+   * Get the last fully processed (decoded & rotated) image.
+   * Useful for debugging/preview without re-processing.
+   */
+  std::shared_ptr<camera::CameraImage> get_last_processed_image() const { return last_processed_image_; }
 #endif
 
 #if defined(USE_CAMERA_ROTATOR) || defined(DEV_ENABLE_ROTATION)

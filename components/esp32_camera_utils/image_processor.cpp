@@ -154,6 +154,12 @@ ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t* data, s
     // RAII for decoder
     std::unique_ptr<struct jpeg_dec_s, JpegDecoderDeleter> decoder(decoder_handle);
 
+    static bool version_logged = false;
+    if (!version_logged) {
+        // ESP_LOGI(TAG, "Using ESP_NEW_JPEG Library Version: %s", ESP_JPEG_VERION);
+        version_logged = true;
+    }
+
     int channels = 3;
     if (output_format == JPEG_PIXEL_FORMAT_GRAY) {
         channels = 1;
@@ -191,18 +197,34 @@ ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t* data, s
     // Since our downstream processing (and the web preview) expects standard R-G-B order,
     // we must perform an in-place swap of the Red (0) and Blue (2) channels.
     // Source: Common ESP32 camera/JPEG behavior observed in ESP-IDF and Arduino implementations.
-    // #ifdef ESP32
-    // if (output_format == JPEG_PIXEL_FORMAT_RGB888) {
-    //     // Iterate through pixels and swap R (index 0) and B (index 2)
-    //     // BGR (Input) -> RGB (Output)
-    //     uint8_t* pixels = out_buf.get();
-    //     for (size_t i = 0; i < out_size; i += 3) {
-    //         uint8_t temp = pixels[i];     // B (from BGR)
-    //         pixels[i] = pixels[i+2];      // Move R to index 0
-    //         pixels[i+2] = temp;           // Move B to index 2
-    //     }
-    // }
-    // #endif
+    // Fix for ESP32 JPEG decoder outputting BGR (Little Endian RGB) instead of RGB.
+    // DISABLING THIS FIX as it seems to cause incorrect BGR output observed by user. 
+    // Hypothesis: Decoder now outputs RGB correctly, so this swap breaks it.
+    /*
+    #ifdef ESP32
+    if (output_format == JPEG_PIXEL_FORMAT_RGB888) {
+        // Iterate through pixels and swap R (index 0) and B (index 2)
+        // BGR (Input) -> RGB (Output)
+        uint8_t* pixels = out_buf.get();
+        for (size_t i = 0; i < out_size; i += 3) {
+            uint8_t temp = pixels[i];     // B (from BGR)
+            pixels[i] = pixels[i+2];      // Move R to index 0
+            pixels[i+2] = temp;           // Move B to index 2
+        }
+    } else if (output_format == JPEG_PIXEL_FORMAT_RGB565_LE || output_format == JPEG_PIXEL_FORMAT_RGB565_BE) {
+        // Fix for RGB565 as well
+        uint16_t* pixels = (uint16_t*)out_buf.get();
+        size_t count = out_size / 2;
+        for (size_t i = 0; i < count; i++) {
+             uint16_t p = pixels[i];
+             // Swap Red and Blue in 565 format (R=top 5, B=bottom 5)
+             // RRRRR GGGGGG BBBBB
+             // Mask R: 0xF800, Mask B: 0x001F
+             pixels[i] = (p & 0x07E0) | ((p & 0xF800) >> 11) | ((p & 0x001F) << 11);
+        }
+    }
+    #endif
+    */
 
     return out_buf;
 }
@@ -570,7 +592,55 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
                return results;
            }
       }
+
       #endif
+  }
+
+  // PREVIEW CACHING LOGIC
+  const uint8_t* processing_source_ptr = nullptr;
+  if (use_master_buffer && master_decoded_buffer) {
+        // Fix BGR -> RGB unconditionally for 3-channel
+        // Since we disabled the internal fix in decode_jpeg, we know we have specific BGR output to correct.
+        if (master_channels == 3) {
+            // ESP_LOGD(TAG, "ImageProcessor: Executing BGR->RGB Swap on %dx%d image", master_width, master_height);
+            uint8_t* raw_buf = master_decoded_buffer.get();
+            size_t pixel_count = master_width * master_height;
+            for (size_t i = 0; i < pixel_count; i++) {
+                size_t idx = i * 3;
+                uint8_t temp = raw_buf[idx];
+                raw_buf[idx] = raw_buf[idx + 2];
+                raw_buf[idx + 2] = temp;
+            }
+        } else {
+             // ESP_LOGW(TAG, "ImageProcessor: Skipping BGR->RGB Swap. Channels=%d", master_channels);
+        }
+
+        if (config_.cache_preview_image) {
+            uint8_t* raw = master_decoded_buffer.release();
+            // Wrap in TrackedBuffer (jpeg aligned)
+            // Constructor: ptr, spiram, jpeg_aligned, pooled, size
+            // Note: size=0 is safe for free (jpeg_free_align doesn't need it), but checking track usage might be off.
+            // Using 0 for now as we don't easily know alloc size unless we track it from decode/alloc.
+            // Actually decode_jpeg allocates size = w*h*c roughly.
+            TrackedBuffer* tb = new TrackedBuffer(raw, false, true, false, 0);
+            UniqueBufferPtr uptr(tb);
+            
+            size_t buf_len = master_width * master_height * master_channels;
+            
+            // Create preview image
+             std::shared_ptr<RotatedPreviewImage> cached_img = std::make_shared<RotatedPreviewImage>(
+                std::move(uptr), 
+                buf_len,
+                master_width, master_height,
+                (master_channels == 1) ? PIXFORMAT_GRAYSCALE : PIXFORMAT_RGB888 
+            );
+            this->last_processed_image_ = cached_img;
+            processing_source_ptr = raw; // Still valid, owned by cached_img
+            ESP_LOGD(TAG, "ImageProcessor: Cached preview image. Ptr: %p", cached_img.get());
+        } else {
+             ESP_LOGD(TAG, "ImageProcessor: Preview caching DISABLED. Releasing buffer.");
+             processing_source_ptr = master_decoded_buffer.get();
+        }
   }
 
   // Process Zones from Master Buffer (or Source if not JPEG/Mastered)
@@ -603,12 +673,12 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
                   // Grayscale
                    if (config_.input_type == kInputTypeFloat32) {
                         crop_success = process_grayscale_crop_and_scale_to_float32(
-                            master_decoded_buffer.get(), zone, crop_w, crop_h,
+                            processing_source_ptr, zone, crop_w, crop_h,
                             out_buf->get(), config_.model_width, config_.model_height,
                             config_.model_channels, config_.normalize, stride);
                    } else {
                         crop_success = process_grayscale_crop_and_scale_to_uint8(
-                            master_decoded_buffer.get(), zone, crop_w, crop_h,
+                            processing_source_ptr, zone, crop_w, crop_h,
                             out_buf->get(), config_.model_width, config_.model_height,
                             config_.model_channels, stride);
                    }
@@ -616,12 +686,12 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
                   // RGB
                    if (config_.input_type == kInputTypeFloat32) {
                         crop_success = process_rgb888_crop_and_scale_to_float32(
-                            master_decoded_buffer.get(), zone, crop_w, crop_h,
+                            processing_source_ptr, zone, crop_w, crop_h,
                             out_buf->get(), config_.model_width, config_.model_height,
                             config_.model_channels, config_.normalize, stride);
                    } else {
                         crop_success = process_rgb888_crop_and_scale_to_uint8(
-                            master_decoded_buffer.get(), zone, crop_w, crop_h,
+                            processing_source_ptr, zone, crop_w, crop_h,
                             out_buf->get(), config_.model_width, config_.model_height,
                             config_.model_channels, stride);
                    }
@@ -854,7 +924,29 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
             // Clean up original decode buffer early to save memory
             full_image_buf.reset();
             
-            processing_buf = rotated_buf;
+            // Wrap in RotatedPreviewImage to keep it alive and accessible for preview ONLY if requested
+            if (config_.cache_preview_image) {
+                // We transfer ownership of the UniqueBufferPtr to the shared_ptr<RotatedPreviewImage>
+                std::shared_ptr<RotatedPreviewImage> cached_img = std::make_shared<RotatedPreviewImage>(
+                    std::move(rotated_buffer_storage), 
+                    rotated_size,
+                    out_w, out_h,
+                    (decode_channels == 1) ? PIXFORMAT_GRAYSCALE : PIXFORMAT_RGB888 
+                );
+                
+                this->last_processed_image_ = cached_img;
+                ESP_LOGD(TAG, "ImageProcessor: Cached preview image. Ptr: %p", cached_img.get());
+                
+                // Access raw pointer from cached image
+                processing_buf = cached_img->get_data_buffer();
+            } else {
+                ESP_LOGD(TAG, "ImageProcessor: Preview caching DISABLED. Releasing buffer.");
+                // No caching, just use the rotated buffer directly
+                // rotated_buffer_storage owns it, we just point processing_buf to it
+                // and it will be auto-released at end of scope unless we moved it (which we didn't here)
+                processing_buf = rotated_buffer_storage->get();
+            }
+            
         } else {
             ESP_LOGE(TAG, "Software rotation failed");
             return false;

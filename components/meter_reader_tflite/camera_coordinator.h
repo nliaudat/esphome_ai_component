@@ -29,6 +29,11 @@ class CameraCoordinator {
   std::vector<ProcessResult> process_frame(
       std::shared_ptr<camera::CameraImage> frame,
       const std::vector<esp32_camera_utils::CropZone>& zones); 
+      
+  std::shared_ptr<camera::CameraImage> get_debug_image() const {
+      if (image_processor_) return image_processor_->get_last_processed_image();
+      return nullptr;
+  } 
 
 
   // Window control
@@ -55,17 +60,22 @@ class CameraCoordinator {
   // Helpers
   bool test_camera_after_reset(std::atomic<bool>& frame_available, std::atomic<bool>& frame_requested);
   void basic_recovery();
+  std::string get_pixel_format() const { return current_format_; }
+  void set_enable_preview(bool enable) { enable_preview_ = enable; }
   
- private:
+ protected:
   esp32_camera::ESP32Camera* camera_{nullptr};
   esp32_camera_utils::CameraWindowControl window_control_;
+  esp32_camera_utils::ImageProcessorConfig ip_config_;
   std::unique_ptr<esp32_camera_utils::ImageProcessor> image_processor_;
 
   float rotation_{0.0f};
 
+  // Reverted names to match .cpp implementation
   int current_width_{0};
   int current_height_{0};
-  std::string current_format_;
+  std::string current_format_{"RGB888"};
+  bool enable_preview_{false};
   
   // Original specs
   int orig_width_{0};
