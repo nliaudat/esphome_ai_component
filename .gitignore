@@ -31,3 +31,4 @@ config_hotwateryaml
 fuzz_build.py
 fuzz_build.py
 globals_AI_component.yaml
+config_hotwater.yaml
