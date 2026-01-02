@@ -73,6 +73,7 @@ substitutions:
   sdcard_d3_pin: GPIO3 #SD_CS, CD/DAT3
   
   # Camera Pins 
+  camera_pwdn_pin: GPIO44 # Not used on this board, dummy valid pin
   external_clock_pin: GPIO15
   external_clock_frequency: 20MHz
   i2c_pins_sda: GPIO4

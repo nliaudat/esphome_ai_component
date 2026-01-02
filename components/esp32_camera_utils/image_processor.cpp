@@ -636,7 +636,7 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
             );
             this->last_processed_image_ = cached_img;
             processing_source_ptr = raw; // Still valid, owned by cached_img
-            ESP_LOGD(TAG, "ImageProcessor: Cached preview image. Ptr: %p", cached_img.get());
+            // ESP_LOGD(TAG, "ImageProcessor: Cached preview image. Ptr: %p", (void*)cached_img.get());
         } else {
              ESP_LOGD(TAG, "ImageProcessor: Preview caching DISABLED. Releasing buffer.");
              processing_source_ptr = master_decoded_buffer.get();
@@ -935,7 +935,7 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
                 );
                 
                 this->last_processed_image_ = cached_img;
-                ESP_LOGD(TAG, "ImageProcessor: Cached preview image. Ptr: %p", cached_img.get());
+                // ESP_LOGD(TAG, "ImageProcessor: Cached preview image. Ptr: %p", (void*)cached_img.get());
                 
                 // Access raw pointer from cached image
                 processing_buf = cached_img->get_data_buffer();

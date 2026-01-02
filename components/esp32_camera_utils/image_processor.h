@@ -290,13 +290,13 @@ public:
   static std::shared_ptr<camera::CameraImage> generate_rotated_preview(
       std::shared_ptr<camera::CameraImage> source, 
       float rotation, int width, int height);
+#endif
 
   /**
    * Get the last fully processed (decoded & rotated) image.
    * Useful for debugging/preview without re-processing.
    */
   std::shared_ptr<camera::CameraImage> get_last_processed_image() const { return last_processed_image_; }
-#endif
 
 #if defined(USE_CAMERA_ROTATOR) || defined(DEV_ENABLE_ROTATION)
   // Software rotation for arbitrary angles
@@ -348,7 +348,7 @@ public:
 #endif
 };
 
-#ifdef USE_CAMERA_ROTATOR
+// RotatedPreviewImage class moved here for shared usage
 // RotatedPreviewImage class moved here for shared usage
 class RotatedPreviewImage : public camera::CameraImage {
   using UniqueBufferPtr = esphome::esp32_camera_utils::ImageProcessor::UniqueBufferPtr;
@@ -370,7 +370,7 @@ class RotatedPreviewImage : public camera::CameraImage {
   int height_;
   pixformat_t format_;
 };
-#endif
+
 
 }  // namespace esp32_camera_utils
 }  // namespace esphome
