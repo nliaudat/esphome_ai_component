@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESP32 AI Rotation & ROI Tool</title>
+    <title>ESP32 AI Rotation & ROI Tool v3</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -87,7 +87,7 @@
         }
 
         .btn.active {
-            ring: 2px solid #2c3e50;
+            box-shadow: 0 0 0 2px #2c3e50;
             transform: translateY(1px);
         }
 
@@ -236,7 +236,8 @@
             </div>
 
             <div class="mode-toggles">
-                <button class="mode-btn active" onclick="setMode('roi')" id="btn-mode-roi">1. Set Camera ROI</button>
+                <button class="mode-btn active" onclick="setMode('roi')" id="btn-mode-roi">1. Set Camera ROI
+                    (Optional)</button>
                 <button class="mode-btn" onclick="setMode('digits')" id="btn-mode-digits">2. Set Digit Zones</button>
             </div>
 
@@ -387,8 +388,8 @@
             document.getElementById('btn-mode-' + mode).classList.add('active');
 
             const help = document.getElementById('help-text');
-            if (mode === 'roi') help.textContent = "Draw a rectangle to define the Camera Window (Blue). This limits what the ESP32 processes.";
-            else help.textContent = "Draw boxes around each digit (Green) INSIDE the Blue ROI.";
+            if (mode === 'roi') help.textContent = "Draw a rectangle to define the Camera Window (Blue). Optional: If skipped, full sensor is used.";
+            else help.textContent = "Draw boxes around each digit (Green).";
 
             updateCanvas();
         }
@@ -591,6 +592,12 @@
             if (anisotropic) lines.push(`# WARNING: Anisotropic scaling detected! (${scale_x.toFixed(2)} vs ${scale_y.toFixed(2)})`);
             lines.push(`rotation: ${state.rotation}`);
 
+            // ROI Variables
+            let off_x = 0;
+            let off_y = 0;
+            let w = sensor_w; // Default to full sensor
+            let h = sensor_h;
+
             if (state.roi) {
                 // 1. Map Visual ROI -> Unrotated Image Coordinates (0-img_w)
                 const visROI = mapToOriginal(state.roi.x, state.roi.y, state.roi.w, state.roi.h);
@@ -601,11 +608,8 @@
                 let raw_w = visROI.w * scale_x;
                 let raw_h = visROI.h * scale_y;
 
-                let off_x, off_y, w, h;
-
                 if (state.force43) {
                     // Force 4:3 Ratio logic (also adhering to Divisible by 8)
-                    // W must be multiple of 32 (4*8), H multiple of 24 (3*8) to satisfy both 4:3 and %8.
                     let nw = raw_w / 32;
                     let nh = raw_h / 24;
                     let n = Math.max(1, Math.round(Math.max(nw, nh)));
@@ -652,79 +656,93 @@
                 lines.push(`  offset_y: ${off_y} # multiple of 8`);
                 lines.push(`  width: ${w} ${comment_w}`);
                 lines.push(`  height: ${h} ${comment_h}`);
+            } else {
+                lines.push(`# No Camera ROI defined. Assuming full sensor frame.`);
+                // We keep off_x, off_y at 0
+                // w, h are set to sensor_w, sensor_h
+                // Note: If using full frame, ensure width/height match rotation logic if we printed them,
+                // but we aren't printing camera_window, so just internal variables for digit calc.
 
-                // Digits
-                if (state.digits.length > 0) {
-                    const zones = state.digits.map(d_vis => {
-                        // 1. Visual -> Sensor Global (Original Unrotated)
-                        // Then Scale to Sensor Space
-                        const sensor_g = mapToOriginal(d_vis.x, d_vis.y, d_vis.w, d_vis.h);
-                        const d_sensor_x = sensor_g.x * scale_x;
-                        const d_sensor_y = sensor_g.y * scale_y;
-                        const d_sensor_w = sensor_g.w * scale_x;
-                        const d_sensor_h = sensor_g.h * scale_y;
+                // IMPORTANT: 'w' and 'h' are used for Digit Relative calculation and Rotation Logic.
+                // In Rotation Logic:
+                // let out_w = (state.rotation % 180 === 0) ? w : h;
+                // If w=1600, h=1200 (Sensor).
+                // Rotation 90. out_w = 1200.
+                // This seems correct.
+            }
 
-                        // 2. Relativize to Snapped Window (in Sensor Space)
-                        let rel_x = d_sensor_x - off_x;
-                        let rel_y = d_sensor_y - off_y;
+            // Digits
+            if (state.digits.length > 0) {
+                const zones = state.digits.map(d_vis => {
+                    // 1. Visual -> Sensor Global (Original Unrotated)
+                    // Then Scale to Sensor Space
+                    const sensor_g = mapToOriginal(d_vis.x, d_vis.y, d_vis.w, d_vis.h);
+                    const d_sensor_x = sensor_g.x * scale_x;
+                    const d_sensor_y = sensor_g.y * scale_y;
+                    const d_sensor_w = sensor_g.w * scale_x;
+                    const d_sensor_h = sensor_g.h * scale_y;
 
-                        // 3. Transform to Configured Rotation Space (Final Output)
-                        // The output image will be the Window (w x h).
-                        // Rotation applies to this window.
+                    // 2. Relativize to Snapped Window (in Sensor Space)
+                    let rel_x = d_sensor_x - off_x;
+                    let rel_y = d_sensor_y - off_y;
 
-                        let out_w = (state.rotation % 180 === 0) ? w : h;
-                        let out_h = (state.rotation % 180 === 0) ? h : w;
+                    // 3. Transform to Configured Rotation Space (Final Output)
+                    // The output image will be the Window (w x h).
+                    // Rotation applies to this window.
 
-                        let fin_x, fin_y, fin_w, fin_h;
+                    let out_w = (state.rotation % 180 === 0) ? w : h;
+                    let out_h = (state.rotation % 180 === 0) ? h : w;
 
-                        switch (state.rotation) {
-                            case 0:
-                                fin_x = rel_x;
-                                fin_y = rel_y;
-                                fin_w = d_sensor_w;
-                                fin_h = d_sensor_h;
-                                break;
-                            case 90:
-                                // CW 90: (x,y) -> (H-y-h, x)
-                                fin_x = out_w - rel_y - d_sensor_h;
-                                fin_y = rel_x;
-                                fin_w = d_sensor_h;
-                                fin_h = d_sensor_w;
-                                break;
-                            case 180:
-                                // (x,y) -> (W-x-w, H-y-h)
-                                fin_x = out_w - rel_x - d_sensor_w;
-                                fin_y = out_h - rel_y - d_sensor_h;
-                                fin_w = d_sensor_w;
-                                fin_h = d_sensor_h;
-                                break;
-                            case 270:
-                                // CCW 90
-                                fin_x = rel_y;
-                                fin_y = out_h - rel_x - d_sensor_w;
-                                fin_w = d_sensor_h;
-                                fin_h = d_sensor_w;
-                                break;
-                        }
+                    let fin_x, fin_y, fin_w, fin_h;
 
-                        // NOTE: If actual output is resized (e.g. window 240x680 -> output 480x640), 
-                        // these pixel values will be wrong for the resized image.
-                        // But precise crop zones usually require matching window to resolution.
+                    switch (state.rotation) {
+                        case 0:
+                            fin_x = rel_x;
+                            fin_y = rel_y;
+                            fin_w = d_sensor_w;
+                            fin_h = d_sensor_h;
+                            break;
+                        case 90:
+                            // CW 90: (x,y) -> (H-y-h, x)
+                            fin_x = out_w - rel_y - d_sensor_h;
+                            fin_y = rel_x;
+                            fin_w = d_sensor_h;
+                            fin_h = d_sensor_w;
+                            break;
+                        case 180:
+                            // (x,y) -> (W-x-w, H-y-h)
+                            fin_x = out_w - rel_x - d_sensor_w;
+                            fin_y = out_h - rel_y - d_sensor_h;
+                            fin_w = d_sensor_w;
+                            fin_h = d_sensor_h;
+                            break;
+                        case 270:
+                            // CCW 90
+                            fin_x = rel_y;
+                            fin_y = out_h - rel_x - d_sensor_w;
+                            fin_w = d_sensor_h;
+                            fin_h = d_sensor_w;
+                            break;
+                    }
 
-                        return [
-                            Math.round(fin_x),
-                            Math.round(fin_y),
-                            Math.round(fin_x + fin_w),
-                            Math.round(fin_y + fin_h)
-                        ];
-                    });
+                    return [
+                        Math.round(fin_x),
+                        Math.round(fin_y),
+                        Math.round(fin_x + fin_w),
+                        Math.round(fin_y + fin_h)
+                    ];
+                });
 
-                    // Single-line JSON string format
-                    const jsonStr = JSON.stringify(zones);
-                    lines.push(``);
+                // Single-line JSON string format
+                const jsonStr = JSON.stringify(zones);
+                lines.push(``);
+
+                if (!state.roi) {
+                    lines.push(`# Crop Zones (Sensor Space - Full Frame)`);
+                } else {
                     lines.push(`# Crop Zones (Sensor Space - Relative to Window)`);
-                    lines.push(`initial_value: '"${jsonStr}"'`);
                 }
+                lines.push(`initial_value: '"${jsonStr}"'`);
             }
 
             ta.value = lines.join('\n');
@@ -779,20 +797,16 @@
                 state.roi = { x, y, w, h };
                 state.digits = []; // Reset digits if ROI changes
             } else {
-                if (!state.roi) {
-                    alert("Please set the Camera ROI first.");
-                    return;
+                if (state.roi) {
+                    // Clip/Ensure inside ROI (Warning only)
+                    if (x < state.roi.x || y < state.roi.y ||
+                        (x + w) > (state.roi.x + state.roi.w) ||
+                        (y + h) > (state.roi.y + state.roi.h)) {
+                        if (!confirm("Warning: Zone is outside ROI. Keep it?")) return;
+                    }
                 }
 
-                // Clip/Ensure inside ROI
-                // Simple check for now
-                if (x < state.roi.x || y < state.roi.y ||
-                    (x + w) > (state.roi.x + state.roi.w) ||
-                    (y + h) > (state.roi.y + state.roi.h)) {
-                    if (!confirm("Warning: Zone is outside ROI. Keep it?")) return;
-                }
-
-                state.digits.push({ x, y, w, h });
+                state.digits.push({ x: x, y: y, w: w, h: h });
             }
 
             updateCanvas();
@@ -907,68 +921,6 @@
             state.isManualUpdate = false;
         }
 
-        // Mouse Events
-        function startDrawing(e) {
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-
-            state.startPos = { x, y };
-            state.isDrawing = true;
-        }
-
-        function draw(e) {
-            if (!state.isDrawing) return;
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-
-            const w = x - state.startPos.x;
-            const h = y - state.startPos.y;
-
-            if (state.mode === 'roi') {
-                // Ensure Positive WH
-                let rx = state.startPos.x;
-                let ry = state.startPos.y;
-                let rw = w;
-                let rh = h;
-
-                if (rw < 0) { rx += rw; rw = Math.abs(rw); }
-                if (rh < 0) { ry += rh; rh = Math.abs(rh); }
-
-                state.roi = { x: rx, y: ry, w: rw, h: rh };
-            } else if (state.mode === 'digits') {
-                // Don't update digits live, just visualize current drag?
-                // For now, let's just use ROI visual
-            }
-            updateCanvas();
-        }
-
-        function stopDrawing(e) {
-            if (!state.isDrawing) return;
-            state.isDrawing = false;
-
-            // If mode was digits and we finished a rect, add it
-            if (state.mode === 'digits') {
-                const rect = canvas.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-
-                let rw = x - state.startPos.x;
-                let rh = y - state.startPos.y;
-                let rx = state.startPos.x;
-                let ry = state.startPos.y;
-
-                if (rw < 0) { rx += rw; rw = Math.abs(rw); }
-                if (rh < 0) { ry += rh; rh = Math.abs(rh); }
-
-                if (rw > 5 && rh > 5) {
-                    state.digits.push({ x: rx, y: ry, w: rw, h: rh });
-                }
-            }
-
-            generateOutput();
-        }
 
     </script>
 </body>
