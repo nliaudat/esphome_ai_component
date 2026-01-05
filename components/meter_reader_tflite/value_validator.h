@@ -66,6 +66,7 @@ class ValueValidator {
     float high_confidence_threshold{0.90f}; // Threshold for validation override
     size_t max_history_size_bytes{51200}; // 50KB limit for history buffer
     float per_digit_confidence_threshold{0.85f}; // Minimum confidence to accept a changed digit
+    bool strict_confidence_check{false}; // If true, requires all digits to be above threshold
   };
 
   void setup();
@@ -82,6 +83,7 @@ class ValueValidator {
   
   void reset();
   void set_last_valid_reading(int value);
+  void set_strict_confidence_check(bool strict);
 
  private:
   ValidationConfig config_;

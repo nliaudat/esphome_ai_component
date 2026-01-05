@@ -110,6 +110,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_max_absolute_diff(int max_diff) { max_absolute_diff_ = max_diff; }
   void set_frame_request_timeout(uint32_t ms) { frame_request_timeout_ms_ = ms; }
   void set_high_confidence_threshold(float threshold) { high_confidence_threshold_ = threshold; }
+  void set_strict_confidence_check(bool strict) { strict_confidence_check_ = strict; }
   void set_last_valid_value(float value);
 
   // Pause
@@ -214,6 +215,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   bool debug_memory_enabled_{false}; // Runtime flag
   bool window_active_{false};
   bool enable_flash_calibration_{false};
+  bool strict_confidence_check_{false};
 
   // Calibration
   struct FlashCalibrationHandler {

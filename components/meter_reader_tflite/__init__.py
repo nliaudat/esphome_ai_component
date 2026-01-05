@@ -112,6 +112,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_MAX_ABSOLUTE_DIFF, default=100): cv.positive_int,
     cv.Optional(CONF_FRAME_REQUEST_TIMEOUT, default=15000): cv.int_range(min=1000, max=60000),
     cv.Optional(CONF_HIGH_CONFIDENCE_THRESHOLD, default=0.90): cv.float_range(min=0.5, max=1.0),
+    cv.Optional("strict_confidence_check", default=False): cv.boolean,
     cv.Optional("value_sensor"): cv.use_id(sensor.Sensor),
     cv.Optional("confidence_sensor"): cv.use_id(sensor.Sensor),
     cv.Optional("inference_logs"): cv.use_id(text_sensor.TextSensor),
@@ -380,6 +381,8 @@ async def to_code(config):
         cg.add(var.set_frame_request_timeout(config[CONF_FRAME_REQUEST_TIMEOUT]))
     if CONF_HIGH_CONFIDENCE_THRESHOLD in config:
         cg.add(var.set_high_confidence_threshold(config[CONF_HIGH_CONFIDENCE_THRESHOLD]))
+    if "strict_confidence_check" in config:
+        cg.add(var.set_strict_confidence_check(config["strict_confidence_check"]))
         
 
     # Optional: Debug memory sensors

@@ -282,6 +282,7 @@ void MeterReaderTFLite::setup() {
     val_conf.max_absolute_diff = max_absolute_diff_;
     val_conf.high_confidence_threshold = high_confidence_threshold_;
     val_conf.per_digit_confidence_threshold = high_confidence_threshold_;
+    val_conf.strict_confidence_check = strict_confidence_check_;
     output_validator_.set_config(val_conf);
     output_validator_.setup();
     
@@ -782,26 +783,26 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
              // Publish to inference logs text sensor
              char inference_log[150];
              snprintf(inference_log, sizeof(inference_log),
-                      "Reading: %.1f -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%%)",
+                      "Reading: %.1f -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%% (high: %.1f%%))",
                       final_val, validated_val, valid ? "yes" : "no",
-                      avg_conf * 100.0f, confidence_threshold_ * 100.0f);
+                      avg_conf * 100.0f, confidence_threshold_ * 100.0f, high_confidence_threshold_ * 100.0f);
              inference_logs_->publish_state(inference_log);
         }
 
         if (valid && avg_conf >= confidence_threshold_) {
              // Removed checking of inference_log char buffer availability to match legacy cleanly
-             ESP_LOGI(TAG, "Reading: %.1f -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%%)", 
+             ESP_LOGI(TAG, "Reading: %.1f -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%% (high: %.1f%%))", 
                 final_val, validated_val, valid ? "yes" : "no", 
-                avg_conf * 100.0f, confidence_threshold_ * 100.0f);
+                avg_conf * 100.0f, confidence_threshold_ * 100.0f, high_confidence_threshold_ * 100.0f);
              
              if (value_sensor_) value_sensor_->publish_state(validated_val);
              if (confidence_sensor_) confidence_sensor_->publish_state(avg_conf * 100.0f);
              
              ESP_LOGI(TAG, "Reading published - valid and confidence threshold met");
         } else {
-             ESP_LOGI(TAG, "Reading: %.1f -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%%)", 
+             ESP_LOGI(TAG, "Reading: %.1f -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%% (high: %.1f%%))", 
                 final_val, validated_val, valid ? "yes" : "no", 
-                avg_conf * 100.0f, confidence_threshold_ * 100.0f);
+                avg_conf * 100.0f, confidence_threshold_ * 100.0f, high_confidence_threshold_ * 100.0f);
              ESP_LOGW(TAG, "Reading NOT published - %s", 
                      !valid ? "validation failed" : "confidence below threshold");
         }

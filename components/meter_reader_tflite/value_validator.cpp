@@ -243,6 +243,7 @@ bool ValueValidator::validate_reading(const std::vector<float>& digits, const st
 
   // --- Per-Digit Filtering ---
   int filtered_val = raw_val;
+  bool final_valid_check = true; // Assumed valid unless strict check fails
   
   if (!first_reading_ && !last_valid_digits_.empty() && last_valid_digits_.size() == current_digits.size()) {
       std::string filtered_digit_string;
@@ -266,7 +267,16 @@ bool ValueValidator::validate_reading(const std::vector<float>& digits, const st
                   filtered_digit_string += std::to_string(new_d);
               }
           } else {
-              // Unchanged
+              // Unchanged match
+              // Strict check: if high_confidence_threshold is configured (per_digit_confidence_threshold),
+              // we require even unchanged digits to meet it IF strict mode is enabled.
+              // User request: "I want all digit to be upper".
+              if (config_.strict_confidence_check && conf < config_.per_digit_confidence_threshold) {
+                  ESP_LOGW(TAG, "Digit %d unchanged but low confidence (Conf: %.2f < %.2f) - Rejecting reading in strict mode", 
+                           (int)i, conf, config_.per_digit_confidence_threshold);
+                  // Mark invalid, but continue constructing string to maintain state if needed
+                  final_valid_check = false;
+              }
               filtered_digit_string += std::to_string(new_d);
           }
       }
@@ -281,6 +291,23 @@ bool ValueValidator::validate_reading(const std::vector<float>& digits, const st
              filtered_val = raw_val; // Fallback
           }
       }
+  } else {
+       // First reading or no history - check all digits strictly
+       for (size_t i = 0; i < current_digits.size(); i++) {
+           float conf = (i < confidences.size()) ? confidences[i] : 0.0f;
+           if (conf < config_.per_digit_confidence_threshold) {
+               ESP_LOGW(TAG, "Initial reading digit %d low confidence (Conf: %.2f < %.2f)", 
+                        (int)i, conf, config_.per_digit_confidence_threshold);
+               final_valid_check = false;
+           }
+       }
+  }
+  
+  if (!final_valid_check) {
+      // If we failed strict per-digit check, we return false immediately?
+      // Or we let legacy validator run but return false at end?
+      // Better to fail now to avoid logging "valid: yes".
+      return false;
   }
 
   // Now pass the FILTERED value to the standard validator
@@ -508,6 +535,11 @@ void ValueValidator::set_last_valid_reading(int value) {
   // So clear() is fine.
   
   ESP_LOGW(TAG, "Manually set last valid reading to: %d", value);
+}
+
+
+void ValueValidator::set_strict_confidence_check(bool strict) {
+  config_.strict_confidence_check = strict;
 }
 
 }  // namespace meter_reader_tflite

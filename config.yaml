@@ -168,7 +168,8 @@ meter_reader_tflite:
 
   ### Advanced parameters
   # frame_request_timeout: 15000  # ms (1000-60000)
-  # high_confidence_threshold: 0.90  # (0.5-1.0)
+  high_confidence_threshold: 0.95
+  strict_confidence_check: true #all digits must be min at "high_confidence_threshold"
 
   # Pool efficiency monitoring (optional, requires DEBUG_METER_READER_MEMORY)
   # pool_job_efficiency_sensor: ${id_prefix}_pool_job_efficiency
@@ -231,3 +232,4 @@ packages:
   - !include sensor_others.yaml
   - !include logger.yaml 
   - !include time.yaml
+
