@@ -3,6 +3,7 @@ switch:
     name: "Pause AI processing"
     id: ${id_prefix}_pause_ai_processing
     icon: "mdi:pause"
+    entity_category: config
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
     turn_on_action:
@@ -20,6 +21,7 @@ switch:
     name: "Setup Mode (Preview)"
     id: ${id_prefix}_setup_mode_preview
     icon: "mdi:camera-cog"
+    entity_category: config
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
     turn_on_action:
@@ -37,6 +39,7 @@ switch:
     name: "Allow Negative Rates"
     id: ${id_prefix}_allow_negative_rates_switch
     icon: "mdi:minus-circle-off"
+    entity_category: config
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
     turn_on_action:
@@ -50,93 +53,97 @@ switch:
             id(${id_prefix}_meter_reader)->set_allow_negative_rates(false);
           }
 
-  - platform: template
-    name: "Debug Memory"
-    id: ${id_prefix}_debug_memory_switch
-    icon: "mdi:memory"
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_ON # Assuming default enabled via yaml
-    turn_on_action:
-      - lambda: |-
-          #ifdef DEBUG_METER_READER_MEMORY
-            if (id(${id_prefix}_meter_reader) != nullptr) {
-              id(${id_prefix}_meter_reader)->set_debug_memory_enabled(true);
-            }
-          #endif
-    turn_off_action:
-      - lambda: |-
-          #ifdef DEBUG_METER_READER_MEMORY
-            if (id(${id_prefix}_meter_reader) != nullptr) {
-              id(${id_prefix}_meter_reader)->set_debug_memory_enabled(false);
-            }
-          #endif
+  # - platform: template
+  #   name: "Debug Memory"
+  #   id: ${id_prefix}_debug_memory_switch
+  #   icon: "mdi:memory"
+  #   entity_category: diagnostic
+  #   optimistic: true
+  #   restore_mode: RESTORE_DEFAULT_ON # Assuming default enabled via yaml
+  #   turn_on_action:
+  #     - lambda: |-
+  #         #ifdef DEBUG_METER_READER_MEMORY
+  #           if (id(${id_prefix}_meter_reader) != nullptr) {
+  #             id(${id_prefix}_meter_reader)->set_debug_memory_enabled(true);
+  #           }
+  #         #endif
+  #   turn_off_action:
+  #     - lambda: |-
+  #         #ifdef DEBUG_METER_READER_MEMORY
+  #           if (id(${id_prefix}_meter_reader) != nullptr) {
+  #             id(${id_prefix}_meter_reader)->set_debug_memory_enabled(false);
+  #           }
+  #         #endif
 
-  - platform: template
-    name: "Component Debug Mode"
-    id: ${id_prefix}_component_debug_mode_switch
-    icon: "mdi:bug"
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_ON
-    turn_on_action:
-      - lambda: |-
-          #ifdef DEBUG_METER_READER_TFLITE
-            if (id(${id_prefix}_meter_reader) != nullptr) {
-               id(${id_prefix}_meter_reader)->set_debug_mode(true);
-            }
-          #endif
-    turn_off_action:
-      - lambda: |-
-           #ifdef DEBUG_METER_READER_TFLITE
-             if (id(${id_prefix}_meter_reader) != nullptr) {
-                id(${id_prefix}_meter_reader)->set_debug_mode(false);
-             }
-           #endif
+  # - platform: template
+  #   name: "Component Debug Mode"
+  #   id: ${id_prefix}_component_debug_mode_switch
+  #   icon: "mdi:bug"
+  #   entity_category: diagnostic
+  #   optimistic: true
+  #   restore_mode: RESTORE_DEFAULT_ON
+  #   turn_on_action:
+  #     - lambda: |-
+  #         #ifdef DEBUG_METER_READER_TFLITE
+  #           if (id(${id_prefix}_meter_reader) != nullptr) {
+  #              id(${id_prefix}_meter_reader)->set_debug_mode(true);
+  #           }
+  #         #endif
+  #   turn_off_action:
+  #     - lambda: |-
+  #          #ifdef DEBUG_METER_READER_TFLITE
+  #            if (id(${id_prefix}_meter_reader) != nullptr) {
+  #               id(${id_prefix}_meter_reader)->set_debug_mode(false);
+  #            }
+  #          #endif
            
-  - platform: template
-    name: "Debug Timing"
-    id: ${id_prefix}_debug_timing_switch
-    icon: "mdi:clock-fast"
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_OFF
-    turn_on_action:
-      - lambda: |-
-          #ifdef DEBUG_METER_READER_TIMING
-            if (id(${id_prefix}_meter_reader) != nullptr) {
-               id(${id_prefix}_meter_reader)->set_debug_timing(true);
-            }
-          #endif
-    turn_off_action:
-      - lambda: |-
-           #ifdef DEBUG_METER_READER_TIMING
-             if (id(${id_prefix}_meter_reader) != nullptr) {
-                id(${id_prefix}_meter_reader)->set_debug_timing(false);
-             }
-           #endif
+  # - platform: template
+  #   name: "Debug Timing"
+  #   id: ${id_prefix}_debug_timing_switch
+  #   icon: "mdi:clock-fast"
+  #   entity_category: diagnostic
+  #   optimistic: true
+  #   restore_mode: RESTORE_DEFAULT_OFF
+  #   turn_on_action:
+  #     - lambda: |-
+  #         #ifdef DEBUG_METER_READER_TIMING
+  #           if (id(${id_prefix}_meter_reader) != nullptr) {
+  #              id(${id_prefix}_meter_reader)->set_debug_timing(true);
+  #           }
+  #         #endif
+  #   turn_off_action:
+  #     - lambda: |-
+  #          #ifdef DEBUG_METER_READER_TIMING
+  #            if (id(${id_prefix}_meter_reader) != nullptr) {
+  #               id(${id_prefix}_meter_reader)->set_debug_timing(false);
+  #            }
+  #          #endif
 
-  - platform: template
-    name: "Camera Window Enabled"
-    id: ${id_prefix}_camera_window_enabled_switch
-    icon: "mdi:crop-free"
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_OFF
-    turn_on_action:
-      - lambda: |-
-          if (id(${id_prefix}_meter_reader) != nullptr) {
-            id(${id_prefix}_meter_reader)->set_camera_window_configured(true);
-          }
-    turn_off_action:
-      - lambda: |-
-          if (id(${id_prefix}_meter_reader) != nullptr) {
-            id(${id_prefix}_meter_reader)->set_camera_window_configured(false);
-          }
+  # - platform: template
+  #   name: "Camera Window Enabled"
+  #   id: ${id_prefix}_camera_window_enabled_switch
+  #   icon: "mdi:crop-free"
+  #   entity_category: config
+  #   optimistic: true
+  #   restore_mode: RESTORE_DEFAULT_OFF
+  #   turn_on_action:
+  #     - lambda: |-
+  #         if (id(${id_prefix}_meter_reader) != nullptr) {
+  #           id(${id_prefix}_meter_reader)->set_camera_window_configured(true);
+  #         }
+  #   turn_off_action:
+  #     - lambda: |-
+  #         if (id(${id_prefix}_meter_reader) != nullptr) {
+  #           id(${id_prefix}_meter_reader)->set_camera_window_configured(false);
+  #         }
 
-button:
-  - platform: template
-    name: "Force AI inference"
-    id: ${id_prefix}_force_ai_inference
-    icon: "mdi:arrow-top-bold-hexagon-outline"
-    on_press:
-      - lambda: |-
-          if (id(${id_prefix}_meter_reader) != nullptr) {
-            id(${id_prefix}_meter_reader)->force_flash_inference(); 
-          }
+# button:
+#   - platform: template
+#     name: "Force AI inference"
+#     id: ${id_prefix}_force_ai_inference
+#     icon: "mdi:arrow-top-bold-hexagon-outline"
+#     on_press:
+#       - lambda: |-
+#           if (id(${id_prefix}_meter_reader) != nullptr) {
+#             id(${id_prefix}_meter_reader)->force_flash_inference(); 
+#           }
