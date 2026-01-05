@@ -141,8 +141,8 @@ bool ModelHandler::load_model_with_arena(const uint8_t *model_data, size_t model
   }
 
   if (tflite_model_->version() != TFLITE_SCHEMA_VERSION) {
-    ESP_LOGE(TAG, "Model schema version mismatch: Model has %lu, Expecting %d", 
-             (unsigned long)tflite_model_->version(), TFLITE_SCHEMA_VERSION);
+    ESP_LOGE(TAG, "Model schema version mismatch: Model has %d, Expecting %d",
+             tflite_model_->version(), TFLITE_SCHEMA_VERSION);
     return false;
   }
 

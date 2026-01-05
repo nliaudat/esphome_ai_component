@@ -110,6 +110,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_max_absolute_diff(int max_diff) { max_absolute_diff_ = max_diff; }
   void set_frame_request_timeout(uint32_t ms) { frame_request_timeout_ms_ = ms; }
   void set_high_confidence_threshold(float threshold) { high_confidence_threshold_ = threshold; }
+  void set_last_valid_value(float value);
 
   // Pause
   void set_pause_processing(bool pause) { pause_processing_.store(pause); }
@@ -268,6 +269,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void process_full_image(std::shared_ptr<camera::CameraImage> frame);
   float combine_readings(const std::vector<float>& readings);
   bool validate_and_update_reading(float raw, float conf, float& val);
+  bool validate_and_update_reading(const std::vector<float>& digits, const std::vector<float>& confidences, float& val);
   
 #ifdef USE_WEB_SERVER
   web_server_base::WebServerBase *web_server_{nullptr};

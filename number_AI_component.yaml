@@ -121,3 +121,17 @@ number:
           if (id(${id_prefix}_meter_reader) != nullptr) {
             id(${id_prefix}_meter_reader)->set_camera_window_height((int)x);
           }
+ 
+  - platform: template
+    name: "Set Last Valid Value"
+    id: ${id_prefix}_set_last_valid
+    min_value: 0
+    max_value: 9999999
+    step: 1
+    initial_value: 0
+    optimistic: true
+    set_action:
+      - lambda: |-
+          if (id(${id_prefix}_meter_reader) != nullptr) {
+            id(${id_prefix}_meter_reader)->set_last_valid_value(x);
+          }

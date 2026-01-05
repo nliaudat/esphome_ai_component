@@ -65,10 +65,15 @@ class ValueValidator {
     int smart_validation_window{5};
     float high_confidence_threshold{0.90f}; // Threshold for validation override
     size_t max_history_size_bytes{51200}; // 50KB limit for history buffer
+    float per_digit_confidence_threshold{0.85f}; // Minimum confidence to accept a changed digit
   };
 
   void setup();
+  // Legacy single-value validation
   bool validate_reading(int new_reading, float confidence, int& validated_reading);
+  // Per-digit validation
+  bool validate_reading(const std::vector<float>& digits, const std::vector<float>& confidences, int& validated_reading);
+  
   void set_config(const ValidationConfig& config) { config_ = config; }
   const ValidationConfig& get_config() const { return config_; }
   
@@ -76,11 +81,13 @@ class ValueValidator {
   const ReadingHistory& get_history() const { return history_; }
   
   void reset();
+  void set_last_valid_reading(int value);
 
  private:
   ValidationConfig config_;
   ReadingHistory history_;
   int last_valid_reading_{0};
+  std::vector<int> last_valid_digits_; // Digits of the last valid reading
   bool first_reading_{true};
   std::deque<int> last_good_values_; // Store last N good values for precise comparison
   
