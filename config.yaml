@@ -193,6 +193,24 @@ meter_reader_tflite:
 #   value:
 #     name: "SSOCR Value"
 
+# analog_reader: # DEV !
+#   id: analog_main
+#   camera_id: ${id_prefix}_espcam
+#   value_sensor:
+#     name: "Analog Total"
+#   dials: 
+#     - id: dial_1
+#       scale: 1.0 
+#       crop_x: 0
+#       crop_y: 0
+#       crop_w: 100
+#       crop_h: 100
+#       min_angle: 0
+#       max_angle: 360
+#       angle_offset: 0 # 0=North, 90=East
+#       min_value: 0
+#       max_value: 10
+
 # web_server: # needed if generate_preview: true
   # port: 80
 
