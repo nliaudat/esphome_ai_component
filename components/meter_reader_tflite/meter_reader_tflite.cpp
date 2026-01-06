@@ -281,6 +281,8 @@ void MeterReaderTFLite::setup() {
     val_conf.allow_negative_rates = allow_negative_rates_;
     val_conf.max_absolute_diff = max_absolute_diff_;
     val_conf.high_confidence_threshold = high_confidence_threshold_;
+    val_conf.per_digit_confidence_threshold = high_confidence_threshold_;
+    val_conf.strict_confidence_check = strict_confidence_check_;
     output_validator_.set_config(val_conf);
     output_validator_.setup();
     
@@ -775,32 +777,32 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
         float avg_conf = std::accumulate(confidences.begin(), confidences.end(), 0.0f) / confidences.size();
         
         float validated_val = final_val;
-        bool valid = validate_and_update_reading(final_val, avg_conf, validated_val);
+        bool valid = validate_and_update_reading(readings, confidences, validated_val);
 
         if (inference_logs_) {
              // Publish to inference logs text sensor
              char inference_log[150];
              snprintf(inference_log, sizeof(inference_log),
-                      "Reading: %.1f -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%%)",
+                      "Reading: %.1f -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%% (high: %.1f%%))",
                       final_val, validated_val, valid ? "yes" : "no",
-                      avg_conf * 100.0f, confidence_threshold_ * 100.0f);
+                      avg_conf * 100.0f, confidence_threshold_ * 100.0f, high_confidence_threshold_ * 100.0f);
              inference_logs_->publish_state(inference_log);
         }
 
         if (valid && avg_conf >= confidence_threshold_) {
              // Removed checking of inference_log char buffer availability to match legacy cleanly
-             ESP_LOGI(TAG, "Reading: %.1f -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%%)", 
+             ESP_LOGI(TAG, "Reading: %.1f -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%% (high: %.1f%%))", 
                 final_val, validated_val, valid ? "yes" : "no", 
-                avg_conf * 100.0f, confidence_threshold_ * 100.0f);
+                avg_conf * 100.0f, confidence_threshold_ * 100.0f, high_confidence_threshold_ * 100.0f);
              
              if (value_sensor_) value_sensor_->publish_state(validated_val);
              if (confidence_sensor_) confidence_sensor_->publish_state(avg_conf * 100.0f);
              
              ESP_LOGI(TAG, "Reading published - valid and confidence threshold met");
         } else {
-             ESP_LOGI(TAG, "Reading: %.1f -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%%)", 
+             ESP_LOGI(TAG, "Reading: %.1f -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%% (high: %.1f%%))", 
                 final_val, validated_val, valid ? "yes" : "no", 
-                avg_conf * 100.0f, confidence_threshold_ * 100.0f);
+                avg_conf * 100.0f, confidence_threshold_ * 100.0f, high_confidence_threshold_ * 100.0f);
              ESP_LOGW(TAG, "Reading NOT published - %s", 
                      !valid ? "validation failed" : "confidence below threshold");
         }
@@ -830,6 +832,16 @@ void MeterReaderTFLite::set_camera_image_format(int w, int h, const std::string 
          camera_coord_.update_image_processor_config(
              spec.input_width, spec.input_height, spec.input_channels,
              spec.input_type, spec.normalize, spec.input_order);
+    }
+}
+
+void MeterReaderTFLite::set_last_valid_value(float value) {
+    ESP_LOGI(TAG, "Manual override: Setting last valid value to %.1f", value);
+    output_validator_.set_last_valid_reading((int)value);
+    
+    // Immediately publish this as the truth to the sensor
+    if (value_sensor_) {
+        value_sensor_->publish_state(value);
     }
 }
 
@@ -943,6 +955,13 @@ bool MeterReaderTFLite::validate_and_update_reading(float raw, float conf, float
     int ival = static_cast<int>(raw);
     int oval = ival;
     bool valid = output_validator_.validate_reading(ival, conf, oval);
+    val = static_cast<float>(oval);
+    return valid;
+}
+
+bool MeterReaderTFLite::validate_and_update_reading(const std::vector<float>& digits, const std::vector<float>& confidences, float& val) {
+    int oval = 0;
+    bool valid = output_validator_.validate_reading(digits, confidences, oval);
     val = static_cast<float>(oval);
     return valid;
 }

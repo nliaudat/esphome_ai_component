@@ -211,6 +211,134 @@ bool ValueValidator::validate_reading(int new_reading, float confidence, int& va
   return is_valid;
 }
 
+bool ValueValidator::validate_reading(const std::vector<float>& digits, const std::vector<float>& confidences, int& validated_reading) {
+  // If we don't have per-digit history yet, fallback to standard validation
+  // But wait, we can't do standard validation without a single int.
+  // We first construct the "raw" int from the digits.
+  
+  std::vector<int> current_digits;
+  std::string digit_string;
+  
+  for (float d : digits) {
+      int digit = static_cast<int>(round(d));
+      if (digit >= 10) digit = 0; // Wrap 10 -> 0 standard TFLite behavior
+      current_digits.push_back(digit);
+      digit_string += std::to_string(digit);
+  }
+  
+  int raw_val = 0;
+  if (!digit_string.empty()) {
+      char *end;
+      long val = strtol(digit_string.c_str(), &end, 10);
+      if (end == digit_string.c_str() + digit_string.length()) { // Full conversion
+          raw_val = (int)val;
+      }
+  }
+  
+  // Calculate average confidence for the legacy validator call
+  float avg_conf = 0.0f;
+  if (!confidences.empty()) {
+      avg_conf = std::accumulate(confidences.begin(), confidences.end(), 0.0f) / confidences.size();
+  }
+
+  // --- Per-Digit Filtering ---
+  int filtered_val = raw_val;
+  bool final_valid_check = true; // Assumed valid unless strict check fails
+  
+  if (!first_reading_ && !last_valid_digits_.empty() && last_valid_digits_.size() == current_digits.size()) {
+      std::string filtered_digit_string;
+      bool modified = false;
+      
+      for (size_t i = 0; i < current_digits.size(); i++) {
+          int new_d = current_digits[i];
+          int old_d = last_valid_digits_[i];
+          float conf = (i < confidences.size()) ? confidences[i] : 0.0f;
+          
+          if (new_d != old_d) {
+              // Digit changed. Check confidence.
+              if (conf < config_.per_digit_confidence_threshold) {
+                  // Confidence too low for a change. Reject it.
+                  ESP_LOGW(TAG, "Digit %d change rejected (Val: %d->%d, Conf: %.2f < %.2f)", 
+                           (int)i, old_d, new_d, conf, config_.per_digit_confidence_threshold);
+                  filtered_digit_string += std::to_string(old_d);
+                  modified = true;
+              } else {
+                  // Accepted
+                  filtered_digit_string += std::to_string(new_d);
+              }
+          } else {
+              // Unchanged match
+              // Strict check: if high_confidence_threshold is configured (per_digit_confidence_threshold),
+              // we require even unchanged digits to meet it IF strict mode is enabled.
+              // User request: "I want all digit to be upper".
+              if (config_.strict_confidence_check && conf < config_.per_digit_confidence_threshold) {
+                  ESP_LOGW(TAG, "Digit %d unchanged but low confidence (Conf: %.2f < %.2f) - Rejecting reading in strict mode", 
+                           (int)i, conf, config_.per_digit_confidence_threshold);
+                  // Mark invalid, but continue constructing string to maintain state if needed
+                  final_valid_check = false;
+              }
+              filtered_digit_string += std::to_string(new_d);
+          }
+      }
+      
+      if (modified) {
+          char *end;
+          long val = strtol(filtered_digit_string.c_str(), &end, 10);
+          if (end == filtered_digit_string.c_str() + filtered_digit_string.length()) {
+             filtered_val = (int)val;
+             ESP_LOGD(TAG, "Per-digit filter modified reading: %d -> %d", raw_val, filtered_val);
+          } else {
+             filtered_val = raw_val; // Fallback
+          }
+      }
+  } else {
+       // First reading or no history - check all digits strictly
+       for (size_t i = 0; i < current_digits.size(); i++) {
+           float conf = (i < confidences.size()) ? confidences[i] : 0.0f;
+           if (conf < config_.per_digit_confidence_threshold) {
+               ESP_LOGW(TAG, "Initial reading digit %d low confidence (Conf: %.2f < %.2f)", 
+                        (int)i, conf, config_.per_digit_confidence_threshold);
+               final_valid_check = false;
+           }
+       }
+  }
+  
+  if (!final_valid_check) {
+      // If we failed strict per-digit check, we return false immediately?
+      // Or we let legacy validator run but return false at end?
+      // Better to fail now to avoid logging "valid: yes".
+      return false;
+  }
+
+  // Now pass the FILTERED value to the standard validator
+  // This will perform rate checks, consistency checks, etc.
+  bool final_valid = validate_reading(filtered_val, avg_conf, validated_reading);
+  
+  if (final_valid) {
+      // If accepted, update our digit history
+      // We must reconstruct the digits of `validated_reading` because the standard validator 
+      // might have modified it (e.g. median filter, history recovery, etc.)
+      
+      // Edge case: if validate_reading returned a value from history (e.g. 210600), we need its digits.
+      // Since we don't know the exact digits of that historic integer easily (could have ambiguous length),
+      // we assume it has the same length as current input.
+      std::string val_str = std::to_string(validated_reading);
+      
+      // Pad if necessary? usually leading zeros.
+      if (val_str.length() < current_digits.size()) {
+          val_str = std::string(current_digits.size() - val_str.length(), '0') + val_str;
+      }
+      
+      last_valid_digits_.clear();
+      for (char c : val_str) {
+          last_valid_digits_.push_back(c - '0');
+      }
+  }
+  
+  return final_valid;
+}
+
+
 bool ValueValidator::is_digit_plausible(int new_reading, int last_reading) const {
   // Calculate absolute difference
   int absolute_diff = std::abs(new_reading - last_reading);
@@ -237,73 +365,76 @@ bool ValueValidator::is_digit_plausible(int new_reading, int last_reading) const
 }
 
 int ValueValidator::apply_smart_validation(int new_reading, float confidence, float last_confidence) {
-  // High confidence readings get more lenient validation
-  float confidence_factor = std::min(1.0f, confidence / 0.7f); // Normalize to 0.7 threshold
+  // Basic digit plausibility check
+  if (is_digit_plausible(new_reading, last_valid_reading_)) {
+    return new_reading;
+  }
+
+  // If the reading is NOT plausible (e.g. large jump), check for consistency.
+  // Instead of an instant override based on confidence, we require the value 
+  // to be stable for a few readings. This prevents flickering.
   
-  // Adjust max diff based on confidence
-  int effective_max_diff = config_.max_absolute_diff * confidence_factor;
+  // Get recent history (including the current one we just added)
+  // We need enough history to check for N consecutive readings.
+  const size_t CONSISTENCY_COUNT = 3;
+  auto recent = history_.get_recent_readings(CONSISTENCY_COUNT);
   
-  // High confidence override: If confidence is very high (> 90%) AND greater than the previous confidence,
-  // trust the reading even if it deviates significantly from history.
-  // This solves getting stuck with a bad low-confidence reading in history.
-  if (confidence > config_.high_confidence_threshold && confidence > last_confidence) {
-      bool is_plausible = is_digit_plausible(new_reading, last_valid_reading_);
-      
-      if (!is_plausible) {
-          ESP_LOGW(TAG, "Validation Override: High confidence (%.2f > %.2f) reading %d accepted despite validation failure (last: %d)", 
-                   confidence, last_confidence, new_reading, last_valid_reading_);
-                   
-          // If the deviation is huge, it's likely a reset or correction of bad history
-          // so we shouldn't mix it with old "good" values
-          if (std::abs(new_reading - last_valid_reading_) > (config_.max_absolute_diff * 10)) {
-              last_good_values_.clear();
-              ESP_LOGI(TAG, "History cleared due to high-confidence correction");
+  if (recent.size() >= CONSISTENCY_COUNT) {
+      bool consistent = true;
+      for (int val : recent) {
+          if (val != new_reading) {
+              consistent = false;
+              break;
           }
-          return new_reading;
+      }
+      
+      if (consistent) {
+           ESP_LOGW(TAG, "Large change confirmed by %d consecutive readings: %d -> %d", 
+                    (int)CONSISTENCY_COUNT, last_valid_reading_, new_reading);
+           
+           // If the deviation is huge, clear old history to prevent it from dragging us back
+           if (std::abs(new_reading - last_valid_reading_) > (config_.max_absolute_diff * 5)) {
+               last_good_values_.clear();
+           }
+           return new_reading;
       }
   }
 
-  // Basic digit plausibility check
-  if (!is_digit_plausible(new_reading, last_valid_reading_)) {
-    // Try to find a plausible reading from recent history
-    auto recent_readings = history_.get_recent_readings(config_.smart_validation_window);
-    if (!recent_readings.empty()) {
-      int plausible_reading = find_most_plausible_reading(new_reading, recent_readings);
-      
-      // Check if the plausible reading is better
-      if (plausible_reading != new_reading && 
-          is_digit_plausible(plausible_reading, last_valid_reading_)) {
-        ESP_LOGI(TAG, "Using plausible reading from history: %d (was: %d)", 
-                 plausible_reading, new_reading);
-        return plausible_reading;
-      }
-    }
+  // --- Fallback Strategies ---
+
+  // 1. Try to find a plausible reading from recent history
+  auto recent_readings = history_.get_recent_readings(config_.smart_validation_window);
+  if (!recent_readings.empty()) {
+    int plausible_reading = find_most_plausible_reading(new_reading, recent_readings);
     
-    // If no good historical reading, use median of recent values
-    if (!last_good_values_.empty()) {
-      std::vector<int> good_values(last_good_values_.begin(), last_good_values_.end());
-      std::sort(good_values.begin(), good_values.end());
-      int median = good_values[good_values.size() / 2];
-      
-      // Only use median if it's somewhat close to the new reading
-      if (std::abs(median - new_reading) < (config_.max_absolute_diff * 2)) {
-        ESP_LOGI(TAG, "Using median of last good values: %d (was: %d)", median, new_reading);
-        return median;
-      }
+    // Check if the plausible reading is better
+    if (plausible_reading != new_reading && 
+        is_digit_plausible(plausible_reading, last_valid_reading_)) {
+      ESP_LOGD(TAG, "Using plausible reading from history: %d (was: %d)", 
+               plausible_reading, new_reading);
+      return plausible_reading;
     }
-    
-    // Last resort: use last valid reading with small increment if possible
-    if (is_small_increment(new_reading, last_valid_reading_)) {
-      ESP_LOGI(TAG, "Using small increment from last valid: %d", last_valid_reading_);
-      return last_valid_reading_;
-    }
-    
-    ESP_LOGW(TAG, "No plausible alternative found, using last valid: %d", last_valid_reading_);
-    return last_valid_reading_;
   }
+    
+  // 2. If no good historical reading, use median of recent GOOD values
+  if (!last_good_values_.empty()) {
+    std::vector<int> good_values(last_good_values_.begin(), last_good_values_.end());
+    std::sort(good_values.begin(), good_values.end());
+    int median = good_values[good_values.size() / 2];
+    
+    // Only use median if it's somewhat close to the last valid
+    if (std::abs(median - last_valid_reading_) <= config_.max_absolute_diff) {
+      ESP_LOGD(TAG, "Using median of last good values: %d (was: %d)", median, new_reading);
+      return median;
+    }
+  }
+    
+  // 3. Last resort: use last valid reading
+  // Note: We intentionally avoid small_increment logic here if it failed is_digit_plausible
+  // because is_digit_plausible usually allows small increments.
   
-  // Reading is plausible
-  return new_reading;
+  ESP_LOGW(TAG, "No plausible alternative found, keeping last valid: %d (Ignored: %d)", last_valid_reading_, new_reading);
+  return last_valid_reading_;
 }
 
 int ValueValidator::find_most_plausible_reading(int new_reading, const std::vector<int>& recent_readings) {
@@ -369,7 +500,46 @@ void ValueValidator::reset() {
   last_valid_reading_ = 0;
   first_reading_ = true;
   last_good_values_.clear();
+  last_valid_digits_.clear();
   ESP_LOGI(TAG, "Value validator reset");
+}
+
+void ValueValidator::set_last_valid_reading(int value) {
+  last_valid_reading_ = value;
+  first_reading_ = false; // We have a valid reading now
+  
+  // Update last_valid_digits_
+  std::string val_str = std::to_string(value);
+  last_valid_digits_.clear();
+  for (char c : val_str) {
+      last_valid_digits_.push_back(c - '0');
+  }
+  
+  // Create a "fake" history for this value to stabilize it
+  last_good_values_.clear();
+  // Fill with this value to pass median filters immediately
+  for(int i=0; i<config_.smart_validation_window; i++) {
+     last_good_values_.push_back(value);
+  }
+  
+  // Also clear raw history to prevent "consistency check" from reverting back to old values
+  history_.clear(); 
+  // Add a few dummy entries so it doesn't look empty? 
+  // No, let's just clear it. The next reading will be compared to last_valid_reading_.
+  // Consistency check (Layer 2) requires 'recent' readings. If history is empty, recent is empty.
+  // The code `if (recent.size() >= CONSISTENCY_COUNT)` handles that. 
+  // If we want the next reading to be accepted immediately, we need history?
+  // Actually, if we clear history, the consistency check might NOT trigger (size < count).
+  // Then it falls back to IsDigitPlausible.
+  // If the new real reading is close to this manually set value, IsDigitPlausible returns true. -> Accepted.
+  // So clear() is fine.
+  
+  ESP_LOGW(TAG, "Manually set last valid reading to: %d", value);
+}
+
+
+void ValueValidator::set_strict_confidence_check(bool strict) {
+  config_.strict_confidence_check = strict;
 }
 
 }  // namespace meter_reader_tflite

@@ -141,8 +141,27 @@ bool ModelHandler::load_model_with_arena(const uint8_t *model_data, size_t model
   }
 
   if (tflite_model_->version() != TFLITE_SCHEMA_VERSION) {
-    ESP_LOGE(TAG, "Model schema version mismatch: Model has %lu, Expecting %d", 
-             (unsigned long)tflite_model_->version(), TFLITE_SCHEMA_VERSION);
+    ESP_LOGE(TAG, "Model schema version mismatch: Model has %d, Expecting %d",
+             tflite_model_->version(), TFLITE_SCHEMA_VERSION);
+    
+    // Diagnostic dump to identify corrupted files
+    if (model_data != nullptr && model_size >= 16) {
+        ESP_LOGE(TAG, "Model Header Dump (First 16 bytes):");
+        ESP_LOGE(TAG, "  %02X %02X %02X %02X %02X %02X %02X %02X  %02X %02X %02X %02X %02X %02X %02X %02X",
+            model_data[0], model_data[1], model_data[2], model_data[3],
+            model_data[4], model_data[5], model_data[6], model_data[7],
+            model_data[8], model_data[9], model_data[10], model_data[11],
+            model_data[12], model_data[13], model_data[14], model_data[15]);
+
+        // Check magic number TFL3 (starts at offset 4)
+        if (model_data[4] == 'T' && model_data[5] == 'F' && model_data[6] == 'L' && model_data[7] == '3') {
+             ESP_LOGW(TAG, "Magic number 'TFL3' is PRESENT. Issue might be alignment or genuine schema mismatch.");
+        } else {
+             ESP_LOGE(TAG, "Magic number 'TFL3' is MISSING! The file is likely corrupted or not a valid TFLite model.");
+        }
+    } else {
+        ESP_LOGE(TAG, "Unable to dump header: Data null or too small (%zu bytes)", model_size);
+    }
     return false;
   }
 

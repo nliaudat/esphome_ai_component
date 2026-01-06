@@ -2,6 +2,7 @@ text_sensor:
   - platform: template
     name: "Crop Zones"  # Exposed to HA
     id: ${id_prefix}_crop_zones_sensor
+    entity_category: diagnostic
     #Update ESPHome when changed from HA
     # on_value:
       # then:

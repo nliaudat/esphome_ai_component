@@ -6,6 +6,7 @@ number:
     max_value: 2000
     step: 10
     initial_value: 300
+    entity_category: config
     optimistic: true
     restore_value: true
     set_action:
@@ -22,6 +23,7 @@ number:
     max_value: 3600
     step: 1
     initial_value: 60
+    entity_category: config
     optimistic: true
     restore_value: true
     set_action:
@@ -38,6 +40,7 @@ number:
     max_value: 10000
     step: 100
     initial_value: 7000
+    entity_category: config
     optimistic: true
     restore_value: true
     set_action:
@@ -54,6 +57,7 @@ number:
     max_value: 5000
     step: 100
     initial_value: 2000
+    entity_category: config
     optimistic: true
     restore_value: true
     set_action:
@@ -62,62 +66,80 @@ number:
             id(${id_prefix}_flash_controller)->set_flash_post_time((uint32_t)x);
           }
           
-  - platform: template
-    name: "Camera Window Offset X"
-    id: ${id_prefix}_cam_window_offset_x
-    min_value: 0
-    max_value: 1600
-    step: 4
-    initial_value: 0
-    optimistic: true
-    restore_value: true
-    set_action:
-      - lambda: |-
-          if (id(${id_prefix}_meter_reader) != nullptr) {
-            id(${id_prefix}_meter_reader)->set_camera_window_offset_x((int)x);
-          }
+  # - platform: template
+  #   name: "Camera Window Offset X"
+  #   id: ${id_prefix}_cam_window_offset_x
+  #   min_value: 0
+  #   max_value: 1600
+  #   step: 4
+  #   initial_value: 0
+  #   entity_category: config
+  #   optimistic: true
+  #   restore_value: true
+  #   set_action:
+  #     - lambda: |-
+  #         if (id(${id_prefix}_meter_reader) != nullptr) {
+  #           id(${id_prefix}_meter_reader)->set_camera_window_offset_x((int)x);
+  #         }
 
-  - platform: template
-    name: "Camera Window Offset Y"
-    id: ${id_prefix}_cam_window_offset_y
-    min_value: 0
-    max_value: 1200
-    step: 4
-    initial_value: 0
-    optimistic: true
-    restore_value: true
-    set_action:
-      - lambda: |-
-          if (id(${id_prefix}_meter_reader) != nullptr) {
-            id(${id_prefix}_meter_reader)->set_camera_window_offset_y((int)x);
-          }
+  # - platform: template
+  #   name: "Camera Window Offset Y"
+  #   id: ${id_prefix}_cam_window_offset_y
+  #   min_value: 0
+  #   max_value: 1200
+  #   step: 4
+  #   initial_value: 0
+  #   entity_category: config
+  #   optimistic: true
+  #   restore_value: true
+  #   set_action:
+  #     - lambda: |-
+  #         if (id(${id_prefix}_meter_reader) != nullptr) {
+  #           id(${id_prefix}_meter_reader)->set_camera_window_offset_y((int)x);
+  #         }
           
-  - platform: template
-    name: "Camera Window Width"
-    id: ${id_prefix}_cam_window_width
-    min_value: 32
-    max_value: 1600
-    step: 4
-    initial_value: 640
-    optimistic: true
-    restore_value: true
-    set_action:
-      - lambda: |-
-          if (id(${id_prefix}_meter_reader) != nullptr) {
-            id(${id_prefix}_meter_reader)->set_camera_window_width((int)x);
-          }
+  # - platform: template
+  #   name: "Camera Window Width"
+  #   id: ${id_prefix}_cam_window_width
+  #   min_value: 32
+  #   max_value: 1600
+  #   step: 4
+  #   initial_value: 640
+  #   entity_category: config
+  #   optimistic: true
+  #   restore_value: true
+  #   set_action:
+  #     - lambda: |-
+  #         if (id(${id_prefix}_meter_reader) != nullptr) {
+  #           id(${id_prefix}_meter_reader)->set_camera_window_width((int)x);
+  #         }
 
+  # - platform: template
+  #   name: "Camera Window Height"
+  #   id: ${id_prefix}_cam_window_height
+  #   min_value: 32
+  #   max_value: 1200
+  #   step: 4
+  #   initial_value: 480
+  #   entity_category: config
+  #   optimistic: true
+  #   restore_value: true
+  #   set_action:
+  #     - lambda: |-
+  #         if (id(${id_prefix}_meter_reader) != nullptr) {
+  #           id(${id_prefix}_meter_reader)->set_camera_window_height((int)x);
+  #         }
+ 
   - platform: template
-    name: "Camera Window Height"
-    id: ${id_prefix}_cam_window_height
-    min_value: 32
-    max_value: 1200
-    step: 4
-    initial_value: 480
+    name: "Set Last Valid Value"
+    id: ${id_prefix}_set_last_valid
+    min_value: 0
+    max_value: 9999999
+    step: 1
+    initial_value: 0
     optimistic: true
-    restore_value: true
     set_action:
       - lambda: |-
           if (id(${id_prefix}_meter_reader) != nullptr) {
-            id(${id_prefix}_meter_reader)->set_camera_window_height((int)x);
+            id(${id_prefix}_meter_reader)->set_last_valid_value(x);
           }
