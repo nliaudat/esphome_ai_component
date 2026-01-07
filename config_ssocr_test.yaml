@@ -1,0 +1,297 @@
+
+# for flashing : press boot button for 2-3 seconds before the serial connection initialize
+# After OTA update, the EN (reset) button must be pressed to run firmware
+      
+# external_components:
+  # - source: 
+      # type: git
+      # url: https://github.com/nliaudat/esphome_ai_component
+      # ref: main
+    # components: [legacy_meter_reader_tflite]
+      
+external_components:    
+  - source:
+      type: local
+      path: components 
+    #components: [meter_reader_tflite, tflite_micro_helper, esp32_camera_utils, flash_light_controller] #, ssocr_reader] 
+    components: [ssocr_reader, esp32_camera_utils, flash_light_controller]
+      
+
+
+############## General configuration
+
+substitutions:
+
+  name: test_ssocr #no special caracters
+  friendly_name: "test-ssocr"
+  id_prefix: "test_ssocr" #if you have more than one board, it could be usefull to remane all the "id:prefix_xxxx" with a decicaded prefix
+  # name: esp-cam-2mb #no special caracters
+  # friendly_name: "esp-cam-2mb"
+  # id_prefix: "esp_cam_2mb" #if you have more than one board, it could be usefull to remane all the "id:prefix_xxxx" with a decicaded prefix
+ 
+  revision: "1.2"
+  esphome_min_version: "2025.12.0"
+
+  # Board Selection (s3_cam, aithinker)
+  # board_variant: s3_cam
+
+  
+  # Meter settings
+  meter_unit: L # Unit of measurement for the meter (e.g. m³, kWh, L) (https://developers.home-assistant.io/docs/core/entity/sensor/https://developers.home-assistant.io/docs/core/entity/sensor/)
+  meter_device_class: water # device class for the meter (e.g. water, energy, gas)
+  meter_state_class: total_increasing # state class for the meter (e.g. total_increasing, total, measurement)
+  
+  # camera
+  camera_pixel_format: JPEG # (cropping implementation is faster with RGB888 format) | Displays: RGB565, RGB888 | Cameras: YUV422, YUV420, RAW | Efficiency: Grayscale, YUV420, JPEG
+  # camera_pixel_format: GRAYSCALE 
+  camera_resolution: 640x480 #800x600 #640x480 #https://esphome.io/components/esp32_camera.html
+  # camera_jpeg_quality: 10 # From 10 (best) to 63 (worst). | Must be 0 if non JPEG
+  camera_jpeg_quality: 10
+  camera_max_framerate: 1fps
+  camera_idle_framerate: 0.2fps
+      
+  #time
+  TZ: Europe/Zurich #timezone
+  reboot_days_of_week: MON
+  reboot_hours: 5
+  reboot_minutes: 0
+  reboot_seconds: 0
+
+  
+preferences:
+  flash_write_interval: 60min
+  
+
+ota:
+  - platform: esphome
+
+safe_mode:
+
+# network:
+    # enable_ipv6: false
+    
+
+api:
+  reboot_timeout: 0s # do not reboot if hassio connection is lost.
+  # services:
+  #   - service: set_camera_window
+  #     variables:
+  #       offset_x: int
+  #       offset_y: int
+  #       width: int
+  #       height: int
+  #     then:
+  #       - lambda: |-
+  #           if (offset_x >= 0 && offset_y >= 0 && width > 0 && height > 0) {
+  #             id(${id_prefix}_meter_reader).set_camera_window(offset_x, offset_y, width, height);
+  #           }
+
+# tflite_micro_helper:
+#   debug: true
+
+# globals:
+#   - id: ${id_prefix}_crop_zones
+#     type: std::string
+#     # restore_value: true 
+#     max_restore_data_length: 254 
+#     # initial_value: "\"[]\""
+#     initial_value: '"[[0,19,40,91],[64,16,104,96],[129,16,169,96],[192,13,232,93],[254,11,294,91],[320,13,360,93],[380,10,420,90],[447,10,487,90]]"'
+
+esp32_camera_utils:
+  id: ${id_prefix}_camera_utils
+  camera_id: ${id_prefix}_espcam
+  # debug: true
+  ### zoom availale for OV2640, OV3660, OV5640, SC101IOT, SC030IOT from crop zones (explicit)
+  # camera_window:
+  #   offset_x: 952 # multiple of 4
+  #   offset_y: 360 # multiple of 4
+  #   width: 112 # multiple of 4 or 16 if rotation enabled #Enforcement: 4:3 Aspect Ratio (W/H = 160/120)
+  #   height: 512 # multiple of 4 or 16 if rotation enabled
+
+
+  # enable_rotation: true
+  # rotation: 270 # 0, 90, 180, 270 (special case built-in "accelerated" for 90, 180, 270 )
+
+  
+  # enable_scaler: true
+  # scaler:
+  #   width: 640
+  #   height: 480
+    
+  # enable_cropper: true
+  # cropper:
+  #   width: 320
+  #   height: 240
+  #   offset_x: 0
+  #   offset_y: 0
+  
+  # enable_drawing: true
+
+  # debug_memory: true
+
+# optional : flash light at taking image
+flash_light_controller:
+  id: ${id_prefix}_flash_controller
+  flash_light: ${id_prefix}_flash
+  flash_pre_time: 7000ms # 7 seconds before update (time to stabilize) (works with 5sec on my board)
+  flash_post_time: 200ms # 2 seconds after update (works with 100ms on my board)
+  # debug: true
+
+
+# meter_reader_tflite:
+#   id: ${id_prefix}_meter_reader
+#   camera_id: ${id_prefix}_espcam
+#   model: "digit_recognizer_v4_10cls_RGB.tflite"
+#   # model: "digit_recognizer_v4_10cls_GRAY.tflite"
+
+#   update_interval: 60s
+
+#   # debug: true
+#   # debug_image: false # static embedded image (debug.jpg)
+#   # debug_image_out_serial: false
+#   # debug_memory: true
+#   # debug_timing: true
+
+#   # Preview of what the AI sees (Rotated Live Cam)
+#   # Set to true to enable continuous updates, or false for on-demand only (via button)
+#   # generate_preview: true
+#   # show_crop_areas: true # Draw boxes on preview
+
+
+
+#   crop_zones_global: ${id_prefix}_crop_zones  # local
+#   flash_light_controller: ${id_prefix}_flash_controller
+#   ### Enhanced validation parameters
+#   allow_negative_rates: false    # Prevent meter rollbacks
+#   max_absolute_diff: 300         # Maximum allowed absolute difference
+
+#   value_sensor: ${id_prefix}_meter_value
+#   confidence_sensor: ${id_prefix}_meter_confidence
+  
+
+#   inference_logs: ${id_prefix}_inference_logs
+#   main_logs: ${id_prefix}_main_logs
+  
+  
+  
+#   enable_flash_calibration: false # still in dev
+
+#   ### Advanced parameters
+#   # frame_request_timeout: 15000  # ms (1000-60000)
+#   high_confidence_threshold: 0.95
+#   strict_confidence_check: true #all digits must be min at "high_confidence_threshold"
+
+#   # Pool efficiency monitoring (optional, requires DEBUG_METER_READER_MEMORY)
+#   # pool_job_efficiency_sensor: ${id_prefix}_pool_job_efficiency
+#   # pool_result_efficiency_sensor: ${id_prefix}_pool_result_efficiency
+#   # arena_efficiency_sensor: ${id_prefix}_arena_efficiency
+#   # heap_fragmentation_sensor: ${id_prefix}_heap_fragmentation
+
+#   unload_button: ${id_prefix}_unload_btn
+#   reload_button: ${id_prefix}_reload_btn
+
+ssocr_reader: #seven segment reader (dev) / do not if using meter_reader_tflite
+  id: ssocr_main
+  update_interval: 60s
+  camera_id: ${id_prefix}_espcam
+  threshold_level: 128
+  digit_count: 8
+  # Adjust crop to focus EXACTLY on the digits
+  crop_x: 0
+  crop_y: 0
+  crop_w: 320
+  crop_h: 240
+  value:
+    name: "SSOCR Value"
+
+# analog_reader: # DEV !
+#   id: analog_main
+#   camera_id: ${id_prefix}_espcam
+#   value_sensor:
+#     name: "Analog Total"
+#   dials: 
+#     - id: dial_1
+#       scale: 1.0 
+#       crop_x: 0
+#       crop_y: 0
+#       crop_w: 100
+#       crop_h: 100
+#       min_angle: 0
+#       max_angle: 360
+#       angle_offset: 0 # 0=North, 90=East
+#       min_value: 0
+#       max_value: 10
+
+# web_server: # needed if generate_preview: true
+  # port: 80
+
+packages:
+  # Board Configuration (Mutually Exclusive)
+  # - !include board_freenove_esp32-s3-n8r8.yaml
+  # - !include board_Seeed_Studio_XIAO_ESP32-S3_sense.yaml
+  # - !include board_generic_esp32-s3-n16r8.yaml
+  # - !include board_wrover_kit.yaml
+  # - !include board_m5stack_psram.yaml
+  - !include board_esp32cam_aithinker.yaml # esp32_camera.yaml > power_down_pin must be enabled
+  # - !include board_AI-On-The-Edge-Cam_Esp32-S3.yaml
+
+  # - !include debug_board.yaml
+  
+  # AI components
+  # - !include switch_AI_component.yaml
+  - !include sensor_AI_component.yaml
+  # - !include globals_AI_component.yaml
+  - !include text_sensor_AI_component.yaml
+  # - !include number_AI_component.yaml
+  # - !include button_AI_component.yaml
+  # - !include api_AI_component.yaml
+  
+  # camera configs
+  - !include camera_options.yaml
+  - !include esp32_camera.yaml
+  # - !include camera_webserver.yaml
+  
+  # network choice
+  - !include wifi.yaml
+  # - !include lan.yaml # only for AI-On-The-Edge-Cam_Esp32-S3.yaml + wifi must be disabled
+  
+  # others
+  - !include globals.yaml
+  - !include switch_others.yaml
+  - !include sensor_others.yaml
+  - !include logger.yaml 
+  - !include time.yaml
+
+debug:
+  update_interval: 60s
+
+sensor:
+  - platform: debug
+    free:
+      name: "Heap Free"
+      entity_category: diagnostic
+    loop_time:
+      name: "Loop Time"
+      entity_category: diagnostic
+    psram:
+      name: "Free PSRAM"
+      entity_category: diagnostic
+
+  # CPU Temperature
+  - platform: internal_temperature
+    name: "${id_prefix} CPU Temperature"
+    id: ${id_prefix}_cpu_temperature
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+    device_class: temperature
+    state_class: measurement
+    icon: "mdi:thermometer"
+    update_interval: 5s
+    entity_category: diagnostic
+
+
+
+
+
+
+
