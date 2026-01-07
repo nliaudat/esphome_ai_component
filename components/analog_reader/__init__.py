@@ -1,0 +1,98 @@
+import esphome.codegen as cg
+import esphome.config_validation as cv
+from esphome.components import sensor, esp32_camera, esp32
+
+from esphome.const import CONF_ID, CONF_NAME
+from esphome.core import CORE
+
+DEPENDENCIES = ["esp32_camera"]
+AUTO_LOAD = ["esp32_camera_utils"]
+
+analog_reader_ns = cg.esphome_ns.namespace("analog_reader")
+AnalogReader = analog_reader_ns.class_("AnalogReader", cg.PollingComponent)
+
+CONF_CAMERA_ID = "camera_id"
+CONF_DIALS = "dials"
+CONF_VALUE_SENSOR = "value_sensor"
+CONF_SCALE = "scale"
+CONF_MIN_ANGLE = "min_angle"
+CONF_MAX_ANGLE = "max_angle"
+CONF_ANGLE_OFFSET = "angle_offset"
+CONF_MIN_VALUE = "min_value"
+CONF_MAX_VALUE = "max_value"
+CONF_CROP_X = "crop_x"
+CONF_CROP_Y = "crop_y"
+CONF_CROP_W = "crop_w"
+CONF_CROP_H = "crop_h"
+
+DIAL_SCHEMA = cv.Schema({
+    cv.Required(CONF_ID): cv.string, # String ID for logs
+    cv.Optional(CONF_SCALE, default=1.0): cv.float_,
+    cv.Optional(CONF_CROP_X, default=0): cv.int_,
+    cv.Optional(CONF_CROP_Y, default=0): cv.int_,
+    cv.Optional(CONF_CROP_W, default=64): cv.int_,
+    cv.Optional(CONF_CROP_H, default=64): cv.int_,
+    cv.Optional(CONF_MIN_ANGLE, default=0): cv.float_,
+    cv.Optional(CONF_MAX_ANGLE, default=360): cv.float_,
+    cv.Optional(CONF_ANGLE_OFFSET, default=0): cv.float_, 
+    cv.Optional(CONF_MIN_VALUE, default=0): cv.float_,
+    cv.Optional(CONF_MAX_VALUE, default=10): cv.float_,
+})
+
+CONFIG_SCHEMA = cv.Schema({
+    cv.GenerateID(): cv.declare_id(AnalogReader),
+    cv.Required(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera),
+    cv.Optional(CONF_VALUE_SENSOR): sensor.sensor_schema(),
+    cv.Required(CONF_DIALS): cv.ensure_list(DIAL_SCHEMA),
+}).extend(cv.polling_component_schema("10s"))
+
+async def to_code(config):
+    cg.add_library(
+        "analog_reader_lib",
+        None,
+        [
+            "analog_reader.cpp",
+            "camera_coordinator.cpp",
+            "flashlight_coordinator.cpp", 
+            "value_validator.cpp",
+        ],
+    )
+    var = cg.new_Pvariable(config[CONF_ID])
+
+    await cg.register_component(var, config)
+
+    cam = await cg.get_variable(config[CONF_CAMERA_ID])
+    cg.add(var.set_camera(cam))
+
+    if CONF_VALUE_SENSOR in config:
+        sens = await sensor.new_sensor(config[CONF_VALUE_SENSOR])
+        cg.add(var.set_value_sensor(sens))
+
+    for dial in config[CONF_DIALS]:
+        # Struct construction
+        # We need to map Py config to C++ struct DialConfig
+        # cpp: struct DialConfig { string id; float scale; ... }
+        # generated: var.add_dial({id, scale, ...})
+        
+        # We can't pass a dict directly to add_dial typically in codegen unless we struct init.
+        # cg.StructInitializer
+        
+        s = cg.StructInitializer(
+            analog_reader_ns.struct("DialConfig"),
+            ("id", dial[CONF_ID]),
+            ("scale", dial[CONF_SCALE]),
+            ("crop_x", dial[CONF_CROP_X]),
+            ("crop_y", dial[CONF_CROP_Y]),
+            ("crop_w", dial[CONF_CROP_W]),
+            ("crop_h", dial[CONF_CROP_H]),
+            ("min_angle", dial[CONF_MIN_ANGLE]),
+            ("max_angle", dial[CONF_MAX_ANGLE]),
+            ("angle_offset", dial[CONF_ANGLE_OFFSET]),
+            ("min_value", dial[CONF_MIN_VALUE]),
+            ("max_value", dial[CONF_MAX_VALUE]),
+        )
+        cg.add(var.add_dial(s))
+
+    # Resolution default (matches others)
+    cg.add(var.set_resolution(640, 480))
+    # Or fetch from substitutions? (Omitted for brevity, good to have)

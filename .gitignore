@@ -29,3 +29,5 @@ analyze_heap.py
 heap_history.csv
 globals_AI_component.yaml
 config_hotwater.yaml
+config_test.yaml
+/components/analog_reader/__pycache__
