@@ -116,7 +116,7 @@ void AnalogReader::process_image(std::shared_ptr<esphome::camera::CameraImage> i
       
       if (!res.data) continue;
       
-      uint8_t* raw = res.data.get();
+      uint8_t* raw = res.data->get();
       
       // We start with 128x128 standard crops
       int proc_w = 128; 
@@ -198,6 +198,7 @@ float AnalogReader::find_needle_angle(const uint8_t* img, int w, int h, const Di
     return best_angle;
 }
 
+float AnalogReader::angle_to_value(float angle, const DialConfig& dial) {
     // Map angle [min_angle, max_angle] to [min_value, max_value]
     // Input 'angle' is in Image Space: 0=East, 90=South (Clockwise).
     // User Configuration 'angle_offset' is Relative to NORTH (Clockwise).
@@ -220,10 +221,12 @@ float AnalogReader::find_needle_angle(const uint8_t* img, int w, int h, const Di
     while (rel_angle < 0) rel_angle += 360.0f;
     while (rel_angle >= 360.0f) rel_angle -= 360.0f;
     
-    // Check if relative angle is within "forward" range
-    // Issues arise if range > 360 (impossible for circle) or wrap-around logic is strictly 
-    // relying on "shortest path". For now we assume the gauge does not span > 360 relative.
+    // Determine range
+    float range_angle = dial.max_angle - dial.min_angle;
+    if (range_angle <= 0) range_angle += 360.0f; // Handle wrap-around definition if needed or assume user error
     
+    float range_val = dial.max_value - dial.min_value;
+
     float fraction = rel_angle / range_angle;
     
     // Hard clamp for sanity if somehow out of bounds

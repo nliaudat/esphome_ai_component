@@ -1,7 +1,9 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import sensor, esp32_camera
+from esphome.components import sensor, esp32_camera, esp32
+
 from esphome.const import CONF_ID, CONF_NAME
+from esphome.core import CORE
 
 DEPENDENCIES = ["esp32_camera"]
 AUTO_LOAD = ["esp32_camera_utils"]
@@ -56,6 +58,7 @@ async def to_code(config):
         ],
     )
     var = cg.new_Pvariable(config[CONF_ID])
+
     await cg.register_component(var, config)
 
     cam = await cg.get_variable(config[CONF_CAMERA_ID])
