@@ -4,7 +4,7 @@ from esphome.components import esp32
 
 from esphome.core import CORE
 if CORE.target_platform == "esp32":
-    DEPENDENCIES = ['esp32', 'esp32_camera_utils']
+    DEPENDENCIES = ['esp32']
 else:
     DEPENDENCIES = []
 

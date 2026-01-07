@@ -2,7 +2,7 @@
 #include "esphome/core/log.h"
 #include <algorithm>
 #include <cstdlib> // for strtol
-#include "../tflite_micro_helper/debug_utils.h"
+#include "debug_utils.h"
 
 namespace esphome {
 namespace esp32_camera_utils {

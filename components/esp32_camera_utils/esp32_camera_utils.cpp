@@ -1,7 +1,7 @@
 #include "esp32_camera_utils.h"
 #include "esphome/core/log.h"
 #include <esp_heap_caps.h>
-#include "../tflite_micro_helper/debug_utils.h"
+#include "debug_utils.h"
 
 namespace esphome {
 namespace esp32_camera_utils {
