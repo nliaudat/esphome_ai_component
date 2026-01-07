@@ -1,4 +1,8 @@
-# Analog Reader Component
+# Analog Reader Component (Alpha)
+
+> [!WARNING]
+> **ALPHA STAGE SOFTWARE**
+> This component is currently in **ALPHA**. It is experimental, may be unstable, and the configuration API is subject to change. Use with caution.
 
 This component provides a lightweight, non-AI solution for reading analog gauges (dials) using traditional computer vision.
 
