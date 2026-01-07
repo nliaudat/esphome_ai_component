@@ -37,8 +37,11 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
 
   void set_value_sensor(sensor::Sensor *s) { value_sensor_ = s; }
   void set_camera(esphome::camera::Camera *camera) { camera_ = camera; }
-  void set_resolution(int w, int h) { img_width_ = w; img_height_ = h; }
-  void set_pixel_format_str(const std::string &fmt) { pixel_format_str_ = fmt; } // For Coordinator
+  void set_camera_image_format(int width, int height, const std::string &format) {
+      img_width_ = width;
+      img_height_ = height;
+      pixel_format_str_ = format;
+  }
 
   void add_dial(DialConfig config) { dials_.push_back(config); }
 

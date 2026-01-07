@@ -93,6 +93,13 @@ async def to_code(config):
         )
         cg.add(var.add_dial(s))
 
-    # Resolution default (matches others)
-    cg.add(var.set_resolution(640, 480))
-    # Or fetch from substitutions? (Omitted for brevity, good to have)
+    # Get camera resolution from substitutions
+    width, height = 640, 480  # Defaults
+    substitutions = CORE.config.get("substitutions", {})
+    if substitutions.get("camera_resolution"):
+        res = substitutions["camera_resolution"]
+        if 'x' in res:
+            width, height = map(int, res.split('x'))
+    
+    pixel_format = substitutions.get("camera_pixel_format", "RGB888")
+    cg.add(var.set_camera_image_format(width, height, pixel_format))
