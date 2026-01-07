@@ -210,10 +210,6 @@ async def to_code(config):
         if 'x' in res:
             width, height = map(int, res.split('x'))
     
-            width, height = map(int, res.split('x'))
-    
-            width, height = map(int, res.split('x'))
-    
     pixel_format = substitutions.get("camera_pixel_format", "RGB888")
     cg.add(var.set_camera_image_format(width, height, pixel_format))
     
