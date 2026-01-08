@@ -1,0 +1,131 @@
+---
+name: "Bug Report"
+description: Report a bug or unexpected behavior
+labels: ["bug", "needs-triage"]
+body:
+- type: markdown
+  attributes:
+    value: |
+      Before you open a new issue, search through the existing issues to see if others have had the same problem.
+      
+      **Please fill out all sections of this template completely.** Incomplete reports may be closed.
+      
+      Thanks for helping us improve!
+
+- type: checkboxes
+  attributes:
+    label: Prerequisites
+    description: Please confirm the following items
+    options:
+      - label: I'm running the newest version
+        required: true
+      - label: I have enabled debug logging (debug = true) in configuration
+        required: true
+      - label: I have searched [open issues](https://github.com/nliaudat/esphome_ai_component/issues?q=is%3Aissue) for similar problems
+        required: true
+      - label: This issue only contains 1 problem (please open separate issues for multiple problems)
+        required: true
+      - label: This is a bug report, not a feature request
+        required: true
+
+- type: input
+  attributes:
+    label: ESPHome Version
+    description: What version of ESPHome are you using?
+    placeholder: "e.g., 2023.12.0"
+  validations:
+    required: true
+
+- type: dropdown
+  attributes:
+    label: Board Type
+    description: What type of ESP board are you using?
+    options:
+      - ESP32
+      - ESP32-C3
+      - ESP32-S3
+      - ESP8266
+      - Other (specify in description)
+  validations:
+    required: true
+
+- type: dropdown
+  attributes:
+    label: Compilation Environment
+    description: How are you compiling/running ESPHome?
+    options:
+      - Home Assistant OS (Hass.io)
+      - Docker
+      - Python venv
+      - ESPHome Web
+      - Other
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: Describe the Issue
+    description: A clear and concise description of what the bug is.
+    placeholder: "What happens? What did you expect to happen instead?"
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: Reproduction Steps
+    description: Exact steps to reproduce the issue
+    value: |
+      1. 
+      2. 
+      3. 
+      ...
+    placeholder: "Be as specific as possible"
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: Configuration
+    description: |
+      Provide relevant parts of your YAML configuration.
+      **Remove or obscure any passwords, API keys, or sensitive information!**
+    render: yaml
+    placeholder: |
+      esphome:
+        name: example
+      
+      # Your component configuration here
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: Debug Logs
+    description: |
+      Copy and paste the relevant debug logs from ESPHome.
+      Please wrap logs in triple backticks (```) for readability.
+    render: text
+    placeholder: |
+      ```
+      [Your logs here]
+      ```
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: Screenshots/Additional Context
+    description: |
+      Add any screenshots, diagrams, or additional context that might help.
+      For visual bugs, screenshots are especially helpful.
+    placeholder: "Drag and drop images here or provide links"
+
+- type: textarea
+  attributes:
+    label: Environment Details
+    description: Any other relevant environment details
+    placeholder: |
+      Operating System: [e.g., Ubuntu 22.04, Windows 11, macOS Ventura]
+      Python Version: [e.g., 3.11.0]
+      Home Assistant Version (if applicable): [e.g., 2023.12.3]
+      Network setup: [e.g., WiFi, Ethernet, VLAN setup]
