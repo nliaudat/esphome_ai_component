@@ -1,1 +1,8 @@
 blank_issues_enabled: false
+contact_links:
+  - name: Feature Requests
+    url: https://github.com/nliaudat/esphome_ai_component/discussions/categories/ideas
+    about: Have an idea for a new feature? Please post it in the 'ideas' section in the discussions tab.
+  - name: Questions
+    url: https://github.com/nliaudat/esphome_ai_component/discussions/categories/q-a
+    about: Please ask and answer questions in the community. For more technical questions, post them in the discussion tab under 'Q&A'.
