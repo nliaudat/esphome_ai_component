@@ -18,6 +18,7 @@ class FlashlightCoordinator {
   // Configuration
   void set_timing(uint32_t pre_time, uint32_t post_time);
   void set_update_interval(uint32_t interval_ms);
+  uint32_t get_pre_time() const { return pre_time_; }
   
   // Logic
   // Returns TRUE if flash logic is active/waiting (i.e. don't update normally)

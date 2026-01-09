@@ -16,9 +16,18 @@ try:
 except ImportError:
     flash_light_controller = None
 
+try:
+    import esphome.components.data_collector as data_collector
+except ImportError:
+    data_collector = None
+
 CODEOWNERS = ["@nl"]
 if CORE.target_platform == "esp32":
-    DEPENDENCIES = ['esp32', 'tflite_micro_helper', 'esp32_camera_utils', 'flash_light_controller', 'value_validator']
+    DEPENDENCIES = ['esp32', 'tflite_micro_helper', 'esp32_camera_utils', 'value_validator']
+    if flash_light_controller:
+        DEPENDENCIES.append('flash_light_controller')
+    if data_collector:
+        DEPENDENCIES.append('data_collector')
 else:
     # On host, we mock utils and remove esp32 check
     DEPENDENCIES = ['tflite_micro_helper', 'value_validator']
@@ -41,6 +50,8 @@ CONF_GENERATE_PREVIEW = 'generate_preview'
 CONF_START_FLASH_CALIBRATION_BUTTON = 'start_flash_calibration_button'
 
 CONF_FLASH_LIGHT_CONTROLLER = 'flash_light_controller'
+CONF_DATA_COLLECTOR = 'data_collector'
+CONF_COLLECT_LOW_CONFIDENCE = 'collect_low_confidence'
 
 CONF_CROP_ZONES = 'crop_zones_global'
 
@@ -98,6 +109,8 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("heap_fragmentation_sensor"): cv.use_id(sensor.Sensor),
 
     cv.Optional(CONF_FLASH_LIGHT_CONTROLLER): cv.use_id(flash_light_controller.FlashLightController) if flash_light_controller else cv.string,
+    cv.Optional(CONF_DATA_COLLECTOR): cv.use_id(data_collector.DataCollector) if data_collector else cv.string,
+    cv.Optional(CONF_COLLECT_LOW_CONFIDENCE, default=False): cv.boolean,
     cv.Optional(CONF_CROP_ZONES): cv.use_id(globals.GlobalsComponent),
     # cv.Optional(CONF_CAMERA_WINDOW): cv.Any(
     # cv.Schema({  # Or detailed configuration
@@ -352,6 +365,15 @@ async def to_code(config):
     if CONF_FLASH_LIGHT_CONTROLLER in config:
         flash_controller = await cg.get_variable(config[CONF_FLASH_LIGHT_CONTROLLER])
         cg.add(var.set_flash_controller(flash_controller))
+
+    if CONF_DATA_COLLECTOR in config:
+        dc = await cg.get_variable(config[CONF_DATA_COLLECTOR])
+        cg.add(var.set_data_collector(dc))
+    if CONF_DATA_COLLECTOR in config:
+        dc = await cg.get_variable(config[CONF_DATA_COLLECTOR])
+        cg.add(var.set_data_collector(dc))
+        cg.add(var.set_collect_low_confidence(config[CONF_COLLECT_LOW_CONFIDENCE]))
+        cg.add_define("USE_DATA_COLLECTOR")
     
     # Handle optional camera window configuration
     # if CONF_CAMERA_WINDOW in config:
