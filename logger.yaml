@@ -14,15 +14,21 @@ logger:
     internal_temperature: ERROR 
     
     
-text_sensor:  
-  - platform: template
-    name: "${friendly_name} main logs"
-    entity_category: diagnostic
-    icon: mdi:math-log
-    id: ${id_prefix}_main_logs
+# text_sensor:  
+#   - platform: template
+#     name: "${friendly_name} main logs"
+#     entity_category: diagnostic
+#     icon: mdi:math-log
+#     id: ${id_prefix}_main_logs
     
-  - platform: template
-    name: "${friendly_name} inference"
-    entity_category: diagnostic
-    icon: mdi:math-log
-    id: ${id_prefix}_inference_logs
+#   - platform: template
+#     name: "${friendly_name} inference"
+#     entity_category: diagnostic
+#     icon: mdi:math-log
+#     id: ${id_prefix}_inference_logs
+
+#   - platform: template
+#     name: "${friendly_name} crop zones"
+#     entity_category: diagnostic
+#     icon: mdi:crop
+#     id: ${id_prefix}_crop_zones_sensor

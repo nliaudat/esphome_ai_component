@@ -1,0 +1,248 @@
+# ESP32 Camera Utils Controls for Home Assistant
+# Exposes esp32_camera_utils parameters for runtime configuration
+# Comment out sections you don't need to reduce Home Assistant entity count
+
+switch:
+  # Enable Rotation
+  - platform: template
+    name: "Enable Rotation"
+    id: ${id_prefix}_enable_rotation
+    icon: "mdi:rotate-3d"
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+
+  # Enable Scaler
+  - platform: template
+    name: "Enable Scaler"
+    id: ${id_prefix}_enable_scaler
+    icon: "mdi:resize"
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+
+  # Enable Cropper
+  - platform: template
+    name: "Enable Cropper"
+    id: ${id_prefix}_enable_cropper
+    icon: "mdi:crop"
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+
+  # Enable Drawing
+  - platform: template
+    name: "Enable Drawing"
+    id: ${id_prefix}_enable_drawing
+    icon: "mdi:draw"
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+
+number:
+  # ===== Camera Window Controls (comment out if not using camera window) =====
+  # Camera Window - Offset X
+  - platform: template
+    name: "Camera Window Offset X"
+    id: ${id_prefix}_cam_window_offset_x
+    icon: "mdi:arrow-left-right"
+    unit_of_measurement: "px"
+    min_value: 0
+    max_value: 1600
+    step: 4
+    initial_value: 0
+    entity_category: config
+    optimistic: true
+    restore_value: true
+
+  # Camera Window - Offset Y
+  - platform: template
+    name: "Camera Window Offset Y"
+    id: ${id_prefix}_cam_window_offset_y
+    icon: "mdi:arrow-up-down"
+    unit_of_measurement: "px"
+    min_value: 0
+    max_value: 1200
+    step: 4
+    initial_value: 0
+    entity_category: config
+    optimistic: true
+    restore_value: true
+
+  # Camera Window - Width
+  - platform: template
+    name: "Camera Window Width"
+    id: ${id_prefix}_cam_window_width
+    icon: "mdi:arrow-expand-horizontal"
+    unit_of_measurement: "px"
+    min_value: 32
+    max_value: 1600
+    step: 4
+    initial_value: 640
+    entity_category: config
+    optimistic: true
+    restore_value: true
+
+  # Camera Window - Height
+  - platform: template
+    name: "Camera Window Height"
+    id: ${id_prefix}_cam_window_height
+    icon: "mdi:arrow-expand-vertical"
+    unit_of_measurement: "px"
+    min_value: 32
+    max_value: 1200
+    step: 4
+    initial_value: 480
+    entity_category: config
+    optimistic: true
+    restore_value: true
+
+  # ===== Rotation Control (comment out if not using rotation) =====
+  # Image Rotation
+  - platform: template
+    name: "Camera Rotation"
+    id: ${id_prefix}_camera_rotation
+    icon: "mdi:rotate-3d-variant"
+    unit_of_measurement: "°"
+    min_value: 0
+    max_value: 270
+    step: 90
+    initial_value: 0
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          if (id(${id_prefix}_camera_utils) != nullptr) {
+            id(${id_prefix}_camera_utils)->set_rotation(x);
+          }
+
+  # ===== Scaler Controls (comment out if not using scaler) =====
+  # Scaler Width
+  - platform: template
+    name: "Scaler Width"
+    id: ${id_prefix}_scaler_width
+    icon: "mdi:resize"
+    unit_of_measurement: "px"
+    min_value: 32
+    max_value: 1600
+    step: 4
+    initial_value: 640
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          if (id(${id_prefix}_camera_utils) != nullptr) {
+            int h = id(${id_prefix}_scaler_height).state;
+            id(${id_prefix}_camera_utils)->set_scaler_config((int)x, h);
+          }
+
+  # Scaler Height
+  - platform: template
+    name: "Scaler Height"
+    id: ${id_prefix}_scaler_height
+    icon: "mdi:resize"
+    unit_of_measurement: "px"
+    min_value: 32
+    max_value: 1200
+    step: 4
+    initial_value: 480
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          if (id(${id_prefix}_camera_utils) != nullptr) {
+            int w = id(${id_prefix}_scaler_width).state;
+            id(${id_prefix}_camera_utils)->set_scaler_config(w, (int)x);
+          }
+
+  # ===== Cropper Controls (comment out if not using cropper) =====
+  # Cropper Width
+  - platform: template
+    name: "Cropper Width"
+    id: ${id_prefix}_cropper_width
+    icon: "mdi:crop"
+    unit_of_measurement: "px"
+    min_value: 32
+    max_value: 1600
+    step: 4
+    initial_value: 320
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          if (id(${id_prefix}_camera_utils) != nullptr) {
+            int h = id(${id_prefix}_cropper_height).state;
+            int ox = id(${id_prefix}_cropper_offset_x).state;
+            int oy = id(${id_prefix}_cropper_offset_y).state;
+            id(${id_prefix}_camera_utils)->set_cropper_config((int)x, h, ox, oy);
+          }
+
+  # Cropper Height
+  - platform: template
+    name: "Cropper Height"
+    id: ${id_prefix}_cropper_height
+    icon: "mdi:crop"
+    unit_of_measurement: "px"
+    min_value: 32
+    max_value: 1200
+    step: 4
+    initial_value: 240
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          if (id(${id_prefix}_camera_utils) != nullptr) {
+            int w = id(${id_prefix}_cropper_width).state;
+            int ox = id(${id_prefix}_cropper_offset_x).state;
+            int oy = id(${id_prefix}_cropper_offset_y).state;
+            id(${id_prefix}_camera_utils)->set_cropper_config(w, (int)x, ox, oy);
+          }
+
+  # Cropper Offset X
+  - platform: template
+    name: "Cropper Offset X"
+    id: ${id_prefix}_cropper_offset_x
+    icon: "mdi:arrow-right"
+    unit_of_measurement: "px"
+    min_value: 0
+    max_value: 1600
+    step: 4
+    initial_value: 0
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          if (id(${id_prefix}_camera_utils) != nullptr) {
+            int w = id(${id_prefix}_cropper_width).state;
+            int h = id(${id_prefix}_cropper_height).state;
+            int oy = id(${id_prefix}_cropper_offset_y).state;
+            id(${id_prefix}_camera_utils)->set_cropper_config(w, h, (int)x, oy);
+          }
+
+  # Cropper Offset Y
+  - platform: template
+    name: "Cropper Offset Y"
+    id: ${id_prefix}_cropper_offset_y
+    icon: "mdi:arrow-down"
+    unit_of_measurement: "px"
+    min_value: 0
+    max_value: 1200
+    step: 4
+    initial_value: 0
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          if (id(${id_prefix}_camera_utils) != nullptr) {
+            int w = id(${id_prefix}_cropper_width).state;
+            int h = id(${id_prefix}_cropper_height).state;
+            int ox = id(${id_prefix}_cropper_offset_x).state;
+            id(${id_prefix}_camera_utils)->set_cropper_config(w, h, ox, (int)x);
+          }
