@@ -24,21 +24,20 @@ class ValueValidatorCoordinator {
     if (validator_ == nullptr) {
         // Fallback: No validator = No strict per-digit check here.
         // We need to convert digits to value manually as fallback.
-        std::string digit_string;
+        if (digits.empty()) {
+            return false;
+        }
+        long val = 0;
         for (float d : digits) {
             int digit = static_cast<int>(round(d));
-            if (digit >= 10) digit = 0;
-            digit_string += std::to_string(digit);
+            // Ensure digit is in the range [0, 9]
+            if (digit < 0 || digit >= 10) {
+                digit = 0;
+            }
+            val = val * 10 + digit;
         }
-        if (!digit_string.empty()) {
-             char *end;
-             long val = strtol(digit_string.c_str(), &end, 10);
-             if (end == digit_string.c_str() + digit_string.length()) { 
-                 validated_value = (int)val;
-                 return true;
-             }
-        }
-        return false; 
+        validated_value = static_cast<int>(val);
+        return true; 
     }
     return validator_->validate_reading(digits, confidences, validated_value);
   }
