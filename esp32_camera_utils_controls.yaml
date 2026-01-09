@@ -4,13 +4,13 @@
 
 switch:
   # Enable Rotation
-  - platform: template
-    name: "Enable Rotation"
-    id: ${id_prefix}_enable_rotation
-    icon: "mdi:rotate-3d"
-    entity_category: config
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_OFF
+  # - platform: template
+  #   name: "Enable Rotation"
+  #   id: ${id_prefix}_enable_rotation
+  #   icon: "mdi:rotate-3d"
+  #   entity_category: config
+  #   optimistic: true
+  #   restore_mode: RESTORE_DEFAULT_OFF
 
   # # Enable Scaler
   # - platform: template
@@ -42,46 +42,46 @@ switch:
 number:
   # ===== Camera Window Controls (comment out if not using camera window) =====
   # Camera Window - Offset X
-  - platform: template
-    name: "Camera Window Offset X"
-    id: ${id_prefix}_cam_window_offset_x
-    icon: "mdi:arrow-left-right"
-    unit_of_measurement: "px"
-    min_value: 0
-    max_value: 1600
-    step: 4
-    initial_value: 0
-    entity_category: config
-    optimistic: true
-    restore_value: true
+  # - platform: template
+  #   name: "Camera Window Offset X"
+  #   id: ${id_prefix}_cam_window_offset_x
+  #   icon: "mdi:arrow-left-right"
+  #   unit_of_measurement: "px"
+  #   min_value: 0
+  #   max_value: 1600
+  #   step: 4
+  #   initial_value: 0
+  #   entity_category: config
+  #   optimistic: true
+  #   restore_value: true
 
-  # Camera Window - Offset Y
-  - platform: template
-    name: "Camera Window Offset Y"
-    id: ${id_prefix}_cam_window_offset_y
-    icon: "mdi:arrow-up-down"
-    unit_of_measurement: "px"
-    min_value: 0
-    max_value: 1200
-    step: 4
-    initial_value: 0
-    entity_category: config
-    optimistic: true
-    restore_value: true
+  # # Camera Window - Offset Y
+  # - platform: template
+  #   name: "Camera Window Offset Y"
+  #   id: ${id_prefix}_cam_window_offset_y
+  #   icon: "mdi:arrow-up-down"
+  #   unit_of_measurement: "px"
+  #   min_value: 0
+  #   max_value: 1200
+  #   step: 4
+  #   initial_value: 0
+  #   entity_category: config
+  #   optimistic: true
+  #   restore_value: true
 
-  # Camera Window - Width
-  - platform: template
-    name: "Camera Window Width"
-    id: ${id_prefix}_cam_window_width
-    icon: "mdi:arrow-expand-horizontal"
-    unit_of_measurement: "px"
-    min_value: 32
-    max_value: 1600
-    step: 4
-    initial_value: 640
-    entity_category: config
-    optimistic: true
-    restore_value: true
+  # # Camera Window - Width
+  # - platform: template
+  #   name: "Camera Window Width"
+  #   id: ${id_prefix}_cam_window_width
+  #   icon: "mdi:arrow-expand-horizontal"
+  #   unit_of_measurement: "px"
+  #   min_value: 32
+  #   max_value: 1600
+  #   step: 4
+  #   initial_value: 640
+  #   entity_category: config
+  #   optimistic: true
+  #   restore_value: true
 
   # # Camera Window - Height
   # - platform: template

@@ -144,7 +144,7 @@ number:
     min_value: 50
     max_value: 100
     step: 1
-    initial_value: 85
+    initial_value: 90
     entity_category: config
     optimistic: true
     restore_value: true

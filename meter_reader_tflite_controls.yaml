@@ -217,6 +217,24 @@ sensor:
     icon: "mdi:percent"
 
 
+
+text:
+  # Set Last Valid Value (String) - Supports leading zeros
+  - platform: template
+    name: "Set Last Valid Value (String)"
+    id: ${id_prefix}_set_last_valid_string
+    icon: "mdi:form-textbox"
+    mode: text
+    entity_category: config
+    optimistic: true
+    min_length: 1
+    max_length: 20
+    set_action:
+      - lambda: |-
+          if (id(${id_prefix}_meter_reader) != nullptr) {
+            id(${id_prefix}_meter_reader)->set_last_valid_value(x);
+          }
+
 # API Services
 api:
   services:

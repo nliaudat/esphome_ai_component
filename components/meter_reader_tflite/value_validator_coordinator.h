@@ -32,6 +32,12 @@ class ValueValidatorCoordinator {
     }
   }
 
+  void set_last_valid_reading(const std::string &value) {
+    if (validator_ != nullptr) {
+      validator_->set_last_valid_reading(value);
+    }
+  }
+
  protected:
   value_validator::ValueValidator *validator_{nullptr};
 };

@@ -591,6 +591,42 @@ void ValueValidator::set_last_valid_reading(int value) {
   ESP_LOGW(TAG, "Manually set last valid reading to: %d", value);
 }
 
+void ValueValidator::set_last_valid_reading(const std::string &value) {
+  int int_val = 0;
+  if (!value.empty()) {
+      char* end = nullptr;
+      long val = strtol(value.c_str(), &end, 10);
+      if (end == value.c_str()) {
+          ESP_LOGE(TAG, "Failed to parse manual value string: %s", value.c_str());
+          return;
+      }
+      int_val = (int)val;
+  }
+
+  // Set the integer value
+  last_valid_reading_ = int_val;
+  first_reading_ = false;
+
+  // Use the STRING length for digit count, preserving leading zeros
+  ensure_last_valid_digits_size(value.length());
+  for (size_t i = 0; i < value.length(); i++) {
+        if (isdigit(value[i])) {
+            last_valid_digits_data_[i] = value[i] - '0';
+        } else {
+            last_valid_digits_data_[i] = 0; // Default to 0 for non-digits?
+        }
+  }
+  
+  // Create a "fake" history for this value
+  last_good_values_count_ = 0;
+  for(int i=0; i<config_.smart_validation_window; i++) {
+     add_good_value(int_val);
+  }
+  
+  history_.clear();  
+  ESP_LOGW(TAG, "Manually set last valid reading to: %d (Digits: %d, Str: %s)", int_val, (int)value.length(), value.c_str());
+}
+
 void ValueValidator::free_resources() {
   free_digit_history();
   if (last_good_values_data_) {
