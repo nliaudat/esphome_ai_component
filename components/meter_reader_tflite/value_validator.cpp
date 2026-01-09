@@ -90,10 +90,9 @@ int ReadingHistory::get_hour_median() const {
   if (count_ == 0 || !buffer_) return 0;
   
   // Iterate backwards
-  uint32_t now = get_last_reading() ? 0 : 0; // Need timestamp of last reading...
   // Access last reading directly
   size_t last_idx = (head_ == 0) ? (capacity_ - 1) : (head_ - 1);
-  now = buffer_[last_idx].timestamp;
+  uint32_t now = buffer_[last_idx].timestamp;
   
   uint32_t threshold = (now >= 3600000) ? (now - 3600000) : 0;
 
@@ -120,21 +119,34 @@ int ReadingHistory::get_hour_median() const {
   return median;
 }
 
+
 int ReadingHistory::get_day_median() const {
   if (count_ == 0 || !buffer_) return 0;
   
-  std::vector<int> values;
-  values.reserve(count_);
+  // Need timestamp of last reading
+  size_t last_idx = (head_ == 0) ? (capacity_ - 1) : (head_ - 1);
+  uint32_t now = buffer_[last_idx].timestamp;
   
-  // Iterate all valid
-  size_t curr = (head_ == 0) ? (capacity_ - 1) : (head_ - 1);
+  // 24 hours = 86400000 ms (timestamps are ms usually? Wait, `timestamps` in add_reading are typically ms from millis()).
+  // Let's verify unit. If it's `millis()`, then 86400000.
+  // Code in get_hour_median uses 3600000 (3.6e6), so it IS milliseconds.
+  // So 24h = 86400000.
+  
+  uint32_t threshold = (now >= 86400000) ? (now - 86400000) : 0;
+
+  std::vector<int> values;
+  size_t curr = last_idx;
   for (size_t i = 0; i < count_; i++) {
+      if (buffer_[curr].timestamp < threshold) break;
       values.push_back(buffer_[curr].value);
+      
       if (curr == 0) curr = capacity_ - 1;
       else curr--;
   }
   
-  size_t size = values.size();
+  if (values.empty()) return 0;
+
+  size_t size = values.size();  
   std::nth_element(values.begin(), values.begin() + size/2, values.end());
   int median = values[size/2];
   
@@ -471,6 +483,7 @@ int ValueValidator::apply_smart_validation(int new_reading, float confidence, fl
   }
     
   // 2. If no good historical reading, use median of recent GOOD values
+  if (last_good_values_count_ > 0) {
     int median = get_good_values_median();
     
     // Only use median if it's somewhat close to the last valid
@@ -478,6 +491,7 @@ int ValueValidator::apply_smart_validation(int new_reading, float confidence, fl
       ESP_LOGD(TAG, "Using median of last good values: %d (was: %d)", median, new_reading);
       return median;
     }
+  }
     
   // 3. Last resort: use last valid reading
   // Note: We intentionally avoid small_increment logic here if it failed is_digit_plausible
@@ -719,25 +733,47 @@ int ValueValidator::get_stable_digit(int digit_index, int new_digit) {
   uint8_t& count = digit_history_counts_[digit_index];
   uint8_t& head = digit_history_heads_[digit_index];
   
-  // Push
+  // Push new digit into circular buffer
   history[head] = new_digit;
   head = (head + 1) % DIGIT_HISTORY_SIZE;
   if (count < DIGIT_HISTORY_SIZE) count++;
   
-  // Mode Logic
-  int max_count = 0;
-  int mode_val = new_digit;
+  // Find the mode (most frequent digit) in O(N)
+  int digit_counts[10] = {0};
   
-  // Iterate strictly over valid elements
+  // Correctly iterate the circular buffer from oldest to newest (though order doesn't stricter matter for mode)
+  // The 'head' points to the *next* write slot, so the oldest value is at 'head' if full, or 0 if not full.
+  // Actually, 'head' moves forward. 
+  // If count < size: valid indices are [0, count-1].
+  // If count == size: valid indices are [head, size-1] followed by [0, head-1].
+  // Simpler: iterate 'count' times backwards from head? Or just iterating all valid slots is fine.
+  
   for (int i = 0; i < count; i++) {
-      int val = history[i];
-      int current_count = 0;
-      for (int j = 0; j < count; j++) {
-          if (history[j] == val) current_count++;
+      // Logic to find physical index:
+      // If not full (count < size), valid are 0..count-1. head is at count.
+      // If full, valid are everywhere.
+      // But let's use the provided logic which seemed robust:
+      // size_t start_idx = (head + DIGIT_HISTORY_SIZE - count) % DIGIT_HISTORY_SIZE;
+      // This works for both full and partial cases.
+      
+      size_t idx = (head + DIGIT_HISTORY_SIZE - count + i) % DIGIT_HISTORY_SIZE;
+      int val = history[idx];
+      
+      if (val >= 0 && val < 10) {
+          digit_counts[val]++;
       }
-      if (current_count > max_count) {
-          max_count = current_count;
-          mode_val = val;
+  }
+  
+  int max_freq = 0;
+  int mode_val = new_digit; // Default to the new digit
+  
+  for (int i = 0; i < 10; i++) {
+      if (digit_counts[i] > max_freq) {
+          max_freq = digit_counts[i];
+          mode_val = i;
+      } else if (digit_counts[i] == max_freq && i == new_digit) {
+          // Tie-breaking: prefer the new digit if it has equal max frequency
+          mode_val = new_digit; 
       }
   }
   
