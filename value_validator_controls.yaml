@@ -153,3 +153,4 @@ number:
           if (id(${id_prefix}_validator) != nullptr) {
             id(${id_prefix}_validator)->set_per_digit_confidence_threshold(x / 100.0);
           }
+

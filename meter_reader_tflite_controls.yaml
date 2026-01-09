@@ -40,42 +40,42 @@ switch:
             id(${id_prefix}_meter_reader)->set_generate_preview(false);
           }
 
-  # Show Crop Areas
-  - platform: template
-    name: "Show Crop Areas"
-    id: ${id_prefix}_show_crop_areas
-    icon: "mdi:crop"
-    entity_category: config
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_ON
-    turn_on_action:
-      - lambda: |-
-          if (id(${id_prefix}_meter_reader) != nullptr) {
-            id(${id_prefix}_meter_reader)->set_show_crop_areas(true);
-          }
-    turn_off_action:
-      - lambda: |-
-          if (id(${id_prefix}_meter_reader) != nullptr) {
-            id(${id_prefix}_meter_reader)->set_show_crop_areas(false);
-          }
+  # # Show Crop Areas
+  # - platform: template
+  #   name: "Show Crop Areas"
+  #   id: ${id_prefix}_show_crop_areas
+  #   icon: "mdi:crop"
+  #   entity_category: config
+  #   optimistic: true
+  #   restore_mode: RESTORE_DEFAULT_ON
+  #   turn_on_action:
+  #     - lambda: |-
+  #         if (id(${id_prefix}_meter_reader) != nullptr) {
+  #           id(${id_prefix}_meter_reader)->set_show_crop_areas(true);
+  #         }
+  #   turn_off_action:
+  #     - lambda: |-
+  #         if (id(${id_prefix}_meter_reader) != nullptr) {
+  #           id(${id_prefix}_meter_reader)->set_show_crop_areas(false);
+  #         }
 
-  # Debug Mode
-  - platform: template
-    name: "Debug Mode"
-    id: ${id_prefix}_debug_mode
-    icon: "mdi:bug"
-    entity_category: config
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_OFF
+  # # Debug Mode
+  # - platform: template
+  #   name: "Debug Mode"
+  #   id: ${id_prefix}_debug_mode
+  #   icon: "mdi:bug"
+  #   entity_category: config
+  #   optimistic: true
+  #   restore_mode: RESTORE_DEFAULT_OFF
 
-  # Debug Image
-  - platform: template
-    name: "Debug Image"
-    id: ${id_prefix}_debug_image
-    icon: "mdi:image-search"
-    entity_category: config
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_OFF
+  # # Debug Image
+  # - platform: template
+  #   name: "Debug Image"
+  #   id: ${id_prefix}_debug_image
+  #   icon: "mdi:image-search"
+  #   entity_category: config
+  #   optimistic: true
+  #   restore_mode: RESTORE_DEFAULT_OFF
 
   # Debug Timing
   - platform: template
@@ -86,14 +86,14 @@ switch:
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
 
-  # Enable Flash Calibration
-  - platform: template
-    name: "Enable Flash Calibration"
-    id: ${id_prefix}_enable_flash_calibration
-    icon: "mdi:flash-auto"
-    entity_category: config
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_OFF
+  # # Enable Flash Calibration
+  # - platform: template
+  #   name: "Enable Flash Calibration"
+  #   id: ${id_prefix}_enable_flash_calibration
+  #   icon: "mdi:flash-auto"
+  #   entity_category: config
+  #   optimistic: true
+  #   restore_mode: RESTORE_DEFAULT_OFF
 
 number:
   # Update Interval
@@ -135,23 +135,23 @@ number:
           }
 
   # Frame Request Timeout
-  - platform: template
-    name: "Frame Request Timeout"
-    id: ${id_prefix}_frame_request_timeout
-    icon: "mdi:timer-alert"
-    unit_of_measurement: "ms"
-    min_value: 1000
-    max_value: 60000
-    step: 1000
-    initial_value: 15000
-    entity_category: config
-    optimistic: true
-    restore_value: true
-    set_action:
-      - lambda: |-
-          if (id(${id_prefix}_meter_reader) != nullptr) {
-            id(${id_prefix}_meter_reader)->set_frame_request_timeout((uint32_t)x);
-          }
+  # - platform: template
+  #   name: "Frame Request Timeout"
+  #   id: ${id_prefix}_frame_request_timeout
+  #   icon: "mdi:timer-alert"
+  #   unit_of_measurement: "ms"
+  #   min_value: 1000
+  #   max_value: 60000
+  #   step: 1000
+  #   initial_value: 15000
+  #   entity_category: config
+  #   optimistic: true
+  #   restore_value: true
+  #   set_action:
+  #     - lambda: |-
+  #         if (id(${id_prefix}_meter_reader) != nullptr) {
+  #           id(${id_prefix}_meter_reader)->set_frame_request_timeout((uint32_t)x);
+  #         }
 
   # Set Last Valid Value
   - platform: template
@@ -171,17 +171,17 @@ number:
           }
 
 button:
-  # Start Flash Calibration
-  - platform: template
-    name: "Start Flash Calibration"
-    id: ${id_prefix}_start_flash_calibration_btn
-    icon: "mdi:timer-sand"
-    entity_category: config
-    on_press:
-      - lambda: |-
-          if (id(${id_prefix}_meter_reader) != nullptr) {
-            id(${id_prefix}_meter_reader)->start_flash_calibration(); 
-          }
+  # # Start Flash Calibration
+  # - platform: template
+  #   name: "Start Flash Calibration"
+  #   id: ${id_prefix}_start_flash_calibration_btn
+  #   icon: "mdi:timer-sand"
+  #   entity_category: config
+  #   on_press:
+  #     - lambda: |-
+  #         if (id(${id_prefix}_meter_reader) != nullptr) {
+  #           id(${id_prefix}_meter_reader)->start_flash_calibration(); 
+  #         }
 
   # Unload AI Components
   - platform: template
@@ -216,6 +216,7 @@ sensor:
     accuracy_decimals: 2
     icon: "mdi:percent"
 
+
 # API Services
 api:
   services:
@@ -239,23 +240,6 @@ api:
             id(${id_prefix}_crop_zones) = zones;
             id(${id_prefix}_meter_reader).set_crop_zones(zones);
 
-    # Set Camera Window
-    - service: set_camera_window
-      variables:
-        offset_x: int
-        offset_y: int
-        width: int
-        height: int
-      then:
-        - lambda: |-
-            if (offset_x >= 0 && offset_y >= 0 && width > 0 && height > 0) {
-              id(${id_prefix}_meter_reader).set_camera_window(offset_x, offset_y, width, height);
-            }
-
-    # Reset Camera Window
-    - service: reset_camera_window
-      then:
-        - lambda: 'id(${id_prefix}_meter_reader).reset_camera_window();'
 
     # Trigger Inference
     - service: trigger_inference
