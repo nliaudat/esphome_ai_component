@@ -6,7 +6,7 @@
 #include "esphome/components/esp32_camera/esp32_camera.h"
 #include "camera_coordinator.h"
 #include "flashlight_coordinator.h"
-#include "value_validator.h"
+#include "value_validator_coordinator.h"
 #include <vector>
 
 namespace esphome {
@@ -22,10 +22,8 @@ class SSOCRReader : public PollingComponent, public esphome::camera::CameraListe
 
   void set_value_sensor(sensor::Sensor *s) { value_sensor_ = s; }
   void set_confidence_sensor(sensor::Sensor *s) { confidence_sensor_ = s; } 
-  void set_validation_config(bool allow_negative, int max_diff) { 
-      allow_negative_rates_ = allow_negative;
-      max_absolute_diff_ = max_diff;
-  }
+  void set_validator(value_validator::ValueValidator *v) { validation_coord_.set_validator(v); }
+  
   void set_threshold_config(int level) { threshold_level_ = level; }
   void set_crop_config(int x, int y, int w, int h) {
       crop_x_ = x; crop_y_ = y; crop_w_ = w; crop_h_ = h;
@@ -39,7 +37,7 @@ class SSOCRReader : public PollingComponent, public esphome::camera::CameraListe
   // Coordinators
   CameraCoordinator camera_coord_;
   FlashlightCoordinator flashlight_coord_;
-  ValueValidator output_validator_;
+  ValueValidatorCoordinator validation_coord_;
 
   esphome::camera::Camera *camera_{nullptr};
   bool capture_next_{false};
@@ -55,10 +53,6 @@ class SSOCRReader : public PollingComponent, public esphome::camera::CameraListe
   int crop_w_{0};
   int crop_h_{0};
   int digit_count_{6};
-  
-  // Validation config
-  bool allow_negative_rates_{false};
-  int max_absolute_diff_{100};
   
   // State
   bool processing_frame_{false};

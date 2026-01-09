@@ -23,12 +23,8 @@ void AnalogReader::setup() {
   }
   
   // Setup Validation
-  ValueValidator::ValidationConfig val_conf;
-  // Default values or load from config (TODO: add setters in header/python)
-  // For now we use safe defaults or hardcoded 100 max diff
-  val_conf.max_absolute_diff = 100; 
-  output_validator_.set_config(val_conf);
-  output_validator_.setup();
+  // External component handles this
+
 
   // Register Listener
   if (this->camera_) {
@@ -134,9 +130,10 @@ void AnalogReader::process_image(std::shared_ptr<esphome::camera::CameraImage> i
   
   // Validation
   // Validate the TOTAL value against the previous TOTAL value
-  int validated_int_val = 0;
+  int validated_int_val = (int)total_value;
   // Using 1.0 confidence for basic analog reading until we implement confidence metric
-  bool valid = output_validator_.validate_reading((int)total_value, 1.0f, validated_int_val);
+  bool valid = validation_coord_.validate_reading((int)total_value, 1.0f, validated_int_val);
+
   float final_val = (float)validated_int_val;
 
   if (valid) {

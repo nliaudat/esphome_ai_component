@@ -15,9 +15,11 @@
 #include "flashlight_coordinator.h"
 #include "debug_coordinator.h"
 
+// Include Value Validator Coordinator
+#include "value_validator_coordinator.h"
+
 #include "esphome/components/esp32_camera_utils/crop_zone_handler.h"
 #include "esphome/components/esp32_camera_utils/esp32_camera_utils.h"
-#include "value_validator.h"
 
 #ifdef USE_WEB_SERVER
 #include "esphome/components/web_server_base/web_server_base.h"
@@ -40,6 +42,10 @@
 #endif
 
   #include "esphome/components/esp32_camera/esp32_camera.h"
+
+#ifdef USE_WEB_SERVER
+#include "esphome/components/web_server_base/web_server_base.h"
+#endif
 
 namespace esphome {
 namespace meter_reader_tflite {
@@ -68,31 +74,35 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_confidence_threshold(float threshold) { confidence_threshold_ = threshold; }
   void set_tensor_arena_size(size_t size_bytes); // -> TFLite
   void set_model(const uint8_t *model, size_t length); // -> TFLite
-  
+
   void set_value_sensor(sensor::Sensor *sensor) { value_sensor_ = sensor; }
   void set_confidence_sensor(sensor::Sensor *sensor) { confidence_sensor_ = sensor; }
+  
+  // Set Validator (External)
+  void set_validator(value_validator::ValueValidator *v) { validation_coord_.set_validator(v); }
 
   void set_crop_zones(const std::string &zones_json);
   void set_crop_zones_global(globals::GlobalsComponent<std::string> *global_var) {
       crop_zone_handler_.set_crop_zones_global(global_var);
   }
-  
+
   void set_camera_image_format(int width, int height, const std::string &pixel_format); // -> CameraCoord & TFLite
   void set_camera(camera::Camera *camera); // -> CameraCoord
-  
+
   sensor::Sensor *get_value_sensor() const { return value_sensor_; }
   sensor::Sensor *get_confidence_sensor() const { return confidence_sensor_; }
-  
+
   void set_model_config(const std::string &model_type); // -> TFLite
   void set_rotation(float rotation) { rotation_ = rotation; } // Storage, passed to TFLite late
-  
+
   void set_generate_preview(bool generate);
   void set_show_crop_areas(bool show) { show_crop_areas_ = show; }
+
 #ifdef DEV_ENABLE_ROTATION
   void take_preview_image();
   void capture_preview();
   std::shared_ptr<camera::CameraImage> get_preview_image();
-  
+
  private:
   void update_preview_image(std::shared_ptr<camera::CameraImage> image);
   std::shared_ptr<camera::CameraImage> last_preview_image_{nullptr};
@@ -104,13 +114,14 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   // Debug/Reporting
   static void register_service(MeterReaderTFLite *comp) { comp->print_debug_info(); }
   void print_debug_info();
-  
+
   // Validation
-  void set_allow_negative_rates(bool allow) { allow_negative_rates_ = allow; }
-  void set_max_absolute_diff(int max_diff) { max_absolute_diff_ = max_diff; }
+  // Obsolete local validation setters - removed or must be handled by external validator config
+  // void set_allow_negative_rates(bool allow); 
+  // void set_max_absolute_diff(int max_diff);
+  // ...
   void set_frame_request_timeout(uint32_t ms) { frame_request_timeout_ms_ = ms; }
   void set_high_confidence_threshold(float threshold) { high_confidence_threshold_ = threshold; }
-  void set_strict_confidence_check(bool strict) { strict_confidence_check_ = strict; }
   void set_last_valid_value(float value);
 
   // Pause
@@ -130,7 +141,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
   // Calibration
   void start_flash_calibration();
-  void update_calibration(float confidence);
+  void update_calibration(float confidence); // Modified signature to match logic
   bool is_calibrating() const { return calibration_.state != FlashCalibrationHandler::IDLE; }
 
   // Window Control
@@ -139,7 +150,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_camera_window_width(int w);
   void set_camera_window_height(int h);
   void set_camera_window_configured(bool c);
-  
+
   bool reset_camera_window();
   bool set_camera_window(int offset_x, int offset_y, int width, int height);
 
@@ -148,13 +159,13 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_main_logs(text_sensor::TextSensor *main_logs) { main_logs_ = main_logs; }
 
   void set_esp32_camera_utils(esp32_camera_utils::Esp32CameraUtils *utils) { esp32_camera_utils_ = utils; }
-  
+
   // Dynamic Resource Management
   void unload_resources();
   void reload_resources();
   void set_unload_button(button::Button *b) { unload_button_ = b; }
   void set_reload_button(button::Button *b) { reload_button_ = b; }
-  
+
 #ifdef DEBUG_METER_READER_MEMORY
   void set_tensor_arena_size_sensor(sensor::Sensor *s) { tensor_arena_size_sensor_ = s; }
   void set_tensor_arena_used_sensor(sensor::Sensor *s) { tensor_arena_used_sensor_ = s; }
@@ -169,7 +180,6 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
   void set_total_inference_time_sensor(sensor::Sensor *s) { total_inference_time_sensor_ = s; }
   void set_debug_timing(bool enabled) { debug_timing_ = enabled; }
-
 
 #ifdef USE_WEB_SERVER
   void set_web_server(web_server_base::WebServerBase *web_server);
@@ -192,7 +202,10 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   DebugCoordinator debug_coord_;
 
   esp32_camera_utils::CropZoneHandler crop_zone_handler_;
-  ValueValidator output_validator_;
+  
+  // Refactor: Use coordinator instead of local object
+  // ValueValidator output_validator_; 
+  ValueValidatorCoordinator validation_coord_;
 
   // State
   std::atomic<bool> pause_processing_{false};
@@ -202,20 +215,20 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   std::shared_ptr<camera::CameraImage> pending_frame_{nullptr};
   uint32_t last_request_time_{0};
   uint32_t pending_frame_acquisition_time_{0};
-  
+
   // Config
   float confidence_threshold_{0.85f};
-  bool allow_negative_rates_{false};
-  int max_absolute_diff_{100};
+  // bool allow_negative_rates_{false}; // Moved to validator component
+  // int max_absolute_diff_{100};       // Moved
   uint32_t frame_request_timeout_ms_{15000};
-  float high_confidence_threshold_{0.90f};
+  float high_confidence_threshold_{0.90f}; // Used for logging only here?
   float rotation_{0.0f};
   bool generate_preview_{false};
   bool show_crop_areas_{true};
   bool debug_memory_enabled_{false}; // Runtime flag
   bool window_active_{false};
   bool enable_flash_calibration_{false};
-  bool strict_confidence_check_{false};
+  // bool strict_confidence_check_{false}; // Moved
 
   // Calibration
   struct FlashCalibrationHandler {
@@ -228,12 +241,12 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
       float baseline_confidence{0.0f};
       float best_confidence{0.0f};
       uint32_t step_start_time{0};
-      
+
       // Configuration
       uint32_t start_pre{7000};
       uint32_t end_pre{100};
       uint32_t step_pre{500};
-      
+
       uint32_t start_post{2000};
       uint32_t end_post{0};
       uint32_t step_post{200};
@@ -258,10 +271,10 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   sensor::Sensor *arena_efficiency_sensor_{nullptr};
   sensor::Sensor *heap_fragmentation_sensor_{nullptr};
 #endif
-  
+
   sensor::Sensor *total_inference_time_sensor_{nullptr};
   bool debug_timing_{false};
-  
+
   button::Button *unload_button_{nullptr};
   button::Button *reload_button_{nullptr};
 
@@ -272,13 +285,13 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   float combine_readings(const std::vector<float>& readings);
   bool validate_and_update_reading(float raw, float conf, float& val);
   bool validate_and_update_reading(const std::vector<float>& digits, const std::vector<float>& confidences, float& val);
-  
+
 #ifdef USE_WEB_SERVER
   web_server_base::WebServerBase *web_server_{nullptr};
 #endif
 
 #ifdef SUPPORT_DOUBLE_BUFFERING
-  // Double Buffering / Multithreading
+// Double Buffering / Multithreading
  public:
   struct InferenceJob {
       std::shared_ptr<camera::CameraImage> frame; // Keep managed
@@ -301,6 +314,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   QueueHandle_t output_queue_{nullptr};
   TaskHandle_t inference_task_handle_{nullptr};
   static void inference_task(void *arg);
+
 #endif
 };
 

@@ -1,6 +1,6 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import sensor, text_sensor, esp32_camera
+from esphome.components import sensor, text_sensor, esp32_camera, value_validator
 from esphome.core import CORE
 from esphome.const import (
     CONF_ID,
@@ -9,7 +9,7 @@ from esphome.const import (
 
 CONF_CAMERA_ID = "camera_id"
 
-DEPENDENCIES = ["esp32_camera"]
+DEPENDENCIES = ["esp32_camera", "value_validator"]
 AUTO_LOAD = ["esp32_camera_utils"]
 
 ssocr_reader_ns = cg.esphome_ns.namespace("ssocr_reader")
@@ -25,10 +25,12 @@ CONF_DIGIT_COUNT = "digit_count"
 CONF_DECIMAL_POINT = "decimal_point"
 
 CONF_VALUE = "value"
+CONF_VALIDATOR = "validator"
 
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(SSOCRReader),
+        cv.Required(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator),
         cv.Optional(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera),
         cv.Optional(CONF_VALUE): sensor.sensor_schema(),
         cv.Optional(CONF_THRESHOLD_TYPE, default="fixed"): cv.enum(
@@ -52,11 +54,14 @@ async def to_code(config):
             "ssocr_reader.cpp",
             "camera_coordinator.cpp",
             "flashlight_coordinator.cpp",
-            "value_validator.cpp",
         ],
     )
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
+
+    # Validator
+    v = await cg.get_variable(config[CONF_VALIDATOR])
+    cg.add(var.set_validator(v))
 
     if CONF_CAMERA_ID in config:
         cam = await cg.get_variable(config[CONF_CAMERA_ID])

@@ -11,8 +11,8 @@ number:
     restore_value: true
     set_action:
       - lambda: |-
-          if (id(${id_prefix}_meter_reader) != nullptr) {
-            id(${id_prefix}_meter_reader)->set_max_absolute_diff((int)x);
+          if (id(${id_prefix}_validator) != nullptr) {
+            id(${id_prefix}_validator)->set_max_absolute_diff((int)x);
           }
 
   - platform: template

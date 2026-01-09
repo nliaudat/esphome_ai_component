@@ -1,11 +1,11 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import sensor, esp32_camera, esp32
+from esphome.components import sensor, esp32_camera, esp32, value_validator
 
 from esphome.const import CONF_ID, CONF_NAME
 from esphome.core import CORE
 
-DEPENDENCIES = ["esp32_camera"]
+DEPENDENCIES = ["esp32_camera", "value_validator"]
 AUTO_LOAD = ["esp32_camera_utils"]
 
 analog_reader_ns = cg.esphome_ns.namespace("analog_reader")
@@ -24,6 +24,7 @@ CONF_CROP_X = "crop_x"
 CONF_CROP_Y = "crop_y"
 CONF_CROP_W = "crop_w"
 CONF_CROP_H = "crop_h"
+CONF_VALIDATOR = "validator"
 
 DIAL_SCHEMA = cv.Schema({
     cv.Required(CONF_ID): cv.string, # String ID for logs
@@ -41,6 +42,7 @@ DIAL_SCHEMA = cv.Schema({
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(AnalogReader),
+    cv.Required(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator),
     cv.Required(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera),
     cv.Optional(CONF_VALUE_SENSOR): sensor.sensor_schema(),
     cv.Required(CONF_DIALS): cv.ensure_list(DIAL_SCHEMA),
@@ -54,12 +56,15 @@ async def to_code(config):
             "analog_reader.cpp",
             "camera_coordinator.cpp",
             "flashlight_coordinator.cpp", 
-            "value_validator.cpp",
         ],
     )
     var = cg.new_Pvariable(config[CONF_ID])
 
     await cg.register_component(var, config)
+
+    # Validator
+    v = await cg.get_variable(config[CONF_VALIDATOR])
+    cg.add(var.set_validator(v))
 
     cam = await cg.get_variable(config[CONF_CAMERA_ID])
     cg.add(var.set_camera(cam))

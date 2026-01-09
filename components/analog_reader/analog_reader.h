@@ -5,8 +5,8 @@
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/esp32_camera/esp32_camera.h"
 #include "camera_coordinator.h"
-#include "flashlight_coordinator.h" // Assuming shared usage or similar
-#include "value_validator.h"
+#include "flashlight_coordinator.h" 
+#include "value_validator_coordinator.h"
 #include <vector>
 
 namespace esphome {
@@ -36,6 +36,8 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   void dump_config() override;
 
   void set_value_sensor(sensor::Sensor *s) { value_sensor_ = s; }
+  void set_validator(value_validator::ValueValidator *v) { validation_coord_.set_validator(v); }
+  
   void set_camera(esphome::camera::Camera *camera) { camera_ = camera; }
   void set_camera_image_format(int width, int height, const std::string &format) {
       img_width_ = width;
@@ -53,6 +55,7 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   // We will add it to __init__.py libraries.
   CameraCoordinator camera_coord_;
   FlashlightCoordinator flashlight_coord_;
+  ValueValidatorCoordinator validation_coord_;
 
   esphome::camera::Camera *camera_{nullptr};
   bool capture_next_{false};
@@ -63,9 +66,6 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   sensor::Sensor *value_sensor_{nullptr};
   std::vector<DialConfig> dials_;
   
-  // Validation
-  ValueValidator output_validator_;
-
   // State
   bool processing_frame_{false};
   uint32_t last_request_time_{0};

@@ -14,7 +14,7 @@ external_components:
       type: local
       path: components 
     #components: [meter_reader_tflite, tflite_micro_helper, esp32_camera_utils, flash_light_controller] #, ssocr_reader] 
-    components: [analog_reader, esp32_camera_utils, flash_light_controller]
+    components: [analog_reader, esp32_camera_utils, flash_light_controller, value_validator]
       
 
 
@@ -203,9 +203,23 @@ flash_light_controller:
 #   value:
 #     name: "SSOCR Value"
 
+value_validator:
+  id: ${id_prefix}_validator
+  allow_negative_rates: false
+  max_absolute_diff: 300
+  # All available parameters (with defaults):
+  # max_rate_change: 0.15                # Max rate change as percentage (default: 15%)
+  # enable_smart_validation: true        # Enable adaptive validation (default: true)
+  # smart_validation_window: 5           # Window size for pattern analysis (default: 5)
+  # high_confidence_threshold: 0.90      # Threshold for high confidence (default: 90%)
+  # per_digit_confidence_threshold: 0.85 # Min confidence per digit (default: 85%)
+  # strict_confidence_check: false       # Require all digits meet threshold (default: false)
+  # max_history_size: 50kB               # Max history memory usage (default: 50kB)
+
 analog_reader: # DEV !
   id: analog_main
   camera_id: ${id_prefix}_espcam
+  validator: ${id_prefix}_validator
   value_sensor:
     name: "Analog Total"
   dials: 

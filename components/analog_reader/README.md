@@ -24,10 +24,18 @@ Using this component instead of an AI model (`meter_reader_tflite`) offers signi
 The component allows you to define multiple dials. Each dial detects its needle angle and contributes to a total value.
 
 ```yaml
+value_validator:
+  id: ${id_prefix}_validator
+  allow_negative_rates: true  # Analog gauges can go both ways
+  max_rate_change: 0.25
+
 analog_reader:
   id: analog_main
   # Camera Reference
   camera_id: my_camera
+  
+  # Validator (recommended)
+  validator: ${id_prefix}_validator
   
   # The main sensor reporting the total aggregated value
   value_sensor:

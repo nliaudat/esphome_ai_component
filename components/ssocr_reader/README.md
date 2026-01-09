@@ -20,10 +20,18 @@ Unlike the `meter_reader_tflite` component which uses Neural Networks (AI), this
 ## Configuration
 
 ```yaml
+value_validator:
+  id: ${id_prefix}_validator
+  allow_negative_rates: false
+  max_absolute_diff: 50
+
 ssocr_reader:
   id: ssocr_main
   # Camera ID to use (from esp32_camera)
   camera_id: my_camera
+  
+  # Validator (recommended)
+  validator: ${id_prefix}_validator
   
   # Update interval
   update_interval: 60s
