@@ -250,14 +250,11 @@ packages:
 
   # - !include debug_board.yaml
   
-  # AI components
-  # - !include switch_AI_component.yaml
-  - !include sensor_AI_component.yaml
-  # - !include globals_AI_component.yaml
-  - !include text_sensor_AI_component.yaml
-  # - !include number_AI_component.yaml
-  # - !include button_AI_component.yaml
-  # - !include api_AI_component.yaml
+  # Component-specific controls (uncomment to disable individual controls)
+  # - !include meter_reader_tflite_controls.yaml # Not used for analog reader
+  - !include value_validator_controls.yaml
+  - !include flash_light_controller_controls.yaml
+  - !include esp32_camera_utils_controls.yaml
   
   # camera configs
   - !include camera_options.yaml
