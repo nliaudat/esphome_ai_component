@@ -40,15 +40,20 @@ class ReadingHistory {
   std::vector<int> get_recent_readings(size_t count) const;
   
   size_t get_hour_count() const;
-  size_t get_day_count() const { return readings_.size(); }
+  size_t get_day_count() const { return count_; }
   
   void clear();
+  ~ReadingHistory();
 
  private:
-  std::deque<HistoricalReading> readings_;
+  HistoricalReading* buffer_{nullptr};
+  size_t capacity_{0};
+  size_t head_{0}; // Write index (points to next free slot)
+  size_t count_{0}; // Current number of elements
+  
   size_t max_history_size_bytes_{51200};
   
-  void cleanup_old_readings(uint32_t current_timestamp);
+  void ensure_capacity();
 };
 
 /**
@@ -69,6 +74,7 @@ class ValueValidator {
     bool strict_confidence_check{false}; // If true, requires all digits to be above threshold
   };
 
+  ~ValueValidator();
   void setup();
   // Legacy single-value validation
   bool validate_reading(int new_reading, float confidence, int& validated_reading);
@@ -89,15 +95,40 @@ class ValueValidator {
   ValidationConfig config_;
   ReadingHistory history_;
   int last_valid_reading_{0};
-  std::vector<int> last_valid_digits_; // Digits of the last valid reading
+  
+  // Last valid digits (PSRAM array)
+  int* last_valid_digits_data_{nullptr};
+  size_t last_valid_digits_count_{0};
+
+  // Per-digit history for stability check (Flat arrays for PSRAM efficiency)
+  int* digit_history_data_{nullptr};      // [num_digits * 5]
+  uint8_t* digit_history_counts_{nullptr}; // [num_digits]
+  uint8_t* digit_history_heads_{nullptr};  // [num_digits]
+  size_t digit_history_num_digits_{0};
+  static const size_t DIGIT_HISTORY_SIZE = 5;
+
   bool first_reading_{true};
-  std::deque<int> last_good_values_; // Store last N good values for precise comparison
+  
+  // Recent good values ring buffer (PSRAM)
+  int* last_good_values_data_{nullptr};
+  size_t last_good_values_capacity_{0};
+  size_t last_good_values_head_{0};
+  size_t last_good_values_count_{0};
   
   bool is_digit_plausible(int new_reading, int last_reading) const;
   int apply_smart_validation(int new_reading, float confidence, float last_confidence);
   int find_most_plausible_reading(int new_reading, const std::vector<int>& recent_readings);
   bool is_small_increment(int new_reading, int last_reading) const;
   int calculate_digit_difference(int reading1, int reading2) const;
+  int get_stable_digit(int digit_index, int new_digit);
+  void ensure_digit_history_size(size_t num_digits);
+  void ensure_last_valid_digits_size(size_t num_digits);
+  void ensure_last_good_values_capacity(size_t capacity);
+  void add_good_value(int value);
+  int get_good_values_median() const;
+  
+  void free_digit_history();
+  void free_resources();
 };
 
 }  // namespace meter_reader_tflite
