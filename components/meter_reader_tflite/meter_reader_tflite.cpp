@@ -497,7 +497,7 @@ void MeterReaderTFLite::loop() {
                 conf_list += "]";
 
                 // Publish (matches process_full_image logic)
-                if (valid && avg_conf >= confidence_threshold_) {
+                if (valid && (validation_coord_.has_validator() || avg_conf >= confidence_threshold_)) {
                      ESP_LOGI(TAG, "Result: VALID (Raw: %.0f, Conf: %.3f, %s)", 
                               final_val, avg_conf, conf_list.c_str());
                      value_sensor_->publish_state(validated_val);
@@ -778,7 +778,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
              inference_logs_->publish_state(inference_log);
         }
 
-        if (valid && avg_conf >= confidence_threshold_) {
+        if (valid && (validation_coord_.has_validator() || avg_conf >= confidence_threshold_)) {
              // Removed checking of inference_log char buffer availability to match legacy cleanly
              ESP_LOGI(TAG, "Reading: %.1f -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%% (high: %.1f%%))", 
                 final_val, validated_val, valid ? "yes" : "no", 
