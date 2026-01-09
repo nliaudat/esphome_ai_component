@@ -9,7 +9,7 @@
 #include <esp_heap_caps.h>
 
 namespace esphome {
-namespace meter_reader_tflite {
+namespace value_validator {
 
 static const char *const TAG = "value_validator";
 
@@ -30,15 +30,8 @@ void ReadingHistory::ensure_capacity() {
   
   // Calculate capacity based on max bytes
   // HistoricalReading size is 12 bytes
-  // Default 50KB -> ~4200 entries. 
-  // User limits to 1440 in logic anyway, let's respect the byte limit primarily or 1440?
-  // Original logic: byte limit AND 1440 limit. 
-  // Let's allocate for the SMALLER of the two to save RAM, or LARGER?
-  // Limit was "pop if > 1440". So we never store more than 1440.
-  // So capacity should be min(1440, bytes/12).
-  
   size_t max_count_by_bytes = max_history_size_bytes_ / sizeof(HistoricalReading);
-  const size_t MAX_DAY_COUNT = 1440;
+  const size_t MAX_DAY_COUNT = 1440; //prevents excessive memory usage while still allowing for 24 hours of minute-by-minute tracking (24h*60min =1440)
   
   size_t target = std::min(max_count_by_bytes, MAX_DAY_COUNT);
   if (target < 10) target = 10; // Minimum sanity
@@ -71,7 +64,6 @@ void ReadingHistory::add_reading(int value, uint32_t timestamp, float confidence
   if (count_ < capacity_) {
       count_++;
   }
-  
 }
 
 int ReadingHistory::get_last_reading() const {
@@ -127,11 +119,7 @@ int ReadingHistory::get_day_median() const {
   size_t last_idx = (head_ == 0) ? (capacity_ - 1) : (head_ - 1);
   uint32_t now = buffer_[last_idx].timestamp;
   
-  // 24 hours = 86400000 ms (timestamps are ms usually? Wait, `timestamps` in add_reading are typically ms from millis()).
-  // Let's verify unit. If it's `millis()`, then 86400000.
-  // Code in get_hour_median uses 3600000 (3.6e6), so it IS milliseconds.
-  // So 24h = 86400000.
-  
+  // 24 hours = 86400000 ms
   uint32_t threshold = (now >= 86400000) ? (now - 86400000) : 0;
 
   std::vector<int> values;
@@ -195,6 +183,15 @@ void ValueValidator::setup() {
   
   // Initialize with some capacity
   ensure_last_good_values_capacity(config_.smart_validation_window);
+}
+
+void ValueValidator::dump_config() {
+  ESP_LOGCONFIG(TAG, "Value Validator:");
+  ESP_LOGCONFIG(TAG, "  Max Absolute Diff: %d", config_.max_absolute_diff);
+  ESP_LOGCONFIG(TAG, "  Allow Negative Rates: %s", YESNO(config_.allow_negative_rates));
+  ESP_LOGCONFIG(TAG, "  Strict Confidence Check: %s", YESNO(config_.strict_confidence_check));
+  ESP_LOGCONFIG(TAG, "  Per Digit Conf Threshold: %.2f", config_.per_digit_confidence_threshold);
+  ESP_LOGCONFIG(TAG, "  Max History Size: %d bytes", (int)config_.max_history_size_bytes);
 }
 
 bool ValueValidator::validate_reading(int new_reading, float confidence, int& validated_reading) {
@@ -594,13 +591,6 @@ void ValueValidator::set_last_valid_reading(int value) {
   ESP_LOGW(TAG, "Manually set last valid reading to: %d", value);
 }
 
-
-void ValueValidator::set_strict_confidence_check(bool strict) {
-  config_.strict_confidence_check = strict;
-}
-
-
-
 void ValueValidator::free_resources() {
   free_digit_history();
   if (last_good_values_data_) {
@@ -741,21 +731,7 @@ int ValueValidator::get_stable_digit(int digit_index, int new_digit) {
   // Find the mode (most frequent digit) in O(N)
   int digit_counts[10] = {0};
   
-  // Correctly iterate the circular buffer from oldest to newest (though order doesn't stricter matter for mode)
-  // The 'head' points to the *next* write slot, so the oldest value is at 'head' if full, or 0 if not full.
-  // Actually, 'head' moves forward. 
-  // If count < size: valid indices are [0, count-1].
-  // If count == size: valid indices are [head, size-1] followed by [0, head-1].
-  // Simpler: iterate 'count' times backwards from head? Or just iterating all valid slots is fine.
-  
   for (int i = 0; i < count; i++) {
-      // Logic to find physical index:
-      // If not full (count < size), valid are 0..count-1. head is at count.
-      // If full, valid are everywhere.
-      // But let's use the provided logic which seemed robust:
-      // size_t start_idx = (head + DIGIT_HISTORY_SIZE - count) % DIGIT_HISTORY_SIZE;
-      // This works for both full and partial cases.
-      
       size_t idx = (head + DIGIT_HISTORY_SIZE - count + i) % DIGIT_HISTORY_SIZE;
       int val = history[idx];
       
@@ -780,5 +756,5 @@ int ValueValidator::get_stable_digit(int digit_index, int new_digit) {
   return mode_val;
 }
 
-}  // namespace meter_reader_tflite
+}  // namespace value_validator
 }  // namespace esphome

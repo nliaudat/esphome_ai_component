@@ -6,6 +6,7 @@ import zlib
 from esphome.const import CONF_ID, CONF_MODEL, CONF_ROTATION, CONF_NAME, CONF_DISABLED_BY_DEFAULT, CONF_INTERNAL, CONF_ICON, CONF_FORCE_UPDATE, CONF_ENTITY_CATEGORY
 from esphome.core import CORE, HexInt
 from esphome.components import esp32, sensor, text_sensor, button
+from esphome.components import value_validator
 
 import esphome.components.esp32_camera as esp32_camera
 from esphome.cpp_generator import RawExpression
@@ -17,10 +18,10 @@ except ImportError:
 
 CODEOWNERS = ["@nl"]
 if CORE.target_platform == "esp32":
-    DEPENDENCIES = ['esp32', 'tflite_micro_helper', 'esp32_camera_utils', 'flash_light_controller']
+    DEPENDENCIES = ['esp32', 'tflite_micro_helper', 'esp32_camera_utils', 'flash_light_controller', 'value_validator']
 else:
     # On host, we mock utils and remove esp32 check
-    DEPENDENCIES = ['tflite_micro_helper']
+    DEPENDENCIES = ['tflite_micro_helper', 'value_validator']
 
 AUTO_LOAD = ['sensor']
 
@@ -32,6 +33,7 @@ CONF_DEBUG = 'debug'
 CONF_DEBUG_IMAGE = 'debug_image'
 CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL = 'debug_image_out_serial'
 CONF_DEBUG_MEMORY = 'debug_memory'
+CONF_VALIDATOR = 'validator'
 
 # CONF_MODEL_TYPE = 'model_type' 
 CONF_PREVIEW = 'preview_camera'
@@ -44,10 +46,7 @@ CONF_CROP_ZONES = 'crop_zones_global'
 
 CONF_CAMERA_WINDOW = 'camera_window'
 
-CONF_ALLOW_NEGATIVE_RATES = 'allow_negative_rates'
-CONF_MAX_ABSOLUTE_DIFF = 'max_absolute_diff'
 CONF_FRAME_REQUEST_TIMEOUT = 'frame_request_timeout'
-CONF_HIGH_CONFIDENCE_THRESHOLD = 'high_confidence_threshold'
 CONF_UNLOAD_BUTTON = 'unload_button'
 CONF_RELOAD_BUTTON = 'reload_button'
 
@@ -73,6 +72,7 @@ def datasize_to_bytes(value):
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(MeterReaderTFLite),
     cv.Required(CONF_MODEL): cv.file_,
+    cv.Required(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator),
     cv.Optional(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera) if CORE.target_platform == "esp32" else cv.string,
     # cv.Optional(CONF_MODEL_TYPE, default="class100-0180"): cv.string,  # Add model type selection
     cv.Optional(CONF_CONFIDENCE_THRESHOLD, default=0.85): cv.float_range(
@@ -108,11 +108,8 @@ CONFIG_SCHEMA = cv.Schema({
     #     })
     # ),
     # cv.Optional(CONF_AUTO_CAMERA_WINDOW, default=False): cv.boolean,
-    cv.Optional(CONF_ALLOW_NEGATIVE_RATES, default=False): cv.boolean,
-    cv.Optional(CONF_MAX_ABSOLUTE_DIFF, default=100): cv.positive_int,
     cv.Optional(CONF_FRAME_REQUEST_TIMEOUT, default=15000): cv.int_range(min=1000, max=60000),
-    cv.Optional(CONF_HIGH_CONFIDENCE_THRESHOLD, default=0.90): cv.float_range(min=0.5, max=1.0),
-    cv.Optional("strict_confidence_check", default=False): cv.boolean,
+    
     cv.Optional("value_sensor"): cv.use_id(sensor.Sensor),
     cv.Optional("confidence_sensor"): cv.use_id(sensor.Sensor),
     cv.Optional("inference_logs"): cv.use_id(text_sensor.TextSensor),
@@ -160,6 +157,10 @@ async def to_code(config):
     cg.add_global(cg.RawStatement('#include "esphome/components/meter_reader_tflite/meter_reader_tflite.h"'))
     cg.add_global(cg.RawStatement('using namespace esphome::meter_reader_tflite;'))
     await cg.register_component(var, config)
+    
+    # Register validator
+    v = await cg.get_variable(config[CONF_VALIDATOR])
+    cg.add(var.set_validator(v))
 
     if CORE.target_platform == "esp32":
         cam = await cg.get_variable(config[CONF_CAMERA_ID])
@@ -368,19 +369,9 @@ async def to_code(config):
     #         cg.add(var.set_camera_window_configured(True)) 
 
 
-    # Set validation parameters
-    if CONF_ALLOW_NEGATIVE_RATES in config:
-        cg.add(var.set_allow_negative_rates(config[CONF_ALLOW_NEGATIVE_RATES]))
-    if CONF_MAX_ABSOLUTE_DIFF in config:
-        cg.add(var.set_max_absolute_diff(config[CONF_MAX_ABSOLUTE_DIFF]))
-    
-    # Set timeout and threshold parameters
+    # Set timeout parameters
     if CONF_FRAME_REQUEST_TIMEOUT in config:
         cg.add(var.set_frame_request_timeout(config[CONF_FRAME_REQUEST_TIMEOUT]))
-    if CONF_HIGH_CONFIDENCE_THRESHOLD in config:
-        cg.add(var.set_high_confidence_threshold(config[CONF_HIGH_CONFIDENCE_THRESHOLD]))
-    if "strict_confidence_check" in config:
-        cg.add(var.set_strict_confidence_check(config["strict_confidence_check"]))
         
 
     # Optional: Debug memory sensors

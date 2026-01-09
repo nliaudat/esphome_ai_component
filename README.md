@@ -14,12 +14,27 @@ This project provides a robust, modular framework for running TensorFlow Lite Mi
 
 The repository allows you to use specific components based on your needs:
 
+### Core Reading Components
+
 | Component | Description |
 |-----------|-------------|
-| **[meter_reader_tflite](./components/meter_reader_tflite)** | The main component for running AI models on camera images. Orchestrates capture, inference, and reporting. |
+| **[meter_reader_tflite](./components/meter_reader_tflite)** | AI-powered meter reader using TensorFlow Lite models. Orchestrates capture, inference, and reporting for digital meters. |
+| **[ssocr_reader](./components/ssocr_reader)** | (Alpha dev !) Seven-segment OCR reader using SSOCR algorithm. Reads digital displays without AI models. |
+| **[analog_reader](./components/analog_reader)** | (Alpha dev!) Analog dial/gauge reader using radial intensity sum algorithm. Reads pointer positions without AI. |
+
+### Supporting Components
+
+| Component | Description |
+|-----------|-------------|
+| **[value_validator](./components/value_validator)** | Robust validation engine for meter readings. Eliminates outliers, tracks history, and prevents impossible value jumps. |
 | **[esp32_camera_utils](./components/esp32_camera_utils)** | Powerful image processing utilities. Handles cropping, scaling, rotation (JPEG/Raw), and format conversion using `esp_new_jpeg` library. |
 | **[tflite_micro_helper](./components/tflite_micro_helper)** | Wrapper for TensorFlow Lite Micro runtime (checking model CRC32, etc..) and `esp-nn` optimizations. Manages tensor arena and model loading. |
 | **[flash_light_controller](./components/flash_light_controller)** | Manages flash light timing for optimal image capture conditions. |
+
+### Legacy
+
+| Component | Description |
+|-----------|-------------|
 | **[legacy_meter_reader_tflite](./components/legacy_meter_reader_tflite)** | The previous monolithic version, kept for backward compatibility. |
 
 ## 🏁 Quick Start
@@ -37,13 +52,21 @@ external_components:
       url: https://github.com/nliaudat/esphome_ai_component
       ref: main
     components: 
-      - meter_reader_tflite
-      - tflite_micro_helper
-      - esp32_camera_utils
+      # Choose the reader type you need:
+      - meter_reader_tflite   # AI-powered digit recognition
+      # - ssocr_reader        # Seven-segment OCR (no AI)
+      # - analog_reader       # Analog gauge/dial reader (no AI)
+      
+      # Supporting components:
+      - value_validator       # Validation engine (recommended)
+      - tflite_micro_helper   # Required for meter_reader_tflite
+      - esp32_camera_utils    # Image processing utilities
       - flash_light_controller
 ```
 
 ### 2. Basic Configuration
+
+#### Option A: AI-Powered Meter Reader (TFLite)
 
 ```yaml
 esp32_camera:
@@ -51,11 +74,16 @@ esp32_camera:
   resolution: 640x480
   pixel_format: JPEG
 
+value_validator:
+  id: my_validator
+  allow_negative_rates: false
+  max_absolute_diff: 300
 
 meter_reader_tflite:
   id: my_meter_reader
   model: "digit_recognizer.tflite"
   camera_id: my_camera
+  validator: my_validator
   update_interval: 60s
   
   # Optional: Link to other components
@@ -64,6 +92,43 @@ meter_reader_tflite:
   
   # Image Rotation (Dev)
   rotation: "90" # Options: "0", "90", "180", "270"
+```
+
+#### Option B: Seven-Segment OCR Reader (No AI)
+
+```yaml
+value_validator:
+  id: my_validator
+  allow_negative_rates: false
+  max_absolute_diff: 50
+
+ssocr_reader:
+  id: my_ssocr
+  camera_id: my_camera
+  validator: my_validator
+  update_interval: 60s
+  threshold_level: 128
+  digit_count: 8
+```
+
+#### Option C: Analog Gauge Reader (No AI)
+
+```yaml
+value_validator:
+  id: my_validator
+  allow_negative_rates: true  # Analog gauges can go both ways
+  max_rate_change: 0.25
+
+analog_reader:
+  id: my_analog
+  camera_id: my_camera
+  validator: my_validator
+  update_interval: 60s
+  dials:
+    - min_value: 0
+      max_value: 100
+      radius_min: 20
+      radius_max: 80
 ```
 
 > [!NOTE]

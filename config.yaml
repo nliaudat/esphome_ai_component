@@ -13,7 +13,7 @@ external_components:
   - source:
       type: local
       path: components 
-    components: [meter_reader_tflite, tflite_micro_helper, esp32_camera_utils, flash_light_controller] #, ssocr_reader] 
+    components: [meter_reader_tflite, tflite_micro_helper, esp32_camera_utils, flash_light_controller, value_validator] #, ssocr_reader] 
       
 
 
@@ -127,8 +127,29 @@ flash_light_controller:
   debug: false
 
 
+value_validator:
+  id: ${id_prefix}_validator
+  # Basic Validation
+  allow_negative_rates: false          # Allow values < previous value (default: false)
+  max_absolute_diff: 300               # Max allowed absolute change (default: 100)
+  # max_rate_change: 0.15                # Max rate change as percentage (default: 15%)
+    
+  # Smart Validation
+  enable_smart_validation: true        # Enable adaptive validation (default: true)
+  smart_validation_window: 5           # Window size for pattern analysis (default: 5)
+    
+  # Confidence Thresholds
+  high_confidence_threshold: 0.95      # Threshold for high confidence (default: 90%)
+  per_digit_confidence_threshold: 0.95 # Min confidence per digit (default: 85%)
+  strict_confidence_check: true       # Require all digits meet threshold (default: false)
+    
+  # Memory Management
+  max_history_size: 50kB               # Max history memory usage (default: 50kB)
+
+
 meter_reader_tflite:
   id: ${id_prefix}_meter_reader
+  validator: ${id_prefix}_validator
   camera_id: ${id_prefix}_espcam
   model: "digit_recognizer_v4_10cls_RGB.tflite"
   # model: "digit_recognizer_v4_10cls_GRAY.tflite"
@@ -151,10 +172,7 @@ meter_reader_tflite:
 
   crop_zones_global: ${id_prefix}_crop_zones  # Reference the global variables set in globals_AI_component.yaml | To update, use http://[hassio]/developer-tools/action >esphome.[s3cam_tflite]_set_crop_zones | to get, use the tools>draw_regions.py
   flash_light_controller: ${id_prefix}_flash_controller
-  ### Enhanced validation parameters
-  allow_negative_rates: false    # Prevent meter rollbacks
-  max_absolute_diff: 300         # Maximum allowed absolute difference
-
+  
   value_sensor: ${id_prefix}_meter_value
   confidence_sensor: ${id_prefix}_meter_confidence
   
@@ -168,8 +186,6 @@ meter_reader_tflite:
 
   ### Advanced parameters
   # frame_request_timeout: 15000  # ms (1000-60000)
-  high_confidence_threshold: 0.95
-  strict_confidence_check: true #all digits must be min at "high_confidence_threshold"
 
   # Pool efficiency monitoring (optional, requires DEBUG_METER_READER_MEMORY)
   # pool_job_efficiency_sensor: ${id_prefix}_pool_job_efficiency
@@ -250,4 +266,3 @@ packages:
   - !include sensor_others.yaml
   - !include logger.yaml 
   - !include time.yaml
-

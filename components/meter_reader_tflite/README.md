@@ -5,12 +5,22 @@
 ## ⚙️ Configuration
 
 ```yaml
+value_validator:
+  id: ${id_prefix}_validator
+  allow_negative_rates: false
+  max_absolute_diff: 300
+  strict_confidence_check: true
+  per_digit_confidence_threshold: 0.95
+
 meter_reader_tflite:
   id: my_meter_reader
   
   # Required
   model: "digit_recognizer.tflite"  # Model file in config directory
   camera_id: my_camera             # ID of esp32_camera component
+  
+  # Validator (recommended)
+  validator: ${id_prefix}_validator
   
   # Optional Settings
   update_interval: 60s             # How often to process images
@@ -22,10 +32,6 @@ meter_reader_tflite:
   debug_image: false               # Use embedded static image for testing
   debug_image_out_serial: false    # Dump processed image to serial (very slow!)
   rotation: "0"                    # Image rotation in degrees ("0", "90", "180", "270").
-  
-  # Advanced Validation
-  allow_negative_rates: false      # Prevent reading from decreasing
-  max_absolute_diff: 100           # Max allowed jump between readings
   
   # Sensors
   value_sensor: my_value_sensor             # Sensor to publish reading

@@ -44,13 +44,13 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     turn_on_action:
       - lambda: |-
-          if (id(${id_prefix}_meter_reader) != nullptr) {
-            id(${id_prefix}_meter_reader)->set_allow_negative_rates(true);
+          if (id(${id_prefix}_validator) != nullptr) {
+            id(${id_prefix}_validator)->set_allow_negative_rates(true);
           }
     turn_off_action:
       - lambda: |-
-          if (id(${id_prefix}_meter_reader) != nullptr) {
-            id(${id_prefix}_meter_reader)->set_allow_negative_rates(false);
+          if (id(${id_prefix}_validator) != nullptr) {
+            id(${id_prefix}_validator)->set_allow_negative_rates(false);
           }
 
   # - platform: template

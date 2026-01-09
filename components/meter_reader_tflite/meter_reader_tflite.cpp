@@ -277,19 +277,8 @@ void MeterReaderTFLite::setup() {
      });
     
     // 3. Setup Validation
-    ValueValidator::ValidationConfig val_conf;
-    val_conf.allow_negative_rates = allow_negative_rates_;
-    val_conf.max_absolute_diff = max_absolute_diff_;
-    val_conf.high_confidence_threshold = high_confidence_threshold_;
-    val_conf.per_digit_confidence_threshold = high_confidence_threshold_;
-    val_conf.strict_confidence_check = strict_confidence_check_;
-    output_validator_.set_config(val_conf);
-    output_validator_.setup();
-    
-    ESP_LOGI(TAG, "Output validation configured - AllowNegativeRates: %s, MaxAbsoluteDiff: %d, HighConfThreshold: %.2f",
-             val_conf.allow_negative_rates ? "YES" : "NO", 
-             val_conf.max_absolute_diff,
-             val_conf.high_confidence_threshold);
+    // Validation is now handled by external component wrapped in coordinator
+    // validation_coord_ is member, validator_ pointer is set via set_validator called by setup_priority
     
     // 4. Setup Camera Callback
     // Register callback on the global camera instance.
@@ -837,7 +826,7 @@ void MeterReaderTFLite::set_camera_image_format(int w, int h, const std::string 
 
 void MeterReaderTFLite::set_last_valid_value(float value) {
     ESP_LOGI(TAG, "Manual override: Setting last valid value to %.1f", value);
-    output_validator_.set_last_valid_reading((int)value);
+    validation_coord_.set_last_valid_reading((int)value);
     
     // Immediately publish this as the truth to the sensor
     if (value_sensor_) {
@@ -954,14 +943,14 @@ float MeterReaderTFLite::combine_readings(const std::vector<float>& readings) {
 bool MeterReaderTFLite::validate_and_update_reading(float raw, float conf, float& val) {
     int ival = static_cast<int>(raw);
     int oval = ival;
-    bool valid = output_validator_.validate_reading(ival, conf, oval);
+    bool valid = validation_coord_.validate_reading(ival, conf, oval);
     val = static_cast<float>(oval);
     return valid;
 }
 
 bool MeterReaderTFLite::validate_and_update_reading(const std::vector<float>& digits, const std::vector<float>& confidences, float& val) {
     int oval = 0;
-    bool valid = output_validator_.validate_reading(digits, confidences, oval);
+    bool valid = validation_coord_.validate_reading(digits, confidences, oval);
     val = static_cast<float>(oval);
     return valid;
 }
@@ -1086,6 +1075,9 @@ void MeterReaderTFLite::dump_config() {
     ESP_LOGE(TAG, "  Component FAILED to setup");
   }
 }
+
+
+
 
 } // namespace meter_reader_tflite
 } // namespace esphome

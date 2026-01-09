@@ -15,7 +15,7 @@
 #include <cmath>
 
 namespace esphome {
-namespace meter_reader_tflite {
+namespace value_validator {
 
 /**
  * @class ReadingHistory
@@ -60,7 +60,7 @@ class ReadingHistory {
  * @class ValueValidator
  * @brief Validates meter readings against historical data and rules
  */
-class ValueValidator {
+class ValueValidator : public Component {
  public:
   struct ValidationConfig {
     bool allow_negative_rates{false};
@@ -75,7 +75,10 @@ class ValueValidator {
   };
 
   ~ValueValidator();
-  void setup();
+  void setup() override;
+  void dump_config() override;
+  float get_setup_priority() const override { return setup_priority::DATA; }
+
   // Legacy single-value validation
   bool validate_reading(int new_reading, float confidence, int& validated_reading);
   // Per-digit validation
@@ -84,12 +87,22 @@ class ValueValidator {
   void set_config(const ValidationConfig& config) { config_ = config; }
   const ValidationConfig& get_config() const { return config_; }
   
+  // Setters for configuration
+  void set_allow_negative_rates(bool v) { config_.allow_negative_rates = v; }
+  void set_max_absolute_diff(int v) { config_.max_absolute_diff = v; }
+  void set_max_rate_change(float v) { config_.max_rate_change = v; }
+  void set_enable_smart_validation(bool v) { config_.enable_smart_validation = v; }
+  void set_smart_validation_window(int v) { config_.smart_validation_window = v; }
+  void set_high_confidence_threshold(float v) { config_.high_confidence_threshold = v; }
+  void set_max_history_size_bytes(size_t v) { config_.max_history_size_bytes = v; }
+  void set_per_digit_confidence_threshold(float v) { config_.per_digit_confidence_threshold = v; }
+  void set_strict_confidence_check(bool v) { config_.strict_confidence_check = v; }
+
   int get_last_valid_reading() const { return last_valid_reading_; }
   const ReadingHistory& get_history() const { return history_; }
   
   void reset();
   void set_last_valid_reading(int value);
-  void set_strict_confidence_check(bool strict);
 
  private:
   ValidationConfig config_;
@@ -131,5 +144,5 @@ class ValueValidator {
   void free_resources();
 };
 
-}  // namespace meter_reader_tflite
+}  // namespace value_validator
 }  // namespace esphome

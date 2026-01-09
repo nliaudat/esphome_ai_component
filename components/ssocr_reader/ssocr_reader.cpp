@@ -13,11 +13,8 @@ void SSOCRReader::setup() {
   ESP_LOGCONFIG(TAG, "Setting up SSOCR Reader...");
 
   // 1. Setup Validation
-  ValueValidator::ValidationConfig val_conf;
-  val_conf.allow_negative_rates = allow_negative_rates_;
-  val_conf.max_absolute_diff = max_absolute_diff_;
-  output_validator_.set_config(val_conf);
-  output_validator_.setup();
+  // External component handles this
+
 
   // 2. Setup Camera Coordinator
   if (this->camera_) {
@@ -240,7 +237,8 @@ void SSOCRReader::process_image(std::shared_ptr<esphome::camera::CameraImage> im
           
           // Validate
           int validated_v = v;
-          bool valid = output_validator_.validate_reading(v, 1.0f, validated_v); 
+          bool valid = validation_coord_.validate_reading(v, 1.0f, validated_v); 
+
           
           if (valid) {
               this->value_sensor_->publish_state((float)validated_v);
