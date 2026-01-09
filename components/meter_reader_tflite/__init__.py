@@ -72,7 +72,7 @@ def datasize_to_bytes(value):
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(MeterReaderTFLite),
     cv.Required(CONF_MODEL): cv.file_,
-    cv.Required(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator),
+    cv.Optional(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator),
     cv.Optional(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera) if CORE.target_platform == "esp32" else cv.string,
     # cv.Optional(CONF_MODEL_TYPE, default="class100-0180"): cv.string,  # Add model type selection
     cv.Optional(CONF_CONFIDENCE_THRESHOLD, default=0.85): cv.float_range(
@@ -159,8 +159,9 @@ async def to_code(config):
     await cg.register_component(var, config)
     
     # Register validator
-    v = await cg.get_variable(config[CONF_VALIDATOR])
-    cg.add(var.set_validator(v))
+    if CONF_VALIDATOR in config:
+        v = await cg.get_variable(config[CONF_VALIDATOR])
+        cg.add(var.set_validator(v))
 
     if CORE.target_platform == "esp32":
         cam = await cg.get_variable(config[CONF_CAMERA_ID])

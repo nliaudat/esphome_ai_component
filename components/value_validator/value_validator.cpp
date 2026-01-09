@@ -309,6 +309,9 @@ bool ValueValidator::validate_reading(const std::vector<float>& digits, const st
           
           if (new_d != old_d) {
               // Digit changed. Check confidence.
+              ESP_LOGD(TAG, "Digit %d changed (%d -> %d). Conf: %.2f vs Threshold: %.2f", 
+                       (int)i, old_d, new_d, conf, config_.per_digit_confidence_threshold);
+                       
               if (conf < config_.per_digit_confidence_threshold) {
                   // Confidence too low for a change. Reject it.
                   ESP_LOGW(TAG, "Digit %d change rejected (Val: %d->%d, Conf: %.2f < %.2f)", 
@@ -345,14 +348,25 @@ bool ValueValidator::validate_reading(const std::vector<float>& digits, const st
           }
       }
   } else {
-       // First reading or no history - check all digits strictly
-       for (size_t i = 0; i < current_digits.size(); i++) {
-           float conf = (i < confidences.size()) ? confidences[i] : 0.0f;
-           if (conf < config_.per_digit_confidence_threshold) {
-               ESP_LOGW(TAG, "Initial reading digit %d low confidence (Conf: %.2f < %.2f)", 
-                        (int)i, conf, config_.per_digit_confidence_threshold);
-               final_valid_check = false;
-           }
+       // First reading or no history 
+       
+       if (config_.strict_confidence_check) {
+            ESP_LOGD(TAG, "First reading (Strict Mode): Checking %d digits against %.2f", 
+                     (int)current_digits.size(), config_.per_digit_confidence_threshold);
+            
+            for (size_t i = 0; i < current_digits.size(); i++) {
+                float conf = (i < confidences.size()) ? confidences[i] : 0.0f;
+                // ... same logic ...
+                if (conf < config_.per_digit_confidence_threshold) {
+                     ESP_LOGW(TAG, "Initial reading digit %d low confidence (Conf: %.2f < %.2f) - Rejecting", 
+                              (int)i, conf, config_.per_digit_confidence_threshold);
+                     final_valid_check = false;
+                }
+            }
+       } else {
+           // If strict check is OFF, do we accept ANYTHING as the first value? 
+           // Probably yes, to "get started".
+           ESP_LOGD(TAG, "First reading: Strict check disabled, accepting (unless invalid digits).");
        }
   }
   
@@ -592,12 +606,21 @@ void ValueValidator::set_last_valid_reading(int value) {
 }
 
 void ValueValidator::set_last_valid_reading(const std::string &value) {
+  if (!value.empty()) {
+    for (char c : value) {
+      if (!isdigit(c)) {
+        ESP_LOGE(TAG, "Invalid characters in manual value string. Only digits are allowed. Got: '%s'", value.c_str());
+        return;
+      }
+    }
+  }
+
   int int_val = 0;
   if (!value.empty()) {
       char* end = nullptr;
       long val = strtol(value.c_str(), &end, 10);
-      if (end == value.c_str()) {
-          ESP_LOGE(TAG, "Failed to parse manual value string: %s", value.c_str());
+      if (end != value.c_str() + value.length()) {
+          ESP_LOGE(TAG, "Failed to parse complete manual value string: %s", value.c_str());
           return;
       }
       int_val = (int)val;
@@ -610,11 +633,7 @@ void ValueValidator::set_last_valid_reading(const std::string &value) {
   // Use the STRING length for digit count, preserving leading zeros
   ensure_last_valid_digits_size(value.length());
   for (size_t i = 0; i < value.length(); i++) {
-        if (isdigit(value[i])) {
-            last_valid_digits_data_[i] = value[i] - '0';
-        } else {
-            last_valid_digits_data_[i] = 0; // Default to 0 for non-digits?
-        }
+    last_valid_digits_data_[i] = value[i] - '0';
   }
   
   // Create a "fake" history for this value

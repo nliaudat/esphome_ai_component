@@ -151,6 +151,7 @@ value_validator:
 meter_reader_tflite:
   id: ${id_prefix}_meter_reader
   validator: ${id_prefix}_validator
+  # confidence_threshold: 0.85 # Only if validator is disabled
   camera_id: ${id_prefix}_espcam
   model: "digit_recognizer_v4_10cls_RGB.tflite"
   # model: "digit_recognizer_v4_10cls_GRAY.tflite"

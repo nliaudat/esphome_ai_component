@@ -115,24 +115,24 @@ number:
             id(${id_prefix}_meter_reader)->set_update_interval((uint32_t)(x * 1000));
           }
 
-  # Confidence Threshold
-  - platform: template
-    name: "Confidence Threshold"
-    id: ${id_prefix}_confidence_threshold
-    icon: "mdi:speedometer"
-    unit_of_measurement: "%"
-    min_value: 0
-    max_value: 100
-    step: 1
-    initial_value: 85
-    entity_category: config
-    optimistic: true
-    restore_value: true
-    set_action:
-      - lambda: |-
-          if (id(${id_prefix}_meter_reader) != nullptr) {
-            id(${id_prefix}_meter_reader)->set_confidence_threshold(x / 100.0);
-          }
+  # Confidence Threshold (only used when no external validator is configured)
+  # - platform: template
+  #   name: "Confidence Threshold"
+  #   id: ${id_prefix}_confidence_threshold
+  #   icon: "mdi:speedometer"
+  #   unit_of_measurement: "%"
+  #   min_value: 0
+  #   max_value: 100
+  #   step: 1
+  #   initial_value: 85
+  #   entity_category: config
+  #   optimistic: true
+  #   restore_value: true
+  #   set_action:
+  #     - lambda: |-
+  #         if (id(${id_prefix}_meter_reader) != nullptr) {
+  #           id(${id_prefix}_meter_reader)->set_confidence_threshold(x / 100.0);
+  #         }
 
   # Frame Request Timeout
   # - platform: template

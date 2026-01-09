@@ -1,11 +1,6 @@
 
 ## Todos by priorites : 
 
-### add image rotation
-- For Jpeg, it's very cpu and memory intensive as the image must be full decoded and then rotated
-- For RGB888/ RGB565 and grayscale, it's simpler and do not need full decoding
-waiting for https://github.com/esphome/esphome/pull/9496
-
 ### add grayscale support
 - waiting for https://github.com/esphome/esphome/pull/9496
 - performance inprovement estimated 30%
@@ -76,3 +71,13 @@ Savings: You completely eliminate the JPEG Decoding step, which is computational
 ### fix regressions
 - Guarded `arena_used_bytes` with `DEBUG_METER_READER_MEMORY`
 - Restored `inference_logs` update in async loop
+
+### robust manual value validation
+- Enforce strict digit-only validation for set_last_valid_reading
+
+### Image rotation support
+- Implemented full software rotation support
+- Handles JPEG (via decode-rotate), RGB565, RGB888, and Grayscale
+- Integrated with arbitrary rotation (float degrees)
+
+
