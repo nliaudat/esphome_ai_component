@@ -83,7 +83,12 @@ meter_reader_tflite:
   id: my_meter_reader
   model: "digit_recognizer.tflite"
   camera_id: my_camera
+  # Optional: Validator
   validator: my_validator
+
+  # If no validator is set, use simple threshold:
+  # confidence_threshold: 0.85 
+
   update_interval: 60s
   
   # Optional: Link to other components

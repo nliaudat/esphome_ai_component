@@ -19,13 +19,13 @@ meter_reader_tflite:
   model: "digit_recognizer.tflite"  # Model file in config directory
   camera_id: my_camera             # ID of esp32_camera component
   
-  # Validator (recommended)
+  # Validator (optional but recommended)
   validator: ${id_prefix}_validator
   
   # Optional Settings
   update_interval: 60s             # How often to process images
-  confidence_threshold: 0.7        # Minimum confidence (0.0 - 1.0)
-  tensor_arena_size: 512KB         # Memory for TFLite (default: 512KB)
+  # confidence_threshold: 0.85        # Used if validator is NOT set (0.0 - 1.0)
+  # tensor_arena_size: 512KB         # Memory for TFLite (default: 512KB)
   
   # Debugging
   debug: false                     # Enable verbose logging
