@@ -592,12 +592,21 @@ void ValueValidator::set_last_valid_reading(int value) {
 }
 
 void ValueValidator::set_last_valid_reading(const std::string &value) {
+  if (!value.empty()) {
+    for (char c : value) {
+      if (!isdigit(c)) {
+        ESP_LOGE(TAG, "Invalid characters in manual value string. Only digits are allowed. Got: '%s'", value.c_str());
+        return;
+      }
+    }
+  }
+
   int int_val = 0;
   if (!value.empty()) {
       char* end = nullptr;
       long val = strtol(value.c_str(), &end, 10);
-      if (end == value.c_str()) {
-          ESP_LOGE(TAG, "Failed to parse manual value string: %s", value.c_str());
+      if (end != value.c_str() + value.length()) {
+          ESP_LOGE(TAG, "Failed to parse complete manual value string: %s", value.c_str());
           return;
       }
       int_val = (int)val;
@@ -610,11 +619,7 @@ void ValueValidator::set_last_valid_reading(const std::string &value) {
   // Use the STRING length for digit count, preserving leading zeros
   ensure_last_valid_digits_size(value.length());
   for (size_t i = 0; i < value.length(); i++) {
-        if (isdigit(value[i])) {
-            last_valid_digits_data_[i] = value[i] - '0';
-        } else {
-            last_valid_digits_data_[i] = 0; // Default to 0 for non-digits?
-        }
+    last_valid_digits_data_[i] = value[i] - '0';
   }
   
   // Create a "fake" history for this value
