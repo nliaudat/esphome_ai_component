@@ -1,0 +1,156 @@
+# Value Validator Controls for Home Assistant
+# Exposes all value_validator parameters for runtime configuration
+
+switch:
+  # Allow Negative Rates
+  - platform: template
+    name: "Allow Negative Rates"
+    id: ${id_prefix}_allow_negative_rates
+    icon: "mdi:arrow-down-bold"
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - lambda: |-
+          if (id(${id_prefix}_validator) != nullptr) {
+            id(${id_prefix}_validator)->set_allow_negative_rates(true);
+          }
+    turn_off_action:
+      - lambda: |-
+          if (id(${id_prefix}_validator) != nullptr) {
+            id(${id_prefix}_validator)->set_allow_negative_rates(false);
+          }
+
+  # Enable Smart Validation
+  - platform: template
+    name: "Enable Smart Validation"
+    id: ${id_prefix}_enable_smart_validation
+    icon: "mdi:brain"
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    turn_on_action:
+      - lambda: |-
+          if (id(${id_prefix}_validator) != nullptr) {
+            id(${id_prefix}_validator)->set_enable_smart_validation(true);
+          }
+    turn_off_action:
+      - lambda: |-
+          if (id(${id_prefix}_validator) != nullptr) {
+            id(${id_prefix}_validator)->set_enable_smart_validation(false);
+          }
+
+  # Strict Confidence Check
+  - platform: template
+    name: "Strict Confidence Check"
+    id: ${id_prefix}_strict_confidence_check
+    icon: "mdi:check-decagram"
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - lambda: |-
+          if (id(${id_prefix}_validator) != nullptr) {
+            id(${id_prefix}_validator)->set_strict_confidence_check(true);
+          }
+    turn_off_action:
+      - lambda: |-
+          if (id(${id_prefix}_validator) != nullptr) {
+            id(${id_prefix}_validator)->set_strict_confidence_check(false);
+          }
+
+number:
+  # Max Absolute Difference
+  - platform: template
+    name: "Max Absolute Difference"
+    id: ${id_prefix}_max_absolute_diff_num
+    icon: "mdi:delta"
+    min_value: 0
+    max_value: 2000
+    step: 10
+    initial_value: 300
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          if (id(${id_prefix}_validator) != nullptr) {
+            id(${id_prefix}_validator)->set_max_absolute_diff((int)x);
+          }
+
+  # Max Rate Change (percentage)
+  - platform: template
+    name: "Max Rate Change"
+    id: ${id_prefix}_max_rate_change
+    icon: "mdi:speedometer"
+    unit_of_measurement: "%"
+    min_value: 0
+    max_value: 100
+    step: 1
+    initial_value: 15
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          if (id(${id_prefix}_validator) != nullptr) {
+            id(${id_prefix}_validator)->set_max_rate_change(x / 100.0);  // Convert % to decimal
+          }
+
+  # Smart Validation Window
+  - platform: template
+    name: "Smart Validation Window"
+    id: ${id_prefix}_smart_validation_window
+    icon: "mdi:window-open"
+    unit_of_measurement: "readings"
+    min_value: 1
+    max_value: 20
+    step: 1
+    initial_value: 5
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          if (id(${id_prefix}_validator) != nullptr) {
+            id(${id_prefix}_validator)->set_smart_validation_window((int)x);
+          }
+
+  # High Confidence Threshold
+  - platform: template
+    name: "High Confidence Threshold"
+    id: ${id_prefix}_high_confidence_threshold
+    icon: "mdi:gauge-full"
+    unit_of_measurement: "%"
+    min_value: 50
+    max_value: 100
+    step: 1
+    initial_value: 90
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          if (id(${id_prefix}_validator) != nullptr) {
+            id(${id_prefix}_validator)->set_high_confidence_threshold(x / 100.0);
+          }
+
+  # Per-Digit Confidence Threshold
+  - platform: template
+    name: "Per-Digit Confidence Threshold"
+    id: ${id_prefix}_per_digit_confidence_threshold
+    icon: "mdi:format-list-numbered"
+    unit_of_measurement: "%"
+    min_value: 50
+    max_value: 100
+    step: 1
+    initial_value: 90
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          if (id(${id_prefix}_validator) != nullptr) {
+            id(${id_prefix}_validator)->set_per_digit_confidence_threshold(x / 100.0);
+          }
+

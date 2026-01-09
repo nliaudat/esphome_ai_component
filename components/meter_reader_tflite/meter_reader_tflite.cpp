@@ -834,6 +834,22 @@ void MeterReaderTFLite::set_last_valid_value(float value) {
     }
 }
 
+void MeterReaderTFLite::set_last_valid_value(const std::string &value) {
+    // Try to parse just to publish to sensor if valid number
+    char* end = nullptr;
+    float f = strtof(value.c_str(), &end);
+    if (end != value.c_str()) {
+        if (value_sensor_) {
+            value_sensor_->publish_state(f);
+        }
+    }
+
+    // Pass string to validator to preserve digit count (leading zeros)
+    // This allows solving the "8 digits vs 6 digits" mismatch by forcing 8 digits (with 00 prefix)
+    validation_coord_.set_last_valid_reading(value);
+}
+
+
 void MeterReaderTFLite::set_flash_light(light::LightState* light) {
     flashlight_coord_.setup(this, light, nullptr);
 }

@@ -1,0 +1,289 @@
+# Meter Reader TFLite Controls for Home Assistant
+# Exposes meter_reader_tflite parameters for runtime configuration
+
+switch:
+  # Pause AI Processing
+  - platform: template
+    name: "Pause AI Processing"
+    id: ${id_prefix}_pause_ai_processing
+    icon: "mdi:pause"
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - lambda: |-
+          if (id(${id_prefix}_meter_reader) != nullptr) {
+            id(${id_prefix}_meter_reader)->set_pause_processing(true);
+          }
+    turn_off_action:
+      - lambda: |-
+          if (id(${id_prefix}_meter_reader) != nullptr) {
+            id(${id_prefix}_meter_reader)->set_pause_processing(false);
+          }
+
+  # Setup Mode (Preview)
+  - platform: template
+    name: "Setup Mode (Preview)"
+    id: ${id_prefix}_setup_mode_preview
+    icon: "mdi:camera-cog"
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - lambda: |-
+          if (id(${id_prefix}_meter_reader) != nullptr) {
+            id(${id_prefix}_meter_reader)->set_generate_preview(true);
+          }
+    turn_off_action:
+      - lambda: |-
+          if (id(${id_prefix}_meter_reader) != nullptr) {
+            id(${id_prefix}_meter_reader)->set_generate_preview(false);
+          }
+
+  # # Show Crop Areas
+  # - platform: template
+  #   name: "Show Crop Areas"
+  #   id: ${id_prefix}_show_crop_areas
+  #   icon: "mdi:crop"
+  #   entity_category: config
+  #   optimistic: true
+  #   restore_mode: RESTORE_DEFAULT_ON
+  #   turn_on_action:
+  #     - lambda: |-
+  #         if (id(${id_prefix}_meter_reader) != nullptr) {
+  #           id(${id_prefix}_meter_reader)->set_show_crop_areas(true);
+  #         }
+  #   turn_off_action:
+  #     - lambda: |-
+  #         if (id(${id_prefix}_meter_reader) != nullptr) {
+  #           id(${id_prefix}_meter_reader)->set_show_crop_areas(false);
+  #         }
+
+  # # Debug Mode
+  # - platform: template
+  #   name: "Debug Mode"
+  #   id: ${id_prefix}_debug_mode
+  #   icon: "mdi:bug"
+  #   entity_category: config
+  #   optimistic: true
+  #   restore_mode: RESTORE_DEFAULT_OFF
+
+  # # Debug Image
+  # - platform: template
+  #   name: "Debug Image"
+  #   id: ${id_prefix}_debug_image
+  #   icon: "mdi:image-search"
+  #   entity_category: config
+  #   optimistic: true
+  #   restore_mode: RESTORE_DEFAULT_OFF
+
+  # Debug Timing
+  - platform: template
+    name: "Debug Timing"
+    id: ${id_prefix}_debug_timing
+    icon: "mdi:clock-fast"
+    entity_category: diagnostic
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+
+  # # Enable Flash Calibration
+  # - platform: template
+  #   name: "Enable Flash Calibration"
+  #   id: ${id_prefix}_enable_flash_calibration
+  #   icon: "mdi:flash-auto"
+  #   entity_category: config
+  #   optimistic: true
+  #   restore_mode: RESTORE_DEFAULT_OFF
+
+number:
+  # Update Interval
+  - platform: template
+    name: "Update Interval"
+    id: ${id_prefix}_meter_update_interval
+    icon: "mdi:timer"
+    unit_of_measurement: "s"
+    min_value: 1
+    max_value: 3600
+    step: 1
+    initial_value: 60
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          if (id(${id_prefix}_meter_reader) != nullptr) {
+            id(${id_prefix}_meter_reader)->set_update_interval((uint32_t)(x * 1000));
+          }
+
+  # Confidence Threshold
+  - platform: template
+    name: "Confidence Threshold"
+    id: ${id_prefix}_confidence_threshold
+    icon: "mdi:speedometer"
+    unit_of_measurement: "%"
+    min_value: 0
+    max_value: 100
+    step: 1
+    initial_value: 85
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          if (id(${id_prefix}_meter_reader) != nullptr) {
+            id(${id_prefix}_meter_reader)->set_confidence_threshold(x / 100.0);
+          }
+
+  # Frame Request Timeout
+  # - platform: template
+  #   name: "Frame Request Timeout"
+  #   id: ${id_prefix}_frame_request_timeout
+  #   icon: "mdi:timer-alert"
+  #   unit_of_measurement: "ms"
+  #   min_value: 1000
+  #   max_value: 60000
+  #   step: 1000
+  #   initial_value: 15000
+  #   entity_category: config
+  #   optimistic: true
+  #   restore_value: true
+  #   set_action:
+  #     - lambda: |-
+  #         if (id(${id_prefix}_meter_reader) != nullptr) {
+  #           id(${id_prefix}_meter_reader)->set_frame_request_timeout((uint32_t)x);
+  #         }
+
+  # Set Last Valid Value
+  - platform: template
+    name: "Set Last Valid Value"
+    id: ${id_prefix}_set_last_valid
+    icon: "mdi:restore"
+    min_value: 0
+    max_value: 9999999
+    step: 1
+    initial_value: 0
+    entity_category: config
+    optimistic: true
+    set_action:
+      - lambda: |-
+          if (id(${id_prefix}_meter_reader) != nullptr) {
+            id(${id_prefix}_meter_reader)->set_last_valid_value(x);
+          }
+
+button:
+  # # Start Flash Calibration
+  # - platform: template
+  #   name: "Start Flash Calibration"
+  #   id: ${id_prefix}_start_flash_calibration_btn
+  #   icon: "mdi:timer-sand"
+  #   entity_category: config
+  #   on_press:
+  #     - lambda: |-
+  #         if (id(${id_prefix}_meter_reader) != nullptr) {
+  #           id(${id_prefix}_meter_reader)->start_flash_calibration(); 
+  #         }
+
+  # Unload AI Components
+  - platform: template
+    name: "Unload AI Components"
+    id: ${id_prefix}_unload_btn
+    icon: "mdi:download-off"
+    entity_category: config
+
+  # Reload AI Components
+  - platform: template
+    name: "Reload AI Components"
+    id: ${id_prefix}_reload_btn
+    icon: "mdi:reload"
+    entity_category: config
+
+sensor:
+  # Meter Reading
+  - platform: template
+    name: "Meter Reading"
+    id: ${id_prefix}_meter_value
+    unit_of_measurement: "${meter_unit}"
+    accuracy_decimals: 0
+    icon: "mdi:counter"
+    state_class: ${meter_state_class}
+    device_class: ${meter_device_class}
+
+  # Meter Reading Confidence
+  - platform: template
+    name: "Meter Reading Confidence"
+    id: ${id_prefix}_meter_confidence
+    unit_of_measurement: "%"
+    accuracy_decimals: 2
+    icon: "mdi:percent"
+
+
+
+text:
+  # Set Last Valid Value (String) - Supports leading zeros
+  - platform: template
+    name: "Set Last Valid Value (String)"
+    id: ${id_prefix}_set_last_valid_string
+    icon: "mdi:form-textbox"
+    mode: text
+    entity_category: config
+    optimistic: true
+    min_length: 1
+    max_length: 20
+    set_action:
+      - lambda: |-
+          if (id(${id_prefix}_meter_reader) != nullptr) {
+            id(${id_prefix}_meter_reader)->set_last_valid_value(x);
+          }
+
+# API Services
+api:
+  services:
+    # Get Meter Data
+    - service: get_meter_data
+      then:
+        - lambda: |-
+            auto val = id(${id_prefix}_meter_reader).get_value_sensor()->state;
+            auto conf = id(${id_prefix}_meter_reader).get_confidence_sensor()->state;
+            ESP_LOGD("api", "Meter Data: Value=%.2f, Confidence=%.2f", val, conf);
+
+    # Set Crop Zones
+    - service: set_crop_zones
+      variables:
+        zones: string
+      then:
+        - text_sensor.template.publish:
+            id: ${id_prefix}_crop_zones_sensor
+            state: !lambda 'return zones;'
+        - lambda: |-
+            id(${id_prefix}_crop_zones) = zones;
+            id(${id_prefix}_meter_reader).set_crop_zones(zones);
+
+
+    # Trigger Inference
+    - service: trigger_inference
+      then:
+        - lambda: 'id(${id_prefix}_meter_reader).force_flash_inference();'
+
+    # Start Flash Calibration
+    - service: start_flash_calibration
+      then:
+        - lambda: 'id(${id_prefix}_meter_reader).start_flash_calibration();'
+
+text_sensor:
+  # Inference Logs
+  - platform: template
+    name: "Inference Logs"
+    id: ${id_prefix}_inference_logs
+    icon: "mdi:text-box-outline"
+
+  # Main Logs
+  - platform: template
+    name: "Main Logs"
+    id: ${id_prefix}_main_logs
+    icon: "mdi:text-box-multiple-outline"
+
+  # Crop Zones
+  - platform: template
+    name: "Crop Zones"
+    id: ${id_prefix}_crop_zones_sensor
+    icon: "mdi:crop"

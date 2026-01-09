@@ -103,6 +103,7 @@ class ValueValidator : public Component {
   
   void reset();
   void set_last_valid_reading(int value);
+  void set_last_valid_reading(const std::string &value);
 
  private:
   ValidationConfig config_;

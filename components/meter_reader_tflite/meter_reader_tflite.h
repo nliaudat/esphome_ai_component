@@ -123,6 +123,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_frame_request_timeout(uint32_t ms) { frame_request_timeout_ms_ = ms; }
   void set_high_confidence_threshold(float threshold) { high_confidence_threshold_ = threshold; }
   void set_last_valid_value(float value);
+  void set_last_valid_value(const std::string &value);
 
   // Pause
   void set_pause_processing(bool pause) { pause_processing_.store(pause); }

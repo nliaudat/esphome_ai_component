@@ -1,0 +1,41 @@
+# Flash Light Controller Controls for Home Assistant
+# Exposes flash_light_controller parameters for runtime configuration
+
+number:
+  # Flash Pre-Time
+  - platform: template
+    name: "Flash Pre-Time"
+    id: ${id_prefix}_flash_pre_time_setting
+    icon: "mdi:lightning-bolt"
+    unit_of_measurement: "ms"
+    min_value: 0
+    max_value: 10000
+    step: 100
+    initial_value: 7000
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          if (id(${id_prefix}_flash_controller) != nullptr) {
+            id(${id_prefix}_flash_controller)->set_flash_pre_time((uint32_t)x);
+          }
+
+  # Flash Post-Time
+  - platform: template
+    name: "Flash Post-Time"
+    id: ${id_prefix}_flash_post_time_setting
+    icon: "mdi:lightning-bolt-outline"
+    unit_of_measurement: "ms"
+    min_value: 0
+    max_value: 5000
+    step: 100
+    initial_value: 2000
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          if (id(${id_prefix}_flash_controller) != nullptr) {
+            id(${id_prefix}_flash_controller)->set_flash_post_time((uint32_t)x);
+          }
