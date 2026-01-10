@@ -22,9 +22,9 @@ external_components:
 
 substitutions:
 
-  name: test #no special caracters
+  name: esp_cam_2mb #no special caracters
   friendly_name: "test-ssocr"
-  id_prefix: "test" #if you have more than one board, it could be usefull to remane all the "id:prefix_xxxx" with a decicaded prefix
+  id_prefix: "esp_cam_2mb" #if you have more than one board, it could be usefull to remane all the "id:prefix_xxxx" with a decicaded prefix
   # name: esp-cam-2mb #no special caracters
   # friendly_name: "esp-cam-2mb"
   # id_prefix: "esp_cam_2mb" #if you have more than one board, it could be usefull to remane all the "id:prefix_xxxx" with a decicaded prefix
