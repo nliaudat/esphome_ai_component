@@ -397,7 +397,7 @@
             const help = document.getElementById('help-text');
             if (mode === 'roi') help.textContent = "Draw a rectangle to define the Camera Window (Blue). Optional: If skipped, full sensor is used.";
             else if (mode === 'digits') help.textContent = "Draw boxes around each digit (Green).";
-            else if (mode === 'analog') help.textContent = "Draw boxes around each dial (Orange).";
+            else if (mode === 'analog') help.textContent = "Click Center & Drag to create a Square Dial (Orange).";
 
             updateCanvas();
         }
@@ -764,6 +764,7 @@
                 } else {
                     lines.push(`# Crop Zones (Sensor Space - Relative to Window)`);
                 }
+                lines.push(`initial_value: '"${jsonStr}"'`);
             }
 
             // Analog Dials
@@ -838,12 +839,22 @@
             // Draw scratch rect
             let color = '#3498db'; // ROI
             if (state.mode === 'digits') color = '#2ecc71';
-            if (state.mode === 'analog') color = '#f39c12';
 
             ctx.strokeStyle = color;
             ctx.lineWidth = 2;
             ctx.setLineDash([5, 5]);
-            ctx.strokeRect(state.startPos.x, state.startPos.y, w, h);
+
+            if (state.mode === 'analog') {
+                ctx.strokeStyle = '#f39c12';
+                // Center-based Square
+                let dist = Math.max(Math.abs(pos.x - state.startPos.x), Math.abs(pos.y - state.startPos.y));
+                let cx = state.startPos.x;
+                let cy = state.startPos.y;
+                ctx.strokeRect(cx - dist, cy - dist, dist * 2, dist * 2);
+            } else {
+                ctx.strokeRect(state.startPos.x, state.startPos.y, w, h);
+            }
+
             ctx.setLineDash([]);
         }
 
@@ -853,10 +864,23 @@
             const pos = getMousePos(e);
 
             // Normalize Rect
-            let x = Math.min(state.startPos.x, pos.x);
-            let y = Math.min(state.startPos.y, pos.y);
-            let w = Math.abs(pos.x - state.startPos.x);
-            let h = Math.abs(pos.y - state.startPos.y);
+            let x, y, w, h;
+
+            if (state.mode === 'analog') {
+                // Center-based Square
+                let dist = Math.max(Math.abs(pos.x - state.startPos.x), Math.abs(pos.y - state.startPos.y));
+                let cx = state.startPos.x;
+                let cy = state.startPos.y;
+                x = cx - dist;
+                y = cy - dist;
+                w = dist * 2;
+                h = dist * 2;
+            } else {
+                x = Math.min(state.startPos.x, pos.x);
+                y = Math.min(state.startPos.y, pos.y);
+                w = Math.abs(pos.x - state.startPos.x);
+                h = Math.abs(pos.y - state.startPos.y);
+            }
 
             // Snap/Min size
             if (w < 4 || h < 4) return;
