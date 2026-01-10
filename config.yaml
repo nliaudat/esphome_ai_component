@@ -13,7 +13,7 @@ external_components:
   - source:
       type: local
       path: components 
-    components: [meter_reader_tflite, tflite_micro_helper, esp32_camera_utils, flash_light_controller, value_validator]# data_collector] #, ssocr_reader] 
+    components: [meter_reader_tflite, tflite_micro_helper, esp32_camera_utils, flash_light_controller, value_validator] # data_collector] #, ssocr_reader #, analog_reader] 
       
 
 

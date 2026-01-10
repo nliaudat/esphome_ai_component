@@ -16,7 +16,6 @@ secrets.yaml
 /components/esp32_camera_utils/__pycache__
 /components/flash_light_controller/__pycache__
 /components/tflite_micro_helper/__pycache__
-
 .github/workflows/ci.yml
 .clang-format
 test.yaml
@@ -29,3 +28,4 @@ config_test.yaml
 analyze_heap.py
 config_coldwater.yaml
 config_hotwater.yaml
+dig-class100-0180-s2-q.tflite
