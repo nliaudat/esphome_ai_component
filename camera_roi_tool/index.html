@@ -239,6 +239,7 @@
                 <button class="mode-btn active" onclick="setMode('roi')" id="btn-mode-roi">1. Set Camera ROI
                     (Optional)</button>
                 <button class="mode-btn" onclick="setMode('digits')" id="btn-mode-digits">2. Set Digit Zones</button>
+                <button class="mode-btn" onclick="setMode('analog')" id="btn-mode-analog">3. Set Analog Dials</button>
             </div>
 
             <p class="help-text" id="help-text">Select "Load Image" to start. Then draw the Camera ROI (Blue) to define
@@ -256,6 +257,10 @@
                 <div class="legend-item">
                     <div class="color-box" style="background: rgba(46, 204, 113, 0.3); border: 2px solid #2ecc71;">
                     </div> Digit Zones (Software Crop)
+                </div>
+                <div class="legend-item">
+                    <div class="color-box" style="background: rgba(243, 156, 18, 0.3); border: 2px solid #f39c12;">
+                    </div> Analog Dials (Software Crop)
                 </div>
             </div>
         </div>
@@ -307,6 +312,7 @@
             mode: 'roi', // 'roi', 'digits'
             roi: null, // {x, y, w, h} in ROTATED coordinates
             digits: [], // Array of {x, y, w, h} in ROTATED coordinates relative to 0,0 of canvas
+            dials: [], // Array of {x, y, w, h} for analog dials
             isDrawing: false,
             startPos: null,
             sensorRes: { w: 1600, h: 1200, name: "OV2640 UXGA (1600x1200)" },
@@ -377,6 +383,7 @@
             if (confirm("Changing rotation will clear current regions. Continue?")) {
                 state.roi = null;
                 state.digits = [];
+                state.dials = [];
                 updateCanvas();
                 generateOutput();
             }
@@ -389,7 +396,8 @@
 
             const help = document.getElementById('help-text');
             if (mode === 'roi') help.textContent = "Draw a rectangle to define the Camera Window (Blue). Optional: If skipped, full sensor is used.";
-            else help.textContent = "Draw boxes around each digit (Green).";
+            else if (mode === 'digits') help.textContent = "Draw boxes around each digit (Green).";
+            else if (mode === 'analog') help.textContent = "Click Center & Drag to create a Square Dial (Orange).";
 
             updateCanvas();
         }
@@ -470,6 +478,20 @@
                 ctx.font = '12px sans-serif';
                 ctx.globalAlpha = 1.0;
                 ctx.fillText(`#${i + 1}`, d.x + 2, d.y + 12);
+            });
+
+            // Draw Dials
+            state.dials.forEach((d, i) => {
+                ctx.strokeStyle = '#f39c12';
+                ctx.lineWidth = 2;
+                ctx.fillStyle = 'rgba(243, 156, 18, 0.3)';
+                ctx.fillRect(d.x, d.y, d.w, d.h);
+                ctx.strokeRect(d.x, d.y, d.w, d.h);
+
+                ctx.fillStyle = '#fff';
+                ctx.font = '12px sans-serif';
+                ctx.globalAlpha = 1.0;
+                ctx.fillText(`D${i + 1}`, d.x + 2, d.y + 12);
             });
         }
 
@@ -745,6 +767,49 @@
                 lines.push(`initial_value: '"${jsonStr}"'`);
             }
 
+            // Analog Dials
+            if (state.dials.length > 0) {
+                // Same logic as digits
+                const dials_yaml = state.dials.map((d_vis, i) => {
+                    const sensor_g = mapToOriginal(d_vis.x, d_vis.y, d_vis.w, d_vis.h);
+                    const d_sensor_x = sensor_g.x * scale_x;
+                    const d_sensor_y = sensor_g.y * scale_y;
+                    const d_sensor_w = sensor_g.w * scale_x;
+                    const d_sensor_h = sensor_g.h * scale_y;
+
+                    let rel_x = d_sensor_x - off_x;
+                    let rel_y = d_sensor_y - off_y;
+
+                    let out_w = (state.rotation % 180 === 0) ? w : h;
+                    let out_h = (state.rotation % 180 === 0) ? h : w;
+
+                    let fin_x, fin_y, fin_w, fin_h;
+
+                    switch (state.rotation) {
+                        case 0: fin_x = rel_x; fin_y = rel_y; fin_w = d_sensor_w; fin_h = d_sensor_h; break;
+                        case 90: fin_x = out_w - rel_y - d_sensor_h; fin_y = rel_x; fin_w = d_sensor_h; fin_h = d_sensor_w; break;
+                        case 180: fin_x = out_w - rel_x - d_sensor_w; fin_y = out_h - rel_y - d_sensor_h; fin_w = d_sensor_w; fin_h = d_sensor_h; break;
+                        case 270: fin_x = rel_y; fin_y = out_h - rel_x - d_sensor_w; fin_w = d_sensor_h; fin_h = d_sensor_w; break;
+                    }
+
+                    return `    - id: dial_${i + 1}
+      crop_x: ${Math.round(fin_x)}
+      crop_y: ${Math.round(fin_y)}
+      crop_w: ${Math.round(fin_w)}
+      crop_h: ${Math.round(fin_h)}
+      min_angle: 0
+      max_angle: 360
+      min_value: 0
+      max_value: 10`;
+                });
+
+                lines.push(``);
+                lines.push(`# Analog Dials Config`);
+                lines.push(`analog_reader:`);
+                lines.push(`  dials:`);
+                lines.push(dials_yaml.join('\n'));
+            }
+
             ta.value = lines.join('\n');
         }
 
@@ -772,10 +837,24 @@
             updateCanvas(); // Clear old partial rect
 
             // Draw scratch rect
-            ctx.strokeStyle = state.mode === 'roi' ? '#3498db' : '#2ecc71';
+            let color = '#3498db'; // ROI
+            if (state.mode === 'digits') color = '#2ecc71';
+
+            ctx.strokeStyle = color;
             ctx.lineWidth = 2;
             ctx.setLineDash([5, 5]);
-            ctx.strokeRect(state.startPos.x, state.startPos.y, w, h);
+
+            if (state.mode === 'analog') {
+                ctx.strokeStyle = '#f39c12';
+                // Center-based Square
+                let dist = Math.max(Math.abs(pos.x - state.startPos.x), Math.abs(pos.y - state.startPos.y));
+                let cx = state.startPos.x;
+                let cy = state.startPos.y;
+                ctx.strokeRect(cx - dist, cy - dist, dist * 2, dist * 2);
+            } else {
+                ctx.strokeRect(state.startPos.x, state.startPos.y, w, h);
+            }
+
             ctx.setLineDash([]);
         }
 
@@ -785,10 +864,23 @@
             const pos = getMousePos(e);
 
             // Normalize Rect
-            let x = Math.min(state.startPos.x, pos.x);
-            let y = Math.min(state.startPos.y, pos.y);
-            let w = Math.abs(pos.x - state.startPos.x);
-            let h = Math.abs(pos.y - state.startPos.y);
+            let x, y, w, h;
+
+            if (state.mode === 'analog') {
+                // Center-based Square
+                let dist = Math.max(Math.abs(pos.x - state.startPos.x), Math.abs(pos.y - state.startPos.y));
+                let cx = state.startPos.x;
+                let cy = state.startPos.y;
+                x = cx - dist;
+                y = cy - dist;
+                w = dist * 2;
+                h = dist * 2;
+            } else {
+                x = Math.min(state.startPos.x, pos.x);
+                y = Math.min(state.startPos.y, pos.y);
+                w = Math.abs(pos.x - state.startPos.x);
+                h = Math.abs(pos.y - state.startPos.y);
+            }
 
             // Snap/Min size
             if (w < 4 || h < 4) return;
@@ -796,7 +888,8 @@
             if (state.mode === 'roi') {
                 state.roi = { x, y, w, h };
                 state.digits = []; // Reset digits if ROI changes
-            } else {
+                state.dials = [];
+            } else if (state.mode === 'digits') {
                 if (state.roi) {
                     // Clip/Ensure inside ROI (Warning only)
                     if (x < state.roi.x || y < state.roi.y ||
@@ -805,8 +898,16 @@
                         if (!confirm("Warning: Zone is outside ROI. Keep it?")) return;
                     }
                 }
-
                 state.digits.push({ x: x, y: y, w: w, h: h });
+            } else if (state.mode === 'analog') {
+                if (state.roi) {
+                    if (x < state.roi.x || y < state.roi.y ||
+                        (x + w) > (state.roi.x + state.roi.w) ||
+                        (y + h) > (state.roi.y + state.roi.h)) {
+                        if (!confirm("Warning: Dial is outside ROI. Keep it?")) return;
+                    }
+                }
+                state.dials.push({ x: x, y: y, w: w, h: h });
             }
 
             updateCanvas();
@@ -816,6 +917,7 @@
         function resetCurrent() {
             if (state.mode === 'roi') state.roi = null;
             if (state.mode === 'digits') state.digits.pop(); // Undo last
+            if (state.mode === 'analog') state.dials.pop(); // Undo last
             updateCanvas();
             generateOutput();
         }
@@ -823,6 +925,7 @@
         function resetAll() {
             state.roi = null;
             state.digits = [];
+            state.dials = [];
             updateCanvas();
             generateOutput();
         }

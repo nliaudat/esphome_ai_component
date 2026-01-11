@@ -18,6 +18,10 @@
 // Include Value Validator Coordinator
 #include "value_validator_coordinator.h"
 
+#ifdef USE_DATA_COLLECTOR
+#include "esphome/components/data_collector/data_collector.h"
+#endif
+
 #include "esphome/components/esp32_camera_utils/crop_zone_handler.h"
 #include "esphome/components/esp32_camera_utils/esp32_camera_utils.h"
 
@@ -160,6 +164,11 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_main_logs(text_sensor::TextSensor *main_logs) { main_logs_ = main_logs; }
 
   void set_esp32_camera_utils(esp32_camera_utils::Esp32CameraUtils *utils) { esp32_camera_utils_ = utils; }
+  
+  #ifdef USE_DATA_COLLECTOR
+  void set_data_collector(data_collector::DataCollector *collector) { data_collector_ = collector; }
+  void set_collect_low_confidence(bool collect) { collect_low_confidence_ = collect; }
+  #endif
 
   // Dynamic Resource Management
   void unload_resources();
@@ -195,6 +204,9 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
  protected:
   esp32_camera_utils::Esp32CameraUtils *esp32_camera_utils_{nullptr};
+  #ifdef USE_DATA_COLLECTOR
+  data_collector::DataCollector *data_collector_{nullptr};
+  #endif
 
   // Coordinators
   TFLiteCoordinator tflite_coord_;
@@ -226,9 +238,32 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   float rotation_{0.0f};
   bool generate_preview_{false};
   bool show_crop_areas_{true};
+
   bool debug_memory_enabled_{false}; // Runtime flag
   bool window_active_{false};
   bool enable_flash_calibration_{false};
+
+  // Data Collection
+  #ifdef USE_DATA_COLLECTOR
+  bool collect_low_confidence_{false};
+  float low_confidence_trigger_threshold_{0.0f}; // User requested 0%
+  
+  enum CollectionState {
+      COLLECTION_IDLE,
+      COLLECTION_WAITING_FOR_FLASH,
+      COLLECTION_WAITING_FOR_FRAME
+  };
+  std::atomic<CollectionState> collection_state_{COLLECTION_IDLE};
+  
+  // Storage for pending collection
+  struct PendingCollection {
+      float value;
+      float confidence;
+  } pending_collection_;
+  
+  void trigger_low_confidence_collection(float value, float confidence);
+  #endif
+
   // bool strict_confidence_check_{false}; // Moved
 
   // Calibration

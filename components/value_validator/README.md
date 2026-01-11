@@ -10,29 +10,31 @@ The `value_validator` component provides robust validation and filtering of mete
 - **Per-Digit Confidence**: Validates individual digit confidence for multi-digit readings
 - **History Tracking**: Maintains reading history with configurable memory limits
 - **PSRAM Optimized**: Efficiently manages memory for ESP32 devices
+- **Multiple Instances**: Support for multiple validator configurations for different readers
+- **Optional Usage**: Can be omitted if validation is not required
 
 ## Configuration Parameters
 
+You can define a single validator or a list of validators.
+
+### Single Validator
 ```yaml
 value_validator:
-  - id: my_validator
-    
-    # Basic Validation
-    allow_negative_rates: false          # Allow values < previous value (default: false)
-    max_absolute_diff: 100               # Max allowed absolute change (default: 100)
-    max_rate_change: 0.15                # Max rate change as percentage (default: 15%)
-    
-    # Smart Validation
-    enable_smart_validation: true        # Enable adaptive validation (default: true)
-    smart_validation_window: 5           # Window size for pattern analysis (default: 5)
-    
-    # Confidence Thresholds
-    high_confidence_threshold: 0.90      # Threshold for high confidence (default: 90%)
-    per_digit_confidence_threshold: 0.85 # Min confidence per digit (default: 85%)
-    strict_confidence_check: false       # Require all digits meet threshold (default: false)
-    
-    # Memory Management
-    max_history_size: 50kB               # Max history memory usage (default: 50kB)
+  id: my_validator
+  allow_negative_rates: false
+  # ... other params
+```
+
+### Multiple Validators
+```yaml
+value_validator:
+  - id: water_validator
+    allow_negative_rates: false
+    strict_confidence_check: true
+
+  - id: pressure_validator
+    allow_negative_rates: true
+    max_rate_change: 0.25
 ```
 
 ## Parameter Details
@@ -74,30 +76,33 @@ meter_reader_tflite:
   # ... other config
 ```
 
-### SSOCR Reader
-```yaml
-value_validator:
-  id: gas_validator
-  allow_negative_rates: false
-  max_absolute_diff: 50
+### SSOCR Reader (Optional Validator)
+The validator is optional provided the component supports it (e.g., `ssocr_reader`, `analog_reader`).
 
+```yaml
 ssocr_reader:
-  validator: gas_validator
+  # validator: my_validator # Optional: Comment out if not needed
   # ... other config
 ```
 
-### Analog Reader
+### Multiple Instance Example
 ```yaml
 value_validator:
-  id: pressure_validator
-  allow_negative_rates: true  # Pressure can go up/down
-  max_rate_change: 0.25
+  - id: digital_validator
+    strict_confidence_check: true
+  - id: analog_validator
+    allow_negative_rates: true
+
+meter_reader_tflite:
+  validator: digital_validator
+  # ...
 
 analog_reader:
-  validator: pressure_validator
-  # ... other config
+  validator: analog_validator
+  # ...
 ```
 
 ## Runtime Control
 
 Validation parameters can be adjusted at runtime using Home Assistant services or the provided switches/numbers in component YAML packages.
+**Note**: The controls package (`value_validator_controls.yaml`) currently defaults to controlling the validator with ID `${id_prefix}_validator`.

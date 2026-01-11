@@ -30,7 +30,7 @@ CONF_VALIDATOR = "validator"
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(SSOCRReader),
-        cv.Required(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator),
+        cv.Optional(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator),
         cv.Optional(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera),
         cv.Optional(CONF_VALUE): sensor.sensor_schema(),
         cv.Optional(CONF_THRESHOLD_TYPE, default="fixed"): cv.enum(
@@ -60,8 +60,9 @@ async def to_code(config):
     await cg.register_component(var, config)
 
     # Validator
-    v = await cg.get_variable(config[CONF_VALIDATOR])
-    cg.add(var.set_validator(v))
+    if CONF_VALIDATOR in config:
+        v = await cg.get_variable(config[CONF_VALIDATOR])
+        cg.add(var.set_validator(v))
 
     if CONF_CAMERA_ID in config:
         cam = await cg.get_variable(config[CONF_CAMERA_ID])

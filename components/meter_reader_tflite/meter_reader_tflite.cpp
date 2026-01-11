@@ -578,11 +578,54 @@ void MeterReaderTFLite::loop() {
     #endif
 }
 
+#ifdef USE_DATA_COLLECTOR
+void MeterReaderTFLite::trigger_low_confidence_collection(float value, float confidence) {
+    if (!collect_low_confidence_ || !data_collector_) return;
+    // User requested 0% to Threshold range.
+    // if (confidence < low_confidence_trigger_threshold_) return; 
+    if (this->collection_state_ != COLLECTION_IDLE) return; 
+
+    ESP_LOGI(TAG, "Low confidence (%.2f%%) detected. Retaking with flash for data collection...", confidence * 100.0f);
+
+    pending_collection_ = {value, confidence};
+    this->collection_state_ = COLLECTION_WAITING_FOR_FLASH;
+    
+    // Force Flash via Coordinator
+    flashlight_coord_.enable_flash();
+    
+    // Wait for stabilization
+    uint32_t delay = flashlight_coord_.get_pre_time();
+    // Safety clamp
+    if (delay < 500) delay = 500;
+    if (delay > 5000) delay = 5000;
+
+    this->set_timeout(delay, [this]() {
+        ESP_LOGD(TAG, "Flash stabilized. Requesting data collection frame.");
+        this->collection_state_ = COLLECTION_WAITING_FOR_FRAME;
+        this->frame_requested_ = true;
+        this->last_request_time_ = millis();
+    });
+}
+#endif
+
 void MeterReaderTFLite::process_available_frame() {
     processing_frame_ = true;
     std::shared_ptr<camera::CameraImage> frame = pending_frame_;
     pending_frame_.reset();
     frame_available_ = false;
+    
+    // Data Collection Interception
+    #ifdef USE_DATA_COLLECTOR
+    if (this->collection_state_ == COLLECTION_WAITING_FOR_FRAME) {
+         if (this->data_collector_) {
+             this->data_collector_->collect_image(frame, pending_collection_.value, pending_collection_.confidence);
+         }
+         this->collection_state_ = COLLECTION_IDLE;
+         this->flashlight_coord_.disable_flash();
+         processing_frame_ = false;
+         return; 
+    }
+    #endif
     
     if (frame) {
         process_full_image(frame);
@@ -794,6 +837,10 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
                 avg_conf * 100.0f, confidence_threshold_ * 100.0f, high_confidence_threshold_ * 100.0f);
              ESP_LOGW(TAG, "Reading NOT published - %s", 
                      !valid ? "validation failed" : "confidence below threshold");
+             
+             #ifdef USE_DATA_COLLECTOR
+             trigger_low_confidence_collection(final_val, avg_conf);
+             #endif
         }
 
         // Calibration Logic Hook

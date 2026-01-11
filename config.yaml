@@ -13,7 +13,7 @@ external_components:
   - source:
       type: local
       path: components 
-    components: [meter_reader_tflite, tflite_micro_helper, esp32_camera_utils, flash_light_controller, value_validator] #, ssocr_reader] 
+    components: [meter_reader_tflite, tflite_micro_helper, esp32_camera_utils, flash_light_controller, value_validator] # data_collector] #, ssocr_reader #, analog_reader] 
       
 
 
@@ -126,6 +126,20 @@ flash_light_controller:
   flash_pre_time: 7000ms # 7 seconds before update (time to stabilize) (works with 5sec on my board)
   flash_post_time: 200ms # 2 seconds after update (works with 100ms on my board)
   debug: false
+  
+# data_collector:
+#   id: ${id_prefix}_data_collector
+#   upload_url: "http://192.168.1.53:5000/api/upload" # CHANGE ME
+#   # api_key: "Bearer my-secret-token" # Optional: Adds Authorization header
+#   # username: "usr" # Optional: Basic Auth
+#   # api_key: "Bearer my-secret-token" # Optional: Adds Authorization header
+  # username: "usr" # Optional: Basic Auth
+  # password: "pwd"
+  # web_submit:
+  #   name: "${friendly_name} Allow Data Collection"
+  #   id: ${id_prefix}_allow_collection
+  #   icon: "mdi:cloud-upload"
+
 
 
 value_validator:
@@ -174,6 +188,9 @@ meter_reader_tflite:
 
   crop_zones_global: ${id_prefix}_crop_zones  # Reference the global variables set in globals_AI_component.yaml | To update, use http://[hassio]/developer-tools/action >esphome.[s3cam_tflite]_set_crop_zones | to get, use the tools>draw_regions.py
   flash_light_controller: ${id_prefix}_flash_controller
+  
+  # data_collector: ${id_prefix}_data_collector
+  # collect_low_confidence: true
   
   value_sensor: ${id_prefix}_meter_value
   confidence_sensor: ${id_prefix}_meter_confidence
@@ -249,6 +266,7 @@ packages:
   - !include value_validator_controls.yaml
   - !include flash_light_controller_controls.yaml
   - !include esp32_camera_utils_controls.yaml
+  # - !include data_collector_controls.yaml
 
   
   # camera configs

@@ -42,7 +42,7 @@ DIAL_SCHEMA = cv.Schema({
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(AnalogReader),
-    cv.Required(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator),
+    cv.Optional(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator),
     cv.Required(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera),
     cv.Optional(CONF_VALUE_SENSOR): sensor.sensor_schema(),
     cv.Required(CONF_DIALS): cv.ensure_list(DIAL_SCHEMA),
@@ -63,8 +63,9 @@ async def to_code(config):
     await cg.register_component(var, config)
 
     # Validator
-    v = await cg.get_variable(config[CONF_VALIDATOR])
-    cg.add(var.set_validator(v))
+    if CONF_VALIDATOR in config:
+        v = await cg.get_variable(config[CONF_VALIDATOR])
+        cg.add(var.set_validator(v))
 
     cam = await cg.get_variable(config[CONF_CAMERA_ID])
     cg.add(var.set_camera(cam))
