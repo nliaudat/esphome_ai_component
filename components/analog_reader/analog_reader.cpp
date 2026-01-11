@@ -31,15 +31,8 @@ void AnalogReader::setup() {
       this->camera_->add_listener(this);
   }
   
-  // Configure ImageProcessor (Fixed 128x128 Grayscale)
-  // This simplifies the needle detection algorithm which can expect fixed dimensions.
-  camera_coord_.update_image_processor_config(
-      128, 128, 
-      1, // 1 Channel (Grayscale)
-      1, // Uint8
-      false, // No normalize
-      "NHWC"
-  );
+  // Configure ImageProcessor - Now handled per-dial in process_image
+  // camera_coord_.update_image_processor_config(...)
   
   // Setup Flashlight (Default: None)
   flashlight_coord_.setup(this, nullptr, nullptr);
@@ -93,37 +86,34 @@ void AnalogReader::process_image(std::shared_ptr<esphome::camera::CameraImage> i
   
   processing_frame_ = true;
   
-  // 1. Prepare Zones from Dials
-  std::vector<esphome::esp32_camera_utils::CropZone> zones;
-  for (const auto& dial : dials_) {
-      zones.push_back({dial.crop_x, dial.crop_y, dial.crop_w, dial.crop_h});
-  }
-  
-  // 2. Process via Coordinator (Get Grayscale Crops)
-  auto results = camera_coord_.process_frame(image, zones);
-  
-  if (results.size() != dials_.size()) {
-       ESP_LOGE(TAG, "Result count mismatch (Expected %d, Got %d)", dials_.size(), results.size());
-       processing_frame_ = false;
-       return;
-  }
-  
   float total_value = 0.0f;
   std::string debug_str = "";
   
-  for (size_t i = 0; i < dials_.size(); i++) {
-      auto& dial = dials_[i];
-      auto& res = results[i];
+  for (const auto& dial : dials_) {
+      // Reconfigure ImageProcessor for this dial's dimensions
+      camera_coord_.update_image_processor_config(
+          dial.crop_w, dial.crop_h, 
+          1, // 1 Channel (Grayscale)
+          1, // Uint8
+          false, // No normalize
+          "NHWC"
+      );
+
+      std::vector<esphome::esp32_camera_utils::CropZone> zones;
+      zones.push_back({dial.crop_x, dial.crop_y, dial.crop_w, dial.crop_h});
       
-      if (!res.data) continue;
+      // Process via Coordinator
+      auto results = camera_coord_.process_frame(image, zones);
       
-      uint8_t* raw = res.data->get();
+      if (results.empty() || !results[0].data) {
+           ESP_LOGE(TAG, "Failed to process dial %s", dial.id.c_str());
+           continue;
+      }
       
-      // We start with 128x128 standard crops
-      int proc_w = 128; 
-      int proc_h = 128;
+      uint8_t* raw = results[0].data->get();
       
-      float angle = find_needle_angle(raw, proc_w, proc_h, dial);
+      // Use actual crop dimensions
+      float angle = find_needle_angle(raw, dial.crop_w, dial.crop_h, dial);
       float val = angle_to_value(angle, dial);
       
       ESP_LOGD(TAG, "Dial %s: Angle=%.1f, Val=%.2f", dial.id.c_str(), angle, val);
