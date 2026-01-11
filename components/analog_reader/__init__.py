@@ -25,6 +25,7 @@ CONF_CROP_Y = "crop_y"
 CONF_CROP_W = "crop_w"
 CONF_CROP_H = "crop_h"
 CONF_VALIDATOR = "validator"
+CONF_PAUSED = "paused"
 
 DIAL_SCHEMA = cv.Schema({
     cv.Required(CONF_ID): cv.string, # String ID for logs
@@ -46,6 +47,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Required(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera),
     cv.Optional(CONF_VALUE_SENSOR): sensor.sensor_schema(),
     cv.Required(CONF_DIALS): cv.ensure_list(DIAL_SCHEMA),
+    cv.Optional(CONF_PAUSED, default=False): cv.boolean,
 }).extend(cv.polling_component_schema("10s"))
 
 async def to_code(config):
@@ -69,6 +71,9 @@ async def to_code(config):
 
     cam = await cg.get_variable(config[CONF_CAMERA_ID])
     cg.add(var.set_camera(cam))
+
+    if config[CONF_PAUSED]:
+        cg.add(var.set_pause_processing(True))
 
     if CONF_VALUE_SENSOR in config:
         sens = await sensor.new_sensor(config[CONF_VALUE_SENSOR])

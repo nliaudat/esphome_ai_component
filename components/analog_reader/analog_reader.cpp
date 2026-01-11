@@ -59,6 +59,10 @@ void AnalogReader::update() {
       return;
   }
 
+  if (paused_) {
+      return;
+  }
+
   // Request frame
   if (!frame_requested_ && !processing_frame_) {
       frame_requested_ = true;
@@ -68,6 +72,7 @@ void AnalogReader::update() {
 }
 
 void AnalogReader::on_camera_image(const std::shared_ptr<esphome::camera::CameraImage> &image) {
+    if (paused_) return;
     if (frame_requested_ && !processing_frame_) {
         // Simple lock logic
         process_image(image);

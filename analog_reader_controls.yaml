@@ -1,0 +1,42 @@
+# Analog Reader Controls for Home Assistant
+# Exposes analog_reader parameters for runtime configuration
+
+switch:
+  # Pause Analog Processing
+  - platform: template
+    name: "Pause Analog Processing"
+    id: ${id_prefix}_pause_analog_processing
+    icon: "mdi:pause"
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - lambda: |-
+          if (id(${id_prefix}_analog_reader) != nullptr) {
+            id(${id_prefix}_analog_reader)->set_pause_processing(true);
+          }
+    turn_off_action:
+      - lambda: |-
+          if (id(${id_prefix}_analog_reader) != nullptr) {
+            id(${id_prefix}_analog_reader)->set_pause_processing(false);
+          }
+
+number:
+  # Update Interval
+  - platform: template
+    name: "Update Interval"
+    id: ${id_prefix}_analog_update_interval
+    icon: "mdi:timer"
+    unit_of_measurement: "s"
+    min_value: 1
+    max_value: 3600
+    step: 1
+    initial_value: 60
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          if (id(${id_prefix}_analog_reader) != nullptr) {
+            id(${id_prefix}_analog_reader)->set_update_interval((uint32_t)(x * 1000));
+          }

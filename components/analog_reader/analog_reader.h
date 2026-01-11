@@ -45,9 +45,12 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
       pixel_format_str_ = format;
   }
 
+  void set_pause_processing(bool paused) { paused_ = paused; }
+
   void add_dial(DialConfig config) { dials_.push_back(config); }
 
  protected:
+  bool paused_{false};
   // Coordinators
   // Note: We reuse CameraCoordinator from ssocr_reader/meter_reader context
   // Assuming it's available in include path (it is in same 'components' root usually or library)
