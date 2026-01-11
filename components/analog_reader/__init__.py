@@ -26,6 +26,8 @@ CONF_CROP_W = "crop_w"
 CONF_CROP_H = "crop_h"
 CONF_VALIDATOR = "validator"
 CONF_PAUSED = "paused"
+CONF_AUTO_CONTRAST = "auto_contrast"
+CONF_CONTRAST = "contrast"
 
 DIAL_SCHEMA = cv.Schema({
     cv.Required(CONF_ID): cv.string, # String ID for logs
@@ -39,6 +41,8 @@ DIAL_SCHEMA = cv.Schema({
     cv.Optional(CONF_ANGLE_OFFSET, default=0): cv.float_, 
     cv.Optional(CONF_MIN_VALUE, default=0): cv.float_,
     cv.Optional(CONF_MAX_VALUE, default=10): cv.float_,
+    cv.Optional(CONF_AUTO_CONTRAST, default=False): cv.boolean,
+    cv.Optional(CONF_CONTRAST, default=1.0): cv.float_,
 })
 
 CONFIG_SCHEMA = cv.Schema({
@@ -101,6 +105,8 @@ async def to_code(config):
             ("angle_offset", dial[CONF_ANGLE_OFFSET]),
             ("min_value", dial[CONF_MIN_VALUE]),
             ("max_value", dial[CONF_MAX_VALUE]),
+            ("auto_contrast", dial[CONF_AUTO_CONTRAST]),
+            ("contrast", dial[CONF_CONTRAST]),
         )
         cg.add(var.add_dial(s))
 

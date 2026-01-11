@@ -41,8 +41,9 @@ void AnalogReader::setup() {
 void AnalogReader::dump_config() {
   ESP_LOGCONFIG(TAG, "Analog Reader:");
   for (const auto &dial : dials_) {
-      ESP_LOGCONFIG(TAG, "  Dial '%s': Scale=%.3f, Crop=[%d,%d,%d,%d]", 
-          dial.id.c_str(), dial.scale, dial.crop_x, dial.crop_y, dial.crop_w, dial.crop_h);
+      ESP_LOGCONFIG(TAG, "  Dial '%s': Scale=%.3f, Crop=[%d,%d,%d,%d], AutoContrast=%s, Contrast=%.2f", 
+          dial.id.c_str(), dial.scale, dial.crop_x, dial.crop_y, dial.crop_w, dial.crop_h,
+          dial.auto_contrast ? "ON" : "OFF", dial.contrast);
   }
 }
 
@@ -81,6 +82,34 @@ void AnalogReader::loop() {
     }
 }
 
+// Helpers for image enhancement
+static void apply_auto_contrast(uint8_t* data, int size) {
+    uint8_t min_val = 255;
+    uint8_t max_val = 0;
+    for (int i = 0; i < size; i++) {
+        if (data[i] < min_val) min_val = data[i];
+        if (data[i] > max_val) max_val = data[i];
+    }
+    
+    if (max_val > min_val) {
+        float scale = 255.0f / (max_val - min_val);
+        for (int i = 0; i < size; i++) {
+            data[i] = (uint8_t)((data[i] - min_val) * scale);
+        }
+    }
+}
+
+static void apply_contrast(uint8_t* data, int size, float contrast) {
+    if (std::abs(contrast - 1.0f) < 0.01f) return;
+    for (int i = 0; i < size; i++) {
+        float val = (float)data[i];
+        val = (val - 128.0f) * contrast + 128.0f;
+        if (val < 0) val = 0; 
+        if (val > 255) val = 255;
+        data[i] = (uint8_t)val;
+    }
+}
+
 void AnalogReader::process_image(std::shared_ptr<esphome::camera::CameraImage> image) {
   if (this->camera_ == nullptr || dials_.empty()) return;
   
@@ -111,6 +140,15 @@ void AnalogReader::process_image(std::shared_ptr<esphome::camera::CameraImage> i
       }
       
       uint8_t* raw = results[0].data->get();
+      size_t len = results[0].size;
+
+      // Apply enhancements
+      if (dial.auto_contrast) {
+          apply_auto_contrast(raw, len);
+      }
+      if (std::abs(dial.contrast - 1.0f) > 0.01f) {
+          apply_contrast(raw, len, dial.contrast);
+      }
       
       // Use actual crop dimensions
       float angle = find_needle_angle(raw, dial.crop_w, dial.crop_h, dial);

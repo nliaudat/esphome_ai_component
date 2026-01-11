@@ -24,6 +24,8 @@ struct DialConfig {
   float angle_offset{0.0f}; // 0 = North, 90 = East
   float min_value{0.0f};
   float max_value{10.0f};
+  bool auto_contrast{false}; // Normalization (Min-Max Stretch)
+  float contrast{1.0f};      // Multiplier (1.0 = original)
   // Future: needle_color
 };
 
@@ -46,6 +48,14 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   }
 
   void set_pause_processing(bool paused) { paused_ = paused; }
+  
+  void set_all_auto_contrast(bool enabled) {
+      for (auto &dial : dials_) dial.auto_contrast = enabled;
+  }
+  
+  void set_all_contrast(float contrast) {
+      for (auto &dial : dials_) dial.contrast = contrast;
+  }
 
   void add_dial(DialConfig config) { dials_.push_back(config); }
 
