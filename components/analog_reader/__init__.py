@@ -52,7 +52,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_VALUE_SENSOR): sensor.sensor_schema(),
     cv.Required(CONF_DIALS): cv.ensure_list(DIAL_SCHEMA),
     cv.Optional(CONF_PAUSED, default=False): cv.boolean,
-}).extend(cv.polling_component_schema("10s"))
+}).extend(cv.polling_component_schema("60s"))
 
 async def to_code(config):
     cg.add_library(

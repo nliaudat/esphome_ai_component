@@ -6,7 +6,9 @@ esphome:
     priority: -100
     then:
       - lambda: |-
+          ESP_LOGD("analog_controls", "Attempting to sync controls for ID: ${id_prefix}_analog_reader");
           if (id(${id_prefix}_analog_reader) != nullptr) {
+            ESP_LOGD("analog_controls", "Analog Reader found. Syncing config...");
             // Sync Update Interval
             float interval = id(${id_prefix}_analog_update_interval).state;
             if (!isnan(interval) && interval > 0) {
@@ -21,6 +23,8 @@ esphome:
             // Sync Auto Contrast
             bool auto_contrast = id(${id_prefix}_analog_auto_contrast).state;
             id(${id_prefix}_analog_reader)->set_all_auto_contrast(auto_contrast);
+          } else {
+             ESP_LOGE("analog_controls", "Analog Reader component NOT found with ID: ${id_prefix}_analog_reader");
           }
 
 switch:
@@ -79,7 +83,10 @@ number:
     set_action:
       - lambda: |-
           if (id(${id_prefix}_analog_reader) != nullptr) {
+            ESP_LOGD("analog_controls", "Setting update interval to %f s", x);
             id(${id_prefix}_analog_reader)->set_update_interval((uint32_t)(x * 1000));
+          } else {
+            ESP_LOGE("analog_controls", "Cannot set interval: Analog Reader ID not found");
           }
 
   # Contrast Adjustment

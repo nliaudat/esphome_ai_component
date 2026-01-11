@@ -10,6 +10,11 @@ namespace analog_reader {
 
 static const char *const TAG = "analog_reader";
 
+void AnalogReader::set_update_interval(uint32_t interval) {
+  PollingComponent::set_update_interval(interval);
+  ESP_LOGI(TAG, "Update interval set to %u ms", interval);
+}
+
 void AnalogReader::setup() {
   ESP_LOGCONFIG(TAG, "Setting up Analog Reader...");
 
@@ -40,6 +45,7 @@ void AnalogReader::setup() {
 
 void AnalogReader::dump_config() {
   ESP_LOGCONFIG(TAG, "Analog Reader:");
+  ESP_LOGCONFIG(TAG, "  Update Interval: %u ms", this->get_update_interval());
   for (const auto &dial : dials_) {
       ESP_LOGCONFIG(TAG, "  Dial '%s': Scale=%.3f, Crop=[%d,%d,%d,%d], AutoContrast=%s, Contrast=%.2f", 
           dial.id.c_str(), dial.scale, dial.crop_x, dial.crop_y, dial.crop_w, dial.crop_h,
@@ -112,36 +118,99 @@ static void apply_contrast(uint8_t* data, int size, float contrast) {
     }
 }
 
+// Helper class to wrap decoded JPEG buffer
+class DecodedImage : public esphome::camera::CameraImage {
+ public:
+  DecodedImage(esphome::esp32_camera_utils::ImageProcessor::JpegBufferPtr &&data, size_t len, int width, int height)
+      : data_(std::move(data)), len_(len), width_(width), height_(height) {}
+
+  uint8_t *get_data_buffer() override { return data_.get(); }
+  size_t get_data_length() override { return len_; }
+  bool was_requested_by(camera::CameraRequester requester) const override { return true; }
+
+  ~DecodedImage() {
+      // Trace log for memory debugging
+      ESP_LOGV("analog_reader", "Destroying DecodedImage (Buffer released)");
+  }
+
+ private:
+  esphome::esp32_camera_utils::ImageProcessor::JpegBufferPtr data_;
+  size_t len_;
+  int width_;
+  int height_;
+};
+
 void AnalogReader::process_image(std::shared_ptr<esphome::camera::CameraImage> image) {
   if (this->camera_ == nullptr || dials_.empty()) return;
   
   processing_frame_ = true;
   
+  ESP_LOGD(TAG, "Process Image Start. Valid: %s, Free Heap: %u", 
+           image ? "YES" : "NO", (uint32_t)esp_get_free_heap_size());
+  
+  // OPTIMIZATION: Decode JPEG once if needed
+  std::shared_ptr<esphome::camera::CameraImage> processing_image = image;
+  bool is_decoded = false;
+  int processing_w = img_width_;
+  int processing_h = img_height_;
+
+  if (pixel_format_str_ == "JPEG") {
+      int w, h;
+      auto decoded_buf = esphome::esp32_camera_utils::ImageProcessor::decode_jpeg(
+          image->get_data_buffer(), image->get_data_length(), &w, &h);
+      
+      if (decoded_buf) {
+          // Wrap in DecodedImage (RGB888)
+          // 3 bytes per pixel
+          processing_image = std::make_shared<DecodedImage>(std::move(decoded_buf), w * h * 3, w, h);
+          is_decoded = true;
+          processing_w = w;
+          processing_h = h;
+          ESP_LOGD(TAG, "Decoded JPEG to RGB888 (%dx%d) for batch processing", w, h);
+      } else {
+           ESP_LOGE(TAG, "Failed to decode JPEG image. Free Heap: %u", (uint32_t)esp_get_free_heap_size());
+           processing_frame_ = false;
+           return;
+      }
+  }
+
   float total_value = 0.0f;
   std::string debug_str = "";
   
   for (const auto& dial : dials_) {
       // Bounds Check
       if (dial.crop_x + dial.crop_w > img_width_ || dial.crop_y + dial.crop_h > img_height_) {
-          ESP_LOGE(TAG, "Dial %s crop is out of bounds! Image: %dx%d, Crop: [%d,%d,%d,%d]", 
-              dial.id.c_str(), img_width_, img_height_, dial.crop_x, dial.crop_y, dial.crop_w, dial.crop_h);
+          ESP_LOGE(TAG, "Dial %s crop is out of bounds!", dial.id.c_str());
           continue;
       }
       
-      // Reconfigure ImageProcessor for this dial's dimensions
-      camera_coord_.update_image_processor_config(
-          dial.crop_w, dial.crop_h, 
-          1, // 1 Channel (Grayscale)
-          1, // Uint8
-          false, // No normalize
-          "NHWC"
-      );
+      // Configure ImageProcessor explicitly
+      esphome::esp32_camera_utils::ImageProcessorConfig config;
+      if (is_decoded) {
+           config.camera_width = processing_w;
+           config.camera_height = processing_h;
+      } else {
+           config.camera_width = img_width_;
+           config.camera_height = img_height_;
+      }
+      config.pixel_format = is_decoded ? "RGB888" : pixel_format_str_;
+      config.model_width = dial.crop_w;
+      config.model_height = dial.crop_h;
+      config.model_channels = 1; // Grayscale output
+      config.input_type = esphome::esp32_camera_utils::kInputTypeUInt8;
+      
+      // Handle rotation manually if needed, but assuming crop coordinates are pre-rotated or image is upright
+      // If image is already valid, we just crop.
+      // NOTE: Original CameraCoordinator handled rotation config. 
+      // AnalogReader assumes crops are relative to the *delivered* image.
+      
+      auto processor = std::make_unique<esphome::esp32_camera_utils::ImageProcessor>(config);
 
       std::vector<esphome::esp32_camera_utils::CropZone> zones;
-      zones.push_back({dial.crop_x, dial.crop_y, dial.crop_w, dial.crop_h});
+      zones.push_back({dial.crop_x, dial.crop_y, dial.crop_x + dial.crop_w, dial.crop_y + dial.crop_h});
       
-      // Process via Coordinator
-      auto results = camera_coord_.process_frame(image, zones);
+      // Process
+      auto results = processor->split_image_in_zone(processing_image, zones);
       
       if (results.empty() || !results[0].data) {
            ESP_LOGE(TAG, "Failed to process dial %s", dial.id.c_str());
@@ -163,16 +232,26 @@ void AnalogReader::process_image(std::shared_ptr<esphome::camera::CameraImage> i
       float angle = find_needle_angle(raw, dial.crop_w, dial.crop_h, dial);
       float val = angle_to_value(angle, dial);
       
-      ESP_LOGD(TAG, "Dial %s: Angle=%.1f, Val=%.2f", dial.id.c_str(), angle, val);
+      // Convert to North-based angle for logging clarity (User expectation)
+      float display_angle = angle + 90.0f; 
+      if (display_angle >= 360.0f) display_angle -= 360.0f;
+      
+      ESP_LOGD(TAG, "Dial %s: Angle=%.1f (North), Val=%.2f", dial.id.c_str(), display_angle, val);
       
       // Aggregate
       total_value += val * dial.scale;
-      debug_str += (debug_str.empty() ? "" : ", ") + std::to_string(val);
+      
+      char val_buf[16];
+      snprintf(val_buf, sizeof(val_buf), "%.1f", val);
+      debug_str += (debug_str.empty() ? "" : ", ") + std::string(val_buf);
   }
   
   // Validation (Bypassed for Analog Reader float support)
   // int validated_int_val = (int)total_value;
   // bool valid = validation_coord_.validate_reading((int)total_value, 1.0f, validated_int_val);
+
+  // Round to 4 decimal places as requested
+  total_value = roundf(total_value * 10000.0f) / 10000.0f;
 
   ESP_LOGI(TAG, "Result: (Raw: %.4f) [%s]", total_value, debug_str.c_str());
   if (value_sensor_) {
