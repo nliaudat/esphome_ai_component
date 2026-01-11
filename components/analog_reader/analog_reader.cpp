@@ -79,7 +79,9 @@ void AnalogReader::loop() {
     if (frame_requested_ && millis() - last_request_time_ > 5000) {
         ESP_LOGW(TAG, "Frame timeout");
         frame_requested_ = false;
+        processing_frame_ = false;
     }
+    PollingComponent::loop();
 }
 
 // Helpers for image enhancement
@@ -119,6 +121,13 @@ void AnalogReader::process_image(std::shared_ptr<esphome::camera::CameraImage> i
   std::string debug_str = "";
   
   for (const auto& dial : dials_) {
+      // Bounds Check
+      if (dial.crop_x + dial.crop_w > img_width_ || dial.crop_y + dial.crop_h > img_height_) {
+          ESP_LOGE(TAG, "Dial %s crop is out of bounds! Image: %dx%d, Crop: [%d,%d,%d,%d]", 
+              dial.id.c_str(), img_width_, img_height_, dial.crop_x, dial.crop_y, dial.crop_w, dial.crop_h);
+          continue;
+      }
+      
       // Reconfigure ImageProcessor for this dial's dimensions
       camera_coord_.update_image_processor_config(
           dial.crop_w, dial.crop_h, 
@@ -161,22 +170,15 @@ void AnalogReader::process_image(std::shared_ptr<esphome::camera::CameraImage> i
       debug_str += (debug_str.empty() ? "" : ", ") + std::to_string(val);
   }
   
-  // Validation
-  // Validate the TOTAL value against the previous TOTAL value
-  int validated_int_val = (int)total_value;
-  // Using 1.0 confidence for basic analog reading until we implement confidence metric
-  bool valid = validation_coord_.validate_reading((int)total_value, 1.0f, validated_int_val);
+  // Validation (Bypassed for Analog Reader float support)
+  // int validated_int_val = (int)total_value;
+  // bool valid = validation_coord_.validate_reading((int)total_value, 1.0f, validated_int_val);
 
-  float final_val = (float)validated_int_val;
-
-  if (valid) {
-      ESP_LOGI(TAG, "Result: VALID (Raw: %.4f, Validated: %.4f) [%s]", total_value, final_val, debug_str.c_str());
-      if (value_sensor_) {
-          value_sensor_->publish_state(final_val);
-      }
-  } else {
-      ESP_LOGW(TAG, "Result: INVALID (Raw: %.4f) [%s]", total_value, debug_str.c_str());
+  ESP_LOGI(TAG, "Result: (Raw: %.4f) [%s]", total_value, debug_str.c_str());
+  if (value_sensor_) {
+      value_sensor_->publish_state(total_value);
   }
+
 
   processing_frame_ = false;
 }

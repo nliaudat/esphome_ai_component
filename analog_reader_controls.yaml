@@ -1,6 +1,28 @@
 # Analog Reader Controls for Home Assistant
 # Exposes analog_reader parameters for runtime configuration
 
+esphome:
+  on_boot:
+    priority: -100
+    then:
+      - lambda: |-
+          if (id(${id_prefix}_analog_reader) != nullptr) {
+            // Sync Update Interval
+            float interval = id(${id_prefix}_analog_update_interval).state;
+            if (!isnan(interval) && interval > 0) {
+               id(${id_prefix}_analog_reader)->set_update_interval((uint32_t)(interval * 1000));
+            }
+            // Sync Contrast
+            float contrast = id(${id_prefix}_analog_contrast).state;
+            if (!isnan(contrast)) {
+               id(${id_prefix}_analog_reader)->set_all_contrast(contrast);
+            }
+
+            // Sync Auto Contrast
+            bool auto_contrast = id(${id_prefix}_analog_auto_contrast).state;
+            id(${id_prefix}_analog_reader)->set_all_auto_contrast(auto_contrast);
+          }
+
 switch:
   # Pause Analog Processing
   - platform: template
@@ -23,8 +45,8 @@ switch:
 
   # Auto Contrast (Min-Max Normalization)
   - platform: template
-    name: "Auto Contrast"
-    id: ${id_prefix}_auto_contrast
+    name: "Analog Auto Contrast"
+    id: ${id_prefix}_analog_auto_contrast
     icon: "mdi:contrast-box"
     entity_category: config
     optimistic: true
@@ -43,7 +65,7 @@ switch:
 number:
   # Update Interval
   - platform: template
-    name: "Update Interval"
+    name: "Analog Update Interval"
     id: ${id_prefix}_analog_update_interval
     icon: "mdi:timer"
     unit_of_measurement: "s"
@@ -62,8 +84,8 @@ number:
 
   # Contrast Adjustment
   - platform: template
-    name: "Contrast"
-    id: ${id_prefix}_contrast
+    name: "Analog Contrast"
+    id: ${id_prefix}_analog_contrast
     icon: "mdi:contrast-circle"
     min_value: 0.1
     max_value: 5.0
