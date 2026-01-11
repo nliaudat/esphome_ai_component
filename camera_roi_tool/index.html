@@ -467,32 +467,10 @@
             }
 
             // Draw Digits
-            state.digits.forEach((d, i) => {
-                ctx.strokeStyle = '#2ecc71';
-                ctx.lineWidth = 2;
-                ctx.fillStyle = 'rgba(46, 204, 113, 0.3)';
-                ctx.fillRect(d.x, d.y, d.w, d.h);
-                ctx.strokeRect(d.x, d.y, d.w, d.h);
-
-                ctx.fillStyle = '#fff';
-                ctx.font = '12px sans-serif';
-                ctx.globalAlpha = 1.0;
-                ctx.fillText(`#${i + 1}`, d.x + 2, d.y + 12);
-            });
+            drawZones(state.digits, '#2ecc71', '#');
 
             // Draw Dials
-            state.dials.forEach((d, i) => {
-                ctx.strokeStyle = '#f39c12';
-                ctx.lineWidth = 2;
-                ctx.fillStyle = 'rgba(243, 156, 18, 0.3)';
-                ctx.fillRect(d.x, d.y, d.w, d.h);
-                ctx.strokeRect(d.x, d.y, d.w, d.h);
-
-                ctx.fillStyle = '#fff';
-                ctx.font = '12px sans-serif';
-                ctx.globalAlpha = 1.0;
-                ctx.fillText(`D${i + 1}`, d.x + 2, d.y + 12);
-            });
+            drawZones(state.dials, '#f39c12', 'D');
         }
 
         // Coordinate Mapping: Rotated (Canvas) -> Original (Sensor)
@@ -585,6 +563,73 @@
 
         function snapTo8(val) {
             return Math.round(val / 8) * 8;
+        }
+
+        function calculateZoneCoordinates(vis_rect, off_x, off_y, scale_x, scale_y, w, h) {
+            // 1. Visual -> Sensor Global (Original Unrotated)
+            const sensor_g = mapToOriginal(vis_rect.x, vis_rect.y, vis_rect.w, vis_rect.h);
+            const d_sensor_x = sensor_g.x * scale_x;
+            const d_sensor_y = sensor_g.y * scale_y;
+            const d_sensor_w = sensor_g.w * scale_x;
+            const d_sensor_h = sensor_g.h * scale_y;
+
+            // 2. Relativize to Snapped Window (in Sensor Space)
+            let rel_x = d_sensor_x - off_x;
+            let rel_y = d_sensor_y - off_y;
+
+            // 3. Transform to Configured Rotation Space (Final Output)
+            let out_w = (state.rotation % 180 === 0) ? w : h;
+            let out_h = (state.rotation % 180 === 0) ? h : w;
+
+            let fin_x, fin_y, fin_w, fin_h;
+
+            switch (state.rotation) {
+                case 0: fin_x = rel_x; fin_y = rel_y; fin_w = d_sensor_w; fin_h = d_sensor_h; break;
+                case 90: fin_x = out_w - rel_y - d_sensor_h; fin_y = rel_x; fin_w = d_sensor_h; fin_h = d_sensor_w; break;
+                case 180: fin_x = out_w - rel_x - d_sensor_w; fin_y = out_h - rel_y - d_sensor_h; fin_w = d_sensor_w; fin_h = d_sensor_h; break;
+                case 270: fin_x = rel_y; fin_y = out_h - rel_x - d_sensor_w; fin_w = d_sensor_h; fin_h = d_sensor_w; break;
+            }
+
+            return { x: Math.round(fin_x), y: Math.round(fin_y), w: Math.round(fin_w), h: Math.round(fin_h) };
+        }
+
+        function drawZones(zones, color, labelPrefix) {
+            zones.forEach((d, i) => {
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
+                // Light transparent fill matching stroke
+                // Simple hack: assume hex color input and add opacity? 
+                // Or just hardcode based on type since we only resolve duplication.
+                // Let's passed fill color or derive it? The validation logic just wanted to reduce duplication.
+                // The original code used different fill colors.
+                // For 'digits' (#2ecc71) -> rgba(46, 204, 113, 0.3)
+                // For 'dials' (#f39c12) -> rgba(243, 156, 18, 0.3)
+                // We'll keep it simple and just set styles here based on color input being a key or just hardcode if easy.
+
+                // Let's stick to original colors by checking color string since we only have 2 types
+                if (color === '#2ecc71') ctx.fillStyle = 'rgba(46, 204, 113, 0.3)';
+                else if (color === '#f39c12') ctx.fillStyle = 'rgba(243, 156, 18, 0.3)';
+                else ctx.fillStyle = 'rgba(128, 128, 128, 0.3)';
+
+                ctx.fillRect(d.x, d.y, d.w, d.h);
+                ctx.strokeRect(d.x, d.y, d.w, d.h);
+
+                ctx.fillStyle = '#fff';
+                ctx.font = '12px sans-serif';
+                ctx.globalAlpha = 1.0;
+                ctx.fillText(`${labelPrefix}${i + 1}`, d.x + 2, d.y + 12);
+            });
+        }
+
+        function checkOutsideROI(x, y, w, h, name) {
+            if (state.roi) {
+                if (x < state.roi.x || y < state.roi.y ||
+                    (x + w) > (state.roi.x + state.roi.w) ||
+                    (y + h) > (state.roi.y + state.roi.h)) {
+                    return !confirm(`Warning: ${name} is outside ROI. Keep it?`); // Return true to ABORT
+                }
+            }
+            return false;
         }
 
         function generateOutput() {
@@ -696,63 +741,8 @@
             // Digits
             if (state.digits.length > 0) {
                 const zones = state.digits.map(d_vis => {
-                    // 1. Visual -> Sensor Global (Original Unrotated)
-                    // Then Scale to Sensor Space
-                    const sensor_g = mapToOriginal(d_vis.x, d_vis.y, d_vis.w, d_vis.h);
-                    const d_sensor_x = sensor_g.x * scale_x;
-                    const d_sensor_y = sensor_g.y * scale_y;
-                    const d_sensor_w = sensor_g.w * scale_x;
-                    const d_sensor_h = sensor_g.h * scale_y;
-
-                    // 2. Relativize to Snapped Window (in Sensor Space)
-                    let rel_x = d_sensor_x - off_x;
-                    let rel_y = d_sensor_y - off_y;
-
-                    // 3. Transform to Configured Rotation Space (Final Output)
-                    // The output image will be the Window (w x h).
-                    // Rotation applies to this window.
-
-                    let out_w = (state.rotation % 180 === 0) ? w : h;
-                    let out_h = (state.rotation % 180 === 0) ? h : w;
-
-                    let fin_x, fin_y, fin_w, fin_h;
-
-                    switch (state.rotation) {
-                        case 0:
-                            fin_x = rel_x;
-                            fin_y = rel_y;
-                            fin_w = d_sensor_w;
-                            fin_h = d_sensor_h;
-                            break;
-                        case 90:
-                            // CW 90: (x,y) -> (H-y-h, x)
-                            fin_x = out_w - rel_y - d_sensor_h;
-                            fin_y = rel_x;
-                            fin_w = d_sensor_h;
-                            fin_h = d_sensor_w;
-                            break;
-                        case 180:
-                            // (x,y) -> (W-x-w, H-y-h)
-                            fin_x = out_w - rel_x - d_sensor_w;
-                            fin_y = out_h - rel_y - d_sensor_h;
-                            fin_w = d_sensor_w;
-                            fin_h = d_sensor_h;
-                            break;
-                        case 270:
-                            // CCW 90
-                            fin_x = rel_y;
-                            fin_y = out_h - rel_x - d_sensor_w;
-                            fin_w = d_sensor_h;
-                            fin_h = d_sensor_w;
-                            break;
-                    }
-
-                    return [
-                        Math.round(fin_x),
-                        Math.round(fin_y),
-                        Math.round(fin_x + fin_w),
-                        Math.round(fin_y + fin_h)
-                    ];
+                    const res = calculateZoneCoordinates(d_vis, off_x, off_y, scale_x, scale_y, w, h);
+                    return [res.x, res.y, res.x + res.w, res.y + res.h];
                 });
 
                 // Single-line JSON string format
@@ -771,32 +761,15 @@
             if (state.dials.length > 0) {
                 // Same logic as digits
                 const dials_yaml = state.dials.map((d_vis, i) => {
-                    const sensor_g = mapToOriginal(d_vis.x, d_vis.y, d_vis.w, d_vis.h);
-                    const d_sensor_x = sensor_g.x * scale_x;
-                    const d_sensor_y = sensor_g.y * scale_y;
-                    const d_sensor_w = sensor_g.w * scale_x;
-                    const d_sensor_h = sensor_g.h * scale_y;
-
-                    let rel_x = d_sensor_x - off_x;
-                    let rel_y = d_sensor_y - off_y;
-
-                    let out_w = (state.rotation % 180 === 0) ? w : h;
-                    let out_h = (state.rotation % 180 === 0) ? h : w;
-
-                    let fin_x, fin_y, fin_w, fin_h;
-
-                    switch (state.rotation) {
-                        case 0: fin_x = rel_x; fin_y = rel_y; fin_w = d_sensor_w; fin_h = d_sensor_h; break;
-                        case 90: fin_x = out_w - rel_y - d_sensor_h; fin_y = rel_x; fin_w = d_sensor_h; fin_h = d_sensor_w; break;
-                        case 180: fin_x = out_w - rel_x - d_sensor_w; fin_y = out_h - rel_y - d_sensor_h; fin_w = d_sensor_w; fin_h = d_sensor_h; break;
-                        case 270: fin_x = rel_y; fin_y = out_h - rel_x - d_sensor_w; fin_w = d_sensor_h; fin_h = d_sensor_w; break;
-                    }
+                    const res = calculateZoneCoordinates(d_vis, off_x, off_y, scale_x, scale_y, w, h);
+                    const scaleVal = Math.pow(10, -(i + 1));
 
                     return `    - id: dial_${i + 1}
-      crop_x: ${Math.round(fin_x)}
-      crop_y: ${Math.round(fin_y)}
-      crop_w: ${Math.round(fin_w)}
-      crop_h: ${Math.round(fin_h)}
+      # scale: ${scaleVal}
+      crop_x: ${res.x}
+      crop_y: ${res.y}
+      crop_w: ${res.w}
+      crop_h: ${res.h}
       min_angle: 0
       max_angle: 360
       min_value: 0
@@ -839,13 +812,14 @@
             // Draw scratch rect
             let color = '#3498db'; // ROI
             if (state.mode === 'digits') color = '#2ecc71';
+            if (state.mode === 'analog') color = '#f39c12';
 
             ctx.strokeStyle = color;
             ctx.lineWidth = 2;
             ctx.setLineDash([5, 5]);
 
             if (state.mode === 'analog') {
-                ctx.strokeStyle = '#f39c12';
+                // ctx.strokeStyle = '#f39c12'; // Consolidate color logic removed
                 // Center-based Square
                 let dist = Math.max(Math.abs(pos.x - state.startPos.x), Math.abs(pos.y - state.startPos.y));
                 let cx = state.startPos.x;
@@ -890,23 +864,10 @@
                 state.digits = []; // Reset digits if ROI changes
                 state.dials = [];
             } else if (state.mode === 'digits') {
-                if (state.roi) {
-                    // Clip/Ensure inside ROI (Warning only)
-                    if (x < state.roi.x || y < state.roi.y ||
-                        (x + w) > (state.roi.x + state.roi.w) ||
-                        (y + h) > (state.roi.y + state.roi.h)) {
-                        if (!confirm("Warning: Zone is outside ROI. Keep it?")) return;
-                    }
-                }
+                if (checkOutsideROI(x, y, w, h, 'Zone')) return;
                 state.digits.push({ x: x, y: y, w: w, h: h });
             } else if (state.mode === 'analog') {
-                if (state.roi) {
-                    if (x < state.roi.x || y < state.roi.y ||
-                        (x + w) > (state.roi.x + state.roi.w) ||
-                        (y + h) > (state.roi.y + state.roi.h)) {
-                        if (!confirm("Warning: Dial is outside ROI. Keep it?")) return;
-                    }
-                }
+                if (checkOutsideROI(x, y, w, h, 'Dial')) return;
                 state.dials.push({ x: x, y: y, w: w, h: h });
             }
 
