@@ -217,7 +217,7 @@ value_validator:
   # max_history_size: 50kB               # Max history memory usage (default: 50kB)
 
 analog_reader: # DEV !
-  id: analog_main
+  id: ${id_prefix}_analog_main
   camera_id: ${id_prefix}_espcam
   validator: ${id_prefix}_validator
   value_sensor:
