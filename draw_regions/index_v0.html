@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Draw Regions Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .file-input-container {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .file-input {
+            padding: 10px;
+            font-size: 16px;
+            border: 2px dashed #007bff;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .file-input:hover {
+            background-color: #e9ecef;
+        }
+
+        .canvas-container {
+            text-align: center;
+            margin-bottom: 30px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            background-color: #f9f9f9;
+        }
+
+        canvas {
+            border: 2px solid #333;
+            cursor: crosshair;
+            max-width: 100%;
+            height: auto;
+        }
+
+        .instructions {
+            background-color: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .instructions h3 {
+            margin-top: 0;
+            color: #0066cc;
+        }
+
+        .instructions ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+
+        .controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+
+        .btn:hover {
+            background-color: #0056b3;
+        }
+
+        .btn-danger {
+            background-color: #dc3545;
+        }
+
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+
+        .btn-success {
+            background-color: #28a745;
+        }
+
+        .btn-success:hover {
+            background-color: #218838;
+        }
+
+        .regions-container {
+            margin-top: 20px;
+        }
+
+        .regions-container h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 200px;
+            font-family: monospace;
+            font-size: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            resize: vertical;
+            background-color: #f8f9fa;
+        }
+
+        .status {
+            text-align: center;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+
+        .status.success {
+            color: #28a745;
+        }
+
+        .status.error {
+            color: #dc3545;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Draw Regions Tool</h1>
+
+        <div class="file-input-container">
+            <input type="file" id="imageInput" accept="image/*" class="file-input">
+            <label for="imageInput">Choose an image file</label>
+        </div>
+
+        <div class="instructions">
+            <h3>Instructions:</h3>
+            <ul>
+                <li>Select an image using the file picker above</li>
+                <li>Click and drag on the image to draw rectangular regions</li>
+                <li>All regions are automatically adjusted to have dimensions that are multiples of 8</li>
+                <li>Use "Normalize Regions" to make all regions the same size as the first region</li>
+                <li>The JSON data for all regions will be displayed in the textarea below</li>
+                <li>Use the controls to reset regions or download the JSON file</li>
+            </ul>
+        </div>
+
+        <div id="canvasContainer" class="canvas-container hidden">
+            <canvas id="canvas"></canvas>
+        </div>
+
+        <div id="controls" class="controls hidden">
+            <button id="resetBtn" class="btn btn-danger">Reset Regions</button>
+            <button id="normalizeBtn" class="btn">Normalize Regions</button>
+            <button id="downloadBtn" class="btn btn-success">Download JSON</button>
+            <div class="status" id="status"></div>
+        </div>
+
+        <div id="regionsContainer" class="regions-container hidden">
+            <h3>Regions JSON:</h3>
+            <textarea id="regionsOutput" readonly placeholder="Draw regions on the image above to see the JSON data here..."></textarea>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let canvas, ctx;
+        let originalImage = null;
+        let regions = [];
+        let isDrawing = false;
+        let startX, startY;
+
+        // DOM elements
+        const imageInput = document.getElementById('imageInput');
+        const canvasContainer = document.getElementById('canvasContainer');
+        const controls = document.getElementById('controls');
+        const regionsContainer = document.getElementById('regionsContainer');
+        const regionsOutput = document.getElementById('regionsOutput');
+        const resetBtn = document.getElementById('resetBtn');
+        const normalizeBtn = document.getElementById('normalizeBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const status = document.getElementById('status');
+
+        // Initialize canvas
+        function initCanvas() {
+            canvas = document.getElementById('canvas');
+            ctx = canvas.getContext('2d');
+
+            // Mouse events
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseleave', stopDrawing);
+        }
+
+        // Handle image file selection
+        imageInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file && file.type.startsWith('image/')) {
+                loadImage(file);
+            }
+        });
+
+        // Load and display image
+        function loadImage(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                originalImage = new Image();
+                originalImage.onload = function() {
+                    setupCanvas();
+                    showStatus('Image loaded successfully', 'success');
+                };
+                originalImage.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Setup canvas with image
+        function setupCanvas() {
+            canvas.width = originalImage.width;
+            canvas.height = originalImage.height;
+
+            // Show canvas and controls
+            canvasContainer.classList.remove('hidden');
+            controls.classList.remove('hidden');
+            regionsContainer.classList.remove('hidden');
+
+            // Clear regions and redraw
+            regions = [];
+            redrawCanvas();
+            updateRegionsOutput();
+        }
+
+        // Redraw canvas with image and all regions
+        function redrawCanvas() {
+            if (!originalImage) return;
+
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw image
+            ctx.drawImage(originalImage, 0, 0);
+
+            // Draw all regions
+            ctx.strokeStyle = '#00ff00';
+            ctx.lineWidth = 2;
+            ctx.font = '14px Arial';
+            ctx.fillStyle = '#00ff00';
+
+            regions.forEach((region, index) => {
+                const [x1, y1, x2, y2] = region;
+                const width = x2 - x1;
+                const height = y2 - y1;
+
+                // Draw rectangle
+                ctx.strokeRect(x1, y1, width, height);
+
+                // Draw size label
+                ctx.fillText(`${width}x${height}`, x1, Math.max(y1 - 5, 15));
+            });
+        }
+
+        // Normalize region coordinates to multiples of 8
+        function normalizeRegion(x1, y1, x2, y2) {
+            // Ensure x1,y1 is top-left and x2,y2 is bottom-right
+            const minX = Math.min(x1, x2);
+            const maxX = Math.max(x1, x2);
+            const minY = Math.min(y1, y2);
+            const maxY = Math.max(y1, y2);
+
+            // Calculate width and height
+            let width = maxX - minX;
+            let height = maxY - minY;
+
+            // Adjust to multiples of 8
+            width = Math.max(8, Math.floor(width / 8) * 8);
+            height = Math.max(8, Math.floor(height / 8) * 8);
+
+            // Return normalized coordinates as integers
+            return [
+                Math.round(minX),
+                Math.round(minY),
+                Math.round(minX + width),
+                Math.round(minY + height)
+            ];
+        }
+
+        // Get mouse position relative to canvas
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+
+            return {
+                x: (e.clientX - rect.left) * scaleX,
+                y: (e.clientY - rect.top) * scaleY
+            };
+        }
+
+        // Start drawing
+        function startDrawing(e) {
+            if (!originalImage) return;
+
+            isDrawing = true;
+            const pos = getMousePos(e);
+            startX = pos.x;
+            startY = pos.y;
+        }
+
+        // Draw rectangle while dragging
+        function draw(e) {
+            if (!isDrawing || !originalImage) return;
+
+            const pos = getMousePos(e);
+
+            // Redraw canvas
+            redrawCanvas();
+
+            // Draw current rectangle being drawn
+            const [x1, y1, x2, y2] = normalizeRegion(startX, startY, pos.x, pos.y);
+            const width = x2 - x1;
+            const height = y2 - y1;
+
+            ctx.strokeStyle = '#ff0000';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x1, y1, width, height);
+
+            // Show current size
+            ctx.fillStyle = '#ff0000';
+            ctx.fillText(`${width}x${height}`, x1, Math.max(y1 - 5, 15));
+        }
+
+        // Stop drawing and save region
+        function stopDrawing(e) {
+            if (!isDrawing || !originalImage) return;
+
+            isDrawing = false;
+            const pos = getMousePos(e);
+
+            // Create normalized region
+            const region = normalizeRegion(startX, startY, pos.x, pos.y);
+            const [x1, y1, x2, y2] = region;
+            const width = x2 - x1;
+            const height = y2 - y1;
+
+            // Only add region if it has valid dimensions
+            if (width >= 8 && height >= 8) {
+                regions.push(region);
+                console.log(`Region added: [${region.join(', ')}] (Size: ${width}x${height})`);
+                showStatus(`Region added: ${width}x${height}`, 'success');
+                updateRegionsOutput();
+            }
+
+            redrawCanvas();
+        }
+
+        // Update regions textarea
+        function updateRegionsOutput() {
+            regionsOutput.value = JSON.stringify(regions);
+        }
+
+        // Show status message
+        function showStatus(message, type = '') {
+            status.textContent = message;
+            status.className = `status ${type}`;
+
+            // Clear status after 3 seconds
+            setTimeout(() => {
+                status.textContent = '';
+                status.className = 'status';
+            }, 3000);
+        }
+
+        // Normalize all regions to the size of the first region
+        function normalizeRegions() {
+            if (regions.length === 0) {
+                showStatus('No regions to normalize', 'error');
+                return;
+            }
+
+            // Get reference size from first region
+            const firstRegion = regions[0];
+            const refWidth = firstRegion[2] - firstRegion[0];
+            const refHeight = firstRegion[3] - firstRegion[1];
+
+            console.log(`Normalizing to reference size: ${refWidth}x${refHeight}`);
+
+            // Normalize all regions to this size
+            regions = regions.map(region => {
+                const [x1, y1] = region;
+                // Keep top-left corner, adjust bottom-right to match reference size
+                return [
+                    Math.round(x1),
+                    Math.round(y1),
+                    Math.round(x1 + refWidth),
+                    Math.round(y1 + refHeight)
+                ];
+            });
+
+            updateRegionsOutput();
+            redrawCanvas();
+            showStatus(`Regions normalized to ${refWidth}x${refHeight}`, 'success');
+        }
+
+        // Reset all regions
+        resetBtn.addEventListener('click', function() {
+            regions = [];
+            updateRegionsOutput();
+            redrawCanvas();
+            showStatus('All regions cleared', 'success');
+        });
+
+        // Normalize regions button
+        normalizeBtn.addEventListener('click', normalizeRegions);
+
+        // Download regions as JSON file
+        downloadBtn.addEventListener('click', function() {
+            if (regions.length === 0) {
+                showStatus('No regions to download', 'error');
+                return;
+            }
+
+            const dataStr = JSON.stringify(regions);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            link.download = 'regions.json';
+            link.click();
+
+            showStatus('Regions downloaded', 'success');
+        });
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initCanvas();
+        });
+    </script>
+</body>
+</html>
+
