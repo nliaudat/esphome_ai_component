@@ -893,9 +893,12 @@
 
         function copyOutput() {
             const copyText = document.getElementById("output");
-            copyText.select();
-            document.execCommand("copy");
-            alert("Copied to clipboard");
+            navigator.clipboard.writeText(copyText.value).then(() => {
+                alert("Copied to clipboard");
+            }).catch(err => {
+                alert("Failed to copy. See console for details.");
+                console.error('Failed to copy text: ', err);
+            });
         }
         // Coordinate Mapping: Original (Sensor) -> Rotated (Canvas) - INVERSE
         function mapFromOriginal(ox, oy, ow, oh) {

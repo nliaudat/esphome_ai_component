@@ -24,6 +24,8 @@ class ValueValidatorCoordinator {
     if (validator_ == nullptr) {
         // Fallback: No validator = No strict per-digit check here.
         // We need to convert digits to value manually as fallback.
+#include <limits>    
+    
         if (digits.empty()) {
             return false;
         }
@@ -36,7 +38,12 @@ class ValueValidatorCoordinator {
             }
             val = val * 10 + digit;
         }
-        validated_value = static_cast<int>(val);
+        
+        if (val > std::numeric_limits<int>::max()) {
+            validated_value = std::numeric_limits<int>::max();
+        } else {
+            validated_value = static_cast<int>(val);
+        }
         return true; 
     }
     return validator_->validate_reading(digits, confidences, validated_value);
