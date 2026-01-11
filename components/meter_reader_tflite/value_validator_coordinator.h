@@ -27,7 +27,7 @@ class ValueValidatorCoordinator {
         if (digits.empty()) {
             return false;
         }
-        long val = 0;
+        long long val = 0;
         for (float d : digits) {
             int digit = static_cast<int>(round(d));
             // Ensure digit is in the range [0, 9]

@@ -88,6 +88,12 @@ bool DataCollector::upload_image(const uint8_t *data, size_t len, float raw_valu
   config.method = HTTP_METHOD_POST;
   config.timeout_ms = 10000;
 
+  if (!username_.empty()) {
+      config.username = username_.c_str();
+      config.password = password_.c_str();
+      config.auth_type = HTTP_AUTH_TYPE_BASIC;
+  }
+
   esp_http_client_handle_t client = esp_http_client_init(&config);
   if (!client) {
     ESP_LOGE(TAG, "Failed to allow http client");
@@ -109,12 +115,6 @@ bool DataCollector::upload_image(const uint8_t *data, size_t len, float raw_valu
            // Simplest: Add as X-Api-Key
            esp_http_client_set_header(client, "X-Api-Key", api_key_.c_str());
        }
-  }
-
-  if (!username_.empty()) {
-      esp_http_client_set_username(client, username_.c_str());
-      esp_http_client_set_password(client, password_.c_str());
-      config.auth_type = HTTP_AUTH_TYPE_BASIC; // Enforce Basic if user set
   }
   
   // Add metadata headers

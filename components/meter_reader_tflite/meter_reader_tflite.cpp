@@ -839,7 +839,11 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
                      !valid ? "validation failed" : "confidence below threshold");
              
              #ifdef USE_DATA_COLLECTOR
-             trigger_low_confidence_collection(final_val, avg_conf);
+             // Only collect if confidence is actually low, attempting to filter out 
+             // validation failures like Max Rate Change (which usually have high confidence).
+             if (avg_conf < confidence_threshold_) {
+                trigger_low_confidence_collection(final_val, avg_conf);
+             }
              #endif
         }
 

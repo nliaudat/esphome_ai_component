@@ -11,7 +11,7 @@
 compile.bat
 secrets.yaml
 /components/meter_reader_tflite/__pycache__
-secrets.yaml
+
 .vscode/settings.json
 /components/esp32_camera_utils/__pycache__
 /components/flash_light_controller/__pycache__
@@ -29,5 +29,4 @@ analyze_heap.py
 config_coldwater.yaml
 config_hotwater.yaml
 dig-class100-0180-s2-q.tflite
-/components/value_validator/__pycache__
 /components/value_validator/__pycache__
