@@ -263,6 +263,13 @@
                     </div> Analog Dials (Software Crop)
                 </div>
             </div>
+
+            <div class="card" style="margin-top: 20px;">
+                <h3>Configuration Output</h3>
+                <textarea id="output" readonly style="height: 200px;"></textarea>
+                <button class="btn btn-primary" style="width: 100%; margin-top: 10px;" onclick="copyOutput()">📋 Copy to
+                    Clipboard</button>
+            </div>
         </div>
 
         <div class="sidebar">
@@ -289,10 +296,31 @@
             </div>
 
             <div class="card">
-                <h3>Configuration Output</h3>
-                <textarea id="output" readonly></textarea>
-                <button class="btn btn-primary" style="width: 100%; margin-top: 10px;" onclick="copyOutput()">📋 Copy to
-                    Clipboard</button>
+                <h3>Target Resolution (Downscaling)</h3>
+                <p style="font-size: 0.85em; color: #666; margin-top: 5px;">
+                    If your ESPHome <code>camera_resolution</code> (e.g. 640x480) is smaller than the Sensor ROI, set it
+                    here to scale the output coordinates.
+                </p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 10px;">
+                    <div>
+                        <label>Target W:</label> <input type="number" id="target_w" placeholder="e.g 640"
+                            onchange="generateOutput()" style="width: 70px;">
+                    </div>
+                    <div>
+                        <label>Target H:</label> <input type="number" id="target_h" placeholder="e.g 480"
+                            onchange="generateOutput()" style="width: 70px;">
+                    </div>
+                </div>
+                <div style="margin-top: 5px;">
+                    <button class="btn btn-secondary" style="font-size: 0.8em; padding: 4px 8px;"
+                        onclick="setTargetRes(640, 480)">VGA (640x480)</button>
+                    <button class="btn btn-secondary" style="font-size: 0.8em; padding: 4px 8px;"
+                        onclick="setTargetRes(800, 600)">SVGA (800x600)</button>
+                    <button class="btn btn-secondary" style="font-size: 0.8em; padding: 4px 8px;"
+                        onclick="setTargetRes(1024, 768)">XGA (1024x768)</button>
+                    <button class="btn btn-secondary" style="font-size: 0.8em; padding: 4px 8px;"
+                        onclick="setTargetRes('','')">Reset (1:1)</button>
+                </div>
             </div>
 
             <div class="card">
@@ -302,6 +330,7 @@
                 <button class="btn btn-danger" style="width: 100%;" onclick="resetAll()">Reset All</button>
             </div>
         </div>
+
     </div>
 
     <script>
@@ -360,6 +389,12 @@
         function setSensorRes(w, h, name) {
             state.sensorRes = { w, h, name };
             document.getElementById('sensor-res-label').textContent = name;
+            generateOutput();
+        }
+
+        function setTargetRes(w, h) {
+            document.getElementById('target_w').value = w;
+            document.getElementById('target_h').value = h;
             generateOutput();
         }
 
@@ -637,6 +672,14 @@
             if (!state.image) { ta.value = ""; return; }
 
             let lines = [];
+
+            // Output Scaling Logic
+            const target_w_in = document.getElementById('target_w').value;
+            const target_h_in = document.getElementById('target_h').value;
+            let target_w = parseInt(target_w_in);
+            let target_h = parseInt(target_h_in);
+            let use_scaling = !isNaN(target_w) && !isNaN(target_h) && target_w > 0 && target_h > 0;
+
             // ... (Dimensions) ...
 
             // Image Dimensions (Unrotated - how it was loaded)
@@ -738,10 +781,52 @@
                 // This seems correct.
             }
 
+            // Scaling Factor for Crop Zones
+            // The ROI determines the "Source" image size (w, h)
+            // If use_scaling is true, we map (w, h) -> (target_w, target_h)
+            let final_scale_x = 1.0;
+            let final_scale_y = 1.0;
+
+            if (use_scaling) {
+                // Warning if aspect ratio mismatch
+                let roi_ratio = w / h; // Note: w,h are already rotated-aware in logic?
+                // Wait, 'w' and 'h' above are SENSOR SPACE WIDTH/HEIGHT (Unrotated relative to sensor).
+                // But target_w/target_h are OUTPUT IMAGE DIMENSIONS (Rotated?)
+
+                // Let's look at logic:
+                // calculateZoneCoordinates returns coordinates in "ROI Space" (optionally rotated).
+                // If we want to scale to target, we should apply scaling to the result of calculateZoneCoordinates.
+
+                // Wait, logic check:
+                // calculateZoneCoordinates returns {x, y, w, h} which are relative to the "Output Image".
+                // Currently "Output Image" == "ROI size" (rotated).
+
+                // If we simply scale the output of calculateZoneCoordinates, it should work.
+                // We need the "Unscaled Output Size" to calculate the factor.
+
+                let unscaled_out_w = (state.rotation % 180 === 0) ? w : h;
+                let unscaled_out_h = (state.rotation % 180 === 0) ? h : w;
+
+                final_scale_x = target_w / unscaled_out_w;
+                final_scale_y = target_h / unscaled_out_h;
+
+                lines.push(`# Output Scaling Active: Mapping ${unscaled_out_w}x${unscaled_out_h} (ROI) -> ${target_w}x${target_h}`);
+            }
+
+
             // Digits
             if (state.digits.length > 0) {
                 const zones = state.digits.map(d_vis => {
                     const res = calculateZoneCoordinates(d_vis, off_x, off_y, scale_x, scale_y, w, h);
+
+                    // Apply Scaling
+                    if (use_scaling) {
+                        res.x = Math.round(res.x * final_scale_x);
+                        res.y = Math.round(res.y * final_scale_y);
+                        res.w = Math.round(res.w * final_scale_x);
+                        res.h = Math.round(res.h * final_scale_y);
+                    }
+
                     return [res.x, res.y, res.x + res.w, res.y + res.h];
                 });
 
@@ -762,6 +847,15 @@
                 // Same logic as digits
                 const dials_yaml = state.dials.map((d_vis, i) => {
                     const res = calculateZoneCoordinates(d_vis, off_x, off_y, scale_x, scale_y, w, h);
+
+                    // Apply Scaling
+                    if (use_scaling) {
+                        res.x = Math.round(res.x * final_scale_x);
+                        res.y = Math.round(res.y * final_scale_y);
+                        res.w = Math.round(res.w * final_scale_x);
+                        res.h = Math.round(res.h * final_scale_y);
+                    }
+
                     const scaleVal = Math.pow(10, -(i + 1));
 
                     return `    - id: dial_${i + 1}
