@@ -366,9 +366,7 @@ async def to_code(config):
         flash_controller = await cg.get_variable(config[CONF_FLASH_LIGHT_CONTROLLER])
         cg.add(var.set_flash_controller(flash_controller))
 
-    if CONF_DATA_COLLECTOR in config:
-        dc = await cg.get_variable(config[CONF_DATA_COLLECTOR])
-        cg.add(var.set_data_collector(dc))
+
     if CONF_DATA_COLLECTOR in config:
         dc = await cg.get_variable(config[CONF_DATA_COLLECTOR])
         cg.add(var.set_data_collector(dc))
