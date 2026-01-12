@@ -1,31 +1,9 @@
 # Analog Reader Controls for Home Assistant
 # Exposes analog_reader parameters for runtime configuration
 
-esphome:
-  on_boot:
-    priority: -100
-    then:
-      - lambda: |-
-          ESP_LOGD("analog_controls", "Attempting to sync controls for ID: ${id_prefix}_analog_reader");
-          if (id(${id_prefix}_analog_reader) != nullptr) {
-            ESP_LOGD("analog_controls", "Analog Reader found. Syncing config...");
-            // Sync Update Interval
-            float interval = id(${id_prefix}_analog_update_interval).state;
-            if (!isnan(interval) && interval > 0) {
-               id(${id_prefix}_analog_reader)->set_update_interval((uint32_t)(interval * 1000));
-            }
-            // Sync Contrast
-            float contrast = id(${id_prefix}_analog_contrast).state;
-            if (!isnan(contrast)) {
-               id(${id_prefix}_analog_reader)->set_all_contrast(contrast);
-            }
-
-            // Sync Auto Contrast
-            bool auto_contrast = id(${id_prefix}_analog_auto_contrast).state;
-            id(${id_prefix}_analog_reader)->set_all_auto_contrast(auto_contrast);
-          } else {
-             ESP_LOGE("analog_controls", "Analog Reader component NOT found with ID: ${id_prefix}_analog_reader");
-          }
+# Sync on_boot removed to match meter_reader_tflite behavior
+# Controls will start with their initial/restored values but won't force-update the component 
+# until the user interacts with them. Component starts with YAML configuration.
 
 switch:
   # Pause Analog Processing
@@ -51,10 +29,10 @@ switch:
   - platform: template
     name: "Analog Auto Contrast"
     id: ${id_prefix}_analog_auto_contrast
-    icon: "mdi:contrast-box"
+    icon: "mdi:auto-fix"
     entity_category: config
     optimistic: true
-    restore_mode: RESTORE_DEFAULT_OFF
+    restore_mode: RESTORE_DEFAULT_ON
     turn_on_action:
       - lambda: |-
           if (id(${id_prefix}_analog_reader) != nullptr) {
@@ -66,16 +44,36 @@ switch:
             id(${id_prefix}_analog_reader)->set_all_auto_contrast(false);
           }
 
+  # Debug Visualization
+  - platform: template
+    name: "Analog Debug Mode"
+    id: ${id_prefix}_analog_debug
+    icon: "mdi:bug"
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - lambda: |-
+          if (id(${id_prefix}_analog_reader) != nullptr) {
+            id(${id_prefix}_analog_reader)->set_debug(true);
+          }
+    turn_off_action:
+      - lambda: |-
+          if (id(${id_prefix}_analog_reader) != nullptr) {
+            id(${id_prefix}_analog_reader)->set_debug(false);
+          }
+
 number:
-  # Update Interval
+  # Analog Update Interval
   - platform: template
     name: "Analog Update Interval"
     id: ${id_prefix}_analog_update_interval
     icon: "mdi:timer"
-    unit_of_measurement: "s"
     min_value: 1
-    max_value: 3600
+    max_value: 300
     step: 1
+    unit_of_measurement: "s"
+    mode: box
     initial_value: 60
     entity_category: config
     optimistic: true
@@ -83,13 +81,10 @@ number:
     set_action:
       - lambda: |-
           if (id(${id_prefix}_analog_reader) != nullptr) {
-            ESP_LOGD("analog_controls", "Setting update interval to %f s", x);
             id(${id_prefix}_analog_reader)->set_update_interval((uint32_t)(x * 1000));
-          } else {
-            ESP_LOGE("analog_controls", "Cannot set interval: Analog Reader ID not found");
           }
 
-  # Contrast Adjustment
+  # Analog Contrast
   - platform: template
     name: "Analog Contrast"
     id: ${id_prefix}_analog_contrast
@@ -105,4 +100,28 @@ number:
       - lambda: |-
           if (id(${id_prefix}_analog_reader) != nullptr) {
             id(${id_prefix}_analog_reader)->set_all_contrast(x);
+          }
+
+select:
+  # Algorithm Selection
+  - platform: template
+    name: "Analog Detection Algorithm"
+    id: ${id_prefix}_analog_algorithm
+    icon: "mdi:algorithm"
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    options:
+      - "legacy"
+      - "radial_profile"
+      - "hough_transform"
+      - "template_match"
+      - "auto"
+    initial_option: "legacy"
+    set_action:
+      - lambda: |-
+          if (id(${id_prefix}_analog_reader) != nullptr) {
+            std::string algo = x;
+            id(${id_prefix}_analog_reader)->set_all_algorithm(algo);
+            ESP_LOGI("analog_controls", "Algorithm changed to: %s", algo.c_str());
           }

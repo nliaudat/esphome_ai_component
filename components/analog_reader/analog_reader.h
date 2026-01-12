@@ -12,8 +12,21 @@
 namespace esphome {
 namespace analog_reader {
 
+// Exported constants for algorithm implementations
+extern const float kScanStartRadius;
+extern const float kScanEndRadius;
+extern const float kIntensityWeight;
+extern const float kEdgeWeight;
+
+enum NeedleType {
+  NEEDLE_TYPE_DARK = 0,
+  NEEDLE_TYPE_LIGHT = 1,
+};
+
 struct DialConfig {
   std::string id;
+  NeedleType needle_type{NEEDLE_TYPE_DARK};
+  std::string algorithm{"radial_profile"};  // Algorithm: radial_profile, hough_transform, template_match, auto
   float scale{1.0f};
   int crop_x{0};
   int crop_y{0};
@@ -26,7 +39,6 @@ struct DialConfig {
   float max_value{10.0f};
   bool auto_contrast{true}; // Normalization (Min-Max Stretch)
   float contrast{1.0f};      // Multiplier (1.0 = original)
-  // Future: needle_color
 };
 
 class AnalogReader : public PollingComponent, public esphome::camera::CameraListener {
@@ -48,6 +60,7 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   }
 
   void set_pause_processing(bool paused) { paused_ = paused; }
+  void set_debug(bool debug) { debug_ = debug; }
   
   void set_all_auto_contrast(bool enabled) {
       for (auto &dial : dials_) dial.auto_contrast = enabled;
@@ -55,6 +68,10 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   
   void set_all_contrast(float contrast) {
       for (auto &dial : dials_) dial.contrast = contrast;
+  }
+  
+  void set_all_algorithm(const std::string &algorithm) {
+      for (auto &dial : dials_) dial.algorithm = algorithm;
   }
   
   void set_update_interval(uint32_t interval) override;
@@ -83,14 +100,35 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   
   // State
   bool processing_frame_{false};
+  bool debug_{false};
   uint32_t last_request_time_{0};
   bool frame_requested_{false};
 
   void process_image(std::shared_ptr<esphome::camera::CameraImage> image);
   float find_needle_angle(const uint8_t* img, int w, int h, const DialConfig& dial);
   
+  // Detection algorithms
+  struct DetectionResult {
+      float angle;
+      float confidence;
+      std::string algorithm;
+  };
+  
+  DetectionResult detect_legacy(const uint8_t* img, int w, int h, const DialConfig& dial);  // Original algorithm, no preprocessing
+  DetectionResult detect_radial_profile(const uint8_t* img, int w, int h, const DialConfig& dial);
+  DetectionResult detect_hough_transform(const uint8_t* img, int w, int h, const DialConfig& dial);
+  DetectionResult detect_template_match(const uint8_t* img, int w, int h, const DialConfig& dial);
+  
+  // Preprocessing
+  std::vector<uint8_t> preprocess_image(const uint8_t* img, int w, int h, int cx, int cy, int radius);
+  void apply_clahe(uint8_t* img, int w, int h, int tile_size = 8);
+  void remove_background(uint8_t* img, int w, int h, int cx, int cy, int radius);
+  void median_filter_3x3(uint8_t* img, int w, int h);
+  
   // Helpers
   float angle_to_value(float angle, const DialConfig& dial);
+  void debug_dial_image(const uint8_t* img, int w, int h, float detected_angle);
+  void debug_angle_calculation(float image_angle, const DialConfig& dial);
 };
 
 }  // namespace analog_reader

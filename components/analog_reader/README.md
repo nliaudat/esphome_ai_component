@@ -34,6 +34,11 @@ analog_reader:
   # Camera Reference
   camera_id: my_camera
   
+  # Global Settings
+  update_interval: 60s
+  paused: false         # Start paused?
+  debug: false          # Enable ASCII dial visualization in logs
+  
   # Validator (recommended)
   validator: ${id_prefix}_validator
   
@@ -53,6 +58,10 @@ analog_reader:
       # Scale: How much is this dial worth? (e.g. x0.1, x0.001)
       scale: 1.0 
       
+      # Image Processing
+      auto_contrast: true   # Enhances contrast before processing (Recommended)
+      contrast: 1.0         # Manual contrast multiplier
+      
       # Angle Calibration
       # min/max_angle defines the physical arc of the gauge (e.g. 0 to 360 for full circle)
       min_angle: 0
@@ -71,14 +80,34 @@ analog_reader:
       max_value: 10
 ```
 
+### UI Controls Package (Optional)
+To easily adjust settings (Pause, Contrast, Update Interval) from Home Assistant, include the provided controls package:
+
+```yaml
+packages:
+  analog_controls: !include analog_reader_controls.yaml
+```
+
+This exposes:
+- **Pause Switch**: Stop processing to check logs or save power.
+- **Auto Contrast Switch**: Toggle enhancement.
+- **Contrast Slider**: Fine-tune contrast (0.1 - 5.0).
+- **Update Interval**: Adjust poll rate dynamically.
+
 ### Tuning Guide
 1. **Crop**: Ensure your `crop_x/y/w/h` isolates **only** the dial. The center of the crop must be the center of the needle's axis.
-2. **Lighting**: Ensure distinct contrast. The algorithm looks for a **dark needle on a light background** by default.
+2. **Lighting**: Ensure distinct contrast between needle and background. Use `auto_contrast: true` to help normalize lighting conditions.
 3. **Offset**: If your needle at "0" points upwards, use `angle_offset: 0`. If it points to the right, use `angle_offset: 90`.
+4. **Debugging**: Enable `debug: true` to see an ASCII art representation of the dial in the logs (with colorized needle). This confirms exactly what the ESP32 sees and where it thinks the needle is.
 
 ## ⚙️ How it Works
-1. **Extract**: The component extracts the defined crop from the camera image and resizes it to 128x128.
-2. **Scan**: It scans 180 radial lines (every 2 degrees) from the center outwards.
-3. **Sum**: It sums the pixel darkness along each line.
-4. **Detect**: The angle with the darkest sum (for dark needles) is selected as the needle angle.
-5. **Map**: The detected angle is converted to a value using the `min/max` settings.
+1. **Decode Once**: The full camera frame is decoded to RGB888 just once, optimizing memory for multi-dial setups.
+2. **Extract & Enhance**: Each dial crop is extracted. Auto-contrast is applied if enabled (Min-Max normalization).
+3. **Radial Edge Detection**: 
+   - Scans from center OUTWARD along 360 radial lines (1° resolution)  
+   - Detects the **strongest brightness gradient** (edge transition) along each line
+   - This is where the needle crosses that angle
+   - Works for both dark AND light needles (gradient is unsigned)
+   - Avoids ambiguity from detecting both ends of needle
+4. **Detect**: The angle with the **maximum gradient** (sharpest edge) is selected as the needle direction.
+5. **Map**: The detected angle is normalized to North-based coordinates and mapped to a value using the configuration.
