@@ -430,10 +430,9 @@ void AnalogReader::debug_angle_calculation(float image_angle, const DialConfig& 
 // Debug visualization
 void AnalogReader::debug_dial_image(const uint8_t* img, int w, int h, float detected_angle) {
     // Create ASCII visualization of the dial with needle
-    // Use 2:1 aspect ratio because terminal characters are usually tall (10x20px)
-    // 46x23 grid ensures circle looks like a circle, not an oval.
-    const int grid_w = 46;
-    const int grid_h = 23;
+    // Create ASCII visualization of the dial with needle
+    const int grid_w = 40;
+    const int grid_h = 40;
     
     // We can't stack allocate variable size 2D arrays easily in C++98/standard, use flat vector or fixed max size
     // Using simple vector of strings to buffer line
@@ -462,21 +461,9 @@ void AnalogReader::debug_dial_image(const uint8_t* img, int w, int h, float dete
     int max_r = std::min(cx, cy);
     
     for (int r = max_r/5; r < max_r; r++) { // Start 20% out
-        // Apply aspect ratio correction to angle for visualization?
-        // No, the grid sampling handles the image aspect.
-        // We just need to map angle to Grid X/Y.
-        // X is 2x wider than Y visually, so to draw a circle we need X steps to be wider?
-        // Wait, if we map pure angle to grid coordinates, and grid is 46x23 covering square crop...
-        // x_grid = (cos(th) + 1)/2 * 46
-        // y_grid = (sin(th) + 1)/2 * 23
-        // This naturally places the marker correctly in the distorted grid.
-        
-        int px = cx + (int)(r * cos(rad) * (grid_w/(float)grid_h/2.0f)); // Adjust X aspect?
-        // Actually simpler:
-        // x_norm = 0.5 + 0.5*cos
-        // y_norm = 0.5 + 0.5*sin
-        // px = x_norm * grid_w
-        // py = y_norm * grid_h
+        // Map the needle angle to the grid coordinates.
+        // We use a normalized coordinate system (0.0-1.0) and map it to the grid dimensions.
+        // The 0.9f factor keeps the needle slightly inside the grid boundaries.
         
         int draw_x = (int)( (0.5f + 0.5f * cos(rad) * 0.9f) * grid_w );
         int draw_y = (int)( (0.5f + 0.5f * sin(rad) * 0.9f) * grid_h );
