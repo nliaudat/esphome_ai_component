@@ -108,11 +108,8 @@ bool DataCollector::upload_image(const uint8_t *data, size_t len, float raw_valu
        if (api_key_.rfind("Bearer ", 0) == 0) {
            esp_http_client_set_header(client, "Authorization", api_key_.c_str());
        } else {
-           // Assume X-Api-Key or similar custom header if not bearer? 
-           // Or default to adding it as Authorization: <key> or X-Api-Key?
-           // Let's assume generic "Authorization: <key>" if user didn't specify bearer, 
-           // OR if they want X-Api-Key they might need another config.
-           // Simplest: Add as X-Api-Key
+       } else {
+           // Default to X-Api-Key if no Bearer token structure is detected.
            esp_http_client_set_header(client, "X-Api-Key", api_key_.c_str());
        }
   }

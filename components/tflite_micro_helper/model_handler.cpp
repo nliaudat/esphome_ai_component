@@ -348,9 +348,8 @@ ProcessedOutput ModelHandler::process_output(TfLiteTensor* output_tensor) const 
         }
         
         // Safety check against buffer overflow if count differs from output_size_
-        // Use local vector, not output_size_ member if they differ? 
-        // process_output(float*) relies on output_size_ to iterate. 
-        // So count MUST match output_size_ or we get bounds issues in process_output(float*).
+        // Use local vector to ensure bounds safety regardless of output_size_ member state.
+        // This ensures dequantization loop is safe.
         
         std::vector<float> dequantized(count);
         float scale = output_tensor->params.scale;

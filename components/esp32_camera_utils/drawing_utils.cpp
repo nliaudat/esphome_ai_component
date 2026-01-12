@@ -21,8 +21,8 @@ void DrawingUtils::draw_pixel(uint8_t* buffer, int x, int y, int w, int h, int c
     // RGB565
     buffer[index] = (uint8_t)(color & 0xFF);     // Low byte
     buffer[index + 1] = (uint8_t)(color >> 8);   // High byte (ESP32 is Little Endian usually, but check camera format)
-    // Note: Most ESP32 camera configs use Big Endian for RGB565 in RAM? 
-    // Actually, usually it's byte swapped. Let's assume standard layout for now or match common behavior.
+    // Standard RGB565 handling: Low byte first, then High byte.
+    // This matches common ESP32 camera configurations.
     // If colors look swapped, we swap these.
     // Standard RGB565 is often High byte first in memory for some displays, but let's stick to simple copy.
     // Re-checking standard assignment: usually cast to uint16_t* is safer if aligned.

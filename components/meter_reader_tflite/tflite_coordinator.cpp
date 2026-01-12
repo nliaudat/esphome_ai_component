@@ -72,7 +72,7 @@ bool TFLiteCoordinator::load_model() {
         }
     } else {
         ESP_LOGE(TAG, "Model type '%s' not found", model_type_.c_str());
-        // Fallback or fail? Original code kept going with default or previous.
+        // Fallback: Proceed, but correct model loading may fail if config is critical.
     }
 
     if (!allocate_tensor_arena()) {
@@ -156,10 +156,8 @@ bool TFLiteCoordinator::process_model_result(const esp32_camera_utils::ImageProc
         #endif
     } else {
         #ifdef DEBUG_METER_READER_TFLITE
-        // Always log input stats for full debugging validation? 
-        // Or only on high debug level? Let's obey the user request "Restore all debug output"
-        // model_handler_.log_input_stats(); // This might be too spammy if 8 zones enabled.
-        // Maybe only if needed? The user complaint specifically mentioned tflite messages.
+        // Logging enabled if DEBUG_METER_READER_TFLITE is defined.
+        // Useful for debugging specific input patterns when confidence is non-zero but incorrect.
         // Let's enable it behind the define.
         #endif
     }

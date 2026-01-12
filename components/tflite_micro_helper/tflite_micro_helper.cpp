@@ -35,10 +35,7 @@ bool TFLiteMicroHelper::load_model(const uint8_t *model_data, size_t model_size,
     } else {
         ESP_LOGW(TAG, "Failed to parse tensor arena size from config: %s", 
                 config.tensor_arena_size.c_str());
-        // Fallback or error? For now, we assume if it fails we might have a default or it's an error.
-        // But since we don't have a default passed in, we might want to return false or rely on a default if we had one.
-        // In the original code, it kept the existing requested size.
-        // Here we'll default to a safe minimum or error out if 0.
+        // Fallback: Use default 100KB if parsing fails and no valid size was previously set.
         if (tensor_arena_size_requested_ == 0) {
              tensor_arena_size_requested_ = 100 * 1024; // Default 100KB if parsing fails and no previous size
              ESP_LOGW(TAG, "Using default tensor arena size: 100KB");

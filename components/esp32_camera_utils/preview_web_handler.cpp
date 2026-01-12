@@ -52,8 +52,7 @@ void PreviewWebHandler::handleRequest(web_server_idf::AsyncWebServerRequest *req
       // though typically for static buffers direct send might work. 
       // However, RotatedPreviewImage owns the buffer. 
       // AsyncWebServerRequest::send with data copies it. 
-      // request->send(200, "image/jpeg", buf, len) logic for binary?
-      // Better use beginResponse for binary safe handling.
+      // Use beginResponse for binary safe handling to ensure buffer is properly managed.
       web_server_idf::AsyncWebServerResponse *response = request->beginResponse(200, "image/jpeg", (const uint8_t*)buf, len);
       request->send(response);
       ESP_LOGI(TAG, "Serving existing JPEG preview (%u bytes)", len);
