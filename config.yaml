@@ -216,7 +216,7 @@ meter_reader_tflite:
   reload_button: ${id_prefix}_reload_btn
 
 # ssocr_reader: #seven segment reader (dev) / do not if using meter_reader_tflite
-#   id: ssocr_main
+#   id: ${id_prefix}_ssocr_reader
 #   update_interval: 60s
 #   threshold_level: 128
 #   digit_count: 8
@@ -229,7 +229,7 @@ meter_reader_tflite:
 #     name: "SSOCR Value"
 
 # analog_reader: # DEV !
-#   id: analog_main
+#   id: ${id_prefix}_analog_reader
 #   camera_id: ${id_prefix}_espcam
 #   value_sensor:
 #     name: "Analog Total"
@@ -267,6 +267,7 @@ packages:
   - !include flash_light_controller_controls.yaml
   - !include esp32_camera_utils_controls.yaml
   # - !include data_collector_controls.yaml
+  # - !include analog_reader_controls.yaml
 
   
   # camera configs

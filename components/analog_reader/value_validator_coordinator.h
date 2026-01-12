@@ -20,7 +20,7 @@ class ValueValidatorCoordinator {
 
   bool validate_reading(const std::vector<float> &digits, const std::vector<float> &confidences, int &validated_value) {
     if (validator_ == nullptr) {
-        // Fallback or error? defaulting to false safely
+        // Safe default: fail validation if component is missing to avoid bad data
         return false; 
     }
     return validator_->validate_reading(digits, confidences, validated_value);

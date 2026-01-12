@@ -204,7 +204,7 @@ value_validator:
   # max_history_size: 50kB               # Max history memory usage (default: 50kB)
 
 ssocr_reader: #seven segment reader (dev) / do not if using meter_reader_tflite
-  id: ssocr_main
+  id: ${id_prefix}_ssocr_main
   update_interval: 60s
   camera_id: ${id_prefix}_espcam
   validator: ${id_prefix}_validator

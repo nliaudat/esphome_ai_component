@@ -654,6 +654,8 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
       
       UniqueBufferPtr out_buf = allocate_image_buffer(required_size);
       if (!out_buf) {
+          ESP_LOGE(TAG, "Failed to allocate buffer of size %zu for zone [%d,%d,%d,%d]", 
+                   required_size, zone.x1, zone.y1, zone.x2, zone.y2);
           all_zones_successful = false;
           continue;
       }
@@ -681,6 +683,10 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
                             processing_source_ptr, zone, crop_w, crop_h,
                             out_buf->get(), config_.model_width, config_.model_height,
                             config_.model_channels, stride);
+                        if (!crop_success) {
+                             ESP_LOGE(TAG, "process_grayscale... failed for zone [%d,%d,%d,%d]", 
+                                      zone.x1, zone.y1, zone.x2, zone.y2);
+                        }
                    }
               } else {
                   // RGB
