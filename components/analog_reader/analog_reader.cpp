@@ -205,9 +205,10 @@ void AnalogReader::process_image(std::shared_ptr<esphome::camera::CameraImage> i
            config.camera_width = processing_w;
            config.camera_height = processing_h;
       } else {
-           config.camera_width = img_width_;
-           config.camera_height = img_height_;
-      }
+            // Use processing dimensions if available, or config fallback
+            config.camera_width = (processing_w > 0) ? processing_w : img_width_;
+            config.camera_height = (processing_h > 0) ? processing_h : img_height_;
+       }
       config.pixel_format = is_decoded ? "RGB888" : pixel_format_str_;
       config.model_width = dial.crop_w;
       config.model_height = dial.crop_h;
@@ -291,14 +292,18 @@ float AnalogReader::find_needle_angle(const uint8_t* img, int w, int h, const Di
     DetectionResult selected_result;
     
     // Legacy algorithm: Original radial edge detection (NO preprocessing)
-    if (dial.algorithm == "legacy" || dial.algorithm == "radial_profile") {
+    // Legacy algorithm: Original radial edge detection (NO preprocessing)
+    if (dial.algorithm == "legacy") {
         selected_result = detect_legacy(img, w, h, dial);  // Use RAW image, no preprocessing
     } 
     else {
         // New algorithms: Use preprocessing
         auto processed = preprocess_image(img, w, h, cx, cy, radius);
         
-        if (dial.algorithm == "hough_transform") {
+        if (dial.algorithm == "radial_profile") {
+             selected_result = detect_radial_profile(processed.data(), w, h, dial);
+        }
+        else if (dial.algorithm == "hough_transform") {
             selected_result = detect_hough_transform(processed.data(), w, h, dial);
         } else if (dial.algorithm == "template_match") {
             selected_result = detect_template_match(processed.data(), w, h, dial);
@@ -333,7 +338,7 @@ float AnalogReader::find_needle_angle(const uint8_t* img, int w, int h, const Di
                  dial.id.c_str(), selected_result.algorithm.c_str(), selected_result.angle, selected_result.confidence);
         
         // ASCII visualization - use raw image for legacy, processed for others
-        if (dial.algorithm == "legacy" || dial.algorithm == "radial_profile") {
+        if (dial.algorithm == "legacy") {
             debug_dial_image(img, w, h, selected_result.angle);
         } else {
             auto processed = preprocess_image(img, w, h, cx, cy, radius);
@@ -463,10 +468,10 @@ void AnalogReader::debug_dial_image(const uint8_t* img, int w, int h, float dete
     for (int r = max_r/5; r < max_r; r++) { // Start 20% out
         // Map the needle angle to the grid coordinates.
         // We use a normalized coordinate system (0.0-1.0) and map it to the grid dimensions.
-        // The 0.9f factor keeps the needle slightly inside the grid boundaries.
+        float scale = (float)r / max_r; // Scale factor for line drawing
         
-        int draw_x = (int)( (0.5f + 0.5f * cos(rad) * 0.9f) * grid_w );
-        int draw_y = (int)( (0.5f + 0.5f * sin(rad) * 0.9f) * grid_h );
+        int draw_x = (int)( (0.5f + 0.5f * cos(rad) * scale) * grid_w );
+        int draw_y = (int)( (0.5f + 0.5f * sin(rad) * scale) * grid_h );
         
         if (draw_x >= 0 && draw_x < grid_w && draw_y >= 0 && draw_y < grid_h) {
             lines[draw_y][draw_x] = 'X';

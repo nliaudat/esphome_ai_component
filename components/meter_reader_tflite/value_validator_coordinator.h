@@ -2,6 +2,7 @@
 
 #include "esphome/core/component.h"
 #include "esphome/components/value_validator/value_validator.h"
+#include <limits>
 
 namespace esphome {
 namespace meter_reader_tflite {
@@ -24,8 +25,6 @@ class ValueValidatorCoordinator {
     if (validator_ == nullptr) {
         // Fallback: No validator = No strict per-digit check here.
         // We need to convert digits to value manually as fallback.
-#include <limits>    
-    
         if (digits.empty()) {
             return false;
         }

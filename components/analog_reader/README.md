@@ -93,6 +93,7 @@ This exposes:
 - **Auto Contrast Switch**: Toggle enhancement.
 - **Contrast Slider**: Fine-tune contrast (0.1 - 5.0).
 - **Update Interval**: Adjust poll rate dynamically.
+- **Algorithm Selector**: Switch between detection algorithms (Legacy, Radial Profile, Hough, Template, Auto) at runtime.
 
 ### Tuning Guide
 1. **Crop**: Ensure your `crop_x/y/w/h` isolates **only** the dial. The center of the crop must be the center of the needle's axis.
