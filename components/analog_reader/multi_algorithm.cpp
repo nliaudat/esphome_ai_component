@@ -22,6 +22,11 @@ void AnalogReader::preprocess_image(const uint8_t* img, int w, int h, int cx, in
     // Copy data to working buffer
     memcpy(output.data(), img, w * h);
     
+    // Resize second scratch buffer
+    if (scratch_buffer_2_.size() != w * h) {
+        scratch_buffer_2_.resize(w * h);
+    }
+
     // Step 1: CLAHE (Contrast Limited Adaptive Histogram Equalization)
     apply_clahe(output.data(), w, h);
     
@@ -31,16 +36,10 @@ void AnalogReader::preprocess_image(const uint8_t* img, int w, int h, int cx, in
     // Ensure kernel is odd
     if (kernel % 2 == 0) kernel++;
     
-    apply_tophat(output.data(), w, h, kernel, scratch_buffer_, needle_type);
+    apply_tophat(output.data(), w, h, kernel, scratch_buffer_, scratch_buffer_2_, needle_type);
 
-    // Step 2: Remove circular background (Legacy method, maybe redundant with TopHat but handles global gradients)
-    // remove_background(output.data(), w, h, cx, cy, radius);
-    // User requested replacement? Top-hat handles shadow/gradients.
-    // Let's keep remove_background for now or make it lighter?
-    // Actually top-hat is superior for local shadows. Global gradient (light to dark across dial) is also handled by top-hat.
-    // I will disable remove_background to see effect, or keep it.
-    // Let's keep it but maybe it's too aggressive. 
-    // Commenting out remove_background as Top-hat replaces it effectively for "handling shadows".
+    // Step 2: Remove circular background
+    // (Disabled as Top-hat covers it, but keeping placeholder comment)
     
     // Step 3: Median filter to reduce noise
     median_filter_3x3(output.data(), w, h);
@@ -150,10 +149,11 @@ static void erode(const uint8_t* src, uint8_t* dst, int w, int h, int k) {
     }
 }
 
-static void dilate_in_place(uint8_t* img, int w, int h, int k) {
+static void dilate_in_place(uint8_t* img, int w, int h, int k, uint8_t* temp_buffer) {
     int r = k / 2;
-    std::vector<uint8_t> temp(w * h); // Need full copy or rolling buffer. Rolling is complex. Using heap copy.
-    memcpy(temp.data(), img, w * h);
+    // Use provided temp buffer instead of allocating vector
+    // std::vector<uint8_t> temp(w * h); 
+    memcpy(temp_buffer, img, w * h);
     
     for (int y = 0; y < h; y++) {
         for (int x = 0; x < w; x++) {
@@ -163,7 +163,7 @@ static void dilate_in_place(uint8_t* img, int w, int h, int k) {
                     int ny = y + dy;
                     int nx = x + dx;
                     if (ny >= 0 && ny < h && nx >= 0 && nx < w) {
-                        uint8_t val = temp[ny * w + nx]; // Read from copy
+                        uint8_t val = temp_buffer[ny * w + nx]; // Read from copy
                         if (val > max_val) max_val = val;
                     }
                 }
@@ -173,26 +173,12 @@ static void dilate_in_place(uint8_t* img, int w, int h, int k) {
     }
 }
 
-void AnalogReader::apply_tophat(uint8_t* img, int w, int h, int kernel_size, std::vector<uint8_t>& scratch, NeedleType needle_type) {
+void AnalogReader::apply_tophat(uint8_t* img, int w, int h, int kernel_size, std::vector<uint8_t>& scratch, std::vector<uint8_t>& scratch2, NeedleType needle_type) {
     if (scratch.size() != w * h) scratch.resize(w * h);
+    if (scratch2.size() != w * h) scratch2.resize(w * h); // Should be resized by caller but safety
     
     // White Top Hat: Original - Opening (Dilate(Erode(Img)))
     // Black Top Hat: Closing(Img) - Original. Closing = Erode(Dilate(Img))
-    
-    // We implement White Top Hat logic mostly for highlighting peaks.
-    // If Needle is Dark, we want Black Top Hat.
-    
-    // Using simple Min/Max logic:
-    // Opening:
-    // 1. Erode Img -> Scratch
-    // 2. Dilate Scratch -> Scratch (In Place)
-    
-    // Closing:
-    // 1. Dilate Img -> Scratch (requires copy-erode-logic, or just dilate logic)
-    //    Actually dilate_in_place allocates temp.
-    //    Let's use erode(src, dst) and dilate(src, dst) with copy?
-    
-    // Optimized flow reusing scratch:
     
     if (needle_type == NEEDLE_TYPE_LIGHT) {
         // White Top Hat: Original - Opening.
@@ -201,8 +187,8 @@ void AnalogReader::apply_tophat(uint8_t* img, int w, int h, int kernel_size, std
         // 1. Erode(Original -> Scratch)
         erode(img, scratch.data(), w, h, kernel_size);
         
-        // 2. Dilate(Scratch -> Scratch) (Use in-place with temp alloc inside)
-        dilate_in_place(scratch.data(), w, h, kernel_size);
+        // 2. Dilate(Scratch -> Scratch) (Use in-place with temp alloc provided)
+        dilate_in_place(scratch.data(), w, h, kernel_size, scratch2.data());
         
         // 3. Original - Scratch (Opening)
         for (int i = 0; i < w * h; i++) {
@@ -214,25 +200,18 @@ void AnalogReader::apply_tophat(uint8_t* img, int w, int h, int kernel_size, std
         // Closing = Erode(Dilate(Original))
         
         // 1. Dilate(Original -> Scratch) 
-        // We don't have dilate(src, dst). reuse dilate_in_place logic? 
         // Just copy Original to Scratch, then Dilate Scratch
         memcpy(scratch.data(), img, w * h);
-        dilate_in_place(scratch.data(), w, h, kernel_size);
+        dilate_in_place(scratch.data(), w, h, kernel_size, scratch2.data());
         
-        // 2. Erode(Scratch -> Scratch) (Can use erode(src, dst) where src==dst? No. Need temp)
-        // erode implementation above uses src separate from dst logic?
-        // "dst[y*w+x] = min_val". min_val computed from src.
-        // If src==dst, we read modified values.
-        // So we need another buffer OR erode_in_place.
+        // 2. Erode(Scratch -> Scratch2) 
+        // Use scratch2 as destination for erode
+        erode(scratch.data(), scratch2.data(), w, h, kernel_size); // Erode Scratch -> Scratch2
         
-        // Let's allocate one more temp buffer, safety first.
-        std::vector<uint8_t> temp(w*h);
-        erode(scratch.data(), temp.data(), w, h, kernel_size); // Erode Scratch -> Temp
-        
-        // Now Temp is Closing.
-        // 3. Temp - Original
+        // Now Scratch2 is Closing.
+        // 3. Scratch2 - Original
         for (int i = 0; i < w * h; i++) {
-            int val = (int)temp[i] - (int)img[i];
+            int val = (int)scratch2[i] - (int)img[i];
             img[i] = (val < 0) ? 0 : (uint8_t)val;
         }
     }
@@ -248,44 +227,53 @@ AnalogReader::DetectionResult AnalogReader::detect_radial_profile(const uint8_t*
     std::vector<float> radial_profile(360, 0.0f);
     std::vector<float> edge_strength(360, 0.0f);
     
-    // Scan range: use configurable constants
-    int start_r = (int)(radius * kScanStartRadius);
-    int end_r = (int)(radius * kScanEndRadius);
+    // Connectivity Scan
+    int start_r = 5; // Start close to center (skip nut)
+    int max_radius_scan = (int)(radius * dial.max_scan_radius);
     
+    // Configurable gap threshold
+    const int MAX_GAP = 5;
+
     for (int deg = 0; deg < 360; deg++) {
-        // Use LUT
         float dx = cos_lut_[deg];
         float dy = sin_lut_[deg];
         
-        std::vector<uint8_t> ray_values;
-        
-        // Sample along ray
-        for (int r = start_r; r < end_r; r++) {
+        float score = 0.0f;
+        int gap_count = 0;
+        int pixel_count = 0;
+
+        // Trace ray from center outwards
+        for (int r = start_r; r < max_radius_scan; r++) {
             int px = cx + (int)(r * dx);
             int py = cy + (int)(r * dy);
             
             if (px >= 0 && px < w && py >= 0 && py < h) {
-                ray_values.push_back(img[py * w + px]);
+                uint8_t val = img[py * w + px];
+                
+                // TopHat image: Needle is always BRIGHT (High Value)
+                // Threshold to consider "active detection"
+                if (val > 20) { 
+                    score += val;
+                    gap_count = 0; // Reset gap
+                } else {
+                    gap_count++;
+                    // If we hit a large gap, assume needle ended (e.g. this was the tail, or just noise)
+                     // Penalize the gap? No, just don't add to score.
+                    if (gap_count > MAX_GAP) {
+                         break; // Stop tracing this ray
+                    }
+                }
+                pixel_count++;
+            } else {
+                break;
             }
         }
         
-        if (ray_values.size() > 0) {
-            // Calculate average intensity along ray
-            float sum = 0;
-            for (auto val : ray_values) sum += val;
-            radial_profile[deg] = sum / ray_values.size();
-            
-            // Calculate edge strength (gradient between inner and outer parts)
-            if (ray_values.size() > 2) {
-                int mid = ray_values.size() / 2;
-                float inner_avg = 0, outer_avg = 0;
-                for (int i = 0; i < mid; i++) inner_avg += ray_values[i];
-                for (size_t i = mid; i < ray_values.size(); i++) outer_avg += ray_values[i];
-                inner_avg /= mid;
-                outer_avg /= (ray_values.size() - mid);
-                edge_strength[deg] = fabs(outer_avg - inner_avg);
-            }
-        }
+        // Edge strength calculation (simplified radial gradient)
+        // We can reuse the loop or keep it simple.
+        // For now, rely on Intensity Score which is now robustly "Length * Brightness".
+        
+        radial_profile[deg] = score; 
     }
     
     // Find needle using combined criteria
@@ -294,20 +282,17 @@ AnalogReader::DetectionResult AnalogReader::detect_radial_profile(const uint8_t*
     std::vector<float> final_scores(360, 0.0f);
     
     for (int deg = 0; deg < 360; deg++) {
-        // Intensity score depends on needle type
-        float intensity_score;
-        if (dial.needle_type == NEEDLE_TYPE_LIGHT) {
-            intensity_score = radial_profile[deg];  // Light needle = high value
-        } else {
-            intensity_score = 255.0f - radial_profile[deg];  // Dark needle = low value
-        }
+        // Since we process TopHat, higher value is ALWAYS better for needle presence.
+        // No need to invert for NEEDLE_TYPE_DARK.
+        float final_score = radial_profile[deg];
         
-        // Combined score: use configurable weights
-        float combined_score = intensity_score * kIntensityWeight + edge_strength[deg] * kEdgeWeight;
-        final_scores[deg] = combined_score;
+        // Enhance with Neighbor averaging to smooth out noise
+        // (Optional, but good for stability)
         
-        if (combined_score > best_score) {
-            best_score = combined_score;
+        final_scores[deg] = final_score;
+        
+        if (final_score > best_score) {
+            best_score = final_score;
             best_angle_int = deg;
         }
     }
@@ -410,8 +395,8 @@ AnalogReader::DetectionResult AnalogReader::detect_hough_transform(const uint8_t
     std::vector<int> accumulator(NUM_ANGLES, 0);
     
     // Only consider edges in the dial area (30-90% radius)
-    int min_r = (int)(radius * 0.3f);
-    int max_r = (int)(radius * 0.9f);
+    int min_r = (int)(radius * dial.min_scan_radius);
+    int max_r = (int)(radius * dial.max_scan_radius);
     
     // Step 1.5: NMS Pass on edges buffer -> Voting
     // We iterate edges and vote
@@ -471,21 +456,17 @@ AnalogReader::DetectionResult AnalogReader::detect_template_match(const uint8_t*
         int count = 0;
         
         // Sample along needle direction (30-90% radius)
-        int start_r = (int)(radius * 0.3f);
-        int end_r = (int)(radius * 0.9f);
+        int start_r = (int)(radius * dial.min_scan_radius);
+        int end_r = (int)(radius * dial.max_scan_radius);
         
         for (int r = start_r; r < end_r; r++) {
             int px = cx + (int)(r * dx);
             int py = cy + (int)(r * dy);
             
             if (px >= 0 && px < w && py >= 0 && py < h) {
-                // Score based on needle type
+                // Score based on needle type - Preprocessed is always Bright
                 float pixel_val = img[py * w + px];
-                if (dial.needle_type == NEEDLE_TYPE_DARK) {
-                    score += (255.0f - pixel_val);  // Dark needle = low values
-                } else {
-                    score += pixel_val;  // Light needle = high values
-                }
+                score += pixel_val;
                 count++;
             }
         }
@@ -519,20 +500,17 @@ AnalogReader::DetectionResult AnalogReader::detect_template_match(const uint8_t*
         float score = 0.0f;
         int count = 0;
         
-        int start_r = (int)(radius * 0.3f);
-        int end_r = (int)(radius * 0.9f);
+        int start_r = (int)(radius * dial.min_scan_radius);
+        int end_r = (int)(radius * dial.max_scan_radius);
         
         for (int r = start_r; r < end_r; r++) {
             int px = cx + (int)(r * dx);
             int py = cy + (int)(r * dy);
             
             if (px >= 0 && px < w && py >= 0 && py < h) {
+                // Preprocessed image (TopHat) always has Bright Needle
                 float pixel_val = img[py * w + px];
-                if (dial.needle_type == NEEDLE_TYPE_DARK) {
-                    score += (255.0f - pixel_val);
-                } else {
-                    score += pixel_val;
-                }
+                score += pixel_val;
                 count++;
             }
         }
@@ -552,6 +530,98 @@ AnalogReader::DetectionResult AnalogReader::detect_template_match(const uint8_t*
 }
 
 // FILE CONTINUES - This is multi_algorithm.cpp
+
+AnalogReader::DetectionResult AnalogReader::detect_legacy(const uint8_t* img, int w, int h, const DialConfig& dial) {
+    int cx = w / 2;
+    int cy = h / 2;
+    int radius = std::min(cx, cy) - 2;
+    
+    // Original Enhanced Radial Profile Analysis (from checkpoint, before multi-algorithm)
+    // Combines average intensity along each ray with edge strength detection
+    // Score = 70% intensity + 30% edge gradient (inner vs outer parts)
+    
+    std::vector<float> radial_profile(360, 0.0f);
+    std::vector<float> edge_strength(360, 0.0f);
+    
+    // Ray Continuity Scan
+    int start_r = (int)(radius * 0.15f); // Start close to center
+    int end_r = (int)(radius * kScanEndRadius); // Use existing end_r
+    
+    const int MAX_GAP = 5;
+
+    for (int deg = 0; deg < 360; deg++) {
+        float rad = deg * M_PI / 180.0f;
+        float dx = cos(rad);
+        float dy = sin(rad);
+        
+        float score = 0.0f;
+        int gap_count = 0;
+        
+        // Scan ray from center outwards
+        for (int r = start_r; r < end_r; r++) {
+            int px = cx + (int)(r * dx);
+            int py = cy + (int)(r * dy);
+            
+            if (px >= 0 && px < w && py >= 0 && py < h) {
+                uint8_t val = img[py * w + px];
+                bool is_needle_pixel = false;
+                
+                // Logic depends on needle type (RAW image)
+                if (dial.needle_type == NEEDLE_TYPE_LIGHT) {
+                    if (val > 128) is_needle_pixel = true; // Simple threshold for now, or relative to avg
+                    score += val; // Accumulate intensity
+                } else {
+                    // Dark needle
+                    if (val < 128) is_needle_pixel = true;
+                    score += (255 - val); // Accumulate darkness
+                }
+                
+                // Connectivity Check
+                // Basic check: If pixel is "Background-ish", gap++.
+                // Assume background is > 100 for Dark Needle?
+                if (dial.needle_type == NEEDLE_TYPE_DARK && val > 150) gap_count++;
+                else if (dial.needle_type == NEEDLE_TYPE_LIGHT && val < 100) gap_count++;
+                else gap_count = 0;
+                
+                if (gap_count > MAX_GAP) break; // Terminate ray
+            }
+        }
+        radial_profile[deg] = score;
+        
+        // Edge Strength is hard to do with varying lengths. Set to 0 or derive from score.
+        // We will just use the score.
+        edge_strength[deg] = 0; 
+    }
+    
+    // Find needle using combined criteria
+    float best_score = -FLT_MAX;
+    float best_angle = 0;
+    
+    for (int deg = 0; deg < 360; deg++) {
+        // Intensity score depends on needle type
+        float intensity_score;
+        if (dial.needle_type == NEEDLE_TYPE_LIGHT) {
+            intensity_score = radial_profile[deg];  // Light needle = high value
+        } else {
+            intensity_score = 255.0f - radial_profile[deg];  // Dark needle = low value
+        }
+        
+        // Combined score with weights
+        float combined_score = intensity_score * kIntensityWeight + edge_strength[deg] * kEdgeWeight;
+        
+        if (combined_score > best_score) {
+            best_score = combined_score;
+            best_angle = (float)deg;
+        }
+    }
+    
+    // Calculate confidence (0-1)
+    float min_score = *std::min_element(radial_profile.begin(), radial_profile.end());
+    float max_score = *std::max_element(radial_profile.begin(), radial_profile.end());
+    float confidence = (max_score > min_score) ? (best_score / (max_score * kIntensityWeight + 255.0f * kEdgeWeight)) : 0.5f;
+    
+    return {best_angle, confidence, "legacy"};
+}
 
 }  // namespace analog_reader
 }  // namespace esphome

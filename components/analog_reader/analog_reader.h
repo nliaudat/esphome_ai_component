@@ -41,6 +41,17 @@ struct DialConfig {
   float contrast{1.0f};      // Multiplier (1.0 = original)
   uint32_t target_color{0};  // RGB hex
   bool use_color{false};
+  // Scan Parameters
+  float min_scan_radius{0.3f}; // % of radius (0.0-1.0)
+  float max_scan_radius{0.9f}; // % of radius (0.0-1.0)
+  
+  // Sensors
+  sensor::Sensor *value_sensor{nullptr};
+  sensor::Sensor *confidence_sensor{nullptr};
+  sensor::Sensor *angle_sensor{nullptr};
+  
+  // Calibration (Raw Angle -> Corrected Value, overrides Min/Max logic if non-empty)
+  std::vector<std::pair<float, float>> calibration_mapping; 
 };
 
 class AnalogReader : public PollingComponent, public esphome::camera::CameraListener {
@@ -86,6 +97,13 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   void set_dial_angle(std::string dial_id, float min_deg, float max_deg);
 
  protected:
+  // Detection algorithms
+  struct DetectionResult {
+      float angle;
+      float confidence;
+      std::string algorithm;
+  };
+
   bool paused_{false};
   // Coordinators
   // Note: We reuse CameraCoordinator from ssocr_reader/meter_reader context
@@ -117,6 +135,7 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   // Optimization: Pre-allocated buffer and LUTs
   std::vector<uint8_t> working_buffer_;
   std::vector<uint8_t> scratch_buffer_;
+  std::vector<uint8_t> scratch_buffer_2_; // Second scratch for allocation-free morphology
   
   // Persistent RGB buffer (Manual allocation for PSRAM control)
   uint8_t* rgb_buffer_{nullptr};
@@ -128,14 +147,10 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
 
   void process_image(std::shared_ptr<esphome::camera::CameraImage> image);
   void process_image_from_buffer(const uint8_t* data, size_t len);
-  float find_needle_angle(const uint8_t* img, int w, int h, const DialConfig& dial);
+  DetectionResult find_needle_angle(const uint8_t* img, int w, int h, const DialConfig& dial);
   
   // Detection algorithms
-  struct DetectionResult {
-      float angle;
-      float confidence;
-      std::string algorithm;
-  };
+
   
   DetectionResult detect_legacy(const uint8_t* img, int w, int h, const DialConfig& dial);  // Original algorithm, no preprocessing
   DetectionResult detect_radial_profile(const uint8_t* img, int w, int h, const DialConfig& dial);
@@ -146,7 +161,7 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   void preprocess_image(const uint8_t* img, int w, int h, int cx, int cy, int radius, NeedleType needle_type, std::vector<uint8_t>& output);
   void apply_clahe(uint8_t* img, int w, int h, int tile_size = 8);
   void remove_background(uint8_t* img, int w, int h, int cx, int cy, int radius);
-  void apply_tophat(uint8_t* img, int w, int h, int kernel_size, std::vector<uint8_t>& scratch, NeedleType needle_type); // Top-hat transform for shadow removal
+  void apply_tophat(uint8_t* img, int w, int h, int kernel_size, std::vector<uint8_t>& scratch, std::vector<uint8_t>& scratch2, NeedleType needle_type); // Top-hat transform for shadow removal
   void median_filter_3x3(uint8_t* img, int w, int h);
   
   // Helpers
