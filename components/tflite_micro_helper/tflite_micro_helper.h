@@ -78,12 +78,17 @@ class TFLiteMicroHelper {
     );
   }
 
+  void set_debug(bool debug) { 
+      debug_ = debug; 
+      model_handler_.set_debug(debug);
+  }
  private:
   ModelHandler model_handler_;
   MemoryManager memory_manager_;
   MemoryManager::AllocationResult tensor_arena_allocation_;
   size_t tensor_arena_size_requested_{0};
   size_t model_length_{0};
+  bool debug_{false};
 };
 
 }  // namespace tflite_micro_helper

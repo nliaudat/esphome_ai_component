@@ -11,6 +11,8 @@
 namespace esphome {
 namespace analog_reader {
 
+static const char *const TAG = "multi_algorithm";
+
 // PREPROCESSING FUNCTIONS
 
 void AnalogReader::preprocess_image(const uint8_t* img, int w, int h, int cx, int cy, int radius, NeedleType needle_type, std::vector<uint8_t>& output) {
@@ -43,6 +45,11 @@ void AnalogReader::preprocess_image(const uint8_t* img, int w, int h, int cx, in
     
     // Step 3: Median filter to reduce noise
     median_filter_3x3(output.data(), w, h);
+
+    if (debug_) {
+        ESP_LOGD(TAG, "Preprocessing complete. NeedleType: %s, Kernel: %d", 
+                 needle_type == NEEDLE_TYPE_LIGHT ? "Light" : "Dark", kernel);
+    }
 }
 
 void AnalogReader::apply_clahe(uint8_t* img, int w, int h, int tile_size) {
@@ -336,6 +343,9 @@ AnalogReader::DetectionResult AnalogReader::detect_radial_profile(const uint8_t*
     else confidence = range / 100.0f;
     if (confidence > 1.0f) confidence = 1.0f;
     
+    if (debug_) {
+        ESP_LOGD(TAG, "Radial Profile: Best Angle=%.1f, Conf=%.2f", best_angle, confidence);
+    }
     return {best_angle, confidence, "radial_profile"};
 }
 
@@ -434,6 +444,9 @@ AnalogReader::DetectionResult AnalogReader::detect_hough_transform(const uint8_t
     
     float confidence = std::min(1.0f, (float)max_votes / (radius * 0.1f));  // Normalized
     
+    if (debug_) {
+        ESP_LOGD(TAG, "Hough Transform: Best Angle Index=%d, Conf=%.2f", best_angle_idx, confidence);
+    }
     return {(float)best_angle_idx, confidence, "hough_transform"};
 }
 
@@ -526,6 +539,9 @@ AnalogReader::DetectionResult AnalogReader::detect_template_match(const uint8_t*
     
     float confidence = refined_score / 255.0f;
     
+    if (debug_) {
+        ESP_LOGD(TAG, "Template Match: Refined Angle=%.1f, Conf=%.2f", refined_angle, confidence);
+    }
     return {refined_angle, confidence, "template_match"};
 }
 
@@ -599,14 +615,16 @@ AnalogReader::DetectionResult AnalogReader::detect_legacy(const uint8_t* img, in
     
     for (int deg = 0; deg < 360; deg++) {
         // Intensity score depends on needle type
+        // Note: radial_profile[deg] already contains inverted values for dark needles (255 - val)
+        // So we use it directly without a second inversion
         float intensity_score;
         if (dial.needle_type == NEEDLE_TYPE_LIGHT) {
             intensity_score = radial_profile[deg];  // Light needle = high value
         } else {
-            intensity_score = 255.0f - radial_profile[deg];  // Dark needle = low value
+            intensity_score = radial_profile[deg];  // Dark needle = already inverted, use directly
         }
         
-        // Combined score with weights
+        // Combined score with weights (edge_strength is 0, so only intensity matters)
         float combined_score = intensity_score * kIntensityWeight + edge_strength[deg] * kEdgeWeight;
         
         if (combined_score > best_score) {
@@ -615,10 +633,11 @@ AnalogReader::DetectionResult AnalogReader::detect_legacy(const uint8_t* img, in
         }
     }
     
-    // Calculate confidence (0-1)
+    // Calculate confidence (0-1) based on dynamic range (signal-to-noise ratio)
+    // Since edge_strength is 0, we use only the radial_profile range
     float min_score = *std::min_element(radial_profile.begin(), radial_profile.end());
     float max_score = *std::max_element(radial_profile.begin(), radial_profile.end());
-    float confidence = (max_score > min_score) ? (best_score / (max_score * kIntensityWeight + 255.0f * kEdgeWeight)) : 0.5f;
+    float confidence = (max_score > min_score) ? ((max_score - min_score) / max_score) : 0.5f;
     
     return {best_angle, confidence, "legacy"};
 }

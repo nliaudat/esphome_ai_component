@@ -23,6 +23,7 @@ data_collector:
   id: my_data_collector
   # Target Server / Webhook
   upload_url: "http://192.168.1.50:5000/api/upload"
+  debug: false
   
   # Optional Authentication
   # api_key: "Bearer my-token"  # Adds Authorization header

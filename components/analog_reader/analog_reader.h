@@ -74,7 +74,11 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   }
 
   void set_pause_processing(bool paused) { paused_ = paused; }
-  void set_debug(bool debug) { debug_ = debug; }
+  void set_debug(bool debug) { 
+      debug_ = debug; 
+      camera_coord_.set_debug(debug);
+      flashlight_coord_.set_debug(debug);
+  }
   
   void set_all_auto_contrast(bool enabled) {
       for (auto &dial : dials_) dial.auto_contrast = enabled;

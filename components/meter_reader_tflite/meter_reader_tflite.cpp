@@ -357,6 +357,18 @@ void MeterReaderTFLite::set_camera(camera::Camera *camera) { // -> CameraCoord c
     camera->add_listener(this); 
 }
 
+void MeterReaderTFLite::set_debug(bool debug) {
+    this->debug_ = debug;
+    this->tflite_coord_.set_debug(debug);
+    this->camera_coord_.set_debug(debug);
+    this->flashlight_coord_.set_debug(debug);
+    
+    // Also enable legacy debug mode if it exists but ideally we use debug_ everywhere
+    #ifdef DEBUG_METER_READER_TFLITE
+    this->set_debug_mode(debug);
+    #endif
+}
+
 void MeterReaderTFLite::on_camera_image(const std::shared_ptr<camera::CameraImage> &image) {
     if (frame_requested_.load() && !processing_frame_.load()) {
         pending_frame_ = image;
@@ -672,6 +684,9 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     esphome::App.feed_wdt();
     
     uint32_t preprocess_start = millis();
+    if (this->debug_) {
+        ESP_LOGD(TAG, "Processing full image: Requesting frame processing from CameraCoordinator");
+    }
     auto processed_buffers = camera_coord_.process_frame(frame, zones);
     
     // Check for debug image (last processed master)
@@ -796,6 +811,12 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
         } else {
              ESP_LOGW(TAG, "Digit %d: Failed to infer", digit_index);
         }
+        
+        if (this->debug_) {
+            ESP_LOGD(TAG, "Digit %d: Val=%.2f, Conf=%.2f, Success=%s", 
+                     digit_index, res.value, res.confidence, res.success ? "YES" : "NO");
+        }
+        
         digit_index++;
     }
     

@@ -37,8 +37,13 @@ bool CameraCoordinator::supports_window() const {
 
 bool CameraCoordinator::set_window(int offset_x, int offset_y, int width, int height) {
     if (!camera_) return false;
-    ESP_LOGI(TAG, "Setting camera window: off(%d,%d) size(%dx%d)", 
-             offset_x, offset_y, width, height);
+    if (this->debug_) {
+        ESP_LOGD(TAG, "Setting camera window: off(%d,%d) size(%dx%d)", 
+                 offset_x, offset_y, width, height);
+    } else {
+        ESP_LOGD(TAG, "Setting camera window: off(%d,%d) size(%dx%d)", 
+                 offset_x, offset_y, width, height);
+    }
 
     bool success = window_control_.set_window_with_reset(
         camera_, 
@@ -143,8 +148,13 @@ void CameraCoordinator::update_image_processor_config(int model_width, int model
     config.cache_preview_image = enable_preview_;
 
     image_processor_ = std::make_unique<esp32_camera_utils::ImageProcessor>(config);
-    ESP_LOGI(TAG, "ImageProcessor initialized in CameraCoord: %dx%d %s -> Model %dx%d", 
-             current_width_, current_height_, current_format_.c_str(), config.model_width, config.model_height);
+    if (this->debug_) {
+        ESP_LOGD(TAG, "ImageProcessor initialized: %dx%d %s -> Model %dx%d (InputType: %d)", 
+                 current_width_, current_height_, current_format_.c_str(), config.model_width, config.model_height, input_type);
+    } else {
+        ESP_LOGI(TAG, "ImageProcessor initialized in CameraCoord: %dx%d %s -> Model %dx%d", 
+                 current_width_, current_height_, current_format_.c_str(), config.model_width, config.model_height);
+    }
 }
 
 std::vector<CameraCoordinator::ProcessResult> CameraCoordinator::process_frame(

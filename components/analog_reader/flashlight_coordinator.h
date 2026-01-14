@@ -35,6 +35,8 @@ class FlashlightCoordinator {
   // Setters required for logic
   void set_request_frame_callback(std::function<void()> cb) { request_frame_callback_ = cb; }
 
+  void set_debug(bool debug) { debug_ = debug; }
+
  private:
   Component* parent_{nullptr};
   light::LightState* legacy_light_{nullptr};
@@ -46,6 +48,7 @@ class FlashlightCoordinator {
   
   bool scheduled_{false};
   std::atomic<bool> auto_controlled_{false}; // If we turned it on autonomously
+  bool debug_{false};
   
   std::function<void()> request_frame_callback_;
   

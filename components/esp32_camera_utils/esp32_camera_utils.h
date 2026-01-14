@@ -65,6 +65,7 @@ class Esp32CameraUtils : public Component {
 
   // Manually trigger sensor updates
   void update_memory_sensors();
+  void set_debug(bool debug) { debug_ = debug; }
 
 #ifdef DEBUG_ESP32_CAMERA_UTILS_MEMORY
   void set_camera_buffer_size_sensor(sensor::Sensor *s) { camera_buffer_size_sensor_ = s; }
@@ -105,8 +106,8 @@ class Esp32CameraUtils : public Component {
   
   // Stored config template for reinitialization
   ImageProcessorConfig last_config_template_;
-
   bool has_processor_config_{false};
+  bool debug_{false};
 
 #ifdef DEBUG_ESP32_CAMERA_UTILS_MEMORY
   sensor::Sensor *camera_buffer_size_sensor_{nullptr};

@@ -281,6 +281,7 @@ async def to_code(config):
     if config.get(CONF_DEBUG, False):
         cg.add_define("DEBUG_METER_READER_TFLITE")
         cg.add(var.set_debug_mode(True))
+        cg.add(var.set_debug(True))
         
     if config.get(CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL, False):
         cg.add_define("DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL")

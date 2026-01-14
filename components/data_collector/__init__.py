@@ -18,6 +18,7 @@ CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(DataCollector),
         cv.Optional(CONF_UPLOAD_URL): cv.string,
+        cv.Optional("debug", default=False): cv.boolean,
         cv.Optional(CONF_USERNAME): cv.string,
         cv.Optional(CONF_PASSWORD): cv.string,
         cv.Optional(CONF_API_KEY): cv.string,
@@ -31,6 +32,9 @@ CONFIG_SCHEMA = cv.Schema(
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
+    
+    if config.get("debug", False):
+        cg.add(var.set_debug(True))
 
     if CONF_UPLOAD_URL in config:
         cg.add(var.set_upload_url(config[CONF_UPLOAD_URL]))

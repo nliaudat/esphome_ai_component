@@ -131,6 +131,13 @@ bool DataCollector::upload_image(const uint8_t *data, size_t len, float raw_valu
     int status_code = esp_http_client_get_status_code(client);
     ESP_LOGI(TAG, "HTTP POST Status = %d, content_length = %lld", 
              status_code, esp_http_client_get_content_length(client));
+    if (this->debug_) {
+        // Log response body if small? Or just detailed info
+        // esp_http_client_read handling requires event loop or full read.
+        // For now, log that we finished.
+        ESP_LOGD(TAG, "Full upload metrics: Value=%.2f, Conf=%.4f, Size=%zu", raw_value, confidence, len);
+        ESP_LOGD(TAG, "Headers sent: X-Meter-Value, X-Meter-Confidence, Content-Type, Authorization");
+    }
     success = (status_code >= 200 && status_code < 300);
   } else {
     ESP_LOGE(TAG, "HTTP POST request failed: %s", esp_err_to_name(err));

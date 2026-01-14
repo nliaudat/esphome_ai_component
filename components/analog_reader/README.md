@@ -179,7 +179,7 @@ This exposes:
 
 ## ⚙️ How it Works
 1. **Decode Once**: The full camera frame is decoded to RGB888 just once, optimizing memory.
-2. **Extract & Preprocess**: Each diaL crop is extracted. An optional **Top-Hat Filter** removes shadows, leaving only "structure" (the needle).
+2. **Extract & Preprocess**: Each dial crop is extracted. An optional **Top-Hat Filter** removes shadows, leaving only "structure" (the needle).
 3. **Multi-Algorithm Analyze**: The selected algorithm analyzes the image:
    - **Radial Profile**: Traces connected rays from center.
    - **Legacy**: Traces raw intensity rays from center.

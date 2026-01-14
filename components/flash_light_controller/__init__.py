@@ -35,4 +35,4 @@ async def to_code(config):
         cg.add(var.set_flash_post_time(config[CONF_FLASH_POST_TIME]))
 
     if config.get("debug", False):
-        cg.add_define("DEBUG_FLASH_LIGHT_CONTROLLER")
+        cg.add(var.set_debug(True))
