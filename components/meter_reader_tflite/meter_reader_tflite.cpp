@@ -769,6 +769,13 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     }
     #endif
 
+    // Async Path (already checks empty above) but sync path needs it too
+    if (processed_buffers.empty()) {
+        ESP_LOGE(TAG, "No processed buffers generated (JPEG decode failed?). Skipping inference.");
+        processing_frame_ = false;
+        return;
+    }
+
     auto results = tflite_coord_.run_inference(processed_buffers);
     
     #ifdef DEBUG_METER_READER_MEMORY
@@ -1150,6 +1157,7 @@ void MeterReaderTFLite::inference_task(void *arg) {
         if (xQueueReceive(self->input_queue_, &job, portMAX_DELAY) == pdTRUE) {
             if (!job) continue;
             
+            ESP_LOGD(TAG, "Inference Task: Job received. Starting TFLite...");
             uint32_t start = millis();
             
             // Invoke TFLite (Thread-Safe because only this task calls it)
@@ -1173,6 +1181,7 @@ void MeterReaderTFLite::inference_task(void *arg) {
             free_inference_job(job);
             
             // Send back
+            ESP_LOGD(TAG, "Inference Task: TFLite done in %u ms. Sending to output queue...", millis() - start);
             if (xQueueSend(self->output_queue_, &res, 100 / portTICK_PERIOD_MS) != pdTRUE) {
                 // Queue push failed, likely due to main loop backpressure. Drop result to prevent blocking.
                 free_inference_result(res);
