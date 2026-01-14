@@ -81,12 +81,14 @@ bool ModelHandler::load_model_with_arena(const uint8_t *model_data, size_t model
                             uint8_t* tensor_arena, size_t tensor_arena_size,
                             const ModelConfig &config) {
 
-  ESP_LOGD(TAG, "Loading model with config:");
-  ESP_LOGD(TAG, "  Description: %s", config.description.c_str());
-  ESP_LOGD(TAG, "  Output processing: %s", config.output_processing.c_str());
-  ESP_LOGD(TAG, "Model data validation:");
-  ESP_LOGD(TAG, "  Model data pointer: %p", model_data);
-  ESP_LOGD(TAG, "  Model data size: %zu bytes", model_size);
+  if (debug_) {
+      ESP_LOGD(TAG, "Loading model with config:");
+      ESP_LOGD(TAG, "  Description: %s", config.description.c_str());
+      ESP_LOGD(TAG, "  Output processing: %s", config.output_processing.c_str());
+      ESP_LOGD(TAG, "Model data validation:");
+      ESP_LOGD(TAG, "  Model data pointer: %p", model_data);
+      ESP_LOGD(TAG, "  Model data size: %zu bytes", model_size);
+  }
 
   if (model_data == nullptr) {
     ESP_LOGE(TAG, "Model data pointer is NULL!");
@@ -168,12 +170,14 @@ bool ModelHandler::load_model_with_arena(const uint8_t *model_data, size_t model
   // Reset and allocate fresh resolver for this load cycle
   resolver_ = std::make_unique<tflite::MicroMutableOpResolver<MAX_OPERATORS>>();
   
-  ESP_LOGD(TAG, "Operator codes found in model:");
-    for (size_t i = 0; i < tflite_model_->operator_codes()->size(); ++i) {
-      const auto *op_code = tflite_model_->operator_codes()->Get(i);
-      ESP_LOGD(TAG, "  [%d]: %d (%s)", (int)i, op_code->builtin_code(),
-               tflite::EnumNameBuiltinOperator(op_code->builtin_code()));
-    }
+  if (debug_) {
+      ESP_LOGD(TAG, "Operator codes found in model:");
+      for (size_t i = 0; i < tflite_model_->operator_codes()->size(); ++i) {
+        const auto *op_code = tflite_model_->operator_codes()->Get(i);
+        ESP_LOGD(TAG, "  [%d]: %d (%s)", (int)i, op_code->builtin_code(),
+                 tflite::EnumNameBuiltinOperator(op_code->builtin_code()));
+      }
+  }
   
   std::set<tflite::BuiltinOperator> required_ops;
   
@@ -404,7 +408,9 @@ ProcessedOutput ModelHandler::process_output(const float *output_data) const {
   }
   
   float max_val_output = max_val;
-  ESP_LOGD(TAG, "Output range: min=%.6f, max=%.6f", min_val, max_val);
+  if (debug_) {
+    ESP_LOGD(TAG, "Output range: min=%.6f, max=%.6f", min_val, max_val);
+  }
 
   if (config_.output_processing == "direct_class") {
     result.value = static_cast<float>(max_idx);

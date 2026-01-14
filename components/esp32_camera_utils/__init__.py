@@ -107,6 +107,7 @@ async def to_code(config):
 
     if config.get("debug", False):
         cg.add_define("DEBUG_ESP32_CAMERA_UTILS")
+        cg.add(var.set_debug(True))
         
     if 'web_server' in CORE.config:
         cg.add_define("USE_WEB_SERVER")

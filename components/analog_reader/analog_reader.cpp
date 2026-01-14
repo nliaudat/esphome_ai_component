@@ -186,6 +186,8 @@ void AnalogReader::dump_config() {
 }
 
 void AnalogReader::update() {
+  if (debug_) ESP_LOGD(TAG, "Update triggered (Interval cycle)");
+
   // Flash scheduling
   if (flashlight_coord_.update_scheduling()) {
       return;
@@ -436,6 +438,9 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
       
       const uint8_t* input_for_algo = raw;
       
+      if (debug_) ESP_LOGD(TAG, "Processing Dial: %s (Algorithm: %s)", dial.id.c_str(), dial.algorithm.c_str());
+      uint32_t dial_start = millis();
+      
       // If Color Mode: Convert RGB to Distance Map (Grayscale)
       if (dial.use_color) {
           if (scratch_buffer_.size() != crop_w * crop_h) {
@@ -634,8 +639,9 @@ float AnalogReader::angle_to_value(float image_angle, const DialConfig& dial) {
         float rel_angle = effective_dial_angle - dial.min_angle;
         float fraction = rel_angle / range;
         return dial.min_value + fraction * (dial.max_value - dial.min_value);
-    } else {
-        // Calibration Map Override
+    }
+    
+    // Calibration Map Override (non-linear mapping)
     if (!dial.calibration_mapping.empty()) {
         // Let's use `dial_angle` (North-based, 0-360) as input to map.
         
@@ -661,11 +667,10 @@ float AnalogReader::angle_to_value(float image_angle, const DialConfig& dial) {
         return dial.calibration_mapping.back().second; // Should not reach
     }
 
-    // Normal case
+    // Normal case: linear mapping
     float fraction = (effective_dial_angle - dial.min_angle) / (dial.max_angle - dial.min_angle);
     fraction = std::max(0.0f, std::min(1.0f, fraction));
     return dial.min_value + fraction * (dial.max_value - dial.min_value);
-}
 }
 
 // Debug function for detailed angle conversion logging 

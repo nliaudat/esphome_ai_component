@@ -48,7 +48,11 @@ bool Esp32CameraUtils::set_camera_window(int offset_x, int offset_y, int width, 
         if (has_processor_config_) {
             reinitialize_image_processor(last_config_template_);
         }
-        ESP_LOGI(TAG, "Camera window set to %dx%d. ImageProcessor updated.", width, height);
+        if (debug_) {
+            ESP_LOGD(TAG, "Camera window set to %dx%d. ImageProcessor updated.", width, height);
+        } else {
+            ESP_LOGI(TAG, "Camera window set to %dx%d. ImageProcessor updated.", width, height);
+        }
     }
     DURATION_END("set_camera_window");
     return success;

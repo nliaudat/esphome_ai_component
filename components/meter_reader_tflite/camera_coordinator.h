@@ -62,6 +62,7 @@ class CameraCoordinator {
   void basic_recovery();
   std::string get_pixel_format() const { return current_format_; }
   void set_enable_preview(bool enable) { enable_preview_ = enable; }
+  void set_debug(bool debug) { debug_ = debug; }
   
  protected:
   esp32_camera::ESP32Camera* camera_{nullptr};
@@ -76,6 +77,7 @@ class CameraCoordinator {
   int current_height_{0};
   std::string current_format_{"RGB888"};
   bool enable_preview_{false};
+  bool debug_{false};
   
   // Original specs
   int orig_width_{0};

@@ -18,6 +18,7 @@ class CameraCoordinator {
   void set_camera(esp32_camera::ESP32Camera* camera);
   void set_config(int width, int height, const std::string& pixel_format);
   void set_rotation(float rot) { rotation_ = rot; }
+  void set_debug(bool debug) { debug_ = debug; }
   
   // Image Processor
   void update_image_processor_config(int model_width, int model_height, int model_channels, 
@@ -76,6 +77,7 @@ class CameraCoordinator {
   int window_width_{0};
   int window_height_{0};
   bool window_configured_{false};
+  bool debug_{false};
 };
 
 }  // namespace analog_reader

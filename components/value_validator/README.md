@@ -22,6 +22,7 @@ You can define a single validator or a list of validators.
 value_validator:
   id: my_validator
   allow_negative_rates: false
+  debug: false
   # ... other params
 ```
 
@@ -35,6 +36,7 @@ value_validator:
   - id: pressure_validator
     allow_negative_rates: true
     max_rate_change: 0.25
+    debug: true
 ```
 
 ## Parameter Details

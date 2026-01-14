@@ -21,6 +21,7 @@ class DataCollector : public Component {
   void set_web_submit_switch(switch_::Switch *s) { web_submit_switch_ = s; }
   void set_auth(const std::string &user, const std::string &password) { username_ = user; password_ = password; }
   void set_api_key(const std::string &key) { api_key_ = key; }
+  void set_debug(bool debug) { debug_ = debug; }
 
   // Main entry point
   // raw_value and confidence are passed for metadata/logging
@@ -31,6 +32,7 @@ class DataCollector : public Component {
   std::string username_;
   std::string password_;
   std::string api_key_;
+  bool debug_{false};
   switch_::Switch *web_submit_switch_{nullptr};
 
   // Helper to upload

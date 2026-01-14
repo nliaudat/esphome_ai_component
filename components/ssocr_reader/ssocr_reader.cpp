@@ -186,7 +186,9 @@ void SSOCRReader::process_image(std::shared_ptr<esphome::camera::CameraImage> im
       digit_bounds.push_back({start_x, roi_w});
   }
 
-  ESP_LOGD(TAG, "Found %d potential digits", (int)digit_bounds.size());
+  if (debug_) {
+      ESP_LOGD(TAG, "Found %d potential digits", (int)digit_bounds.size());
+  }
 
   // Recognize
   std::string result_str = "";
@@ -308,7 +310,11 @@ int SSOCRReader::recognize_digit(const std::vector<uint8_t> &img, int w, int h) 
         if (digit_map[i] == mask) return i;
     }
     
-    ESP_LOGV(TAG, "Unknown mask: %d", mask);
+    if (debug_) {
+        ESP_LOGD(TAG, "Unknown mask: %d (Binary: " BYTE_TO_BINARY_PATTERN ")", mask, BYTE_TO_BINARY(mask));
+    } else {
+        ESP_LOGV(TAG, "Unknown mask: %d", mask);
+    }
     return -1;
 }
 

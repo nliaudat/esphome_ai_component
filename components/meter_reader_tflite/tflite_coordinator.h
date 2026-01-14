@@ -34,6 +34,10 @@ class TFLiteCoordinator {
 
   void set_model_type(const std::string& model_type) { model_type_ = model_type; }
   void set_tensor_arena_size(size_t size) { tensor_arena_size_requested_ = size; }
+  void set_debug(bool debug) { 
+      debug_ = debug; 
+      model_handler_.set_debug(debug);
+  }
   
   void setup(const std::string& model_type, size_t tensor_arena_size);
   
@@ -94,7 +98,9 @@ class TFLiteCoordinator {
   size_t model_length_{0};
   
   // State
+  // State
   bool model_loaded_{false};
+  bool debug_{false};
   
   // Arena stats cache for thread-safe dual-core access (Core 0 inference, Core 1 main loop)
   mutable std::mutex arena_stats_mutex_;

@@ -129,6 +129,7 @@ class ModelHandler {
   bool invoke_model(const uint8_t* data, size_t len); // Helper for tests
   
   static void feed_watchdog();
+  void set_debug(bool debug) { debug_ = debug; }
 
  private:
   const tflite::Model *tflite_model_{nullptr};
@@ -143,6 +144,7 @@ class ModelHandler {
   size_t model_length_{0};
   
   std::unique_ptr<tflite::MicroMutableOpResolver<MAX_OPERATORS>> resolver_;
+  bool debug_{false};
 };
 
 }  // namespace tflite_micro_helper

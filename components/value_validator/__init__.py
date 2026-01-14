@@ -29,6 +29,7 @@ CONFIG_SCHEMA = cv.All(cv.ensure_list(cv.Schema({
     cv.Optional(CONF_MAX_HISTORY_SIZE, default="50kB"): cv.validate_bytes,
     cv.Optional(CONF_PER_DIGIT_CONFIDENCE_THRESHOLD, default=0.85): cv.percentage,
     cv.Optional(CONF_STRICT_CONFIDENCE_CHECK, default=False): cv.boolean,
+    cv.Optional("debug", default=False): cv.boolean,
 }).extend(cv.COMPONENT_SCHEMA)))
 
 async def to_code(config):
@@ -46,3 +47,4 @@ async def to_code(config):
         cg.add(var.set_max_history_size_bytes(conf[CONF_MAX_HISTORY_SIZE]))
         cg.add(var.set_per_digit_confidence_threshold(conf[CONF_PER_DIGIT_CONFIDENCE_THRESHOLD]))
         cg.add(var.set_strict_confidence_check(conf[CONF_STRICT_CONFIDENCE_CHECK]))
+        cg.add(var.set_debug(conf["debug"]))

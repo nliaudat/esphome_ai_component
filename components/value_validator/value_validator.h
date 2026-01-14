@@ -102,12 +102,14 @@ class ValueValidator : public Component {
   const ReadingHistory& get_history() const { return history_; }
   
   void reset();
+  void set_debug(bool debug) { debug_ = debug; }
   void set_last_valid_reading(int value);
   void set_last_valid_reading(const std::string &value);
 
  private:
   ValidationConfig config_;
   ReadingHistory history_;
+  bool debug_{false};
   int last_valid_reading_{0};
   
   // Last valid digits (PSRAM array)

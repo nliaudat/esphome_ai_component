@@ -17,6 +17,8 @@ class FlashLightController : public Component {
   uint32_t get_flash_pre_time() const { return flash_pre_time_; }
   uint32_t get_flash_post_time() const { return flash_post_time_; }
   
+  void set_debug(bool debug) { debug_ = debug; }
+  
   using CaptureCallback = std::function<void()>;
   
   /**
@@ -43,6 +45,7 @@ class FlashLightController : public Component {
   uint32_t flash_pre_time_{5000};
   uint32_t flash_post_time_{2000};
   bool is_active_{false};
+  bool debug_{false};
 };
 
 }  // namespace flash_light_controller

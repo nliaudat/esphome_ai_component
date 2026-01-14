@@ -230,8 +230,10 @@ bool ValueValidator::validate_reading(int new_reading, float confidence, int& va
     last_valid_reading_ = new_reading;
   }
   
-  ESP_LOGD(TAG, "Validation: %d -> %d (valid: %s, confidence: %.2f)", 
-           new_reading, validated_reading, is_valid ? "yes" : "no", confidence);
+  if (this->debug_) {
+    ESP_LOGD(TAG, "Validation: %d -> %d (valid: %s, confidence: %.2f)", 
+             new_reading, validated_reading, is_valid ? "yes" : "no", confidence);
+  }
   
   return is_valid;
 }
@@ -320,10 +322,17 @@ bool ValueValidator::validate_reading(const std::vector<float>& digits, const st
                   modified = true;
               } else {
                   // Accepted
+                  if (this->debug_) {
+                     ESP_LOGD(TAG, "Digit %d changed (%d -> %d) - Accepted (Conf: %.2f >= %.2f)", 
+                              (int)i, old_d, new_d, conf, config_.per_digit_confidence_threshold);
+                  }
                   filtered_digit_string += std::to_string(new_d);
               }
           } else {
               // Unchanged match
+              if (this->debug_) {
+                 ESP_LOGD(TAG, "Digit %d unchanged (%d). Conf: %.2f", (int)i, new_d, conf);
+              }
               // Strict check: if high_confidence_threshold is configured (per_digit_confidence_threshold),
               // we require even unchanged digits to meet it IF strict mode is enabled.
               // User request: "I want all digit to be upper".
@@ -346,6 +355,10 @@ bool ValueValidator::validate_reading(const std::vector<float>& digits, const st
           } else {
              filtered_val = raw_val; // Fallback
           }
+      }
+      
+      if (this->debug_ && !modified) {
+          ESP_LOGD(TAG, "Per-digit filter: No changes needed. (Raw: %d)", raw_val);
       }
   } else {
        // First reading or no history 
@@ -394,8 +407,10 @@ bool ValueValidator::validate_reading(const std::vector<float>& digits, const st
       }
       
       ensure_last_valid_digits_size(val_str.length());
-      for (size_t i = 0; i < val_str.length(); i++) {
-          last_valid_digits_data_[i] = val_str[i] - '0';
+      if (last_valid_digits_data_) {
+          for (size_t i = 0; i < val_str.length(); i++) {
+              last_valid_digits_data_[i] = val_str[i] - '0';
+          }
       }
   }
   
@@ -431,6 +446,9 @@ bool ValueValidator::is_digit_plausible(int new_reading, int last_reading) const
 int ValueValidator::apply_smart_validation(int new_reading, float confidence, float last_confidence) {
   // Basic digit plausibility check
   if (is_digit_plausible(new_reading, last_valid_reading_)) {
+    if (this->debug_) {
+        ESP_LOGD(TAG, "SmartValidation: Reading %d is plausible (Last: %d). Accepted.", new_reading, last_valid_reading_);
+    }
     return new_reading;
   }
 
@@ -669,7 +687,14 @@ void ValueValidator::ensure_last_valid_digits_size(size_t num_digits) {
   if (!last_valid_digits_data_) {
       last_valid_digits_data_ = (int*)malloc(num_digits * sizeof(int));
   }
-  last_valid_digits_count_ = num_digits;
+  
+  if (last_valid_digits_data_) {
+      last_valid_digits_count_ = num_digits;
+  } else {
+      // Allocation failed
+      last_valid_digits_count_ = 0;
+      ESP_LOGE(TAG, "Failed to allocate memory for last valid digits!");
+  }
 }
 
 void ValueValidator::ensure_last_good_values_capacity(size_t capacity) {
@@ -682,7 +707,12 @@ void ValueValidator::ensure_last_good_values_capacity(size_t capacity) {
   if (!last_good_values_data_) {
       last_good_values_data_ = (int*)malloc(capacity * sizeof(int));
   }
-  last_good_values_capacity_ = capacity;
+  if (last_good_values_data_) {
+      last_good_values_capacity_ = capacity;
+  } else {
+      last_good_values_capacity_ = 0;
+      ESP_LOGE(TAG, "Failed to allocate memory for last good values!");
+  }
   last_good_values_count_ = 0;
   last_good_values_head_ = 0;
 }

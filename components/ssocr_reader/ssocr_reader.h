@@ -32,6 +32,7 @@ class SSOCRReader : public PollingComponent, public esphome::camera::CameraListe
   void set_camera(esphome::camera::Camera *camera) { camera_ = camera; }
   void set_resolution(int w, int h) { img_width_ = w; img_height_ = h; }
   void set_pixel_format_str(const std::string &fmt);
+  void set_debug(bool debug) { debug_ = debug; }
 
  protected:
   // Coordinators
@@ -56,6 +57,7 @@ class SSOCRReader : public PollingComponent, public esphome::camera::CameraListe
   
   // State
   bool processing_frame_{false};
+  bool debug_{false};
   uint32_t last_request_time_{0};
   bool frame_requested_{false};
 

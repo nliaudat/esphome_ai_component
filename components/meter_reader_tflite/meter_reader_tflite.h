@@ -201,6 +201,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_debug_mode(bool m);
   void debug_test_with_pattern();
 #endif
+  void set_debug(bool debug);
 
  protected:
   esp32_camera_utils::Esp32CameraUtils *esp32_camera_utils_{nullptr};
@@ -238,7 +239,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   float rotation_{0.0f};
   bool generate_preview_{false};
   bool show_crop_areas_{true};
-
+  bool debug_{false};
   bool debug_memory_enabled_{false}; // Runtime flag
   bool window_active_{false};
   bool enable_flash_calibration_{false};

@@ -58,6 +58,10 @@ bool TFLiteMicroHelper::load_model(const uint8_t *model_data, size_t model_size,
         return false;
     }
 
+    if (debug_) {
+        ESP_LOGD(TAG, "Model loaded successfully. Arena used: %zu / %zu bytes", 
+                 model_handler_.get_arena_used_bytes(), tensor_arena_allocation_.actual_size);
+    }
     return true;
 }
 

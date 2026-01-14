@@ -111,11 +111,21 @@ std::vector<TFLiteCoordinator::InferenceResult> TFLiteCoordinator::run_inference
         return results;
     }
     
+    if (this->debug_) {
+        ESP_LOGD(TAG, "Running inference on %d zones", (int)processed_zones.size());
+    }
+    
     for (const auto& zone_result : processed_zones) {
         float val, conf;
         if (process_model_result(zone_result, &val, &conf)) {
+             if (this->debug_) {
+                 ESP_LOGD(TAG, "Inference result: val=%.2f, conf=%.2f", val, conf);
+             }
              results.push_back({val, conf, true});
         } else {
+             if (this->debug_) {
+                 ESP_LOGW(TAG, "Inference failed for a zone");
+             }
              results.push_back({0.0f, 0.0f, false});
         }
     }
