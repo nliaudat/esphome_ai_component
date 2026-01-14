@@ -18,6 +18,25 @@ Using this component instead of an AI model (`meter_reader_tflite`) offers signi
 
 **Trade-off**: This valid algorithm requires the dial to be **cleanly cropped and centered**. Unlike AI, it "sees" using strict geometry, so it cannot strictly ignore obstructions or heavy glare as well as a trained network.
 
+## ✨ Improvements (v2)
+The latest version (v2) introduces significant enhancements:
+*   **Performance**: Trigonometric LUTs (Look-Up Tables) and pre-allocated buffers reduce CPU load and heap fragmentation.
+*   **Robustness**: 
+    - **Sub-pixel Precision**: Parabolic interpolation provides angle measurement with precision < 1 degree.
+    - **Top-Hat Filter**: Improved shadow and lighting variation handling using morphological filtering.
+    - **Weighted Voting**: Improved Hough Transform using gradient magnitude as vote weight.
+*   **Features**:
+    - **Color Detection**: Optional RGB-based detection for specific needle colors (e.g., Red needle on Black dial).
+    - **Dynamic Calibration**: Runtime services to adjust dial range and angle limits.
+
+## 🧠 Algorithm Selection Guide
+
+| Algorithm | Speed | Robustness | Best For |
+| :--- | :--- | :--- | :--- |
+| **Radial Profile** (Default) | Fast (~10ms) | ⭐⭐⭐ | Standard dials, high contrast. Balanced performance and accuracy. |
+| **Template Match** | Ultra Fast (~3ms) | ⭐⭐ | Clean dials, very thin needles. Uses sparse scanning (coarse-to-fine). |
+| **Hough Transform** | Slow (~80ms) | ⭐⭐⭐⭐ | Difficult lighting, shadows, broken needles. Uses heavy gradient computations. |
+
 ## 🛠️ Configuration
 
 ### Basic Usage
@@ -60,7 +79,11 @@ analog_reader:
       
       # Image Processing
       auto_contrast: true   # Enhances contrast before processing (Recommended)
+      auto_contrast: true   # Enhances contrast before processing (Recommended)
       contrast: 1.0         # Manual contrast multiplier
+      target_color: 0xFF0000 # Optional: Target needle color (e.g. Red) for Color Detection Mode
+      
+      # Angle Calibration
       
       # Angle Calibration
       # min/max_angle defines the physical arc of the gauge (e.g. 0 to 360 for full circle)
@@ -73,11 +96,56 @@ analog_reader:
       # 180 = South (6 o'clock)
       # 270 = West  (9 o'clock)
       angle_offset: 0 
+
+### 📐 Visual Guide: Coordinates
+The coordinate system is **Clockwise**, starting at **North (12 o'clock)**.
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'fontSize': '16px'}}}%%
+graph TD
+    N((0° North)) --- C[Center]
+    C --- E((90° East))
+    C --- S((180° South))
+    C --- W((270° West))
+    
+    style N fill:#f9f,stroke:#333
+    style E fill:#ccf,stroke:#333
+```
+*   **Needle at 12 o'clock**: Angle is 0°.
+*   **Needle at 3 o'clock**: Angle is 90°.
+*   **Needle at 9 o'clock**: Angle is 270°.
+
+**Offset Example**:
+If your dial's "Zero" is at 7 o'clock (approx 210°), but you want logical 0° to be there:
+*   Set `min_angle: 0`, `max_angle: ...`
+*   Set `angle_offset: 210`
+*   Algorithm detects 210° -> subtracts 210° -> Result 0°.
+
+### 🔌 Services
+The component exposes C++ methods callable from ESPHome lambdas for dynamic calibration:
+
+*   `set_dial_range(dial_id, min_val, max_val)`: Update values (e.g. 0 to 100).
+*   `set_dial_angle(dial_id, min_deg, max_deg)`: Update angle limits.
+
+**Example Usage**:
+```yaml
+button:
+  - platform: template
+    name: "Calibrate Dial 1"
+    on_press:
+      then:
+        - lambda: |-
+            id(analog_main).set_dial_angle("dial_1", 45.0, 315.0);
+            id(analog_main).set_dial_range("dial_1", 0.0, 50.0);
+``` 
       
       # Value Mapping
       # What values do the min/max angles correspond to?
       min_value: 0
       max_value: 10
+      
+      # Algorithm Selection
+      # detection_algorithm: radial_profile # Options: radial_profile, hough_transform, template_match, legacy, auto
 ```
 
 ### UI Controls Package (Optional)

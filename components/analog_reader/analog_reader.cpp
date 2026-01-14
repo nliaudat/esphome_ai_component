@@ -5,11 +5,90 @@
 #include <cfloat>
 #include <memory>
 #include <algorithm>
+#include <esp_jpeg_dec.h> // Required for local decoding
 
 namespace esphome {
 namespace analog_reader {
 
 static const char *const TAG = "analog_reader";
+
+// Deleter for JPEG decoder handle
+struct JpegDecoderDeleter {
+    void operator()(jpeg_dec_handle_t handle) const {
+        if (handle) jpeg_dec_close(handle);
+    }
+};
+
+// Local helper to decode JPEG directly into a buffer
+static bool local_decode_jpeg(
+    const uint8_t* data, size_t len, 
+    uint8_t* output_buffer, size_t output_size, 
+    int* width, int* height) {
+    
+    jpeg_dec_io_t io = {0};
+    jpeg_dec_header_info_t header_info;
+    jpeg_dec_handle_t decoder_handle = nullptr;
+    jpeg_dec_config_t decode_config = {
+        .output_type = JPEG_PIXEL_FORMAT_RGB888, // Hardcoded to RGB888
+        .rotate = JPEG_ROTATE_0D,
+    };
+
+    if (jpeg_dec_open(&decode_config, &decoder_handle) != JPEG_ERR_OK) {
+        return false;
+    }
+    // RAII for decoder
+    std::unique_ptr<void, JpegDecoderDeleter> decoder(decoder_handle);
+
+    io.inbuf = const_cast<uint8_t*>(data);
+    io.inbuf_len = len;
+    io.inbuf_remain = len;
+    
+    // Parse header to check dimensions
+    if (jpeg_dec_parse_header(decoder_handle, &io, &header_info) != JPEG_ERR_OK) {
+        return false;
+    }
+    
+    *width = header_info.width;
+    *height = header_info.height;
+    
+    size_t required_size = header_info.width * header_info.height * 3;
+    if (output_size < required_size) {
+        ESP_LOGE(TAG, "Buffer too small for decoding: %u < %u", output_size, required_size);
+        return false;
+    }
+    
+    io.outbuf = output_buffer;
+    io.out_size = output_size;
+
+    if (jpeg_dec_process(decoder_handle, &io) != JPEG_ERR_OK) {
+        return false;
+    }
+
+    return true;
+}
+
+// Wrapper for Persistent RGB Buffer to implement CameraImage interface
+class PersistentDecodedImage : public esphome::camera::CameraImage {
+ public:
+  PersistentDecodedImage(uint8_t* data, int width, int height, pixformat_t format = PIXFORMAT_RGB888)
+      : data_(data), width_(width), height_(height), format_(format) {}
+
+  uint8_t *get_data_buffer() override { return data_; }
+  size_t get_data_length() override { 
+      return width_ * height_ * (format_ == PIXFORMAT_GRAYSCALE ? 1 : 3); 
+  }
+  int get_width() const { return width_; }
+  int get_height() const { return height_; }
+  pixformat_t get_format() const { return format_; }
+  
+  bool was_requested_by(esphome::camera::CameraRequester requester) const override { return true; }
+
+ protected:
+  uint8_t* data_;
+  int width_;
+  int height_;
+  pixformat_t format_;
+};
 
 // Configuration constants for Enhanced Radial Profile Analysis (exported for multi_algorithm.cpp)
 const float kScanStartRadius = 0.3f;   // Start scan at 30% radius (skip hub/tail)
@@ -17,6 +96,18 @@ const float kScanEndRadius = 0.9f;     // End scan at 90% radius (before edge ma
 const float kIntensityWeight = 0.7f;   // Weight for average intensity (70%)
 const float kEdgeWeight = 0.3f;        // Weight for edge gradient (30%)
 static const float kDecimalPrecision = 10000.0f;  // 4 decimal places (10^4)
+
+// Define static storage
+float AnalogReader::sin_lut_[360];
+float AnalogReader::cos_lut_[360];
+static bool s_luts_initialized = false;
+
+AnalogReader::~AnalogReader() {
+  if (rgb_buffer_) {
+      free(rgb_buffer_);
+      rgb_buffer_ = nullptr;
+  }
+}
 
 void AnalogReader::set_update_interval(uint32_t interval) {
   PollingComponent::set_update_interval(interval);
@@ -34,18 +125,50 @@ void AnalogReader::setup() {
   if (img_width_ > 0 && img_height_ > 0) {
        camera_coord_.set_config(img_width_, img_height_, pixel_format_str_);
   }
-  
-  // Setup Validation
-  // External component handles this
-
 
   // Register Listener
   if (this->camera_) {
       this->camera_->add_listener(this);
   }
-  
-  // Configure ImageProcessor - Now handled per-dial in process_image
-  // camera_coord_.update_image_processor_config(...)
+
+   // Pre-allocate buffers to prevent heap fragmentation later
+   // We prefer PSRAM for this large buffer (up to ~1MB for SVGA) to save internal RAM
+   if (pixel_format_str_ == "JPEG") {
+        // Force RGB888 for now as JPEG decoder doesn't support direct Grayscale downsampling
+        size_t bpp = 3;
+        size_t rgb_size = img_width_ * img_height_ * bpp;
+        
+        ESP_LOGI(TAG, "Allocating persistent RGB buffer: %u bytes (%dx%d)", rgb_size, img_width_, img_height_);
+        
+        // Try PSRAM first
+        rgb_buffer_ = (uint8_t*)heap_caps_malloc(rgb_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        
+        if (rgb_buffer_) {
+            ESP_LOGI(TAG, "Success: Buffer allocated in PSRAM");
+        } else {
+            ESP_LOGW(TAG, "Failed to allocate in PSRAM, falling back to internal RAM/Default");
+            rgb_buffer_ = (uint8_t*)malloc(rgb_size);
+        }
+
+        if (rgb_buffer_) {
+            rgb_buffer_size_ = rgb_size;
+            // Touch memory to enforce allocation
+            memset(rgb_buffer_, 0, rgb_size);
+        } else {
+             ESP_LOGE(TAG, "CRITICAL: Failed to allocate persistent buffer!");
+        }
+   }
+
+  // Initialize LUTs once
+  if (!s_luts_initialized) {
+      for (int i = 0; i < 360; i++) {
+          float rad = i * M_PI / 180.0f;
+          sin_lut_[i] = std::sin(rad);
+          cos_lut_[i] = std::cos(rad);
+      }
+      s_luts_initialized = true;
+      ESP_LOGD(TAG, "Trigonometric LUTs initialized");
+  }
   
   // Setup Flashlight (Default: None)
   flashlight_coord_.setup(this, nullptr, nullptr);
@@ -83,18 +206,36 @@ void AnalogReader::update() {
 void AnalogReader::on_camera_image(const std::shared_ptr<esphome::camera::CameraImage> &image) {
     if (paused_) return;
     if (frame_requested_ && !processing_frame_) {
-        // Simple lock logic
-        process_image(image);
-        frame_requested_ = false;
+        // QUICKLY store frame and return to unblock camera thread
+        pending_frame_ = image;
     }
 }
 
 void AnalogReader::loop() {
+// Process pending frame if available
+    if (pending_frame_) {
+        // Move to local standard pointer
+        std::shared_ptr<esphome::camera::CameraImage> frame = pending_frame_;
+        pending_frame_ = nullptr;
+        
+        // OPTIMIZATION: Copy compressed data to local buffer and release frame IMMEDIATELY
+        if (frame->get_data_length() > 0) {
+             working_buffer_.assign(frame->get_data_buffer(), frame->get_data_buffer() + frame->get_data_length());
+             frame.reset(); 
+             if (!working_buffer_.empty()) {
+                  process_image_from_buffer(working_buffer_.data(), working_buffer_.size());
+             }
+        }
+        
+        frame_requested_ = false;
+    }
+
     // Timeout check
     if (frame_requested_ && millis() - last_request_time_ > 5000) {
         ESP_LOGW(TAG, "Frame timeout");
         frame_requested_ = false;
         processing_frame_ = false;
+        pending_frame_ = nullptr;
     }
     PollingComponent::loop();
 }
@@ -143,7 +284,6 @@ class DecodedImage : public esphome::camera::CameraImage {
   size_t get_height() const { return height_; }
 
   ~DecodedImage() {
-      // Trace log for memory debugging
       ESP_LOGV("analog_reader", "Destroying DecodedImage (Buffer released)");
   }
 
@@ -155,47 +295,106 @@ class DecodedImage : public esphome::camera::CameraImage {
 };
 
 void AnalogReader::process_image(std::shared_ptr<esphome::camera::CameraImage> image) {
+    // Backward compatibility wrapper
+    if (image) {
+        process_image_from_buffer(image->get_data_buffer(), image->get_data_length());
+    }
+}
+
+void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
   if (this->camera_ == nullptr || dials_.empty()) return;
-  
+
+  if (processing_frame_) {
+      ESP_LOGW(TAG, "Already processing, skipping");
+      return; 
+  }
   processing_frame_ = true;
+
+  // Track time
+  uint32_t start_time = micros();
+
+  // Basic validation
+  ESP_LOGD(TAG, "Process Image From Buffer Start. Len: %u, Free Heap: %u", 
+           len, (uint32_t)esp_get_free_heap_size());
+           
+  // Basic validation
+  if (data == nullptr || len == 0) {
+       processing_frame_ = false;
+       return;
+  }
   
-  ESP_LOGD(TAG, "Process Image Start. Valid: %s, Free Heap: %u", 
-           image ? "YES" : "NO", (uint32_t)esp_get_free_heap_size());
-  
-  // OPTIMIZATION: Decode JPEG once if needed
-  std::shared_ptr<esphome::camera::CameraImage> processing_image = image;
+  std::shared_ptr<esphome::camera::CameraImage> processing_image = nullptr;
   bool is_decoded = false;
-  int processing_w = img_width_;
-  int processing_h = img_height_;
+  int processing_w = 0;
+  int processing_h = 0;
 
   if (pixel_format_str_ == "JPEG") {
-      int w, h;
-      auto decoded_buf = esphome::esp32_camera_utils::ImageProcessor::decode_jpeg(
-          image->get_data_buffer(), image->get_data_length(), &w, &h);
+      // Use persistent buffer if available
+      size_t bpp = 3;
+      size_t needed_size = img_width_ * img_height_ * bpp;
       
-      if (decoded_buf) {
-          // Wrap in DecodedImage (RGB888)
-          // Use our wrapper which takes ownership
-          // Width/Height are int from decode_jpeg, cast to size_t
-          processing_image = std::make_shared<DecodedImage>(std::move(decoded_buf), (size_t)w, (size_t)h);
-          is_decoded = true;
-          processing_w = w;
-          processing_h = h;
-          ESP_LOGD(TAG, "Decoded JPEG to RGB888 (%dx%d) for batch processing", w, h);
-      } else {
-           ESP_LOGE(TAG, "Failed to decode JPEG image. Free Heap: %u", (uint32_t)esp_get_free_heap_size());
-           processing_frame_ = false;
-           return;
+      if (rgb_buffer_ && rgb_buffer_size_ >= needed_size) {
+          int out_w = 0, out_h = 0;
+          
+          // Use LOCAL decoder instead of ImageProcessor
+          bool ok = local_decode_jpeg(
+              data, len, 
+              rgb_buffer_, rgb_buffer_size_, 
+              &out_w, &out_h);
+          
+          if (ok) {
+              if (out_w != img_width_ || out_h != img_height_) {
+                  ESP_LOGW(TAG, "Decoded dimensions mismatch config: %dx%d vs %dx%d", out_w, out_h, img_width_, img_height_);
+              }
+              // Wrap the raw pointer
+              processing_image = std::make_shared<PersistentDecodedImage>(rgb_buffer_, out_w, out_h, PIXFORMAT_RGB888);
+              is_decoded = true;
+              processing_w = out_w;
+              processing_h = out_h;
+              ESP_LOGD(TAG, "Decoded JPEG to RGB888 (Persistent Buffer) (%dx%d)", out_w, out_h);
+          } else {
+              ESP_LOGE(TAG, "Failed to decode JPEG to persistent buffer.");
+          }
+      }
+      
+      // Fallback: If persistent buffer failed or wasn't available, but we still have data
+      if (!is_decoded) {
+            ESP_LOGW(TAG, "Persistent buffer not used, falling back to dynamic (likely slower/fragmented)");
+             // Fallback to dynamic allocation (should not happen if setup ran correctly)
+          int w, h;
+          auto decoded_buf = esphome::esp32_camera_utils::ImageProcessor::decode_jpeg(
+              data, len, &w, &h);
+          
+          if (decoded_buf) {
+              processing_image = std::make_shared<DecodedImage>(std::move(decoded_buf), (size_t)w, (size_t)h);
+              is_decoded = true;
+              processing_w = w;
+              processing_h = h;
+              ESP_LOGD(TAG, "Decoded JPEG to RGB888 (Dynamic) (%dx%d)", w, h);
+          } else {
+               ESP_LOGE(TAG, "Failed to decode JPEG image via fallback.");
+          }
       }
   }
 
+  if (!processing_image) {
+      ESP_LOGE(TAG, "No valid image available for processing.");
+      processing_frame_ = false;
+      return;
+  }
+  
   float total_value = 0.0f;
   std::string debug_str = "";
   
   for (const auto& dial : dials_) {
+      // Determine effective image dimensions for checking
+      int check_w = (processing_w > 0) ? processing_w : img_width_;
+      int check_h = (processing_h > 0) ? processing_h : img_height_;
+
       // Bounds Check
-      if (dial.crop_x + dial.crop_w > img_width_ || dial.crop_y + dial.crop_h > img_height_) {
-          ESP_LOGE(TAG, "Dial %s crop is out of bounds!", dial.id.c_str());
+      if (dial.crop_x + dial.crop_w > check_w || dial.crop_y + dial.crop_h > check_h) {
+          ESP_LOGE(TAG, "Dial %s crop is out of bounds! Crop: [x=%d, w=%d] > Img: %d OR [y=%d, h=%d] > Img: %d", 
+                   dial.id.c_str(), dial.crop_x, dial.crop_w, check_w, dial.crop_y, dial.crop_h, check_h);
           continue;
       }
       
@@ -209,16 +408,13 @@ void AnalogReader::process_image(std::shared_ptr<esphome::camera::CameraImage> i
             config.camera_width = (processing_w > 0) ? processing_w : img_width_;
             config.camera_height = (processing_h > 0) ? processing_h : img_height_;
        }
-      config.pixel_format = is_decoded ? "RGB888" : pixel_format_str_;
+      
+      // Use RGB if Color Detection is enabled
+      config.pixel_format = (is_decoded || dial.use_color) ? "RGB888" : pixel_format_str_;
       config.model_width = dial.crop_w;
       config.model_height = dial.crop_h;
-      config.model_channels = 1; // Grayscale output
+      config.model_channels = dial.use_color ? 3 : 1; // 3 for Color, 1 for Grayscale
       config.input_type = esphome::esp32_camera_utils::kInputTypeUInt8;
-      
-      // Handle rotation manually if needed, but assuming crop coordinates are pre-rotated or image is upright
-      // If image is already valid, we just crop.
-      // NOTE: Original CameraCoordinator handled rotation config. 
-      // AnalogReader assumes crops are relative to the *delivered* image.
       
       auto processor = std::make_unique<esphome::esp32_camera_utils::ImageProcessor>(config);
 
@@ -235,17 +431,49 @@ void AnalogReader::process_image(std::shared_ptr<esphome::camera::CameraImage> i
       
       uint8_t* raw = results[0].data->get();
       size_t len = results[0].size;
-
-      // Apply enhancements
-      if (dial.auto_contrast) {
-          apply_auto_contrast(raw, len);
-      }
-      if (std::abs(dial.contrast - 1.0f) > 0.01f) {
-          apply_contrast(raw, len, dial.contrast);
+      int crop_w = dial.crop_w;
+      int crop_h = dial.crop_h;
+      
+      const uint8_t* input_for_algo = raw;
+      
+      // If Color Mode: Convert RGB to Distance Map (Grayscale)
+      if (dial.use_color) {
+          if (scratch_buffer_.size() != crop_w * crop_h) {
+              scratch_buffer_.resize(crop_w * crop_h);
+          }
+          
+          uint8_t tr = (dial.target_color >> 16) & 0xFF;
+          uint8_t tg = (dial.target_color >> 8) & 0xFF;
+          uint8_t tb = dial.target_color & 0xFF;
+          
+          for (int i = 0; i < crop_w * crop_h; i++) {
+              uint8_t r = raw[i*3 + 0];
+              uint8_t g = raw[i*3 + 1];
+              uint8_t b = raw[i*3 + 2];
+              
+              float dist = sqrtf(powf(r - tr, 2) + powf(g - tg, 2) + powf(b - tb, 2));
+              // Map 0-442 to 0-255 directly (Close = Dark/Low Value)
+              // This ensures compatibility with default needle_type (DARK)
+              float val = (dist * 255.0f / 442.0f);
+              if (val > 255) val = 255;
+              scratch_buffer_[i] = (uint8_t)val;
+          }
+          input_for_algo = scratch_buffer_.data();
+      } else {
+          // Standard Grayscale
+          // Apply enhancements
+          if (dial.auto_contrast) {
+              apply_auto_contrast(raw, len);
+          }
+           if (std::abs(dial.contrast - 1.0f) > 0.01f) {
+              apply_contrast(raw, len, dial.contrast);
+          }
       }
       
       // Use actual crop dimensions
-      float angle = find_needle_angle(raw, dial.crop_w, dial.crop_h, dial);
+      uint32_t start_algo = micros();
+      float angle = find_needle_angle(input_for_algo, crop_w, crop_h, dial);
+      uint32_t dur_algo = micros() - start_algo;
       
       // Debug angle calculation (detailed logging)
       if (this->debug_) {
@@ -258,7 +486,7 @@ void AnalogReader::process_image(std::shared_ptr<esphome::camera::CameraImage> i
       float display_angle = angle + 90.0f; 
       if (display_angle >= 360.0f) display_angle -= 360.0f;
       
-      ESP_LOGD(TAG, "Dial %s: Angle=%.1f (North), Val=%.2f", dial.id.c_str(), display_angle, val);
+      ESP_LOGD(TAG, "Dial %s: Angle=%.1f (North), Val=%.2f, Time=%u us", dial.id.c_str(), display_angle, val, dur_algo);
       
       // Aggregate
       total_value += val * dial.scale;
@@ -268,10 +496,6 @@ void AnalogReader::process_image(std::shared_ptr<esphome::camera::CameraImage> i
       debug_str += (debug_str.empty() ? "" : ", ") + std::string(val_buf);
   }
   
-  // Validation (Bypassed for Analog Reader float support)
-  // int validated_int_val = (int)total_value;
-  // bool valid = validation_coord_.validate_reading((int)total_value, 1.0f, validated_int_val);
-
   // Truncate to configured decimal precision
   total_value = truncf(total_value * kDecimalPrecision) / kDecimalPrecision;
 
@@ -279,7 +503,6 @@ void AnalogReader::process_image(std::shared_ptr<esphome::camera::CameraImage> i
   if (value_sensor_) {
       value_sensor_->publish_state(total_value);
   }
-
 
   processing_frame_ = false;
 }
@@ -292,27 +515,30 @@ float AnalogReader::find_needle_angle(const uint8_t* img, int w, int h, const Di
     DetectionResult selected_result;
     
     // Legacy algorithm: Original radial edge detection (NO preprocessing)
-    // Legacy algorithm: Original radial edge detection (NO preprocessing)
     if (dial.algorithm == "legacy") {
         selected_result = detect_legacy(img, w, h, dial);  // Use RAW image, no preprocessing
     } 
     else {
         // New algorithms: Use preprocessing
-        auto processed = preprocess_image(img, w, h, cx, cy, radius);
+        // Resize buffer if needed (reserve somewhat more to avoid reallocs if size fluctuates slightly, though crops usually fixed)
+        // preprocess_image now writes to working_buffer_
+        preprocess_image(img, w, h, cx, cy, radius, dial.needle_type, working_buffer_);
         
+        uint8_t* processed_data = working_buffer_.data();
+
         if (dial.algorithm == "radial_profile") {
-             selected_result = detect_radial_profile(processed.data(), w, h, dial);
+             selected_result = detect_radial_profile(processed_data, w, h, dial);
         }
         else if (dial.algorithm == "hough_transform") {
-            selected_result = detect_hough_transform(processed.data(), w, h, dial);
+            selected_result = detect_hough_transform(processed_data, w, h, dial);
         } else if (dial.algorithm == "template_match") {
-            selected_result = detect_template_match(processed.data(), w, h, dial);
+            selected_result = detect_template_match(processed_data, w, h, dial);
         } else if (dial.algorithm == "auto") {
             // Auto: run all 4, pick highest confidence
             auto result_legacy = detect_legacy(img, w, h, dial);  // No preprocessing for legacy
-            auto result_radial = detect_radial_profile(processed.data(), w, h, dial);
-            auto result_hough = detect_hough_transform(processed.data(), w, h, dial);
-            auto result_template = detect_template_match(processed.data(), w, h, dial);
+            auto result_radial = detect_radial_profile(processed_data, w, h, dial);
+            auto result_hough = detect_hough_transform(processed_data, w, h, dial);
+            auto result_template = detect_template_match(processed_data, w, h, dial);
             
             selected_result = result_legacy;
             if (result_radial.confidence > selected_result.confidence) selected_result = result_radial;
@@ -341,8 +567,9 @@ float AnalogReader::find_needle_angle(const uint8_t* img, int w, int h, const Di
         if (dial.algorithm == "legacy") {
             debug_dial_image(img, w, h, selected_result.angle);
         } else {
-            auto processed = preprocess_image(img, w, h, cx, cy, radius);
-            debug_dial_image(processed.data(), w, h, selected_result.angle);
+            // Reuse working_buffer_ which should contain the processed image from above
+            // (Assuming find_needle_angle flow is sequential and single-threaded per instance)
+            debug_dial_image(working_buffer_.data(), w, h, selected_result.angle);
         }
     }
     
@@ -432,15 +659,10 @@ void AnalogReader::debug_angle_calculation(float image_angle, const DialConfig& 
 }
 
 // Debug visualization
-// Debug visualization
 void AnalogReader::debug_dial_image(const uint8_t* img, int w, int h, float detected_angle) {
-    // Create ASCII visualization of the dial with needle
     // Create ASCII visualization of the dial with needle
     const int grid_w = 40;
     const int grid_h = 40;
-    
-    // We can't stack allocate variable size 2D arrays easily in C++98/standard, use flat vector or fixed max size
-    // Using simple vector of strings to buffer line
     
     std::vector<std::string> lines(grid_h, std::string(grid_w, ' '));
     
@@ -485,7 +707,6 @@ void AnalogReader::debug_dial_image(const uint8_t* img, int w, int h, float dete
     const char* COLOR_RESET = "\033[0m";
     const char* COLOR_RED = "\033[91m";      // Bright red for needle
     const char* COLOR_GREEN = "\033[92m";    // Green for center marker
-    const char* COLOR_YELLOW = "\033[93m";   // Yellow for North indicator
     
     // Print header with legend
     ESP_LOGD(TAG, "Dial visualization (Raw %.1f / North %.1f):", detected_angle, north_angle);
@@ -514,6 +735,30 @@ void AnalogReader::debug_dial_image(const uint8_t* img, int w, int h, float dete
         colored_line += "|";
         ESP_LOGD(TAG, "%s", colored_line.c_str());
     }
+}
+
+void AnalogReader::set_dial_range(std::string dial_id, float min_val, float max_val) {
+    for (auto &dial : dials_) {
+        if (dial.id == dial_id) {
+            dial.min_value = min_val;
+            dial.max_value = max_val;
+            ESP_LOGI(TAG, "Updated dial '%s' range to %.2f - %.2f", dial_id.c_str(), min_val, max_val);
+            return;
+        }
+    }
+    ESP_LOGW(TAG, "Dial '%s' not found for set_dial_range", dial_id.c_str());
+}
+
+void AnalogReader::set_dial_angle(std::string dial_id, float min_deg, float max_deg) {
+    for (auto &dial : dials_) {
+        if (dial.id == dial_id) {
+            dial.min_angle = min_deg;
+            dial.max_angle = max_deg;
+            ESP_LOGI(TAG, "Updated dial '%s' angle limits to %.1f - %.1f", dial_id.c_str(), min_deg, max_deg);
+            return;
+        }
+    }
+    ESP_LOGW(TAG, "Dial '%s' not found for set_dial_angle", dial_id.c_str());
 }
 
 }  // namespace analog_reader

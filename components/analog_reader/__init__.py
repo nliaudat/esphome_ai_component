@@ -62,6 +62,7 @@ DIAL_SCHEMA = cv.Schema({
     cv.Optional(CONF_MAX_VALUE, default=10): cv.float_,
     cv.Optional(CONF_AUTO_CONTRAST, default=True): cv.boolean,
     cv.Optional(CONF_CONTRAST, default=1.0): cv.float_,
+    cv.Optional("target_color"): cv.hex_int, 
 })
 
 
@@ -136,6 +137,8 @@ async def to_code(config):
             ("max_value", dial[CONF_MAX_VALUE]),
             ("auto_contrast", dial[CONF_AUTO_CONTRAST]),
             ("contrast", dial[CONF_CONTRAST]),
+            ("target_color", dial.get("target_color", 0)),
+            ("use_color", "target_color" in dial),
         )
         cg.add(var.add_dial(s))
 
