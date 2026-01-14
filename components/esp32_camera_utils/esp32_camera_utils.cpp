@@ -12,10 +12,8 @@ void Esp32CameraUtils::setup() {
   if (has_config_) {
     ESP_LOGI(TAG, "Setting up camera window: offset=%d,%d size=%dx%d", offset_x_, offset_y_, width_, height_);
     if (camera_) {
-      // We need to wait for camera to be initialized? 
-      // Component setup order handles dependencies if configured correctly.
-      // But camera setup might be async or take time.
-      // We'll try to set it.
+      // Attempt to set the window. If camera is not ready, this might fail or be skipped.
+      // Component setup priority should normally ensure camera is initialized first.
       bool success = window_control_.set_window_with_reset(
           camera_, CameraWindowControl::WindowConfig{
               offset_x_, offset_y_, width_, height_, true});

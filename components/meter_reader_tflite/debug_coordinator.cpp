@@ -80,8 +80,8 @@ void DebugCoordinator::print_info(const TFLiteCoordinator& tflite_coord, int cam
              
     // Since we don't have direct access to internal memory_manager_ here to call report_memory_status
     // we can rely on what we just printed or add a delegated call if strictly needed.
-    // Legacy called memory_manager_.report_memory_status(...) which prints essentially the same info + free heap/psram?
-    // Let's stick to this for now as it covers "tensor arena size, etc".
+    // Reports tensor arena size, peak usage, and model size.
+    // Legacy implementation included heap reporting here, but we handle that separately via sensors now.
     
     ESP_LOGI(TAG, "----------------------------------");
 }

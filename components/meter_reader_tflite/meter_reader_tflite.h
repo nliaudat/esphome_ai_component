@@ -234,7 +234,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   // bool allow_negative_rates_{false}; // Moved to validator component
   // int max_absolute_diff_{100};       // Moved
   uint32_t frame_request_timeout_ms_{15000};
-  float high_confidence_threshold_{0.90f}; // Used for logging only here?
+  float high_confidence_threshold_{0.90f}; // Threshold for 'high confidence' logging distinction
   float rotation_{0.0f};
   bool generate_preview_{false};
   bool show_crop_areas_{true};

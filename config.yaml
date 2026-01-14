@@ -231,6 +231,9 @@ meter_reader_tflite:
 # analog_reader: # DEV !
 #   id: ${id_prefix}_analog_reader
 #   camera_id: ${id_prefix}_espcam
+#   validator: ${id_prefix}_validator
+#   update_interval: 60s
+#   debug: false # Set true to see ASCII in logs
 #   value_sensor:
 #     name: "Analog Total"
 #   dials: 
@@ -240,11 +243,23 @@ meter_reader_tflite:
 #       crop_y: 0
 #       crop_w: 100
 #       crop_h: 100
+#       
+#       # Image Enhancements
+#       auto_contrast: true
+#       contrast: 1.0
+#       
+#       # Color Detection (Optional)
+#       # target_color: 0xFF0000 # Red needle
+#       
+#       # Geometry
 #       min_angle: 0
 #       max_angle: 360
 #       angle_offset: 0 # 0=North, 90=East
 #       min_value: 0
 #       max_value: 10
+#       
+#       # Algorithm Selection (optional, default: radial_profile)
+      # detection_algorithm: radial_profile # Options: radial_profile, hough_transform, template_match, legacy, auto
 
 # web_server: # needed if generate_preview: true
   # port: 80

@@ -412,8 +412,7 @@ ImageProcessor::UniqueBufferPtr ImageProcessor::allocate_image_buffer(size_t siz
             // Successfully got buffer from pool
             // TrackedBuffer(ptr, spiram, jpeg_aligned, pooled, size)
             if (TrackedBuffer::active_instances > 5) {
-                // Periodically log if count gets high, or just log occasionally?
-                // Let's log if it's growing abnormally? No, let's just log on alloc for now if debug is on.
+                // Log on allocation if debug is enabled to track memory usage.
                 #ifdef DEBUG_ESP32_CAMERA_UTILS_MEMORY
                 ESP_LOGD(TAG, "Allocated pooled buffer. Active TrackedBuffers: %d", TrackedBuffer::active_instances.load() + 1);
                 #endif
@@ -584,8 +583,8 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
                    // Rotation failed, free raw_rot (managed by uptr if we assigned it, but we didn't yet)
                    jpeg_free_align(raw_rot);
                    ESP_LOGE(TAG, "Master rotation failed");
-                   // Proceed with unrotated? Or fail? Fail safe.
-                   return results;
+                    // Rotation failed. Fail safe to prevent invalid image usage.
+                    return results;
                }
            } else {
                ESP_LOGE(TAG, "Failed to allocate master rotation buffer");

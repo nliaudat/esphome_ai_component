@@ -364,16 +364,13 @@ bool ValueValidator::validate_reading(const std::vector<float>& digits, const st
                 }
             }
        } else {
-           // If strict check is OFF, do we accept ANYTHING as the first value? 
-           // Probably yes, to "get started".
-           ESP_LOGD(TAG, "First reading: Strict check disabled, accepting (unless invalid digits).");
+           // Strict check disabled: Accept first reading provided digits are valid (checked above)
+           ESP_LOGD(TAG, "First reading: Strict check disabled, accepting.");
        }
   }
   
   if (!final_valid_check) {
-      // If we failed strict per-digit check, we return false immediately?
-      // Or we let legacy validator run but return false at end?
-      // Better to fail now to avoid logging "valid: yes".
+      // Strict per-digit check failed. Return false immediately to prevent invalid state.
       return false;
   }
 
@@ -391,7 +388,7 @@ bool ValueValidator::validate_reading(const std::vector<float>& digits, const st
       // we assume it has the same length as current input.
       std::string val_str = std::to_string(validated_reading);
       
-      // Pad if necessary? usually leading zeros.
+      // Pad with leading zeros if necessary
       if (val_str.length() < current_digits.size()) {
           val_str = std::string(current_digits.size() - val_str.length(), '0') + val_str;
       }

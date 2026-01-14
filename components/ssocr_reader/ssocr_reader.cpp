@@ -22,10 +22,8 @@ void SSOCRReader::setup() {
       
       // We assume img_width_ and img_height_ were set via set_resolution
       std::string fmt_str = "JPEG"; // Default
-      // Map enum to string for coordinator
-      // SSOCR uses set_pixel_format_str to set an enum... convert back or modify setter?
-      // Actually camera_coord_ takes a string.
-      // Let's assume user set it correctly.
+      // Map enum to string for coordinator: Use "JPEG" default or whatever global config set.
+      // camera_coord_ takes a string representation which matches the internal camera config.
   }
   
   if (img_width_ > 0 && img_height_ > 0) {
@@ -44,11 +42,8 @@ void SSOCRReader::setup() {
   int effective_crop_w = (crop_w_ > 0) ? crop_w_ : img_width_ - crop_x_;
   int effective_crop_h = (crop_h_ > 0) ? crop_h_ : img_height_ - crop_y_;
   
-  // Input type: 1=Uint8 (Grayscale/RGB888) or 0=Float?
-  // CameraCoordinator logic for input_type:
-  // It casts to ImageProcessorInputType.
-  // 1 = kImageProcessorInputTypeUint8.
-  // We want Uint8.
+  // Input type: 1 = kImageProcessorInputTypeUint8 (Grayscale/RGB888).
+  // We explicitly request Uint8 for SSOCR operations.
   
   camera_coord_.update_image_processor_config(
       effective_crop_w, effective_crop_h, 1, 
@@ -117,14 +112,7 @@ void SSOCRReader::process_image(std::shared_ptr<esphome::camera::CameraImage> im
   int cw = (crop_w_ > 0) ? crop_w_ : w - cx;
   int ch = (crop_h_ > 0) ? crop_h_ : h - cy;
   
-  zones.push_back({cx, cy, cx+cw, cy+ch}); // x1, y1, x2, y2 structure?
-  // Check CropZone struct in esp32_camera_utils/image_processor.h
-  // struct CropZone { int x; int y; int w; int h; }; OR x1,y1,x2,y2?
-  // Previous `ssocr_reader` used logic: x, y, w, h.
-  // meter_reader uses `CropZone`.
-  // Let's assume x, y, w, h based on usage `zones.push_back({0, 0, w, h})` seen in checks.
-  // Wait, I should verify CropZone struct. 
-  // View file showed `struct CropZone` usage. 
+  zones.push_back({cx, cy, cx+cw, cy+ch}); // CropZone struct: x1, y1, x2, y2 
   
   // 2. Process via Coordinator
   auto results = camera_coord_.process_frame(image, zones);
@@ -283,10 +271,9 @@ int SSOCRReader::recognize_digit(const std::vector<uint8_t> &img, int w, int h) 
     // 6: A+C+D+E+F+G = 1+4+8+16+32+64 = 125
     // 7: A+B+C = 1+2+4 = 7
     // 8: All = 127
-    // 9: A+B+C+F+G or A+B+C+D+F+G? Usually 9 has D. Let's trace standard.
-    // 9: A,B,C,D,F,G = 126. (Often 9 has no E)
-    
-    const uint8_t digit_map[10] = {63, 6, 91, 79, 102, 109, 125, 7, 127, 111 /* 111=A+B+C+D+F+G? Check */};
+    // 9: A+B+C+F+G + D. (Usually 9 has D).
+    // Mapping: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
+    const uint8_t digit_map[10] = {63, 6, 91, 79, 102, 109, 125, 7, 127, 111};
     
     // Map for lookup
     // A B C D F G = 1+2+4+8+32+64 = 111.

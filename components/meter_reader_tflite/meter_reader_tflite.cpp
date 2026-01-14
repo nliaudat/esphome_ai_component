@@ -568,10 +568,8 @@ void MeterReaderTFLite::loop() {
             // Cleanup
             free_inference_result(res_ptr);
             
-            // Request next frame if configured?
-            // Original logic: loop requests if continuous? 
-            // set_timeout logic was used in some versions.
-            // Here 'update()' triggers 'take_picture'.
+            // Request next frame if configured.
+            // Note: 'update()' triggers 'take_picture', so this maintains the loop if continuous mode is enabled.
         }
         processing_frame_ = false; // Release lock
     }
@@ -682,9 +680,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
         ESP_LOGD(TAG, "Checking for preview image. Ptr: %p", preview ? preview.get() : nullptr);
         
         if (preview) {
-             // Draw zones if needed?
-             // Since we have the processed buffers, we know where zones are.
-             // But drawing on the MASTER image (preview) is nice for debug.
+             // Draw crop zones on the preview image for debugging visualization.
              
              if (show_crop_areas_) {
                  #ifdef USE_CAMERA_DRAWING
@@ -708,15 +704,9 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
                      
                      // Simply skip drawing for now to avoid complexity or potential bugs, 
                      // OR rely on user verification that image is correct.
-                     // The user asked for "exactly the same as image used for inference".
-                     // Drawing ON it modifies it for inference? 
-                     // NO, because we ALREADY extracted crop buffers in `process_frame`.
-                     // The `processed_buffers` loop below uses copies/crops made during `process_frame`.
-                     // `preview` is the master source they came from.
-                     // Modifying `preview` now is safe for inference (crops are already taken), 
-                     // but might affect next frame if buffer reused? 
-                     // UniqueBufferPtr in RotatedPreviewImage implies it owns it. 
-                     // Next frame allocates new buffer. Safe.
+                     // Safe to modify 'preview' here because inference buffers were already copied/extracted
+                     // in the `camera_coord_.process_frame` call above.
+                     // The next frame will allocate a new buffer, so this modification does not affect future inference.
                  }
                  #endif
                  #endif
@@ -1056,8 +1046,8 @@ void MeterReaderTFLite::set_camera_window_configured(bool c) {
 
 bool MeterReaderTFLite::reset_camera_window() {
     bool success = camera_coord_.reset_window();
-    // Only clear active flag if reset successful (or forced?) 
-    // Usually reset should imply back to full frame
+    // Only clear active flag if reset was successful.
+    // Reset implies reverting to full frame configuration.
     if (success) {
          window_active_ = false;
          // Note: We do NOT clear the stored config values in CameraCoord, so user can re-enable later.
@@ -1184,7 +1174,7 @@ void MeterReaderTFLite::inference_task(void *arg) {
             
             // Send back
             if (xQueueSend(self->output_queue_, &res, 100 / portTICK_PERIOD_MS) != pdTRUE) {
-                // Main loop stuck? Drop result.
+                // Queue push failed, likely due to main loop backpressure. Drop result to prevent blocking.
                 free_inference_result(res);
             }
             job = nullptr;
