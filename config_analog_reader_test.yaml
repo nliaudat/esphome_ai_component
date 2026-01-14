@@ -234,6 +234,27 @@ analog_reader: # DEV !
       angle_offset: 0 # 0=North, 90=East
       min_value: 0
       max_value: 10
+      
+      # New Per-Dial Sensors
+      angle:
+        name: "Dial 1 Angle"
+        filters:
+          - sliding_window_moving_average:
+              window_size: 5
+              send_every: 1
+      value:
+        name: "Dial 1 Value"
+      confidence:
+        name: "Dial 1 Confidence"
+        
+      # Internal Calibration (Raw Angle -> Corrected Value)
+      calibration:
+        - raw: 0.0
+          mapped: 0.0
+        - raw: 180.0
+          mapped: 5.0
+        - raw: 360.0
+          mapped: 10.0
 
 # web_server: # needed if generate_preview: true
   # port: 80

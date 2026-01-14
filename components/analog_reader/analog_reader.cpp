@@ -472,9 +472,12 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
       
       // Use actual crop dimensions
       uint32_t start_algo = micros();
-      float angle = find_needle_angle(input_for_algo, crop_w, crop_h, dial);
+      DetectionResult result = find_needle_angle(input_for_algo, crop_w, crop_h, dial);
       uint32_t dur_algo = micros() - start_algo;
       
+      float angle = result.angle;
+      float confidence = result.confidence;
+
       // Debug angle calculation (detailed logging)
       if (this->debug_) {
           debug_angle_calculation(angle, dial);
@@ -486,7 +489,14 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
       float display_angle = angle + 90.0f; 
       if (display_angle >= 360.0f) display_angle -= 360.0f;
       
-      ESP_LOGD(TAG, "Dial %s: Angle=%.1f (North), Val=%.2f, Time=%u us", dial.id.c_str(), display_angle, val, dur_algo);
+      ESP_LOGD(TAG, "Dial %s: Angle=%.1f (North), Val=%.2f, Conf=%.2f, Time=%u us", dial.id.c_str(), display_angle, val, confidence, dur_algo);
+      
+      // Publish to per-dial sensors
+      if (dial.angle_sensor) dial.angle_sensor->publish_state(display_angle);
+      if (dial.confidence_sensor) dial.confidence_sensor->publish_state(confidence);
+      if (dial.value_sensor) {
+         dial.value_sensor->publish_state(val);
+      }
       
       // Aggregate
       total_value += val * dial.scale;
@@ -507,56 +517,71 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
   processing_frame_ = false;
 }
 
-float AnalogReader::find_needle_angle(const uint8_t* img, int w, int h, const DialConfig& dial) {
+AnalogReader::DetectionResult AnalogReader::find_needle_angle(const uint8_t* img, int w, int h, const DialConfig& dial) {
     int cx = w / 2;
     int cy = h / 2;
     int radius = std::min(cx, cy) - 2;
     
     DetectionResult selected_result;
     
-    // Legacy algorithm: Original radial edge detection (NO preprocessing)
-    if (dial.algorithm == "legacy") {
-        selected_result = detect_legacy(img, w, h, dial);  // Use RAW image, no preprocessing
-    } 
-    else {
-        // New algorithms: Use preprocessing
-        // Resize buffer if needed (reserve somewhat more to avoid reallocs if size fluctuates slightly, though crops usually fixed)
-        // preprocess_image now writes to working_buffer_
+    // Flag to run all algorithms for comparison
+    bool run_comparison = (dial.algorithm == "auto") || debug_;
+
+    // Initialize variables to store results of each algorithm
+    DetectionResult result_legacy, result_radial, result_hough, result_template;
+    bool has_legacy = false, has_radial = false, has_hough = false, has_template = false;
+
+    // Phase 1: Run Algorithms
+    
+    // 1. Legacy (runs on raw image)
+    if (run_comparison || dial.algorithm == "legacy") {
+         result_legacy = detect_legacy(img, w, h, dial);
+         has_legacy = true;
+    }
+
+    // 2. Preprocessing & Modern Algorithms
+    if (run_comparison || dial.algorithm != "legacy") {
+        // Run preprocessing for all modern algorithms
         preprocess_image(img, w, h, cx, cy, radius, dial.needle_type, working_buffer_);
-        
         uint8_t* processed_data = working_buffer_.data();
 
-        if (dial.algorithm == "radial_profile") {
-             selected_result = detect_radial_profile(processed_data, w, h, dial);
+        if (run_comparison || dial.algorithm == "radial_profile") {
+            result_radial = detect_radial_profile(processed_data, w, h, dial);
+            has_radial = true;
         }
-        else if (dial.algorithm == "hough_transform") {
-            selected_result = detect_hough_transform(processed_data, w, h, dial);
-        } else if (dial.algorithm == "template_match") {
-            selected_result = detect_template_match(processed_data, w, h, dial);
-        } else if (dial.algorithm == "auto") {
-            // Auto: run all 4, pick highest confidence
-            auto result_legacy = detect_legacy(img, w, h, dial);  // No preprocessing for legacy
-            auto result_radial = detect_radial_profile(processed_data, w, h, dial);
-            auto result_hough = detect_hough_transform(processed_data, w, h, dial);
-            auto result_template = detect_template_match(processed_data, w, h, dial);
-            
-            selected_result = result_legacy;
-            if (result_radial.confidence > selected_result.confidence) selected_result = result_radial;
-            if (result_hough.confidence > selected_result.confidence) selected_result = result_hough;
-            if (result_template.confidence > selected_result.confidence) selected_result = result_template;
-            
-            if (debug_) {
-                ESP_LOGD(TAG, "%s AUTO mode comparison:", dial.id.c_str());
-                ESP_LOGD(TAG, "  Legacy: angle=%.1f°, conf=%.2f", result_legacy.angle, result_legacy.confidence);
-                ESP_LOGD(TAG, "  Radial Profile: angle=%.1f°, conf=%.2f", result_radial.angle, result_radial.confidence);
-                ESP_LOGD(TAG, "  Hough Transform: angle=%.1f°, conf=%.2f", result_hough.angle, result_hough.confidence);
-                ESP_LOGD(TAG, "  Template Match: angle=%.1f°, conf=%.2f", result_template.angle, result_template.confidence);
-                ESP_LOGD(TAG, "  Selected: %s", selected_result.algorithm.c_str());
-            }
-        } else {
-            // Unknown algorithm, default to legacy
-            selected_result = detect_legacy(img, w, h, dial);
+        if (run_comparison || dial.algorithm == "hough_transform") {
+             result_hough = detect_hough_transform(processed_data, w, h, dial);
+             has_hough = true;
         }
+        if (run_comparison || dial.algorithm == "template_match") {
+             result_template = detect_template_match(processed_data, w, h, dial);
+             has_template = true;
+        }
+    }
+
+    // Phase 2: Select Result
+    if (dial.algorithm == "auto") {
+        selected_result = result_legacy;
+        if (result_radial.confidence > selected_result.confidence) selected_result = result_radial;
+        if (result_hough.confidence > selected_result.confidence) selected_result = result_hough;
+        if (result_template.confidence > selected_result.confidence) selected_result = result_template;
+    } else {
+        // Enforce specific choice
+        if (dial.algorithm == "legacy") selected_result = result_legacy;
+        else if (dial.algorithm == "radial_profile") selected_result = result_radial;
+        else if (dial.algorithm == "hough_transform") selected_result = result_hough;
+        else if (dial.algorithm == "template_match") selected_result = result_template;
+        else selected_result = result_radial; // Default to radial if unknown (or if default was changed in init)
+    }
+
+    // Phase 3: Log Comparison (if requested)
+    if (run_comparison && debug_) {
+        ESP_LOGD(TAG, "%s Algorithm Comparison:", dial.id.c_str());
+        if (has_legacy) ESP_LOGD(TAG, "  Legacy: angle=%.1f°, conf=%.2f", result_legacy.angle, result_legacy.confidence);
+        if (has_radial) ESP_LOGD(TAG, "  Radial Profile: angle=%.1f°, conf=%.2f", result_radial.angle, result_radial.confidence);
+        if (has_hough)  ESP_LOGD(TAG, "  Hough Transform: angle=%.1f°, conf=%.2f", result_hough.angle, result_hough.confidence);
+        if (has_template) ESP_LOGD(TAG, "  Template Match: angle=%.1f°, conf=%.2f", result_template.angle, result_template.confidence);
+        ESP_LOGD(TAG, "  Selected: %s", selected_result.algorithm.c_str());
     }
     
     if (debug_) {
@@ -573,8 +598,9 @@ float AnalogReader::find_needle_angle(const uint8_t* img, int w, int h, const Di
         }
     }
     
-    return selected_result.angle;
+    return selected_result;
 }
+
 
 // Simplified Angle Conversion 
 float AnalogReader::angle_to_value(float image_angle, const DialConfig& dial) {
@@ -609,11 +635,37 @@ float AnalogReader::angle_to_value(float image_angle, const DialConfig& dial) {
         float fraction = rel_angle / range;
         return dial.min_value + fraction * (dial.max_value - dial.min_value);
     } else {
-        // Normal case
-        float fraction = (effective_dial_angle - dial.min_angle) / (dial.max_angle - dial.min_angle);
-        fraction = std::max(0.0f, std::min(1.0f, fraction));
-        return dial.min_value + fraction * (dial.max_value - dial.min_value);
+        // Calibration Map Override
+    if (!dial.calibration_mapping.empty()) {
+        // Let's use `dial_angle` (North-based, 0-360) as input to map.
+        
+        float input_x = dial_angle;
+        
+        // Find interval
+        if (input_x <= dial.calibration_mapping.front().first) return dial.calibration_mapping.front().second;
+        if (input_x >= dial.calibration_mapping.back().first) return dial.calibration_mapping.back().second;
+        
+        for (size_t i = 0; i < dial.calibration_mapping.size() - 1; i++) {
+            float x1 = dial.calibration_mapping[i].first;
+            float y1 = dial.calibration_mapping[i].second;
+            float x2 = dial.calibration_mapping[i+1].first;
+            float y2 = dial.calibration_mapping[i+1].second;
+            
+            if (input_x >= x1 && input_x <= x2) {
+                // Lerp
+                if (std::abs(x2 - x1) < 0.001f) return y1;
+                float t = (input_x - x1) / (x2 - x1);
+                return y1 + t * (y2 - y1);
+            }
+        }
+        return dial.calibration_mapping.back().second; // Should not reach
     }
+
+    // Normal case
+    float fraction = (effective_dial_angle - dial.min_angle) / (dial.max_angle - dial.min_angle);
+    fraction = std::max(0.0f, std::min(1.0f, fraction));
+    return dial.min_value + fraction * (dial.max_value - dial.min_value);
+}
 }
 
 // Debug function for detailed angle conversion logging 

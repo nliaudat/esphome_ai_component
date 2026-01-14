@@ -6,7 +6,7 @@ The Hough Transform is a robust computer vision technique used for detecting lin
 ## How It Works
 
 1.  **Edge Detection**:
-    *   The image first passes through a Sobel filter to detect edges (sudden changes in brightness).
+    *   The image first passes through a Sobel filter (on the preprocessed Top-Hat image) to detect edges (sudden changes in brightness).
     *   This creates an "Edge Map" where silhouettes of the needle, numbers, and graduations appear white.
 
 2.  **Weighted Voting**:
@@ -29,3 +29,8 @@ The Hough Transform is a robust computer vision technique used for detecting lin
 ## Best For
 *   Dials with "thin" needles.
 *   Situations where lighting is uneven but edges are still visible.
+
+## Resource Usage (IoT)
+*   **RAM**: **Medium**. Requires an extra buffer only during the Edge Detection step.
+*   **CPU**: **High**. Sobel filters and Angle Voting involve many calculations (`sqrt`, `atan2` per pixel). Expect 50ms-100ms processing time per dial.
+*   **Suitability**: Use only if lighter algorithms (Radial/Legacy) fail. Ideally for mains-powered devices, as the extra CPU time consumes more energy.

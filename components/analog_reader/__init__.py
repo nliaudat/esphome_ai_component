@@ -40,6 +40,14 @@ CONF_ALGO_RADIAL = "radial_profile"
 CONF_ALGO_HOUGH = "hough_transform"
 CONF_ALGO_TEMPLATE = "template_match"
 CONF_ALGO_AUTO = "auto"
+CONF_VALUE = "value"
+CONF_CONFIDENCE = "confidence"
+CONF_ANGLE = "angle"
+CONF_CALIBRATION = "calibration"
+CONF_RAW = "raw"
+CONF_MAPPED = "mapped"
+CONF_MIN_SCAN_RADIUS = "min_scan_radius"
+CONF_MAX_SCAN_RADIUS = "max_scan_radius"
 
 DIAL_SCHEMA = cv.Schema({
     cv.Required(CONF_ID): cv.string, # String ID for logs
@@ -47,7 +55,7 @@ DIAL_SCHEMA = cv.Schema({
         CONF_TYPE_DARK: analog_reader_ns.enum("NEEDLE_TYPE_DARK"),
         CONF_TYPE_LIGHT: analog_reader_ns.enum("NEEDLE_TYPE_LIGHT"),
     }),
-    cv.Optional(CONF_ALGORITHM, default=CONF_ALGO_LEGACY): cv.one_of(
+    cv.Optional(CONF_ALGORITHM, default=CONF_ALGO_RADIAL): cv.one_of(
         CONF_ALGO_LEGACY, CONF_ALGO_RADIAL, CONF_ALGO_HOUGH, CONF_ALGO_TEMPLATE, CONF_ALGO_AUTO, lower=True
     ),
     cv.Optional(CONF_SCALE, default=1.0): cv.float_,
@@ -60,9 +68,22 @@ DIAL_SCHEMA = cv.Schema({
     cv.Optional(CONF_ANGLE_OFFSET, default=0): cv.float_, 
     cv.Optional(CONF_MIN_VALUE, default=0): cv.float_,
     cv.Optional(CONF_MAX_VALUE, default=10): cv.float_,
+    cv.Optional(CONF_MIN_SCAN_RADIUS, default=0.3): cv.float_,
+    cv.Optional(CONF_MAX_SCAN_RADIUS, default=0.9): cv.float_,
     cv.Optional(CONF_AUTO_CONTRAST, default=True): cv.boolean,
     cv.Optional(CONF_CONTRAST, default=1.0): cv.float_,
     cv.Optional("target_color"): cv.hex_int, 
+    
+    # Per-dial sensors
+    cv.Optional(CONF_VALUE): sensor.sensor_schema(),
+    cv.Optional(CONF_CONFIDENCE): sensor.sensor_schema(),
+    cv.Optional(CONF_ANGLE): sensor.sensor_schema(),
+    
+    # Internal Calibration Mapping
+    cv.Optional(CONF_CALIBRATION): cv.ensure_list(cv.Schema({
+        cv.Required(CONF_RAW): cv.float_,
+        cv.Required(CONF_MAPPED): cv.float_,
+    })),
 })
 
 
@@ -78,17 +99,6 @@ CONFIG_SCHEMA = cv.Schema({
 
 
 async def to_code(config):
-    cg.add_library(
-        "analog_reader_lib",
-        None,
-        [
-            "analog_reader.cpp",
-            "detect_legacy.cpp",
-            "multi_algorithm.cpp",
-            "camera_coordinator.cpp",
-            "flashlight_coordinator.cpp", 
-        ],
-    )
     var = cg.new_Pvariable(config[CONF_ID])
 
     await cg.register_component(var, config)
@@ -139,7 +149,24 @@ async def to_code(config):
             ("contrast", dial[CONF_CONTRAST]),
             ("target_color", dial.get("target_color", 0)),
             ("use_color", "target_color" in dial),
+            ("min_scan_radius", dial[CONF_MIN_SCAN_RADIUS]),
+            ("max_scan_radius", dial[CONF_MAX_SCAN_RADIUS]),
+            ("value_sensor", await sensor.new_sensor(dial[CONF_VALUE]) if CONF_VALUE in dial else None),
+            ("confidence_sensor", await sensor.new_sensor(dial[CONF_CONFIDENCE]) if CONF_CONFIDENCE in dial else None),
+            ("angle_sensor", await sensor.new_sensor(dial[CONF_ANGLE]) if CONF_ANGLE in dial else None),
         )
+        
+        # Handle calibration mapping
+        if CONF_CALIBRATION in dial:
+            # Convert list of dicts to list of pairs for C++ vector<pair<float,float>>
+            cal_list = []
+            for item in dial[CONF_CALIBRATION]:
+                cal_list.append((item[CONF_RAW], item[CONF_MAPPED]))
+            
+            # StructInitializer can take a list for vector initialization if backend supports it.
+            # Explicitly adding it to the initializer list above:
+            s.args.append(("calibration_mapping", cal_list))
+        
         cg.add(var.add_dial(s))
 
     # Get camera resolution from substitutions

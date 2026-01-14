@@ -31,11 +31,21 @@ The latest version (v2) introduces significant enhancements:
 
 ## 🧠 Algorithm Selection Guide
 
-| Algorithm | Speed | Robustness | Best For |
-| :--- | :--- | :--- | :--- |
-| **Radial Profile** (Default) | Fast (~10ms) | ⭐⭐⭐ | Standard dials, high contrast. Balanced performance and accuracy. |
-| **Template Match** | Ultra Fast (~3ms) | ⭐⭐ | Clean dials, very thin needles. Uses sparse scanning (coarse-to-fine). |
-| **Hough Transform** | Slow (~80ms) | ⭐⭐⭐⭐ | Difficult lighting, shadows, broken needles. Uses heavy gradient computations. |
+| Algorithm | Speed | Robustness | Best For | Documentation |
+| :--- | :--- | :--- | :--- | :--- |
+| **Radial Profile** (Default) | Fast (~10ms) | ⭐⭐⭐⭐ | Default. Uses smart "Center Connectivity" and Preprocessing (Top-Hat) to resolve 180° ambiguity and ignore glare. | [Read More](algo_radial.md) |
+| **Legacy** | Fast (~10ms) | ⭐⭐ | **Fallback**. Raw intensity scan. Now upgraded with Connectivity checks. Use if filters fail. | [Read More](algo_legacy.md) |
+| **Hough Transform** | Slow (~80ms) | ⭐⭐⭐ | Voting-based. Excellent for broken needles or heavy clutter. | [Read More](algo_hough.md) |
+| **Template Match** | Very Slow (~150ms) | ⭐⭐ | Brute-force verification. Finds "Brightest Line" in Top-Hat image. | [Read More](algo_template_matching.md) |
+| **Auto** | Variable | - | Runs comparison and picks highest confidence. Good for calibration. | - |
+
+> **Note on 180° Ambiguity**: All algorithms now feature **Center Connectivity Logic**. They trace the needle from the hub outwards and stop at gaps. This automatically distinguishes the long "Head" from the short "Tail" of the needle, ensuring accurate 0-360° detection without manual range tuning.
+
+### ✅ Quick Recommendations
+*   **For most users**: Use **`Radial Profile`** (Default). It is the smartest and handles most lighting conditions well.
+*   **For Battery Devices**: Use **`Legacy`**. It is ultra-lightweight and consumes the least power.
+*   **For Broken/Faint Needles**: Use **`Hough Transform`**. It is finding "lines" rather than "blobs", so it detects needles even if they are interrupted by text or glare.
+*   **For Tuning**: Use **`Auto`** creates a log with all algorithms' results. Pick the one that is consistently correct for your specific dial.
 
 ## 🛠️ Configuration
 
@@ -79,12 +89,10 @@ analog_reader:
       
       # Image Processing
       auto_contrast: true   # Enhances contrast before processing (Recommended)
-      auto_contrast: true   # Enhances contrast before processing (Recommended)
       contrast: 1.0         # Manual contrast multiplier
       target_color: 0xFF0000 # Optional: Target needle color (e.g. Red) for Color Detection Mode
       
-      # Angle Calibration
-      
+
       # Angle Calibration
       # min/max_angle defines the physical arc of the gauge (e.g. 0 to 360 for full circle)
       min_angle: 0
@@ -170,13 +178,11 @@ This exposes:
 4. **Debugging**: Enable `debug: true` to see an ASCII art representation of the dial in the logs (with colorized needle). This confirms exactly what the ESP32 sees and where it thinks the needle is.
 
 ## ⚙️ How it Works
-1. **Decode Once**: The full camera frame is decoded to RGB888 just once, optimizing memory for multi-dial setups.
-2. **Extract & Enhance**: Each dial crop is extracted. Auto-contrast is applied if enabled (Min-Max normalization).
-3. **Radial Edge Detection**: 
-   - Scans from center OUTWARD along 360 radial lines (1° resolution)  
-   - Detects the **strongest brightness gradient** (edge transition) along each line
-   - This is where the needle crosses that angle
-   - Works for both dark AND light needles (gradient is unsigned)
-   - Avoids ambiguity from detecting both ends of needle
-4. **Detect**: The angle with the **maximum gradient** (sharpest edge) is selected as the needle direction.
-5. **Map**: The detected angle is normalized to North-based coordinates and mapped to a value using the configuration.
+1. **Decode Once**: The full camera frame is decoded to RGB888 just once, optimizing memory.
+2. **Extract & Preprocess**: Each diaL crop is extracted. An optional **Top-Hat Filter** removes shadows, leaving only "structure" (the needle).
+3. **Multi-Algorithm Analyze**: The selected algorithm analyzes the image:
+   - **Radial Profile**: Traces connected rays from center.
+   - **Legacy**: Traces raw intensity rays from center.
+   - **Hough**: Votes for lines passing through center.
+4.  **Detect & Score**: The angle with the highest score (Needle Head) is selected. Connectivity logic ignores the Tail.
+5. **Map**: The detected angle is normalized to North-based coordinates.
