@@ -192,47 +192,7 @@
                 <button class="btn btn-primary" onclick="document.getElementById('imageInput').click()">📂 Load
                     Image</button>
 
-                <div
-                    style="border-left: 1px solid #ddd; padding-left: 10px; margin-left: 10px; display: flex; gap: 5px; align-items: center;">
-                    <span>Sensor:</span>
-                    <div class="dropdown" style="position: relative; display: inline-block;">
-                        <button class="btn btn-secondary"
-                            onclick="document.getElementById('resDropdown').style.display='block'"
-                            id="sensor-res-label">Select Sensor</button>
-                        <div id="resDropdown"
-                            style="display: none; position: absolute; background-color: #f9f9f9; min-width: 160px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 1;">
-                            <div style="padding: 5px 10px; font-weight: bold; background: #eee;">OV2640</div>
-                            <a href="#" style="color: black; padding: 8px 16px; display: block;"
-                                onclick="setSensorRes(1600, 1200, 'OV2640 (1600x1200)'); document.getElementById('resDropdown').style.display='none'; return false;">UxGA
-                                (1600x1200)</a>
 
-                            <div style="padding: 5px 10px; font-weight: bold; background: #eee;">OV3660</div>
-                            <a href="#" style="color: black; padding: 8px 16px; display: block;"
-                                onclick="setSensorRes(2048, 1536, 'OV3660 (2048x1536)'); document.getElementById('resDropdown').style.display='none'; return false;">QXGA
-                                (2048x1536)</a>
-
-                            <div style="padding: 5px 10px; font-weight: bold; background: #eee;">OV5640</div>
-                            <a href="#" style="color: black; padding: 8px 16px; display: block;"
-                                onclick="setSensorRes(2592, 1944, 'OV5640 (2592x1944)'); document.getElementById('resDropdown').style.display='none'; return false;">QSXGA
-                                (2592x1944)</a>
-                        </div>
-                    </div>
-                </div>
-
-                <div
-                    style="border-left: 1px solid #ddd; padding-left: 10px; margin-left: 10px; display: flex; gap: 5px; align-items: center;">
-                    <span>Rotation:</span>
-                    <button class="btn btn-secondary" onclick="setRotation(0)">0°</button>
-                    <button class="btn btn-secondary" onclick="setRotation(90)">90°</button>
-                    <button class="btn btn-secondary" onclick="setRotation(180)">180°</button>
-                    <button class="btn btn-secondary" onclick="setRotation(270)">270°</button>
-                </div>
-
-                <div
-                    style="border-left: 1px solid #ddd; padding-left: 10px; margin-left: 10px; display: flex; gap: 5px; align-items: center;">
-                    <input type="checkbox" id="force43" onchange="state.force43 = this.checked; generateOutput()">
-                    <label for="force43" style="cursor: pointer; user-select: none;">Force 4:3 (Div by 8)</label>
-                </div>
             </div>
 
             <div class="mode-toggles">
@@ -273,8 +233,61 @@
         </div>
 
         <div class="sidebar">
-            <div class="card">
+
+            <!-- ROI SPECIFIC CARDS -->
+            <div id="card-sensor-settings" class="card">
+                <h3>Camera Config</h3>
+                <div style="margin-bottom: 10px;">
+                    <label style="display:block; margin-bottom:5px;">Sensor Model:</label>
+                    <div class="dropdown" style="position: relative; display: inline-block; width: 100%;">
+                        <button class="btn btn-secondary" style="width: 100%; text-align: left;"
+                            onclick="document.getElementById('resDropdown').style.display = document.getElementById('resDropdown').style.display === 'block' ? 'none' : 'block'"
+                            id="sensor-res-label">Select Sensor</button>
+                        <div id="resDropdown"
+                            style="display: none; position: absolute; background-color: #f9f9f9; min-width: 100%; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 10;">
+                            <div style="padding: 5px 10px; font-weight: bold; background: #eee;">OV2640</div>
+                            <a href="#" style="color: black; padding: 8px 16px; display: block; text-decoration:none;"
+                                onclick="setSensorRes(1600, 1200, 'OV2640 (1600x1200)'); document.getElementById('resDropdown').style.display='none'; return false;">UxGA
+                                (1600x1200)</a>
+
+                            <div style="padding: 5px 10px; font-weight: bold; background: #eee;">OV3660</div>
+                            <a href="#" style="color: black; padding: 8px 16px; display: block; text-decoration:none;"
+                                onclick="setSensorRes(2048, 1536, 'OV3660 (2048x1536)'); document.getElementById('resDropdown').style.display='none'; return false;">QXGA
+                                (2048x1536)</a>
+
+                            <div style="padding: 5px 10px; font-weight: bold; background: #eee;">OV5640</div>
+                            <a href="#" style="color: black; padding: 8px 16px; display: block; text-decoration:none;"
+                                onclick="setSensorRes(2592, 1944, 'OV5640 (2592x1944)'); document.getElementById('resDropdown').style.display='none'; return false;">QSXGA
+                                (2592x1944)</a>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 5px; align-items: center; margin-bottom: 10px;">
+                    <input type="checkbox" id="force43" onchange="state.force43 = this.checked; generateOutput()">
+                    <label for="force43" style="cursor: pointer; user-select: none;">Force 4:3 (Div by 8)</label>
+                </div>
+
+                <div style="margin-top: 10px;">
+                    <label style="display:block; margin-bottom:5px;">Rotation:</label>
+                    <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                        <button class="btn btn-secondary" style="flex:1; padding: 4px;"
+                            onclick="setRotation(0)">0°</button>
+                        <button class="btn btn-secondary" style="flex:1; padding: 4px;"
+                            onclick="setRotation(90)">90°</button>
+                        <button class="btn btn-secondary" style="flex:1; padding: 4px;"
+                            onclick="setRotation(180)">180°</button>
+                        <button class="btn btn-secondary" style="flex:1; padding: 4px;"
+                            onclick="setRotation(270)">270°</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="card-sensor-roi" class="card">
                 <h3>Target Sensor ROI</h3>
+                <p style="font-size: 0.85em; color: #666; margin-bottom: 10px;">
+                    Define the hardware window (Blue) on the sensor.
+                </p>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
                     <div>
                         <label>Off_X:</label> <input type="number" id="manual_x" onchange="updateROIFromInput()"
@@ -295,11 +308,11 @@
                 </div>
             </div>
 
-            <div class="card">
-                <h3>Target Resolution (Downscaling)</h3>
+            <!-- SHARED TARGET RES (Shown for Digits & Analog) -->
+            <div id="card-target-res" class="card" style="display:none;">
+                <h3>Target Resolution</h3>
                 <p style="font-size: 0.85em; color: #666; margin-top: 5px;">
-                    If your ESPHome <code>camera_resolution</code> (e.g. 640x480) is smaller than the Sensor ROI, set it
-                    here to scale the output coordinates.
+                    Set the desired output resolution (scaling) for the component(s).
                 </p>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 10px;">
                     <div>
@@ -323,16 +336,35 @@
                 </div>
             </div>
 
-            <div class="card">
+            <!-- ACTIONS (ROI) -->
+            <div id="card-actions-roi" class="card">
                 <h3>Actions</h3>
                 <button class="btn btn-danger" style="width: 100%; margin-bottom: 10px;" onclick="resetCurrent()">Clear
-                    Current Items</button>
+                    ROI</button>
                 <button class="btn btn-danger" style="width: 100%;" onclick="resetAll()">Reset All</button>
             </div>
+
+            <!-- ACTIONS (DIGITS) -->
+            <div id="card-actions-digits" class="card" style="display:none;">
+                <h3>Actions</h3>
+                <button class="btn btn-secondary" style="width: 100%; margin-bottom: 10px;"
+                    onclick="resetCurrent()">Undo Last Digit</button>
+                <button class="btn btn-danger" style="width: 100%;"
+                    onclick="state.digits=[]; updateCanvas(); generateOutput();">Clear All Digits</button>
+            </div>
+
+            <!-- ACTIONS (ANALOG) -->
+            <div id="card-actions-analog" class="card" style="display:none;">
+                <h3>Actions</h3>
+                <button class="btn btn-secondary" style="width: 100%; margin-bottom: 10px;"
+                    onclick="resetCurrent()">Undo Last Dial</button>
+                <button class="btn btn-danger" style="width: 100%;"
+                    onclick="state.dials=[]; updateCanvas(); generateOutput();">Clear All Dials</button>
+            </div>
+
         </div>
 
     </div>
-
     <script>
         // State
         let state = {
@@ -433,6 +465,30 @@
             if (mode === 'roi') help.textContent = "Draw a rectangle to define the Camera Window (Blue). Optional: If skipped, full sensor is used.";
             else if (mode === 'digits') help.textContent = "Draw boxes around each digit (Green).";
             else if (mode === 'analog') help.textContent = "Click Center & Drag to create a Square Dial (Orange).";
+
+            // VISIBILITY LOGIC
+            const hide = (id) => { const el = document.getElementById(id); if (el) el.style.display = 'none'; };
+            const show = (id) => { const el = document.getElementById(id); if (el) el.style.display = 'block'; };
+
+            // Reset all first
+            hide('card-sensor-settings');
+            hide('card-sensor-roi');
+            hide('card-target-res');
+            hide('card-actions-roi');
+            hide('card-actions-digits');
+            hide('card-actions-analog');
+
+            if (mode === 'roi') {
+                show('card-sensor-settings');
+                show('card-sensor-roi');
+                show('card-actions-roi');
+            } else if (mode === 'digits') {
+                show('card-target-res');
+                show('card-actions-digits');
+            } else if (mode === 'analog') {
+                show('card-target-res');
+                show('card-actions-analog');
+            }
 
             updateCanvas();
         }
@@ -657,12 +713,33 @@
         }
 
         function checkOutsideROI(x, y, w, h, name) {
+            // Define the bounding box (Visual Coordinates)
+            let box_x = 0;
+            let box_y = 0;
+            let box_w = canvas.width;
+            let box_h = canvas.height;
+
             if (state.roi) {
-                if (x < state.roi.x || y < state.roi.y ||
-                    (x + w) > (state.roi.x + state.roi.w) ||
-                    (y + h) > (state.roi.y + state.roi.h)) {
-                    return !confirm(`Warning: ${name} is outside ROI. Keep it?`); // Return true to ABORT
-                }
+                box_x = state.roi.x;
+                box_y = state.roi.y;
+                box_w = state.roi.w;
+                box_h = state.roi.h;
+            }
+
+            // Strict check with 1px margin
+            const margin = 1;
+            const safe_x1 = box_x + margin;
+            const safe_y1 = box_y + margin;
+            const safe_x2 = box_x + box_w - margin;
+            const safe_y2 = box_y + box_h - margin;
+
+            const rect_x1 = x;
+            const rect_y1 = y;
+            const rect_x2 = x + w;
+            const rect_y2 = y + h;
+
+            if (rect_x1 < safe_x1 || rect_y1 < safe_y1 || rect_x2 > safe_x2 || rect_y2 > safe_y2) {
+                return !confirm(`Warning: ${name} is too close to the edge (margin ${margin}px required). Keep it?`);
             }
             return false;
         }
@@ -1083,6 +1160,7 @@
         }
 
 
+        setMode("roi");
     </script>
 </body>
 
