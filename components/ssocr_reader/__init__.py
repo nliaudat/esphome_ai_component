@@ -47,15 +47,6 @@ CONFIG_SCHEMA = cv.Schema(
 
 
 async def to_code(config):
-    cg.add_library(
-        "ssocr_reader_lib",
-        None,
-        [
-            "ssocr_reader.cpp",
-            "camera_coordinator.cpp",
-            "flashlight_coordinator.cpp",
-        ],
-    )
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
 
