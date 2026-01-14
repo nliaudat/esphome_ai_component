@@ -154,7 +154,38 @@ std::vector<CameraCoordinator::ProcessResult> CameraCoordinator::process_frame(
          ESP_LOGE(TAG, "ImageProcessor not initialized");
          return {};
     }
-    return image_processor_->split_image_in_zone(frame, zones);
+    
+    // Validate zones against current configuration to prevent crashes
+    std::vector<esp32_camera_utils::CropZone> valid_zones;
+    valid_zones.reserve(zones.size());
+    
+    bool invalid_zones_found = false;
+    for (const auto& zone : zones) {
+        // Basic bounds check: x2/y2 are exclusive-like boundaries for width calculation? 
+        // CropZone is usually x1,y1,x2,y2 where x2>x1. 
+        // We ensure coordinates are within [0, width] and [0, height].
+        
+        if (zone.x1 < 0 || zone.y1 < 0 || 
+            zone.x2 > current_width_ || zone.y2 > current_height_ ||
+            zone.x1 >= zone.x2 || zone.y1 >= zone.y2) {
+            
+            if (!invalid_zones_found) { // limit log spam to one per frame batch
+                ESP_LOGE(TAG, "CRITICAL: Invalid crop zone detected! Zone: [%d,%d,%d,%d] Outside Image: %dx%d. Check resolution config vs crop tool.", 
+                         zone.x1, zone.y1, zone.x2, zone.y2, current_width_, current_height_);
+                invalid_zones_found = true;
+            }
+            continue; // Skip this invalid zone
+        }
+        valid_zones.push_back(zone);
+    }
+    
+    if (valid_zones.empty() && !zones.empty()) {
+        ESP_LOGE(TAG, "All crop zones appear invalid or out of bounds. Skipping processing to prevent crash.");
+        return {};
+    }
+
+    // Process only valid zones
+    return image_processor_->split_image_in_zone(frame, valid_zones);
 
 }
 
