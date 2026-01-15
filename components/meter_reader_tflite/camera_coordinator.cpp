@@ -41,7 +41,7 @@ bool CameraCoordinator::set_window(int offset_x, int offset_y, int width, int he
         ESP_LOGD(TAG, "Setting camera window: off(%d,%d) size(%dx%d)", 
                  offset_x, offset_y, width, height);
     } else {
-        ESP_LOGD(TAG, "Setting camera window: off(%d,%d) size(%dx%d)", 
+        ESP_LOGI(TAG, "Setting camera window: off(%d,%d) size(%dx%d)", 
                  offset_x, offset_y, width, height);
     }
 
