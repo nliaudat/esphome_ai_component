@@ -30,3 +30,4 @@ config_coldwater.yaml
 config_hotwater.yaml
 dig-class100-0180-s2-q.tflite
 /components/value_validator/__pycache__
+wiki_setup.md
