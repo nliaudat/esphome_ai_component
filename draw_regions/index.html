@@ -316,11 +316,11 @@
                 </p>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 10px;">
                     <div>
-                        <label>Target W:</label> <input type="number" id="target_w" placeholder="e.g 640"
+                        <label>Target H:</label> <input type="number" id="target_h" placeholder="e.g 480"
                             onchange="generateOutput()" style="width: 70px;">
                     </div>
                     <div>
-                        <label>Target H:</label> <input type="number" id="target_h" placeholder="e.g 480"
+                        <label>Target W:</label> <input type="number" id="target_w" placeholder="e.g 640"
                             onchange="generateOutput()" style="width: 70px;">
                     </div>
                 </div>
@@ -398,6 +398,11 @@
                 const img = new Image();
                 img.onload = () => {
                     state.image = img;
+                    // Auto-set Target Resolution (Respecting current rotation)
+                    const dims = getTransformedDimensions();
+                    document.getElementById('target_w').value = dims.w;
+                    document.getElementById('target_h').value = dims.h;
+
                     state.roi = null;
                     state.digits = [];
                     updateImageInfo();
@@ -449,8 +454,12 @@
             // as usually you set rotation first then draw.
             if (confirm("Changing rotation will clear current regions. Continue?")) {
                 state.roi = null;
-                state.digits = [];
                 state.dials = [];
+                // Update Target Res to match new rotation
+                const dims = getTransformedDimensions();
+                document.getElementById('target_w').value = dims.w;
+                document.getElementById('target_h').value = dims.h;
+
                 updateCanvas();
                 generateOutput();
             }
