@@ -439,7 +439,7 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
       const uint8_t* input_for_algo = raw;
       
       if (debug_) ESP_LOGD(TAG, "Processing Dial: %s (Algorithm: %s)", dial.id.c_str(), dial.algorithm.c_str());
-      uint32_t dial_start = millis();
+
       
       // If Color Mode: Convert RGB to Distance Map (Grayscale)
       if (dial.use_color) {
