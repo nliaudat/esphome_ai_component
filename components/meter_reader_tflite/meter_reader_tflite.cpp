@@ -172,6 +172,7 @@ void MeterReaderTFLite::setup() {
     // 1. Initial Config
     if (camera_coord_.get_width() == 0) {
         ESP_LOGE(TAG, "Camera dimensions not set!");
+        if (main_logs_) main_logs_->publish_state("CRITICAL: Camera dimensions not set!");
         mark_failed(); return;
     }
     
@@ -316,6 +317,7 @@ void MeterReaderTFLite::setup() {
     
     if (!input_queue_ || !output_queue_) {
         ESP_LOGE(TAG, "Failed to create queues!");
+        if (main_logs_) main_logs_->publish_state("CRITICAL: Failed to create queues!");
         mark_failed(); return;
     }
     
@@ -331,6 +333,7 @@ void MeterReaderTFLite::setup() {
     
     if (res != pdPASS) {
         ESP_LOGE(TAG, "Failed to create inference task!");
+        if (main_logs_) main_logs_->publish_state("CRITICAL: Failed to create inference task!");
         mark_failed(); return;
     }
     ESP_LOGI(TAG, "Double Buffering active on Core 0");
@@ -444,7 +447,12 @@ void MeterReaderTFLite::loop() {
 
     // Watchdog: If frame requested but not arrived, reset state
     if (frame_requested_ && (millis() - last_request_time_ > frame_request_timeout_ms_)) {
-        ESP_LOGW(TAG, "Frame request timed out (%u ms)! Resetting state.", frame_request_timeout_ms_);
+        ESP_LOGE(TAG, "Frame request timed out (%u ms)! Camera Frame Failure.", frame_request_timeout_ms_);
+        if (main_logs_) {
+             char msg[100];
+             snprintf(msg, sizeof(msg), "CRITICAL: Camera Frame Failure (Timeout %ums)", frame_request_timeout_ms_);
+             main_logs_->publish_state(msg);
+        }
         frame_requested_ = false;
         // Check if we need to force reset camera or just continue
     }
@@ -787,6 +795,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     // Async Path (already checks empty above) but sync path needs it too
     if (processed_buffers.empty()) {
         ESP_LOGE(TAG, "No processed buffers generated (JPEG decode failed?). Skipping inference.");
+        if (main_logs_) main_logs_->publish_state("ERROR: JPEG Decode Failed / No Buffers");
         processing_frame_ = false;
         return;
     }
