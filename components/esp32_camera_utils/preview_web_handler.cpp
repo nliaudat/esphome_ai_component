@@ -1,7 +1,7 @@
 
 
 #include "esphome/core/defines.h"
-#ifdef DEV_ENABLE_ROTATION
+#ifdef USE_CAMERA_ROTATOR
 #ifdef USE_WEB_SERVER
 #include "preview_web_handler.h"
 #include <esp_camera.h>

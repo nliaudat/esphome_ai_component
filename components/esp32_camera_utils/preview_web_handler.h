@@ -2,7 +2,7 @@
 
 
 
-#ifdef DEV_ENABLE_ROTATION
+#ifdef USE_CAMERA_ROTATOR
 #ifdef USE_WEB_SERVER
 #include "esphome/components/web_server_base/web_server_base.h"
 #include "esphome/components/esp32_camera_utils/image_processor.h"
