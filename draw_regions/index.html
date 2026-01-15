@@ -202,7 +202,7 @@
                 <button class="mode-btn" onclick="setMode('analog')" id="btn-mode-analog">3. Set Analog Dials</button>
             </div>
 
-            <p class="help-text" id="help-text">Select "Load Image" to start. Then draw the Camera ROI (Blue) to define
+            <p class="help-text" id="help-text">Select "Load Image" to start. Then draw the rectangle to define
                 the active window.</p>
 
             <div class="canvas-wrapper">
@@ -700,7 +700,6 @@
                 // Light transparent fill matching stroke
                 // Simple hack: assume hex color input and add opacity? 
                 // Or just hardcode based on type since we only resolve duplication.
-                // Let's passed fill color or derive it? The validation logic just wanted to reduce duplication.
                 // The original code used different fill colors.
                 // For 'digits' (#2ecc71) -> rgba(46, 204, 113, 0.3)
                 // For 'dials' (#f39c12) -> rgba(243, 156, 18, 0.3)
@@ -782,12 +781,6 @@
 
             let anisotropic = Math.abs(scale_x - scale_y) > 0.1;
 
-            lines.push(`# Sensor: ${state.sensorRes.name}`);
-            lines.push(`# Image: ${img_w}x${img_h}`);
-            lines.push(`# Scale: ${scale_x.toFixed(2)}x (Horizontal)`);
-            if (anisotropic) lines.push(`# WARNING: Anisotropic scaling detected! (${scale_x.toFixed(2)} vs ${scale_y.toFixed(2)})`);
-            lines.push(`rotation: ${state.rotation}`);
-
             // ROI Variables
             let off_x = 0;
             let off_y = 0;
@@ -824,8 +817,6 @@
                     off_y = snapTo8(Math.max(0, new_y));
                     w = target_w;
                     h = target_h;
-
-                    lines.push(`# Enforcement: 4:3 Aspect Ratio (W/H = ${w}/${h}) & DivBy8`);
                 } else {
                     // 3. Snap to 8 (Flexible Ratio)
                     off_x = snapTo8(Math.max(0, raw_x));
@@ -834,37 +825,8 @@
                     h = snapTo8(Math.max(8, raw_h));
                 }
 
-                // Explanatory Comments for Swapped Dims
-                let comment_w = "# multiple of 8";
-                let comment_h = "# multiple of 8";
-
-                if (state.rotation === 90 || state.rotation === 270) {
-                    comment_w += " (Visual Height)";
-                    comment_h += " (Visual Width)";
-                }
-
                 // 4. Bounds Check (Sensor Space)
-                if (off_x + w > sensor_w) lines.push(`# WARNING: ROI width exceeds sensor bounds!`);
-                if (off_y + h > sensor_h) lines.push(`# WARNING: ROI height exceeds sensor bounds!`);
-
-                lines.push(`camera_window:`);
-                lines.push(`  offset_x: ${off_x} # multiple of 8`);
-                lines.push(`  offset_y: ${off_y} # multiple of 8`);
-                lines.push(`  width: ${w} ${comment_w}`);
-                lines.push(`  height: ${h} ${comment_h}`);
-            } else {
-                lines.push(`# No Camera ROI defined. Assuming full sensor frame.`);
-                // We keep off_x, off_y at 0
-                // w, h are set to sensor_w, sensor_h
-                // Note: If using full frame, ensure width/height match rotation logic if we printed them,
-                // but we aren't printing camera_window, so just internal variables for digit calc.
-
-                // IMPORTANT: 'w' and 'h' are used for Digit Relative calculation and Rotation Logic.
-                // In Rotation Logic:
-                // let out_w = (state.rotation % 180 === 0) ? w : h;
-                // If w=1600, h=1200 (Sensor).
-                // Rotation 90. out_w = 1200.
-                // This seems correct.
+                // Just for internal logic, logic below will print if needed.
             }
 
             // Scaling Factor for Crop Zones
@@ -874,93 +836,91 @@
             let final_scale_y = 1.0;
 
             if (use_scaling) {
-                // Warning if aspect ratio mismatch
-                let roi_ratio = w / h; // Note: w,h are already rotated-aware in logic?
-                // Wait, 'w' and 'h' above are SENSOR SPACE WIDTH/HEIGHT (Unrotated relative to sensor).
-                // But target_w/target_h are OUTPUT IMAGE DIMENSIONS (Rotated?)
-
-                // Let's look at logic:
-                // calculateZoneCoordinates returns coordinates in "ROI Space" (optionally rotated).
-                // If we want to scale to target, we should apply scaling to the result of calculateZoneCoordinates.
-
-                // Wait, logic check:
-                // calculateZoneCoordinates returns {x, y, w, h} which are relative to the "Output Image".
-                // Currently "Output Image" == "ROI size" (rotated).
-
-                // If we simply scale the output of calculateZoneCoordinates, it should work.
-                // We need the "Unscaled Output Size" to calculate the factor.
-
                 let unscaled_out_w = (state.rotation % 180 === 0) ? w : h;
                 let unscaled_out_h = (state.rotation % 180 === 0) ? h : w;
 
                 final_scale_x = target_w / unscaled_out_w;
                 final_scale_y = target_h / unscaled_out_h;
-
-                lines.push(`# Output Scaling Active: Mapping ${unscaled_out_w}x${unscaled_out_h} (ROI) -> ${target_w}x${target_h}`);
             }
 
+            // NEW YAML Structure Generation
+            lines.push(`globals:`);
+            lines.push(`  - id: \${id_prefix}_crop_zones`);
+            lines.push(`    type: std::string`);
+            // lines.push(`    # restore_value: true`);
+            lines.push(`    max_restore_data_length: 254`);
 
-            // Digits
-            if (state.digits.length > 0) {
-                const zones = state.digits.map(d_vis => {
-                    const res = calculateZoneCoordinates(d_vis, off_x, off_y, scale_x, scale_y, w, h);
+            // Calculate Crop Zones first to populate initial_value
+            let raw_crop_zones = [];
+            // Merge digits and dials
+            let all_zones = [...state.digits, ...state.dials];
 
-                    // Apply Scaling
-                    if (use_scaling) {
-                        res.x = Math.round(res.x * final_scale_x);
-                        res.y = Math.round(res.y * final_scale_y);
-                        res.w = Math.round(res.w * final_scale_x);
-                        res.h = Math.round(res.h * final_scale_y);
-                    }
+            all_zones.forEach(z => {
+                // Calculate Scaled & Relativized Coordinates
+                let res = calculateZoneCoordinates(z, off_x, off_y, scale_x, scale_y, w, h);
 
-                    return [res.x, res.y, res.x + res.w, res.y + res.h];
-                });
-
-                // Single-line JSON string format
-                const jsonStr = JSON.stringify(zones);
-                lines.push(``);
-
-                if (!state.roi) {
-                    lines.push(`# Crop Zones (Sensor Space - Full Frame)`);
-                } else {
-                    lines.push(`# Crop Zones (Sensor Space - Relative to Window)`);
+                // Apply Final Output Scaling
+                if (use_scaling) {
+                    res.x = Math.round(res.x * final_scale_x);
+                    res.y = Math.round(res.y * final_scale_y);
+                    res.w = Math.round(res.w * final_scale_x);
+                    res.h = Math.round(res.h * final_scale_y);
                 }
-                lines.push(`initial_value: '"${jsonStr}"'`);
+
+                raw_crop_zones.push(`[${res.x},${res.y},${res.x + res.w},${res.y + res.h}]`);
+            });
+
+            lines.push(`    initial_value: '"[${raw_crop_zones.join(',')}]"'`);
+            lines.push(``); // Spacer
+
+            lines.push(`esp32_camera_utils:`);
+            lines.push(`  id: \${id_prefix}_camera_utils`);
+            lines.push(`  camera_id: \${id_prefix}_espcam`);
+            lines.push(`  # debug: true`);
+            lines.push(`  ### zoom availale for OV2640, OV3660, OV5640, SC101IOT, SC030IOT from crop zones (explicit)`);
+
+            if (state.roi) {
+                // Explanatory Comments for Swapped Dims
+                let comment_w = "# multiple of 8";
+                let comment_h = "# multiple of 8";
+                if (state.rotation === 90 || state.rotation === 270) {
+                    comment_w += " (Visual Height)";
+                    comment_h += " (Visual Width)";
+                }
+
+                // Bounds Check (Sensor Space)
+                if (off_x + w > sensor_w) lines.push(`  # WARNING: ROI width exceeds sensor bounds!`);
+                if (off_y + h > sensor_h) lines.push(`  # WARNING: ROI height exceeds sensor bounds!`);
+
+                lines.push(`  camera_window:`);
+                lines.push(`    offset_x: ${off_x} # multiple of 4`);
+                lines.push(`    offset_y: ${off_y} # multiple of 4`);
+                lines.push(`    width: ${w} ${comment_w} #Enforcement: 4:3 Aspect Ratio (W/H = 160/120)`);
+                lines.push(`    height: ${h} ${comment_h}`);
+            } else {
+                lines.push(`  # No camera_window defined (Full Sensor or default)`);
             }
 
-            // Analog Dials
+            lines.push(``);
+            lines.push(`  enable_rotation: true`);
+            lines.push(`  rotation: ${state.rotation} # 0, 90, 180, 270 (special case built-in "accelerated" for 90, 180, 270 )`);
+
+            // Add Debug Comments at bottom
+            lines.push(``);
+            lines.push(`# --- Debug Info ---`);
+            lines.push(`# Sensor: ${state.sensorRes.name}`);
+            lines.push(`# Original Image: ${img_w}x${img_h}`);
+            if (use_scaling) {
+                let unscaled_out_w = (state.rotation % 180 === 0) ? w : h;
+                let unscaled_out_h = (state.rotation % 180 === 0) ? h : w;
+                lines.push(`# Output Scaling: Mapping ${unscaled_out_w}x${unscaled_out_h} (ROI) -> ${target_w}x${target_h}`);
+            }
+            if (anisotropic) lines.push(`# WARNING: Anisotropic scaling input detected!`);
+
+            // Analog Dials (Partial support in output if desired, currently kept simple as per request)
             if (state.dials.length > 0) {
-                // Same logic as digits
-                const dials_yaml = state.dials.map((d_vis, i) => {
-                    const res = calculateZoneCoordinates(d_vis, off_x, off_y, scale_x, scale_y, w, h);
-
-                    // Apply Scaling
-                    if (use_scaling) {
-                        res.x = Math.round(res.x * final_scale_x);
-                        res.y = Math.round(res.y * final_scale_y);
-                        res.w = Math.round(res.w * final_scale_x);
-                        res.h = Math.round(res.h * final_scale_y);
-                    }
-
-                    const scaleVal = Math.pow(10, -(i + 1));
-
-                    return `    - id: dial_${i + 1}
-      # scale: ${scaleVal}
-      crop_x: ${res.x}
-      crop_y: ${res.y}
-      crop_w: ${res.w}
-      crop_h: ${res.h}
-      min_angle: 0
-      max_angle: 360
-      min_value: 0
-      max_value: 10`;
-                });
-
                 lines.push(``);
-                lines.push(`# Analog Dials Config`);
-                lines.push(`analog_reader:`);
-                lines.push(`  dials:`);
-                lines.push(dials_yaml.join('\n'));
+                lines.push(`# Note: Analog Dials included in globals crop_zones but analog_reader config logic omitted for brevity.`);
             }
 
             ta.value = lines.join('\n');
