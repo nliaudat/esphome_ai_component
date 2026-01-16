@@ -179,6 +179,34 @@
             height: 12px;
             border-radius: 2px;
         }
+
+        /* Help Sidebar CSS */
+        .help-sidebar {
+            flex: 1;
+            min-width: 300px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .step-list {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .step-list li {
+            margin-bottom: 10px;
+            color: #555;
+        }
+
+        .step-highlight {
+            background-color: #e8f6f3;
+            border-left: 4px solid #1abc9c;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
     </style>
 </head>
 
@@ -191,8 +219,6 @@
                 <input type="file" id="imageInput" accept="image/*" style="display: none;">
                 <button class="btn btn-primary" onclick="document.getElementById('imageInput').click()">📂 Load
                     Image</button>
-
-
             </div>
 
             <div class="mode-toggles">
@@ -202,8 +228,7 @@
                 <button class="mode-btn" onclick="setMode('analog')" id="btn-mode-analog">3. Set Analog Dials</button>
             </div>
 
-            <p class="help-text" id="help-text">Select "Load Image" to start. Then draw the rectangle to define
-                the active window.</p>
+            <p class="help-text" id="status-text">Active Mode: Camera ROI</p>
 
             <div class="canvas-wrapper">
                 <canvas id="canvas"></canvas>
@@ -212,15 +237,15 @@
             <div class="legend">
                 <div class="legend-item">
                     <div class="color-box" style="background: rgba(52, 152, 219, 0.3); border: 2px solid #3498db;">
-                    </div> Camera ROI (Hardware Window)
+                    </div> Camera ROI (Blue)
                 </div>
                 <div class="legend-item">
                     <div class="color-box" style="background: rgba(46, 204, 113, 0.3); border: 2px solid #2ecc71;">
-                    </div> Digit Zones (Software Crop)
+                    </div> Digit Zones (Green)
                 </div>
                 <div class="legend-item">
                     <div class="color-box" style="background: rgba(243, 156, 18, 0.3); border: 2px solid #f39c12;">
-                    </div> Analog Dials (Software Crop)
+                    </div> Analog Dials (Orange)
                 </div>
             </div>
 
@@ -233,7 +258,6 @@
         </div>
 
         <div class="sidebar">
-
             <!-- ROI SPECIFIC CARDS -->
             <div id="card-sensor-settings" class="card">
                 <h3>Camera Config</h3>
@@ -249,12 +273,10 @@
                             <a href="#" style="color: black; padding: 8px 16px; display: block; text-decoration:none;"
                                 onclick="setSensorRes(1600, 1200, 'OV2640 (1600x1200)'); document.getElementById('resDropdown').style.display='none'; return false;">UxGA
                                 (1600x1200)</a>
-
                             <div style="padding: 5px 10px; font-weight: bold; background: #eee;">OV3660</div>
                             <a href="#" style="color: black; padding: 8px 16px; display: block; text-decoration:none;"
                                 onclick="setSensorRes(2048, 1536, 'OV3660 (2048x1536)'); document.getElementById('resDropdown').style.display='none'; return false;">QXGA
                                 (2048x1536)</a>
-
                             <div style="padding: 5px 10px; font-weight: bold; background: #eee;">OV5640</div>
                             <a href="#" style="color: black; padding: 8px 16px; display: block; text-decoration:none;"
                                 onclick="setSensorRes(2592, 1944, 'OV5640 (2592x1944)'); document.getElementById('resDropdown').style.display='none'; return false;">QSXGA
@@ -281,70 +303,54 @@
                             onclick="setRotation(270)">270°</button>
                     </div>
                 </div>
+                <div style="margin-top: 5px; display: flex; align-items: center; gap: 5px;">
+                    <label style="font-size: 0.9em;">Custom Angle:</label>
+                    <input type="number" id="custom_rot" placeholder="deg"
+                        onchange="setRotation(parseFloat(this.value))" style="width: 70px; padding: 4px;">
+                </div>
+                <div id="rot-warning"
+                    style="display:none; color: #e67e22; font-size: 0.85em; margin-top: 5px; background: #fdf2e9; padding: 5px; border-left: 3px solid #e67e22; border-radius: 2px;">
+                    <strong>Warning:</strong> Custom rotation is CPU intensive!
+                </div>
             </div>
 
             <div id="card-sensor-roi" class="card">
                 <h3>Target Sensor ROI</h3>
-                <p style="font-size: 0.85em; color: #666; margin-bottom: 10px;">
-                    Define the hardware window (Blue) on the sensor.
-                </p>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
-                    <div>
-                        <label>Off_X:</label> <input type="number" id="manual_x" onchange="updateROIFromInput()"
-                            style="width: 50px;">
-                    </div>
-                    <div>
-                        <label>Off_Y:</label> <input type="number" id="manual_y" onchange="updateROIFromInput()"
-                            style="width: 50px;">
-                    </div>
-                    <div>
-                        <label>Width:</label> <input type="number" id="manual_w" onchange="updateROIFromInput()"
-                            style="width: 50px;">
-                    </div>
-                    <div>
-                        <label>Height:</label> <input type="number" id="manual_h" onchange="updateROIFromInput()"
-                            style="width: 50px;">
-                    </div>
+                    <div><label>Off_X:</label> <input type="number" id="manual_x" onchange="updateROIFromInput()"
+                            style="width: 50px;"></div>
+                    <div><label>Off_Y:</label> <input type="number" id="manual_y" onchange="updateROIFromInput()"
+                            style="width: 50px;"></div>
+                    <div><label>Width:</label> <input type="number" id="manual_w" onchange="updateROIFromInput()"
+                            style="width: 50px;"></div>
+                    <div><label>Height:</label> <input type="number" id="manual_h" onchange="updateROIFromInput()"
+                            style="width: 50px;"></div>
                 </div>
             </div>
 
-            <!-- SHARED TARGET RES (Shown for Digits & Analog) -->
             <div id="card-target-res" class="card" style="display:none;">
                 <h3>Target Resolution</h3>
-                <p style="font-size: 0.85em; color: #666; margin-top: 5px;">
-                    Set the desired output resolution (scaling) for the component(s).
-                </p>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 10px;">
-                    <div>
-                        <label>Target H:</label> <input type="number" id="target_h" placeholder="e.g 480"
-                            onchange="generateOutput()" style="width: 70px;">
-                    </div>
-                    <div>
-                        <label>Target W:</label> <input type="number" id="target_w" placeholder="e.g 640"
-                            onchange="generateOutput()" style="width: 70px;">
-                    </div>
+                    <div><label>Target H:</label> <input type="number" id="target_h" placeholder="e.g 480"
+                            onchange="generateOutput()" style="width: 70px;"></div>
+                    <div><label>Target W:</label> <input type="number" id="target_w" placeholder="e.g 640"
+                            onchange="generateOutput()" style="width: 70px;"></div>
                 </div>
                 <div style="margin-top: 5px;">
                     <button class="btn btn-secondary" style="font-size: 0.8em; padding: 4px 8px;"
                         onclick="setTargetRes(640, 480)">VGA (640x480)</button>
                     <button class="btn btn-secondary" style="font-size: 0.8em; padding: 4px 8px;"
                         onclick="setTargetRes(800, 600)">SVGA (800x600)</button>
-                    <button class="btn btn-secondary" style="font-size: 0.8em; padding: 4px 8px;"
-                        onclick="setTargetRes(1024, 768)">XGA (1024x768)</button>
-                    <button class="btn btn-secondary" style="font-size: 0.8em; padding: 4px 8px;"
-                        onclick="setTargetRes('','')">Reset (1:1)</button>
                 </div>
             </div>
 
-            <!-- ACTIONS (ROI) -->
+            <!-- ACTIONS -->
             <div id="card-actions-roi" class="card">
                 <h3>Actions</h3>
                 <button class="btn btn-danger" style="width: 100%; margin-bottom: 10px;" onclick="resetCurrent()">Clear
                     ROI</button>
                 <button class="btn btn-danger" style="width: 100%;" onclick="resetAll()">Reset All</button>
             </div>
-
-            <!-- ACTIONS (DIGITS) -->
             <div id="card-actions-digits" class="card" style="display:none;">
                 <h3>Actions</h3>
                 <button class="btn btn-secondary" style="width: 100%; margin-bottom: 10px;"
@@ -352,8 +358,6 @@
                 <button class="btn btn-danger" style="width: 100%;"
                     onclick="state.digits=[]; updateCanvas(); generateOutput();">Clear All Digits</button>
             </div>
-
-            <!-- ACTIONS (ANALOG) -->
             <div id="card-actions-analog" class="card" style="display:none;">
                 <h3>Actions</h3>
                 <button class="btn btn-secondary" style="width: 100%; margin-bottom: 10px;"
@@ -361,7 +365,14 @@
                 <button class="btn btn-danger" style="width: 100%;"
                     onclick="state.dials=[]; updateCanvas(); generateOutput();">Clear All Dials</button>
             </div>
+        </div>
 
+        <!-- NEW HELP SIDEBAR -->
+        <div class="help-sidebar" id="help-sidebar">
+            <h3>Instructions</h3>
+            <div id="help-content">
+                <!-- Dynamic Content -->
+            </div>
         </div>
 
     </div>
@@ -448,7 +459,16 @@
         }
 
         function setRotation(deg) {
+            if (isNaN(deg)) return;
             state.rotation = deg;
+
+            // UI Sync
+            const isCustom = [0, 90, 180, 270].indexOf(deg) === -1;
+            const input = document.getElementById('custom_rot');
+            if (input) input.value = deg;
+            const warning = document.getElementById('rot-warning');
+            if (warning) warning.style.display = isCustom ? 'block' : 'none';
+
             // When rotation changes, ROI and Digits are invalid visually unless we map them.
             // For simplicity in this tool, we CLEAR them to avoid confusion, 
             // as usually you set rotation first then draw.
@@ -465,16 +485,67 @@
             }
         }
 
+        function updateHelp(mode) {
+            const container = document.getElementById('help-content');
+            let content = '';
+
+            if (mode === 'roi') {
+                content = `
+                    <div class="step-highlight">
+                        <strong>Goal:</strong> Define the active area of the camera sensor.
+                    </div>
+                    <ol class="step-list">
+                        <li><strong>Load Image</strong>: Click 'Load Image' to simulate your camera view.</li>
+                        <li><strong>Set Rotation</strong>: If your camera is mounted at an angle (e.g. 270°), Use the rotation buttons in 'Camera Config'.</li>
+                        <li><strong>Draw ROI</strong>: Click and drag on the image to draw a BLUE rectangle. This is the only area that will be sent to the AI.</li>
+                        <li><strong>Why?</strong>: A smaller ROI (Window) acts like a digital zoom and improves frame rate/perfomance.</li>
+                        <li><strong>Tip</strong>: Use 'Force 4:3' if you want standard aspect ratio.</li>
+                    </ol>
+                `;
+            } else if (mode === 'digits') {
+                content = `
+                    <div class="step-highlight">
+                        <strong>Goal:</strong> Mark where numbers appear.
+                    </div>
+                    <ol class="step-list">
+                        <li><strong>Draw Zones</strong>: Draw a GREEN box around each digit you want to read.</li>
+                        <li><strong>Order</strong>: Draw them in reading order (Left to Right).</li>
+                        <li><strong>Output</strong>: This generates coordinates relative to your ROI.</li>
+                        <li><strong>Target Res</strong>: Ensure 'Target W' and 'Target H' match your AI model input size (usually auto-detected).</li>
+                    </ol>
+                `;
+            } else if (mode === 'analog') {
+                content = `
+                    <div class="step-highlight">
+                        <strong>Goal:</strong> Mark analog clock-dials.
+                    </div>
+                    <ol class="step-list">
+                        <li><strong>Draw Dials</strong>: Click the CENTER of the dial and drag OUTWARDS.</li>
+                        <li><strong>Shape</strong>: This creates a perfect SQUARE box (Orange).</li>
+                        <li><strong>Order</strong>: Draw dials in order.</li>
+                        <li><strong>Note</strong>: The AI uses 30-90% of the crop radius for needle detection.</li>
+                    </ol>
+                `;
+            }
+
+            container.innerHTML = content;
+        }
+
         function setMode(mode) {
             state.mode = mode;
             document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
             document.getElementById('btn-mode-' + mode).classList.add('active');
 
-            const help = document.getElementById('help-text');
-            if (mode === 'roi') help.textContent = "Draw a rectangle to define the Camera Window (Blue). Optional: If skipped, full sensor is used.";
-            else if (mode === 'digits') help.textContent = "Draw boxes around each digit (Green).";
-            else if (mode === 'analog') help.textContent = "Click Center & Drag to create a Square Dial (Orange).";
+            // Update Status Text
+            const status = document.getElementById('status-text');
+            if (mode === 'roi') status.textContent = "Active Mode: Camera ROI (Blue)";
+            else if (mode === 'digits') status.textContent = "Active Mode: Digit Zones (Green)";
+            else if (mode === 'analog') status.textContent = "Active Mode: Analog Dials (Orange)";
 
+            // Update Help Sidebar
+            updateHelp(mode);
+
+            // ... (Rest of visibility logic) ...
             // VISIBILITY LOGIC
             const hide = (id) => { const el = document.getElementById(id); if (el) el.style.display = 'none'; };
             const show = (id) => { const el = document.getElementById(id); if (el) el.style.display = 'block'; };
@@ -502,13 +573,20 @@
             updateCanvas();
         }
 
+        // ... (Rest of existing JS functions) ...
+
+
         function getTransformedDimensions() {
             if (!state.image) return { w: 800, h: 600 };
-            if (state.rotation === 0 || state.rotation === 180) {
-                return { w: state.image.width, h: state.image.height };
-            } else {
-                return { w: state.image.height, h: state.image.width };
-            }
+
+            const rad = state.rotation * Math.PI / 180;
+            const absCos = Math.abs(Math.cos(rad));
+            const absSin = Math.abs(Math.sin(rad));
+
+            const w = state.image.width * absCos + state.image.height * absSin;
+            const h = state.image.width * absSin + state.image.height * absCos;
+
+            return { w: Math.round(w), h: Math.round(h) };
         }
 
         function updateCanvas() {
@@ -574,90 +652,64 @@
         }
 
         // Coordinate Mapping: Rotated (Canvas) -> Original (Sensor)
+        // Returns the Bounding Box in Sensor Space that contains the Visual Box
         function mapToOriginal(x, y, w, h) {
-            const W = state.image.width;
-            const H = state.image.height;
-            let ox, oy, ow, oh;
+            const W = state.image.width; // Sensor W
+            const H = state.image.height; // Sensor H
 
-            // Note: Standard image rotation usually is center-based
-            // 0: x,y
-            // 90 (CW): x'=H-y, y'=x  (Mapping FROM original TO rotated)
-            // We need FROM rotated TO original
+            // Canvas Center (Visual)
+            const dims = getTransformedDimensions();
+            const cx = dims.w / 2;
+            const cy = dims.h / 2;
 
-            // Rotated Dims
-            const RW = (state.rotation % 180 === 0) ? W : H;
-            const RH = (state.rotation % 180 === 0) ? H : W;
+            // Source Center (Sensor)
+            const ocx = W / 2;
+            const ocy = H / 2;
 
-            switch (state.rotation) {
-                case 0:
-                    ox = x; oy = y; ow = w; oh = h;
-                    break;
-                case 90:
-                    // new x is old y, new y is old (W-x)
-                    // Inverse: old x = y (rotated), old y = RW - x (rotated) - h (rotated-orient) ?
-                    // Let's think corners.
-                    // Rotated (x,y) -> Original?
-                    // 90 CW: Top Right of Orig becomes Bottom Right of Rotated? No.
-                    // 90 CW: 
-                    // (0,0) orig -> (H, 0) rot? NO.
-                    // (0,0) orig -> (RH, 0) rot?
-                    // Let's use standard transform logic.
-                    // cw90: (x,y) -> (H-y, x) (assuming 0-indexed)
-                    // Inverse cw90 is ccw90: (x,y) -> (y, W-x)
+            const rad = -state.rotation * Math.PI / 180; // Inverse rotation
+            const cos = Math.cos(rad);
+            const sin = Math.sin(rad);
 
-                    // But we have a rectangle.
-                    // Rot Rect (x,y,w,h).
-                    // TL(x,y) -> (y, W-x).
-                    // TR(x+w,y) -> (y, W-(x+w)).
-                    // BL(x,y+h) -> (y+h, W-x).
-                    // We need bounding box in original space.
+            // Visual Keypoints (TL, TR, BL, BR) relative to center
+            const points = [
+                { x: x, y: y },
+                { x: x + w, y: y },
+                { x: x, y: y + h },
+                { x: x + w, y: y + h }
+            ];
 
-                    // CCW 90 of (x,y) in RWxRH space:
-                    // ox = y
-                    // oy = RW - x // (RW is H of original) ... wait.
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
-                    // Let's trace simpler:
-                    // Rotated 90 (CW). Width=H_orig, Height=W_orig.
-                    // Point P_rot(u, v).
-                    // P_orig(v, H_rot - u).  where H_rot is Width_orig.
+            points.forEach(p => {
+                // translate to center
+                const dx = p.x - cx;
+                const dy = p.y - cy;
 
-                    // Example: Rot(10, 10). H_rot=100.
-                    // Orig(10, 100-10) = (10, 90).
-                    // Let's verify 90CW of (10,90). (100-90, 10) = (10,10). Correct.
+                // rotate
+                const ox_rel = dx * cos - dy * sin;
+                const oy_rel = dx * sin + dy * cos;
 
-                    // So: ox = y; oy = (RW) - (x + w); 
-                    // ow = h; oh = w;
-                    ox = y;
-                    oy = RW - (x + w);
-                    ow = h;
-                    oh = w;
-                    break;
+                // translate back to source center
+                const ox = ox_rel + ocx;
+                const oy = oy_rel + ocy;
 
-                case 180:
-                    // (x,y) -> (W-x, H-y)
-                    // Inverse is same.
-                    ox = RW - (x + w);
-                    oy = RH - (y + h);
-                    ow = w;
-                    oh = h;
-                    break;
+                if (ox < minX) minX = ox;
+                if (ox > maxX) maxX = ox;
+                if (oy < minY) minY = oy;
+                if (oy > maxY) maxY = oy;
+            });
 
-                case 270: // 90 CCW
-                    // (x,y) -> (y, W-x)
-                    // Inverse is 90 CW: (x,y) -> (RH-y, x)
-                    ox = RH - (y + h);
-                    oy = x;
-                    ow = h;
-                    oh = w;
-                    break;
-            }
+            // Clamp to sensor bounds
+            minX = Math.max(0, minX);
+            minY = Math.max(0, minY);
+            maxX = Math.min(W, maxX);
+            maxY = Math.min(H, maxY);
 
-            // Ensure integer
             return {
-                x: Math.round(ox),
-                y: Math.round(oy),
-                w: Math.round(ow),
-                h: Math.round(oh)
+                x: Math.round(minX),
+                y: Math.round(minY),
+                w: Math.round(maxX - minX),
+                h: Math.round(maxY - minY)
             };
         }
 
@@ -677,20 +729,11 @@
             let rel_x = d_sensor_x - off_x;
             let rel_y = d_sensor_y - off_y;
 
-            // 3. Transform to Configured Rotation Space (Final Output)
-            let out_w = (state.rotation % 180 === 0) ? w : h;
-            let out_h = (state.rotation % 180 === 0) ? h : w;
+            // 3. Return Coordinates in Sensor-Relative Space (Unrotated)
+            // ImageProcessor expects crops relative to the raw input buffer (unrotated).
+            // Rotation is applied AFTER cropping.
 
-            let fin_x, fin_y, fin_w, fin_h;
-
-            switch (state.rotation) {
-                case 0: fin_x = rel_x; fin_y = rel_y; fin_w = d_sensor_w; fin_h = d_sensor_h; break;
-                case 90: fin_x = out_w - rel_y - d_sensor_h; fin_y = rel_x; fin_w = d_sensor_h; fin_h = d_sensor_w; break;
-                case 180: fin_x = out_w - rel_x - d_sensor_w; fin_y = out_h - rel_y - d_sensor_h; fin_w = d_sensor_w; fin_h = d_sensor_h; break;
-                case 270: fin_x = rel_y; fin_y = out_h - rel_x - d_sensor_w; fin_w = d_sensor_h; fin_h = d_sensor_w; break;
-            }
-
-            return { x: Math.round(fin_x), y: Math.round(fin_y), w: Math.round(fin_w), h: Math.round(fin_h) };
+            return { x: Math.round(rel_x), y: Math.round(rel_y), w: Math.round(d_sensor_w), h: Math.round(d_sensor_h) };
         }
 
         function drawZones(zones, color, labelPrefix) {
@@ -852,8 +895,8 @@
 
             // Calculate Crop Zones first to populate initial_value
             let raw_crop_zones = [];
-            // Merge digits and dials
-            let all_zones = [...state.digits, ...state.dials];
+            // Merge digits and dials -> ONLY DIGITS for global variable now
+            let all_zones = [...state.digits];
 
             all_zones.forEach(z => {
                 // Calculate Scaled & Relativized Coordinates
@@ -917,10 +960,42 @@
             }
             if (anisotropic) lines.push(`# WARNING: Anisotropic scaling input detected!`);
 
-            // Analog Dials (Partial support in output if desired, currently kept simple as per request)
+            // Analog Dials Generation
             if (state.dials.length > 0) {
                 lines.push(``);
-                lines.push(`# Note: Analog Dials included in globals crop_zones but analog_reader config logic omitted for brevity.`);
+                lines.push(`analog_reader: # DEV !`);
+                lines.push(`  id: \${id_prefix}_analog_reader`);
+                lines.push(`  camera_id: \${id_prefix}_espcam`);
+                // lines.push(`  # validator: \${id_prefix}_analog_validator`);
+                lines.push(`  debug: true`);
+                lines.push(`  value_sensor:`);
+                lines.push(`    name: "Analog Total"`);
+                lines.push(`  update_interval: 60s`);
+                lines.push(`  dials:`);
+
+                state.dials.forEach((d, i) => {
+                     // Calculate Scaled & Relativized Coordinates (Same logic as digits)
+                    let res = calculateZoneCoordinates(d, off_x, off_y, scale_x, scale_y, w, h);
+
+                    // Apply Final Output Scaling
+                    if (use_scaling) {
+                        res.x = Math.round(res.x * final_scale_x);
+                        res.y = Math.round(res.y * final_scale_y);
+                        res.w = Math.round(res.w * final_scale_x);
+                        res.h = Math.round(res.h * final_scale_y);
+                    }
+                    
+                    lines.push(`    - id: dial_${i+1}`);
+                    lines.push(`      scale: 0.1`);
+                    lines.push(`      crop_x: ${res.x}`);
+                    lines.push(`      crop_y: ${res.y}`);
+                    lines.push(`      crop_w: ${res.w}`);
+                    lines.push(`      crop_h: ${res.h}`);
+                    lines.push(`      min_angle: 0`);
+                    lines.push(`      max_angle: 360`);
+                    lines.push(`      min_value: 0`);
+                    lines.push(`      max_value: 10`);
+                });
             }
 
             ta.value = lines.join('\n');

@@ -77,15 +77,6 @@ switch:
   #   optimistic: true
   #   restore_mode: RESTORE_DEFAULT_OFF
 
-  # Debug Timing
-  - platform: template
-    name: "Debug Timing"
-    id: ${id_prefix}_debug_timing
-    icon: "mdi:clock-fast"
-    entity_category: diagnostic
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_OFF
-
   # # Enable Flash Calibration
   # - platform: template
   #   name: "Enable Flash Calibration"

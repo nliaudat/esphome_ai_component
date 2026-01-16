@@ -1168,7 +1168,7 @@ bool ImageProcessor::process_raw_zone_to_buffer(
 
     // Apply rotation if needed
     // Apply rotation if needed
-    #ifdef DEV_ENABLE_ROTATION
+    #ifdef USE_CAMERA_ROTATOR
     if (success && needs_rotation) {
         int element_size = (config_.input_type == kInputTypeFloat32) ? sizeof(float) : sizeof(uint8_t);
         int bytes_per_pixel = config_.model_channels * element_size;
