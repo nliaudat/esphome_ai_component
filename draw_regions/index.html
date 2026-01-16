@@ -895,8 +895,8 @@
 
             // Calculate Crop Zones first to populate initial_value
             let raw_crop_zones = [];
-            // Merge digits and dials
-            let all_zones = [...state.digits, ...state.dials];
+            // Merge digits and dials -> ONLY DIGITS for global variable now
+            let all_zones = [...state.digits];
 
             all_zones.forEach(z => {
                 // Calculate Scaled & Relativized Coordinates
@@ -960,10 +960,42 @@
             }
             if (anisotropic) lines.push(`# WARNING: Anisotropic scaling input detected!`);
 
-            // Analog Dials (Partial support in output if desired, currently kept simple as per request)
+            // Analog Dials Generation
             if (state.dials.length > 0) {
                 lines.push(``);
-                lines.push(`# Note: Analog Dials included in globals crop_zones but analog_reader config logic omitted for brevity.`);
+                lines.push(`analog_reader: # DEV !`);
+                lines.push(`  id: \${id_prefix}_analog_reader`);
+                lines.push(`  camera_id: \${id_prefix}_espcam`);
+                // lines.push(`  # validator: \${id_prefix}_analog_validator`);
+                lines.push(`  debug: true`);
+                lines.push(`  value_sensor:`);
+                lines.push(`    name: "Analog Total"`);
+                lines.push(`  update_interval: 60s`);
+                lines.push(`  dials:`);
+
+                state.dials.forEach((d, i) => {
+                     // Calculate Scaled & Relativized Coordinates (Same logic as digits)
+                    let res = calculateZoneCoordinates(d, off_x, off_y, scale_x, scale_y, w, h);
+
+                    // Apply Final Output Scaling
+                    if (use_scaling) {
+                        res.x = Math.round(res.x * final_scale_x);
+                        res.y = Math.round(res.y * final_scale_y);
+                        res.w = Math.round(res.w * final_scale_x);
+                        res.h = Math.round(res.h * final_scale_y);
+                    }
+                    
+                    lines.push(`    - id: dial_${i+1}`);
+                    lines.push(`      scale: 0.1`);
+                    lines.push(`      crop_x: ${res.x}`);
+                    lines.push(`      crop_y: ${res.y}`);
+                    lines.push(`      crop_w: ${res.w}`);
+                    lines.push(`      crop_h: ${res.h}`);
+                    lines.push(`      min_angle: 0`);
+                    lines.push(`      max_angle: 360`);
+                    lines.push(`      min_value: 0`);
+                    lines.push(`      max_value: 10`);
+                });
             }
 
             ta.value = lines.join('\n');
