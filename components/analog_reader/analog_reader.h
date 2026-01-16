@@ -4,7 +4,7 @@
 #include "esphome/components/camera/camera.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/esp32_camera/esp32_camera.h"
-#include "camera_coordinator.h"
+
 #include "flashlight_coordinator.h" 
 #include "value_validator_coordinator.h"
 #include <vector>
@@ -76,7 +76,6 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   void set_pause_processing(bool paused) { paused_ = paused; }
   void set_debug(bool debug) { 
       debug_ = debug; 
-      camera_coord_.set_debug(debug);
       flashlight_coord_.set_debug(debug);
   }
   
@@ -114,7 +113,7 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   // Assuming it's available in include path (it is in same 'components' root usually or library)
   // But wait, ssocr_reader includes "camera_coordinator.h". We need to ensure we can link it.
   // We will add it to __init__.py libraries.
-  CameraCoordinator camera_coord_;
+
   FlashlightCoordinator flashlight_coord_;
   ValueValidatorCoordinator validation_coord_;
 

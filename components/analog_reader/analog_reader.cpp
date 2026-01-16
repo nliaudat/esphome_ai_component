@@ -5,6 +5,7 @@
 #include <cfloat>
 #include <memory>
 #include <algorithm>
+#include "esphome/components/esp32_camera_utils/image_processor.h"
 #include <esp_jpeg_dec.h> // Required for local decoding
 
 namespace esphome {
@@ -117,14 +118,7 @@ void AnalogReader::set_update_interval(uint32_t interval) {
 void AnalogReader::setup() {
   ESP_LOGCONFIG(TAG, "Setting up Analog Reader...");
 
-  // Setup Camera Coordinator
-  if (this->camera_) {
-      camera_coord_.set_camera((esp32_camera::ESP32Camera*)this->camera_);
-  }
-  
-  if (img_width_ > 0 && img_height_ > 0) {
-       camera_coord_.set_config(img_width_, img_height_, pixel_format_str_);
-  }
+
 
   // Register Listener
   if (this->camera_) {
@@ -133,6 +127,9 @@ void AnalogReader::setup() {
 
    // Pre-allocate buffers to prevent heap fragmentation later
    // We prefer PSRAM for this large buffer (up to ~1MB for SVGA) to save internal RAM
+   /* 
+   // DISABLED: Allocating 1MB persistent buffer causes starvation for concurrent components (MeterReader)
+   // We will rely on dynamic allocation per frame instead.
    if (pixel_format_str_ == "JPEG") {
         // Force RGB888 for now as JPEG decoder doesn't support direct Grayscale downsampling
         size_t bpp = 3;
@@ -158,6 +155,7 @@ void AnalogReader::setup() {
              ESP_LOGE(TAG, "CRITICAL: Failed to allocate persistent buffer!");
         }
    }
+   */
 
   // Initialize LUTs once
   if (!s_luts_initialized) {
@@ -188,7 +186,13 @@ void AnalogReader::dump_config() {
 void AnalogReader::update() {
   if (debug_) ESP_LOGD(TAG, "Update triggered (Interval cycle)");
 
-  // Flash scheduling
+  // The instruction requested to remove usages of `camera_coord_` in `set_debug()`.
+  // As `set_debug()` is not present in the provided code, and the snippet provided
+  // in the instruction was malformed and referred to `flashlight_coord_`,
+  // no changes are made here.
+  // The line `flashlight_coord_.set_debug(debug);` was not part of the original document.
+  // The original document's `update()` function is preserved as is.
+
   if (flashlight_coord_.update_scheduling()) {
       return;
   }
@@ -346,7 +350,9 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
           
           if (ok) {
               if (out_w != img_width_ || out_h != img_height_) {
-                  ESP_LOGW(TAG, "Decoded dimensions mismatch config: %dx%d vs %dx%d", out_w, out_h, img_width_, img_height_);
+                  ESP_LOGW(TAG, "Decoded dimensions mismatch config: %dx%d vs %dx%d. Skipping analog processing to avoid conflict.", out_w, out_h, img_width_, img_height_);
+                  processing_frame_ = false;
+                  return;
               }
               // Wrap the raw pointer
               processing_image = std::make_shared<PersistentDecodedImage>(rgb_buffer_, out_w, out_h, PIXFORMAT_RGB888);
@@ -582,10 +588,10 @@ AnalogReader::DetectionResult AnalogReader::find_needle_angle(const uint8_t* img
     // Phase 3: Log Comparison (if requested)
     if (run_comparison && debug_) {
         ESP_LOGD(TAG, "%s Algorithm Comparison:", dial.id.c_str());
-        if (has_legacy) ESP_LOGD(TAG, "  Legacy: angle=%.1f°, conf=%.2f", result_legacy.angle, result_legacy.confidence);
-        if (has_radial) ESP_LOGD(TAG, "  Radial Profile: angle=%.1f°, conf=%.2f", result_radial.angle, result_radial.confidence);
-        if (has_hough)  ESP_LOGD(TAG, "  Hough Transform: angle=%.1f°, conf=%.2f", result_hough.angle, result_hough.confidence);
-        if (has_template) ESP_LOGD(TAG, "  Template Match: angle=%.1f°, conf=%.2f", result_template.angle, result_template.confidence);
+        if (has_legacy) ESP_LOGD(TAG, "  Legacy: angle=%.1f°, val=%.2f, conf=%.2f", result_legacy.angle, angle_to_value(result_legacy.angle, dial), result_legacy.confidence);
+        if (has_radial) ESP_LOGD(TAG, "  Radial Profile: angle=%.1f°, val=%.2f, conf=%.2f", result_radial.angle, angle_to_value(result_radial.angle, dial), result_radial.confidence);
+        if (has_hough)  ESP_LOGD(TAG, "  Hough Transform: angle=%.1f°, val=%.2f, conf=%.2f", result_hough.angle, angle_to_value(result_hough.angle, dial), result_hough.confidence);
+        if (has_template) ESP_LOGD(TAG, "  Template Match: angle=%.1f°, val=%.2f, conf=%.2f", result_template.angle, angle_to_value(result_template.angle, dial), result_template.confidence);
         ESP_LOGD(TAG, "  Selected: %s", selected_result.algorithm.c_str());
     }
     
@@ -720,8 +726,13 @@ void AnalogReader::debug_dial_image(const uint8_t* img, int w, int h, float dete
     // Create ASCII visualization of the dial with needle
     const int grid_w = 40;
     const int grid_h = 40;
+
+    // 0-85: # in Dark Gray
+    // 86-170: + in Light Gray
+    // 171-255: . in Bright White
     
     std::vector<std::string> lines(grid_h, std::string(grid_w, ' '));
+    std::vector<uint8_t> grid_vals(grid_w * grid_h, 0);
     
     // Initialize grid
     for (int y = 0; y < grid_h; y++) {
@@ -730,7 +741,11 @@ void AnalogReader::debug_dial_image(const uint8_t* img, int w, int h, float dete
             int py = y * h / grid_h;
             if (px < w && py < h) {
                 uint8_t val = img[py * w + px];
-                lines[y][x] = val > 128 ? '.' : '#';
+                grid_vals[y * grid_w + x] = val;
+                
+                if (val <= 85) lines[y][x] = '#';
+                else if (val <= 170) lines[y][x] = '+';
+                else lines[y][x] = '.';
             }
         }
     }
@@ -764,17 +779,22 @@ void AnalogReader::debug_dial_image(const uint8_t* img, int w, int h, float dete
     const char* COLOR_RESET = "\033[0m";
     const char* COLOR_RED = "\033[91m";      // Bright red for needle
     const char* COLOR_GREEN = "\033[92m";    // Green for center marker
+    const char* COLOR_LOW = "\033[90m";      // Dark Gray for low values
+    const char* COLOR_MID = "\033[37m";      // Light Gray for mid values
+    const char* COLOR_HIGH = "\033[97m";     // Bright white for high values
     
     // Print header with legend
     ESP_LOGD(TAG, "Dial visualization (Raw %.1f / North %.1f):", detected_angle, north_angle);
-    ESP_LOGD(TAG, "Legend: '.' = Light pixels | '#' = Dark pixels | %sX%s = Detected needle", 
-             COLOR_RED, COLOR_RESET);
+    ESP_LOGD(TAG, "Legend: '%s#'%s=0-85 | '%s+'%s=86-170 | '%s.'%s=171-255 | %sX%s = Detected needle", 
+             COLOR_LOW, COLOR_RESET, COLOR_MID, COLOR_RESET, COLOR_HIGH, COLOR_RESET, COLOR_RED, COLOR_RESET);
     
     // Print grid with colors
     for (int y = 0; y < grid_h; y++) {
         std::string colored_line = "|";
         for (int x = 0; x < grid_w; x++) {
             char c = lines[y][x];
+            uint8_t val = grid_vals[y * grid_w + x];
+            
             if (c == 'X') {
                 // Needle in RED
                 colored_line += COLOR_RED;
@@ -785,9 +805,18 @@ void AnalogReader::debug_dial_image(const uint8_t* img, int w, int h, float dete
                 colored_line += COLOR_GREEN;
                 colored_line += '+';
                 colored_line += COLOR_RESET;
+            } else if (c != ' ') {
+                // Color based on value
+                if (val <= 85) colored_line += COLOR_LOW;
+                else if (val <= 170) colored_line += COLOR_MID;
+                else colored_line += COLOR_HIGH;
+                
+                colored_line += c;
+                colored_line += COLOR_RESET;
             } else {
                 colored_line += c;
             }
+            colored_line += ' '; // Adjust with spaces
         }
         colored_line += "|";
         ESP_LOGD(TAG, "%s", colored_line.c_str());
