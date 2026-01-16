@@ -1503,6 +1503,12 @@ bool ImageProcessor::apply_software_rotation(
     // Delegate to modular Rotator
     return Rotator::perform_rotation(input, output, width, height, bytes_per_pixel, rotation_deg, out_w, out_h);
 #else
+    // Sanity check to prevent infinite loop
+    if (std::isnan(rotation_deg) || std::isinf(rotation_deg)) {
+        ESP_LOGE("ImageProcessor", "Invalid rotation value: %.2f", rotation_deg);
+        return false;
+    }
+
     // Normalize rotation to 0-360 positive
     float rot = rotation_deg;
     while (rot < 0) rot += 360.0f;
