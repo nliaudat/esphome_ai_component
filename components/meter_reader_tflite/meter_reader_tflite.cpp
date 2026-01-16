@@ -11,7 +11,7 @@
 #endif
 
 // Add missing include for DrawingUtils
-#ifndef USE_HOST
+#if !defined(USE_HOST) && defined(USE_CAMERA_DRAWING)
 #include "esphome/components/esp32_camera_utils/drawing_utils.h"
 #endif
 

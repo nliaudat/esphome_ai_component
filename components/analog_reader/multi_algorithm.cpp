@@ -545,7 +545,6 @@ AnalogReader::DetectionResult AnalogReader::detect_template_match(const uint8_t*
     return {refined_angle, confidence, "template_match"};
 }
 
-// FILE CONTINUES - This is multi_algorithm.cpp
 
 AnalogReader::DetectionResult AnalogReader::detect_legacy(const uint8_t* img, int w, int h, const DialConfig& dial) {
     int cx = w / 2;
