@@ -551,20 +551,22 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
   size_t free_spiram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
   size_t free_internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
   
+  // Log memory state for debugging invisible failures
+  ESP_LOGI(TAG, "Image Processing Start. PSRAM Free: %zu KB (Threshold: %zu KB). Format: %s", 
+           free_spiram/1024, SPIRAM_RESERVE_THRESHOLD/1024, config_.pixel_format.c_str());
+
   bool low_memory = false;
   if (free_spiram > 0) {
       // PSRAM available - check if below threshold
       low_memory = (free_spiram < SPIRAM_RESERVE_THRESHOLD);
       if (low_memory) {
-          ESP_LOGW(TAG, "Low PSRAM detected (%zu KB free < %zu KB threshold), using zone-by-zone processing",
-                   free_spiram / 1024, SPIRAM_RESERVE_THRESHOLD / 1024);
+          ESP_LOGW(TAG, "Low PSRAM detected, using zone-by-zone processing");
       }
   } else {
       // No PSRAM - check internal RAM (ESP32 without PSRAM)
       low_memory = (free_internal < INTERNAL_RESERVE_THRESHOLD);
       if (low_memory) {
-          ESP_LOGW(TAG, "Low internal RAM detected (%zu KB free < %zu KB threshold), using zone-by-zone processing",
-                   free_internal / 1024, INTERNAL_RESERVE_THRESHOLD / 1024);
+          ESP_LOGW(TAG, "Low internal RAM detected, using zone-by-zone processing");
       }
   }
   
@@ -1254,6 +1256,7 @@ bool ImageProcessor::process_raw_zone_to_buffer(
                 target_buffer, scale_width, scale_height, config_.model_channels, config_.camera_width);
         }
     } else {
+        ESP_LOGE(TAG, "ProcessRawZone: Unsupported pixel format '%s'", config_.pixel_format.c_str());
         return false;
     }
 
