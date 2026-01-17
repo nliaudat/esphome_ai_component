@@ -175,6 +175,7 @@ ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t* data, s
     size_t out_size = w * h * channels;
     uint8_t* raw_buf = (uint8_t*)jpeg_calloc_align(out_size, 16);
     if (!raw_buf) {
+        ESP_LOGE(TAG, "CRITICAL: Failed to allocate JPEG output buffer (aligned) of size %zu", out_size);
         return nullptr;
     }
     // RAII for buffer
@@ -189,10 +190,12 @@ ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t* data, s
 
     jpeg_dec_header_info_t header_info;
     if (jpeg_dec_parse_header(decoder_handle, &io, &header_info) != JPEG_ERR_OK) {
+        ESP_LOGE(TAG, "JPEG Decode Error: Header parse failed");
         return nullptr;
     }
 
     if (jpeg_dec_process(decoder_handle, &io) != JPEG_ERR_OK) {
+        ESP_LOGE(TAG, "JPEG Decode Error: Process failed");
         return nullptr;
     }
 
@@ -476,7 +479,10 @@ ImageProcessor::UniqueBufferPtr ImageProcessor::allocate_image_buffer(size_t siz
         spiram = false;
     }
     
-    if (!ptr) return nullptr;
+    if (!ptr) {
+        ESP_LOGE(TAG, "CRITICAL: Failed to allocate image buffer of size %zu (Direct & Pool failed)", size);
+        return nullptr;
+    }
     
     // TrackedBuffer(ptr, spiram, jpeg_aligned, pooled, size)
     #ifdef DEBUG_ESP32_CAMERA_UTILS_MEMORY
@@ -605,6 +611,7 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
       master_decoded_buffer = decode_jpeg(jpeg_data, jpeg_size, &dec_w, &dec_h, decode_format, hw_rotation);
       
       if (!master_decoded_buffer) {
+          ESP_LOGE(TAG, "CRITICAL: Image Decoding Failed (Master Buffer). Check heap/format.");
           stats_.jpeg_decoding_errors++;
           stats_.failed_frames++;
           return results;
