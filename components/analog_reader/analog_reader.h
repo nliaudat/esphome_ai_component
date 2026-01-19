@@ -23,6 +23,13 @@ enum NeedleType {
   NEEDLE_TYPE_LIGHT = 1,
 };
 
+enum ProcessChannel {
+  PROCESS_CHANNEL_GRAYSCALE = 0,
+  PROCESS_CHANNEL_RED = 1,
+  PROCESS_CHANNEL_GREEN = 2,
+  PROCESS_CHANNEL_BLUE = 3,
+};
+
 struct DialConfig {
   std::string id;
   NeedleType needle_type{NEEDLE_TYPE_DARK};
@@ -41,6 +48,7 @@ struct DialConfig {
   float contrast{1.0f};      // Multiplier (1.0 = original)
   uint32_t target_color{0};  // RGB hex
   bool use_color{false};
+  ProcessChannel process_channel{PROCESS_CHANNEL_GRAYSCALE};
   // Scan Parameters
   float min_scan_radius{0.3f}; // % of radius (0.0-1.0)
   float max_scan_radius{0.9f}; // % of radius (0.0-1.0)
@@ -140,10 +148,13 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   std::vector<uint8_t> scratch_buffer_;
   std::vector<uint8_t> scratch_buffer_2_; // Second scratch for allocation-free morphology
   
-  // Persistent RGB buffer (Manual allocation for PSRAM control)
-  uint8_t* rgb_buffer_{nullptr};
-  size_t rgb_buffer_size_{0};
+  // Persistent Buffer (Manual allocation for PSRAM control)
+  // Can be RGB888 or GRAYSCALE depending on configuration and available RAM
+  uint8_t* persistent_buffer_{nullptr};
+  size_t persistent_buffer_size_{0};
   bool requires_color_{false};
+  // Store the actual format of the persistent buffer
+  pixformat_t buffer_format_{PIXFORMAT_RGB888};
   
   static float sin_lut_[360];
   static float cos_lut_[360];
