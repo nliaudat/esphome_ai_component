@@ -296,7 +296,7 @@ std::shared_ptr<camera::CameraImage> ImageProcessor::generate_rotated_preview(
          JpegBufferPtr rot_buf = allocate_jpeg_buffer(out_size);
          
          if (rot_buf) {
-            bool rot_success = Rotator::apply_software_rotation(
+            bool rot_success = Rotator::perform_rotation(
                 full_image_buf.get(), rot_buf.get(),
                 dec_w, dec_h, 3,
                 rotation, new_w, new_h
@@ -638,7 +638,7 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
            // Actually decode_jpeg returns a smart pointer compatible with jpeg_free_align.
            uint8_t* raw_rot = (uint8_t*)jpeg_calloc_align(rot_size, 16);
            if (raw_rot) {
-               bool rot_success = Rotator::apply_software_rotation(
+               bool rot_success = Rotator::perform_rotation(
                    master_decoded_buffer.get(), raw_rot,
                    master_width, master_height, master_channels,
                    config_.rotation, rot_w, rot_h
