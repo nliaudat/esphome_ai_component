@@ -81,6 +81,11 @@ inline bool Rotator::perform_rotation(const uint8_t* input, uint8_t* output,
         #endif
     }
 
+    // Sanity check to prevent infinite loop
+    if (!std::isfinite(angle_deg)) {
+        return false;
+    }
+
     // Normalize rotation
     float rot = angle_deg;
     while (rot < 0) rot += 360.0f;

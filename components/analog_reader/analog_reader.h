@@ -4,7 +4,7 @@
 #include "esphome/components/camera/camera.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/esp32_camera/esp32_camera.h"
-#include "camera_coordinator.h"
+
 #include "flashlight_coordinator.h" 
 #include "value_validator_coordinator.h"
 #include <vector>
@@ -21,6 +21,13 @@ extern const float kEdgeWeight;
 enum NeedleType {
   NEEDLE_TYPE_DARK = 0,
   NEEDLE_TYPE_LIGHT = 1,
+};
+
+enum ProcessChannel {
+  PROCESS_CHANNEL_GRAYSCALE = 0,
+  PROCESS_CHANNEL_RED = 1,
+  PROCESS_CHANNEL_GREEN = 2,
+  PROCESS_CHANNEL_BLUE = 3,
 };
 
 struct DialConfig {
@@ -41,6 +48,7 @@ struct DialConfig {
   float contrast{1.0f};      // Multiplier (1.0 = original)
   uint32_t target_color{0};  // RGB hex
   bool use_color{false};
+  ProcessChannel process_channel{PROCESS_CHANNEL_GRAYSCALE};
   // Scan Parameters
   float min_scan_radius{0.3f}; // % of radius (0.0-1.0)
   float max_scan_radius{0.9f}; // % of radius (0.0-1.0)
@@ -76,7 +84,6 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   void set_pause_processing(bool paused) { paused_ = paused; }
   void set_debug(bool debug) { 
       debug_ = debug; 
-      camera_coord_.set_debug(debug);
       flashlight_coord_.set_debug(debug);
   }
   
@@ -114,7 +121,7 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   // Assuming it's available in include path (it is in same 'components' root usually or library)
   // But wait, ssocr_reader includes "camera_coordinator.h". We need to ensure we can link it.
   // We will add it to __init__.py libraries.
-  CameraCoordinator camera_coord_;
+
   FlashlightCoordinator flashlight_coord_;
   ValueValidatorCoordinator validation_coord_;
 
@@ -141,10 +148,13 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   std::vector<uint8_t> scratch_buffer_;
   std::vector<uint8_t> scratch_buffer_2_; // Second scratch for allocation-free morphology
   
-  // Persistent RGB buffer (Manual allocation for PSRAM control)
-  uint8_t* rgb_buffer_{nullptr};
-  size_t rgb_buffer_size_{0};
+  // Persistent Buffer (Manual allocation for PSRAM control)
+  // Can be RGB888 or GRAYSCALE depending on configuration and available RAM
+  uint8_t* persistent_buffer_{nullptr};
+  size_t persistent_buffer_size_{0};
   bool requires_color_{false};
+  // Store the actual format of the persistent buffer
+  pixformat_t buffer_format_{PIXFORMAT_RGB888};
   
   static float sin_lut_[360];
   static float cos_lut_[360];

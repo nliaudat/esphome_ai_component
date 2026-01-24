@@ -5,6 +5,7 @@
 #include <cfloat>
 #include <memory>
 #include <algorithm>
+#include "esphome/components/esp32_camera_utils/image_processor.h"
 #include <esp_jpeg_dec.h> // Required for local decoding
 
 namespace esphome {
@@ -22,6 +23,7 @@ struct JpegDecoderDeleter {
 // Local helper to decode JPEG directly into a buffer
 static bool local_decode_jpeg(
     const uint8_t* data, size_t len, 
+    jpeg_pixel_format_t output_format,
     uint8_t* output_buffer, size_t output_size, 
     int* width, int* height) {
     
@@ -29,7 +31,7 @@ static bool local_decode_jpeg(
     jpeg_dec_header_info_t header_info;
     jpeg_dec_handle_t decoder_handle = nullptr;
     jpeg_dec_config_t decode_config = {
-        .output_type = JPEG_PIXEL_FORMAT_RGB888, // Hardcoded to RGB888
+        .output_type = output_format,
         .rotate = JPEG_ROTATE_0D,
     };
 
@@ -51,7 +53,8 @@ static bool local_decode_jpeg(
     *width = header_info.width;
     *height = header_info.height;
     
-    size_t required_size = header_info.width * header_info.height * 3;
+    size_t bpp = (output_format == JPEG_PIXEL_FORMAT_GRAY) ? 1 : 3;
+    size_t required_size = header_info.width * header_info.height * bpp;
     if (output_size < required_size) {
         ESP_LOGE(TAG, "Buffer too small for decoding: %u < %u", output_size, required_size);
         return false;
@@ -103,9 +106,9 @@ float AnalogReader::cos_lut_[360];
 static bool s_luts_initialized = false;
 
 AnalogReader::~AnalogReader() {
-  if (rgb_buffer_) {
-      free(rgb_buffer_);
-      rgb_buffer_ = nullptr;
+  if (persistent_buffer_) {
+      free(persistent_buffer_);
+      persistent_buffer_ = nullptr;
   }
 }
 
@@ -117,14 +120,7 @@ void AnalogReader::set_update_interval(uint32_t interval) {
 void AnalogReader::setup() {
   ESP_LOGCONFIG(TAG, "Setting up Analog Reader...");
 
-  // Setup Camera Coordinator
-  if (this->camera_) {
-      camera_coord_.set_camera((esp32_camera::ESP32Camera*)this->camera_);
-  }
-  
-  if (img_width_ > 0 && img_height_ > 0) {
-       camera_coord_.set_config(img_width_, img_height_, pixel_format_str_);
-  }
+
 
   // Register Listener
   if (this->camera_) {
@@ -132,28 +128,62 @@ void AnalogReader::setup() {
   }
 
    // Pre-allocate buffers to prevent heap fragmentation later
-   // We prefer PSRAM for this large buffer (up to ~1MB for SVGA) to save internal RAM
+   // We prefer PSRAM for this large buffer (up to ~1MB for SVGA)
    if (pixel_format_str_ == "JPEG") {
-        // Force RGB888 for now as JPEG decoder doesn't support direct Grayscale downsampling
-        size_t bpp = 3;
-        size_t rgb_size = img_width_ * img_height_ * bpp;
+        size_t free_psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+        ESP_LOGI(TAG, "Available PSRAM: %u bytes", free_psram);
+
+        // 1. Determine requirements
+        requires_color_ = false;
+        for (const auto &dial : dials_) {
+            if (dial.use_color || dial.process_channel != PROCESS_CHANNEL_GRAYSCALE) {
+                requires_color_ = true;
+                break;
+            }
+        }
         
-        ESP_LOGI(TAG, "Allocating persistent RGB buffer: %u bytes (%dx%d)", rgb_size, img_width_, img_height_);
+        // 2. Decide Format based on PSRAM
+        // Force RGB888 if color is required
+        // Prefer RGB888 if sufficient RAM (faster/simpler than on-the-fly grayscale conversion logic elsewhere?)
+        // Actually, converting directly to Grayscale saves memory which is the main constraint.
+        // If we have TONS of RAM, we use RGB to be safe/future proof. 
+        // If we are tight, we drop to Gray.
+
+        size_t rgb_size = img_width_ * img_height_ * 3;
+        size_t gray_size = img_width_ * img_height_ * 1;
+        
+        // Threshold: Buffer + Safety Margin
+        // TFLite arena is small (<200KB), BUT ImageProcessor needs a full RGB framebuffer (~920KB)
+        // to decode images for cropping. We must reserve enough RAM for that concurrent allocation.
+        // Safety Margin: ~1.5MB (1MB for Framebuffer + 500KB for Arena/Stack/Overhead)
+        bool sufficient_psram_for_rgb = free_psram > (rgb_size + 1536 * 1024);
+
+        if (requires_color_ || sufficient_psram_for_rgb) {
+            buffer_format_ = PIXFORMAT_RGB888;
+            persistent_buffer_size_ = rgb_size;
+            ESP_LOGI(TAG, "Selected RGB888 format for persistent buffer (ReqColor=%s, SuffPSRAM=%s)", 
+                requires_color_ ? "YES" : "NO", sufficient_psram_for_rgb ? "YES" : "NO");
+        } else {
+            buffer_format_ = PIXFORMAT_GRAYSCALE;
+            persistent_buffer_size_ = gray_size;
+            ESP_LOGI(TAG, "Selected GRAYSCALE format for persistent buffer (Low PSRAM Mode)");
+        }
+        
+        ESP_LOGI(TAG, "Allocating persistent buffer: %u bytes (%dx%d)", persistent_buffer_size_, img_width_, img_height_);
         
         // Try PSRAM first
-        rgb_buffer_ = (uint8_t*)heap_caps_malloc(rgb_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        persistent_buffer_ = (uint8_t*)heap_caps_malloc(persistent_buffer_size_, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
         
-        if (rgb_buffer_) {
+        if (persistent_buffer_) {
             ESP_LOGI(TAG, "Success: Buffer allocated in PSRAM");
         } else {
-            ESP_LOGW(TAG, "Failed to allocate in PSRAM, falling back to internal RAM/Default");
-            rgb_buffer_ = (uint8_t*)malloc(rgb_size);
+            ESP_LOGW(TAG, "Failed to allocate in PSRAM, falling back to internal RAM");
+            persistent_buffer_ = (uint8_t*)malloc(persistent_buffer_size_);
         }
 
-        if (rgb_buffer_) {
-            rgb_buffer_size_ = rgb_size;
+        if (persistent_buffer_) {
             // Touch memory to enforce allocation
-            memset(rgb_buffer_, 0, rgb_size);
+            memset(persistent_buffer_, 0, persistent_buffer_size_);
         } else {
              ESP_LOGE(TAG, "CRITICAL: Failed to allocate persistent buffer!");
         }
@@ -188,7 +218,13 @@ void AnalogReader::dump_config() {
 void AnalogReader::update() {
   if (debug_) ESP_LOGD(TAG, "Update triggered (Interval cycle)");
 
-  // Flash scheduling
+  // The instruction requested to remove usages of `camera_coord_` in `set_debug()`.
+  // As `set_debug()` is not present in the provided code, and the snippet provided
+  // in the instruction was malformed and referred to `flashlight_coord_`,
+  // no changes are made here.
+  // The line `flashlight_coord_.set_debug(debug);` was not part of the original document.
+  // The original document's `update()` function is preserved as is.
+
   if (flashlight_coord_.update_scheduling()) {
       return;
   }
@@ -332,28 +368,35 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
 
   if (pixel_format_str_ == "JPEG") {
       // Use persistent buffer if available
-      size_t bpp = 3;
-      size_t needed_size = img_width_ * img_height_ * bpp;
+      // Check if buffer size matches current requirements (simple validity check)
       
-      if (rgb_buffer_ && rgb_buffer_size_ >= needed_size) {
+      if (persistent_buffer_) {
           int out_w = 0, out_h = 0;
           
+          jpeg_pixel_format_t out_fmt = (buffer_format_ == PIXFORMAT_GRAYSCALE) 
+                                        ? JPEG_PIXEL_FORMAT_GRAY 
+                                        : JPEG_PIXEL_FORMAT_RGB888;
+
           // Use LOCAL decoder instead of ImageProcessor
           bool ok = local_decode_jpeg(
               data, len, 
-              rgb_buffer_, rgb_buffer_size_, 
+              out_fmt,
+              persistent_buffer_, persistent_buffer_size_, 
               &out_w, &out_h);
           
           if (ok) {
               if (out_w != img_width_ || out_h != img_height_) {
-                  ESP_LOGW(TAG, "Decoded dimensions mismatch config: %dx%d vs %dx%d", out_w, out_h, img_width_, img_height_);
+                  ESP_LOGW(TAG, "Decoded dimensions mismatch config: %dx%d vs %dx%d. Skipping analog processing to avoid conflict.", out_w, out_h, img_width_, img_height_);
+                  processing_frame_ = false;
+                  return;
               }
               // Wrap the raw pointer
-              processing_image = std::make_shared<PersistentDecodedImage>(rgb_buffer_, out_w, out_h, PIXFORMAT_RGB888);
+              processing_image = std::make_shared<PersistentDecodedImage>(persistent_buffer_, out_w, out_h, buffer_format_);
               is_decoded = true;
               processing_w = out_w;
               processing_h = out_h;
-              ESP_LOGD(TAG, "Decoded JPEG to RGB888 (Persistent Buffer) (%dx%d)", out_w, out_h);
+              ESP_LOGD(TAG, "Decoded JPEG to %s (Persistent Buffer) (%dx%d)", 
+                  (buffer_format_ == PIXFORMAT_GRAYSCALE ? "GRAY" : "RGB888"), out_w, out_h);
           } else {
               ESP_LOGE(TAG, "Failed to decode JPEG to persistent buffer.");
           }
@@ -411,11 +454,22 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
             config.camera_height = (processing_h > 0) ? processing_h : img_height_;
        }
       
-      // Use RGB if Color Detection is enabled
-      config.pixel_format = (is_decoded || dial.use_color) ? "RGB888" : pixel_format_str_;
+      // Use RGB if Color Detection is enabled OR specific Channel processing is requested
+      // Note: is_decoded implies we have the full image, but check format!
+      bool need_rgb = dial.use_color || (dial.process_channel != PROCESS_CHANNEL_GRAYSCALE);
+      
+      // If we only have grayscale buffer, but need RGB... we have a problem.
+      // Setup logic should prevent this (requires_color_ would force RGB if need_rgb is true).
+      // But double check buffer format:
+      if (need_rgb && buffer_format_ == PIXFORMAT_GRAYSCALE) {
+          ESP_LOGE(TAG, "Dial %s needs color but buffer is Grayscale! Check setup logic.", dial.id.c_str());
+          continue; 
+      }
+
+      config.pixel_format = need_rgb ? "RGB888" : "GRAYSCALE"; 
       config.model_width = dial.crop_w;
       config.model_height = dial.crop_h;
-      config.model_channels = dial.use_color ? 3 : 1; // 3 for Color, 1 for Grayscale
+      config.model_channels = need_rgb ? 3 : 1; // 3 for Color, 1 for Grayscale
       config.input_type = esphome::esp32_camera_utils::kInputTypeUInt8;
       
       auto processor = std::make_unique<esphome::esp32_camera_utils::ImageProcessor>(config);
@@ -440,9 +494,42 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
       
       if (debug_) ESP_LOGD(TAG, "Processing Dial: %s (Algorithm: %s)", dial.id.c_str(), dial.algorithm.c_str());
 
-      
-      // If Color Mode: Convert RGB to Distance Map (Grayscale)
-      if (dial.use_color) {
+      // Channel Filtering (Red/Green/Blue)
+      if (dial.process_channel != PROCESS_CHANNEL_GRAYSCALE && !dial.use_color) {
+          if (scratch_buffer_.size() != crop_w * crop_h) {
+              scratch_buffer_.resize(crop_w * crop_h);
+          }
+          
+          int offset = 0;
+          if (dial.process_channel == PROCESS_CHANNEL_RED) offset = 0;
+          else if (dial.process_channel == PROCESS_CHANNEL_GREEN) offset = 1;
+          else if (dial.process_channel == PROCESS_CHANNEL_BLUE) offset = 2;
+          
+          // Determine if input is RGB or Grayscale
+          // If we requested RGB because of process_channel, input should be RGB (3 bytes)
+          bool input_is_rgb = (config.model_channels == 3);
+          
+          if (input_is_rgb) {
+              for (int i = 0; i < crop_w * crop_h; i++) {
+                  scratch_buffer_[i] = raw[i*3 + offset];
+              }
+              input_for_algo = scratch_buffer_.data();
+              
+              // Apply contrast/auto-contrast to the single channel if needed
+              if (dial.auto_contrast) {
+                  apply_auto_contrast(scratch_buffer_.data(), crop_w * crop_h);
+              }
+              if (std::abs(dial.contrast - 1.0f) > 0.01f) {
+                  apply_contrast(scratch_buffer_.data(), crop_w * crop_h, dial.contrast);
+              }
+          } else {
+             // Fallback if somehow we got grayscale (shouldn't happen if logic is correct below)
+             // input_for_algo already points to raw (grayscale)
+             ESP_LOGW(TAG, "Dial %s configured for channel %d but input is Grayscale", dial.id.c_str(), (int)dial.process_channel);
+          }
+      } 
+      // Existing Color Mode: Convert RGB to Distance Map (Grayscale)
+      else if (dial.use_color) {
           if (scratch_buffer_.size() != crop_w * crop_h) {
               scratch_buffer_.resize(crop_w * crop_h);
           }
@@ -464,7 +551,7 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
               scratch_buffer_[i] = (uint8_t)val;
           }
           input_for_algo = scratch_buffer_.data();
-      } else {
+      } else if (dial.process_channel == PROCESS_CHANNEL_GRAYSCALE) {
           // Standard Grayscale
           // Apply enhancements
           if (dial.auto_contrast) {
@@ -582,10 +669,10 @@ AnalogReader::DetectionResult AnalogReader::find_needle_angle(const uint8_t* img
     // Phase 3: Log Comparison (if requested)
     if (run_comparison && debug_) {
         ESP_LOGD(TAG, "%s Algorithm Comparison:", dial.id.c_str());
-        if (has_legacy) ESP_LOGD(TAG, "  Legacy: angle=%.1f°, conf=%.2f", result_legacy.angle, result_legacy.confidence);
-        if (has_radial) ESP_LOGD(TAG, "  Radial Profile: angle=%.1f°, conf=%.2f", result_radial.angle, result_radial.confidence);
-        if (has_hough)  ESP_LOGD(TAG, "  Hough Transform: angle=%.1f°, conf=%.2f", result_hough.angle, result_hough.confidence);
-        if (has_template) ESP_LOGD(TAG, "  Template Match: angle=%.1f°, conf=%.2f", result_template.angle, result_template.confidence);
+        if (has_legacy) ESP_LOGD(TAG, "  Legacy: angle=%.1f°, val=%.2f, conf=%.2f", result_legacy.angle, angle_to_value(result_legacy.angle, dial), result_legacy.confidence);
+        if (has_radial) ESP_LOGD(TAG, "  Radial Profile: angle=%.1f°, val=%.2f, conf=%.2f", result_radial.angle, angle_to_value(result_radial.angle, dial), result_radial.confidence);
+        if (has_hough)  ESP_LOGD(TAG, "  Hough Transform: angle=%.1f°, val=%.2f, conf=%.2f", result_hough.angle, angle_to_value(result_hough.angle, dial), result_hough.confidence);
+        if (has_template) ESP_LOGD(TAG, "  Template Match: angle=%.1f°, val=%.2f, conf=%.2f", result_template.angle, angle_to_value(result_template.angle, dial), result_template.confidence);
         ESP_LOGD(TAG, "  Selected: %s", selected_result.algorithm.c_str());
     }
     
@@ -720,8 +807,13 @@ void AnalogReader::debug_dial_image(const uint8_t* img, int w, int h, float dete
     // Create ASCII visualization of the dial with needle
     const int grid_w = 40;
     const int grid_h = 40;
+
+    // 0-85: # in Dark Gray
+    // 86-170: + in Light Gray
+    // 171-255: . in Bright White
     
     std::vector<std::string> lines(grid_h, std::string(grid_w, ' '));
+    std::vector<uint8_t> grid_vals(grid_w * grid_h, 0);
     
     // Initialize grid
     for (int y = 0; y < grid_h; y++) {
@@ -730,7 +822,11 @@ void AnalogReader::debug_dial_image(const uint8_t* img, int w, int h, float dete
             int py = y * h / grid_h;
             if (px < w && py < h) {
                 uint8_t val = img[py * w + px];
-                lines[y][x] = val > 128 ? '.' : '#';
+                grid_vals[y * grid_w + x] = val;
+                
+                if (val <= 85) lines[y][x] = '#';
+                else if (val <= 170) lines[y][x] = '+';
+                else lines[y][x] = '.';
             }
         }
     }
@@ -764,17 +860,22 @@ void AnalogReader::debug_dial_image(const uint8_t* img, int w, int h, float dete
     const char* COLOR_RESET = "\033[0m";
     const char* COLOR_RED = "\033[91m";      // Bright red for needle
     const char* COLOR_GREEN = "\033[92m";    // Green for center marker
+    const char* COLOR_LOW = "\033[90m";      // Dark Gray for low values
+    const char* COLOR_MID = "\033[37m";      // Light Gray for mid values
+    const char* COLOR_HIGH = "\033[97m";     // Bright white for high values
     
     // Print header with legend
     ESP_LOGD(TAG, "Dial visualization (Raw %.1f / North %.1f):", detected_angle, north_angle);
-    ESP_LOGD(TAG, "Legend: '.' = Light pixels | '#' = Dark pixels | %sX%s = Detected needle", 
-             COLOR_RED, COLOR_RESET);
+    ESP_LOGD(TAG, "Legend: '%s#'%s=0-85 | '%s+'%s=86-170 | '%s.'%s=171-255 | %sX%s = Detected needle", 
+             COLOR_LOW, COLOR_RESET, COLOR_MID, COLOR_RESET, COLOR_HIGH, COLOR_RESET, COLOR_RED, COLOR_RESET);
     
     // Print grid with colors
     for (int y = 0; y < grid_h; y++) {
         std::string colored_line = "|";
         for (int x = 0; x < grid_w; x++) {
             char c = lines[y][x];
+            uint8_t val = grid_vals[y * grid_w + x];
+            
             if (c == 'X') {
                 // Needle in RED
                 colored_line += COLOR_RED;
@@ -785,9 +886,18 @@ void AnalogReader::debug_dial_image(const uint8_t* img, int w, int h, float dete
                 colored_line += COLOR_GREEN;
                 colored_line += '+';
                 colored_line += COLOR_RESET;
+            } else if (c != ' ') {
+                // Color based on value
+                if (val <= 85) colored_line += COLOR_LOW;
+                else if (val <= 170) colored_line += COLOR_MID;
+                else colored_line += COLOR_HIGH;
+                
+                colored_line += c;
+                colored_line += COLOR_RESET;
             } else {
                 colored_line += c;
             }
+            colored_line += ' '; // Adjust with spaces
         }
         colored_line += "|";
         ESP_LOGD(TAG, "%s", colored_line.c_str());

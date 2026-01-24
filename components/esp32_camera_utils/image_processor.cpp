@@ -128,7 +128,7 @@ bool ImageProcessor::get_jpeg_dimensions(const uint8_t *data, size_t len, int &w
 }
 
 
-ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t* data, size_t len, int* width, int* height, jpeg_pixel_format_t output_format) {
+ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t* data, size_t len, int* width, int* height, jpeg_pixel_format_t output_format, jpeg_rotate_t rotate) {
     if (!data || len == 0) return nullptr;
 
     int w, h;
@@ -138,13 +138,18 @@ ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t* data, s
     if (width) *width = w;
     if (height) *height = h;
 
+    if (rotate == JPEG_ROTATE_90D || rotate == JPEG_ROTATE_270D) {
+        if (width) *width = h;
+        if (height) *height = w;
+    }
+
     jpeg_dec_config_t decode_config = DEFAULT_JPEG_DEC_CONFIG();
     decode_config.output_type = output_format;
     decode_config.scale.width = w;
     decode_config.scale.height = h;
     decode_config.clipper.width = w;
     decode_config.clipper.height = h;
-    decode_config.rotate = JPEG_ROTATE_0D;
+    decode_config.rotate = rotate;
     decode_config.block_enable = false;
 
     jpeg_dec_handle_t decoder_handle = nullptr;
@@ -170,6 +175,7 @@ ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t* data, s
     size_t out_size = w * h * channels;
     uint8_t* raw_buf = (uint8_t*)jpeg_calloc_align(out_size, 16);
     if (!raw_buf) {
+        ESP_LOGE(TAG, "CRITICAL: Failed to allocate JPEG output buffer (aligned) of size %zu", out_size);
         return nullptr;
     }
     // RAII for buffer
@@ -184,10 +190,12 @@ ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t* data, s
 
     jpeg_dec_header_info_t header_info;
     if (jpeg_dec_parse_header(decoder_handle, &io, &header_info) != JPEG_ERR_OK) {
+        ESP_LOGE(TAG, "JPEG Decode Error: Header parse failed");
         return nullptr;
     }
 
     if (jpeg_dec_process(decoder_handle, &io) != JPEG_ERR_OK) {
+        ESP_LOGE(TAG, "JPEG Decode Error: Process failed");
         return nullptr;
     }
 
@@ -236,55 +244,87 @@ std::shared_ptr<camera::CameraImage> ImageProcessor::generate_rotated_preview(
     
     if (!source) return nullptr;
 
-    const uint8_t *data = source->get_data_buffer();
-    size_t len = source->get_data_length();
+    const uint8_t *jpeg_data = source->get_data_buffer();
+    size_t jpeg_size = source->get_data_length();
     
     // 1. Determine dimensions (prefer JPEG header)
     int src_w = width; 
     int src_h = height; 
     int jpeg_w, jpeg_h;
-    if (get_jpeg_dimensions(data, len, jpeg_w, jpeg_h)) {
+    if (get_jpeg_dimensions(jpeg_data, jpeg_size, jpeg_w, jpeg_h)) {
         src_w = jpeg_w;
         src_h = jpeg_h;
     } 
 
-    // 2. Decode JPEG to RGB888
+    // 2. Determine Rotation Optimization
+    // Check for standard angles to use decoder rotation (Hardware/Optimized)
+    jpeg_rotate_t hw_rotation = JPEG_ROTATE_0D;
+    bool software_rotation_needed = false;
+    
+    float rot = rotation;
+    while (rot < 0) rot += 360.0f;
+    while (rot >= 360.0f) rot -= 360.0f;
+    
+    if (std::abs(rot) < 0.1f) {
+         hw_rotation = JPEG_ROTATE_0D;
+    } else if (std::abs(rot - 90.0f) < 0.1f) {
+         hw_rotation = JPEG_ROTATE_90D;
+    } else if (std::abs(rot - 180.0f) < 0.1f) {
+         hw_rotation = JPEG_ROTATE_180D;
+    } else if (std::abs(rot - 270.0f) < 0.1f) {
+         hw_rotation = JPEG_ROTATE_270D;
+    } else {
+         software_rotation_needed = true;
+    }
+
+    // 3. Decode with optimization
     int dec_w = 0, dec_h = 0;
-    JpegBufferPtr rgb_data = decode_jpeg(data, len, &dec_w, &dec_h, JPEG_PIXEL_FORMAT_RGB888);
-    if (!rgb_data) {
-        // Fallback: If not JPEG or decode failed, we can't process
-        ESP_LOGW(TAG, "Preview: Failed to decode input image (requires JPEG)");
+    // We use RGB888 for preview
+    JpegBufferPtr full_image_buf = decode_jpeg(jpeg_data, jpeg_size, &dec_w, &dec_h, JPEG_PIXEL_FORMAT_RGB888, hw_rotation);
+    if (!full_image_buf) {
+        ESP_LOGW(TAG, "Preview: Failed to decode input image");
         return nullptr;
     }
     
-    // 3. Calculate new dimensions and allocate output
-    int new_w, new_h;
-    Rotator::get_rotated_dimensions(dec_w, dec_h, rotation, new_w, new_h);
+    // 4. Handle Software Rotation if needed
+    if (software_rotation_needed && std::abs(rotation) > 0.01f) {
+         // Calculate new dimensions
+         int new_w = 0, new_h = 0;
+         Rotator::get_rotated_dimensions(dec_w, dec_h, rotation, new_w, new_h);
+         
+         size_t out_size = new_w * new_h * 3;
+         JpegBufferPtr rot_buf = allocate_jpeg_buffer(out_size);
+         
+         if (rot_buf) {
+            bool rot_success = Rotator::perform_rotation(
+                full_image_buf.get(), rot_buf.get(),
+                dec_w, dec_h, 3,
+                rotation, new_w, new_h
+            );
+            
+             if (rot_success) {
+                 full_image_buf = std::move(rot_buf);
+                 dec_w = new_w;
+                 dec_h = new_h;
+             } else {
+                  ESP_LOGE(TAG, "Preview: Zone rotation failed");
+                  return nullptr;
+             }
+         } else {
+              ESP_LOGE(TAG, "Preview: Zone rotation malloc failed");
+              return nullptr;
+         }
+    }
 
-    size_t out_size = new_w * new_h * 3;
+    // 5. Wrap in RotatedPreviewImage (Copy to TrackedBuffer)
+    size_t out_size = dec_w * dec_h * 3;
     UniqueBufferPtr out_buffer = allocate_image_buffer(out_size);
+    if (!out_buffer) return nullptr;
+    memcpy(out_buffer->get(), full_image_buf.get(), out_size);
     
-    if (!out_buffer) {
-        ESP_LOGE(TAG, "Preview: Failed to allocate output buffer (%zu bytes)", out_size);
-        return nullptr;
-    }
-
-    // 4. Rotate
-    // Fix: perform_rotation takes output dims as input args, they are not output references to be filled.
-    // Use the calculating new_w/new_h from step 3.
-    bool success = Rotator::perform_rotation(rgb_data.get(), out_buffer->get(), 
-                                         dec_w, dec_h, 3, 
-                                         rotation, new_w, new_h);
-    
-    if (!success) {
-        ESP_LOGW(TAG, "Preview: Rotation failed");
-        return nullptr;
-    }
-
-    // 5. Return wrapped result
     return std::shared_ptr<RotatedPreviewImage>(new RotatedPreviewImage(
         std::move(out_buffer), out_size,
-        new_w, new_h,
+        dec_w, dec_h,
         PIXFORMAT_RGB888
     ));
 }
@@ -439,7 +479,10 @@ ImageProcessor::UniqueBufferPtr ImageProcessor::allocate_image_buffer(size_t siz
         spiram = false;
     }
     
-    if (!ptr) return nullptr;
+    if (!ptr) {
+        ESP_LOGE(TAG, "CRITICAL: Failed to allocate image buffer of size %zu (Direct & Pool failed)", size);
+        return nullptr;
+    }
     
     // TrackedBuffer(ptr, spiram, jpeg_aligned, pooled, size)
     #ifdef DEBUG_ESP32_CAMERA_UTILS_MEMORY
@@ -508,20 +551,22 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
   size_t free_spiram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
   size_t free_internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
   
+  // Log memory state for debugging invisible failures
+  ESP_LOGI(TAG, "Image Processing Start. PSRAM Free: %zu KB (Threshold: %zu KB). Format: %s", 
+           free_spiram/1024, SPIRAM_RESERVE_THRESHOLD/1024, config_.pixel_format.c_str());
+
   bool low_memory = false;
   if (free_spiram > 0) {
       // PSRAM available - check if below threshold
       low_memory = (free_spiram < SPIRAM_RESERVE_THRESHOLD);
       if (low_memory) {
-          ESP_LOGW(TAG, "Low PSRAM detected (%zu KB free < %zu KB threshold), using zone-by-zone processing",
-                   free_spiram / 1024, SPIRAM_RESERVE_THRESHOLD / 1024);
+          ESP_LOGW(TAG, "Low PSRAM detected, using zone-by-zone processing");
       }
   } else {
       // No PSRAM - check internal RAM (ESP32 without PSRAM)
       low_memory = (free_internal < INTERNAL_RESERVE_THRESHOLD);
       if (low_memory) {
-          ESP_LOGW(TAG, "Low internal RAM detected (%zu KB free < %zu KB threshold), using zone-by-zone processing",
-                   free_internal / 1024, INTERNAL_RESERVE_THRESHOLD / 1024);
+          ESP_LOGW(TAG, "Low internal RAM detected, using zone-by-zone processing");
       }
   }
   
@@ -533,7 +578,7 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
       const uint8_t *jpeg_data = image->get_data_buffer();
       size_t jpeg_size = image->get_data_length();
 
-      // 1. Determine format
+      // 1. Determine format and rotation optimization
       jpeg_pixel_format_t decode_format = JPEG_PIXEL_FORMAT_RGB888;
       int decode_channels = 3;
       if (config_.pixel_format == "GRAYSCALE") {
@@ -541,10 +586,34 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
           decode_channels = 1;
       }
       
-      // 2. Decode
+      // Check for standard angles to use decoder rotation (Hardware/Optimized)
+      jpeg_rotate_t hw_rotation = JPEG_ROTATE_0D;
+      bool software_rotation_needed = false;
+      
+      // Normalize rotation for check
+      float rot = config_.rotation;
+      while (rot < 0) rot += 360.0f;
+      while (rot >= 360.0f) rot -= 360.0f;
+      
+      if (std::abs(rot) < 0.1f) {
+           hw_rotation = JPEG_ROTATE_0D;
+      } else if (std::abs(rot - 90.0f) < 0.1f) {
+           hw_rotation = JPEG_ROTATE_90D;
+      } else if (std::abs(rot - 180.0f) < 0.1f) {
+           hw_rotation = JPEG_ROTATE_180D;
+      } else if (std::abs(rot - 270.0f) < 0.1f) {
+           hw_rotation = JPEG_ROTATE_270D;
+      } else {
+           // arbitrary angle, use software rotation
+           software_rotation_needed = true;
+      }
+      
+      // 2. Decode (with optional rotation)
       int dec_w = 0, dec_h = 0;
-      master_decoded_buffer = decode_jpeg(jpeg_data, jpeg_size, &dec_w, &dec_h, decode_format);
+      master_decoded_buffer = decode_jpeg(jpeg_data, jpeg_size, &dec_w, &dec_h, decode_format, hw_rotation);
+      
       if (!master_decoded_buffer) {
+          ESP_LOGE(TAG, "CRITICAL: Image Decoding Failed (Master Buffer). Check heap/format.");
           stats_.jpeg_decoding_errors++;
           stats_.failed_frames++;
           return results;
@@ -553,9 +622,10 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
       master_height = dec_h;
       master_channels = decode_channels;
 
-      // 3. Rotate Master if needed
+      // 3. Rotate Master if needed (Software fallback for fine angles)
       #ifdef USE_CAMERA_ROTATOR
-      if (std::abs(config_.rotation) > 0.01f) {
+      if (software_rotation_needed && std::abs(config_.rotation) > 0.01f) {
+           // ... (Existing software rotation logic) ...
            float rads = config_.rotation * M_PI / 180.0f;
            float abs_cos = std::abs(std::cos(rads));
            float abs_sin = std::abs(std::sin(rads));
@@ -591,7 +661,6 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
                return results;
            }
       }
-
       #endif
   }
 
@@ -864,7 +933,30 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
     }
 
     int dec_w = 0, dec_h = 0;
-    JpegBufferPtr full_image_buf = decode_jpeg(jpeg_data, jpeg_size, &dec_w, &dec_h, decode_format);
+    
+    // Determine Rotation Optimization
+    // Check for standard angles to use decoder rotation (Hardware/Optimized)
+    jpeg_rotate_t hw_rotation = JPEG_ROTATE_0D;
+    bool software_rotation_needed = false;
+    
+    // Normalize rotation for check
+    float rot = config_.rotation;
+    while (rot < 0) rot += 360.0f;
+    while (rot >= 360.0f) rot -= 360.0f;
+    
+    if (std::abs(rot) < 0.1f) {
+         hw_rotation = JPEG_ROTATE_0D;
+    } else if (std::abs(rot - 90.0f) < 0.1f) {
+         hw_rotation = JPEG_ROTATE_90D;
+    } else if (std::abs(rot - 180.0f) < 0.1f) {
+         hw_rotation = JPEG_ROTATE_180D;
+    } else if (std::abs(rot - 270.0f) < 0.1f) {
+         hw_rotation = JPEG_ROTATE_270D;
+    } else {
+         software_rotation_needed = true;
+    }
+
+    JpegBufferPtr full_image_buf = decode_jpeg(jpeg_data, jpeg_size, &dec_w, &dec_h, decode_format, hw_rotation);
     
     if (!full_image_buf) {
         stats_.jpeg_decoding_errors++;
@@ -879,6 +971,7 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
     int crop_height = zone.y2 - zone.y1;
 
     // Validate zone against ACTUAL image dimensions
+    // Note: If rotated, dimensions are already swapped by decode_jpeg if needed.
     if (zone.x1 < 0 || zone.y1 < 0 || 
         zone.x2 > jpeg_width || zone.y2 > jpeg_height) {
         ESP_LOGE(TAG, "Crop zone (%d,%d -> %d,%d) out of bounds for actual image (%dx%d) - Config: %dx%d",
@@ -894,7 +987,7 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
     UniqueBufferPtr rotated_buffer_storage;
 
     #ifdef USE_CAMERA_ROTATOR
-    if (std::abs(config_.rotation) > 0.01f) {
+    if (software_rotation_needed && std::abs(config_.rotation) > 0.01f) {
         
         // Allocate buffer for rotated image with new bounding box
         int out_w = 0, out_h = 0;
@@ -1163,6 +1256,7 @@ bool ImageProcessor::process_raw_zone_to_buffer(
                 target_buffer, scale_width, scale_height, config_.model_channels, config_.camera_width);
         }
     } else {
+        ESP_LOGE(TAG, "ProcessRawZone: Unsupported pixel format '%s'", config_.pixel_format.c_str());
         return false;
     }
 
@@ -1504,7 +1598,7 @@ bool ImageProcessor::apply_software_rotation(
     return Rotator::perform_rotation(input, output, width, height, bytes_per_pixel, rotation_deg, out_w, out_h);
 #else
     // Sanity check to prevent infinite loop
-    if (std::isnan(rotation_deg) || std::isinf(rotation_deg)) {
+    if (!std::isfinite(rotation_deg)) {
         ESP_LOGE("ImageProcessor", "Invalid rotation value: %.2f", rotation_deg);
         return false;
     }

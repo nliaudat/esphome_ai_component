@@ -79,6 +79,7 @@ static size_t calculate_optimal_pool_size() {
 }
 
 static InferenceJob* allocate_inference_job() {
+  // ESP_LOGD(TAG, "Allocating InferenceJob..."); 
   for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
     if (!inference_job_used[i]) {
       inference_job_used[i] = true;
@@ -86,6 +87,7 @@ static InferenceJob* allocate_inference_job() {
       inference_job_pool[i].crops.clear();
       inference_job_pool[i].start_time = 0;
       pool_job_hits++;
+      // ESP_LOGD(TAG, "Allocated from pool (index %d)", i);
       return &inference_job_pool[i];
     }
   }
@@ -96,6 +98,7 @@ static InferenceJob* allocate_inference_job() {
     ESP_LOGW(TAG, "InferenceJob pool exhausted (efficiency: %.1f%%) – allocating on heap",
              100.0f * pool_job_hits / total);
   }
+  ESP_LOGI(TAG, "Pool exhausted. Allocating new InferenceJob on heap.");
   return new InferenceJob();
 }
 
@@ -238,12 +241,20 @@ void MeterReaderTFLite::setup() {
               config.model_height = spec.input_height;
               config.model_channels = spec.input_channels;
               
+              // Fix: Pass rotation as-is to support "fine rotation" (software)
+              config.rotation = rotation_;
+              
+              // Helper: The underlying ImageProcessor/Rotator will handle 
+              // 90/180/270 efficient paths or arbitrary software rotation.
+              
+              /* 
               switch(static_cast<int>(rotation_)) {
                   case 90:  config.rotation = esp32_camera_utils::ROTATION_90;  break;
                   case 180: config.rotation = esp32_camera_utils::ROTATION_180; break;
                   case 270: config.rotation = esp32_camera_utils::ROTATION_270; break;
                   default:  config.rotation = esp32_camera_utils::ROTATION_0;   break;
               }
+              */
               
               config.input_type = static_cast<esp32_camera_utils::ImageProcessorInputType>(processor_input_type);
               config.normalize = spec.normalize;
@@ -748,9 +759,13 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     }
     #endif
     
+    ESP_LOGI(TAG, "Processed Buffers Size: %d", processed_buffers.size());
+
     #ifdef SUPPORT_DOUBLE_BUFFERING
+    ESP_LOGI(TAG, "Double Buffering IS ENABLED. Entering Async Path.");
     // Async Path
     if (processed_buffers.empty()) {
+        ESP_LOGW(TAG, "Processed buffers empty. Skipping inference (Async).");
         processing_frame_ = false;
         return;
     }
@@ -762,23 +777,29 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     }
     
     InferenceJob* job = allocate_inference_job();
+    ESP_LOGI(TAG, "Allocated InferenceJob. Assigning resources...");
+
     job->frame = frame; // Keep alive
     job->crops = std::move(processed_buffers);
     // Use the start_time from METER_DURATION_START (defined at start of function)
     job->start_time = start_time; 
     
-    ESP_LOGD(TAG, "Preprocessing took %u ms", millis() - start_time);
+    ESP_LOGI(TAG, "Job prepared. Enqueuing... (Preprocessing took %u ms)", millis() - start_time);
 
     if (xQueueSend(input_queue_, &job, 0) != pdTRUE) {
         ESP_LOGW(TAG, "Inference Queue Full - Dropping Frame");
         free_inference_job(job);
         processing_frame_ = false;
+    } else {
+        ESP_LOGI(TAG, "Job successfully enqueued.");
     }
     // Return immediately, loop() will handle result
     return;
+
     #endif
     
     // Buffers -> Inference (Synchronous Fallback)
+    ESP_LOGI(TAG, "Entering Synchronous Inference Path (Single Core Fallback)");
     
     // Buffers -> Inference
     
@@ -800,7 +821,9 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
         return;
     }
 
+    ESP_LOGI(TAG, "Context: %d buffers ready. Running synchronous inference...", processed_buffers.size());
     auto results = tflite_coord_.run_inference(processed_buffers);
+    ESP_LOGI(TAG, "Synchronous inference complete. Results: %d", results.size());
     
     #ifdef DEBUG_METER_READER_MEMORY
     if (debug_memory_enabled_ && tensor_arena_used_sensor_) {

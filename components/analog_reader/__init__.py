@@ -48,12 +48,23 @@ CONF_RAW = "raw"
 CONF_MAPPED = "mapped"
 CONF_MIN_SCAN_RADIUS = "min_scan_radius"
 CONF_MAX_SCAN_RADIUS = "max_scan_radius"
+CONF_PROCESS_CHANNEL = "process_channel"
+CONF_CHANNEL_GRAYSCALE = "GRAYSCALE"
+CONF_CHANNEL_RED = "RED"
+CONF_CHANNEL_GREEN = "GREEN"
+CONF_CHANNEL_BLUE = "BLUE"
 
 DIAL_SCHEMA = cv.Schema({
     cv.Required(CONF_ID): cv.string, # String ID for logs
     cv.Optional(CONF_NEEDLE_TYPE, default=CONF_TYPE_DARK): cv.enum({
         CONF_TYPE_DARK: analog_reader_ns.enum("NEEDLE_TYPE_DARK"),
         CONF_TYPE_LIGHT: analog_reader_ns.enum("NEEDLE_TYPE_LIGHT"),
+    }),
+    cv.Optional(CONF_PROCESS_CHANNEL, default=CONF_CHANNEL_GRAYSCALE): cv.enum({
+        CONF_CHANNEL_GRAYSCALE: analog_reader_ns.enum("PROCESS_CHANNEL_GRAYSCALE"),
+        CONF_CHANNEL_RED: analog_reader_ns.enum("PROCESS_CHANNEL_RED"),
+        CONF_CHANNEL_GREEN: analog_reader_ns.enum("PROCESS_CHANNEL_GREEN"),
+        CONF_CHANNEL_BLUE: analog_reader_ns.enum("PROCESS_CHANNEL_BLUE"),
     }),
     cv.Optional(CONF_ALGORITHM, default=CONF_ALGO_RADIAL): cv.one_of(
         CONF_ALGO_LEGACY, CONF_ALGO_RADIAL, CONF_ALGO_HOUGH, CONF_ALGO_TEMPLATE, CONF_ALGO_AUTO, lower=True
@@ -149,6 +160,7 @@ async def to_code(config):
             ("contrast", dial[CONF_CONTRAST]),
             ("target_color", dial.get("target_color", 0)),
             ("use_color", "target_color" in dial),
+            ("process_channel", dial[CONF_PROCESS_CHANNEL]),
             ("min_scan_radius", dial[CONF_MIN_SCAN_RADIUS]),
             ("max_scan_radius", dial[CONF_MAX_SCAN_RADIUS]),
             ("value_sensor", await sensor.new_sensor(dial[CONF_VALUE]) if CONF_VALUE in dial else None),

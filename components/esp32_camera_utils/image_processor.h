@@ -327,7 +327,7 @@ public:
   using JpegBufferPtr = std::unique_ptr<uint8_t[], JpegBufferDeleter>;
 
   // Helper to decode JPEG to RGB888 or Gray
-  [[nodiscard]] static JpegBufferPtr decode_jpeg(const uint8_t* data, size_t len, int* width, int* height, jpeg_pixel_format_t output_format = JPEG_PIXEL_FORMAT_RGB888);
+  [[nodiscard]] static JpegBufferPtr decode_jpeg(const uint8_t* data, size_t len, int* width, int* height, jpeg_pixel_format_t output_format = JPEG_PIXEL_FORMAT_RGB888, jpeg_rotate_t rotate = JPEG_ROTATE_0D);
 
   // Allocates a buffer suitable for JPEG operations (16-byte aligned)
   [[nodiscard]] static JpegBufferPtr allocate_jpeg_buffer(size_t size);

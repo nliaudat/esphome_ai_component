@@ -574,8 +574,8 @@ AnalogReader::DetectionResult AnalogReader::detect_legacy(const uint8_t* img, in
         
         // Scan ray from center outwards
         for (int r = start_r; r < end_r; r++) {
-            int px = cx + (int)(r * dx);
-            int py = cy + (int)(r * dy);
+            int px = cx + lround(r * dx);
+            int py = cy + lround(r * dy);
             
             if (px >= 0 && px < w && py >= 0 && py < h) {
                 uint8_t val = img[py * w + px];
