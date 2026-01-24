@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESP32 AI Rotation & ROI Tool v4</title>
+    <title>ESP32 AI Rotation & ROI Tool v3</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -729,20 +729,11 @@
             let rel_x = d_sensor_x - off_x;
             let rel_y = d_sensor_y - off_y;
 
-            // 3. Transform to Configured Rotation Space (Final Output)
-            let out_w = (state.rotation % 180 === 0) ? w : h;
-            let out_h = (state.rotation % 180 === 0) ? h : w;
+            // 3. Return Coordinates in Sensor-Relative Space (Unrotated)
+            // ImageProcessor expects crops relative to the raw input buffer (unrotated).
+            // Rotation is applied AFTER cropping.
 
-            let fin_x, fin_y, fin_w, fin_h;
-
-            switch (state.rotation) {
-                case 0: fin_x = rel_x; fin_y = rel_y; fin_w = d_sensor_w; fin_h = d_sensor_h; break;
-                case 90: fin_x = out_w - rel_y - d_sensor_h; fin_y = rel_x; fin_w = d_sensor_h; fin_h = d_sensor_w; break;
-                case 180: fin_x = out_w - rel_x - d_sensor_w; fin_y = out_h - rel_y - d_sensor_h; fin_w = d_sensor_w; fin_h = d_sensor_h; break;
-                case 270: fin_x = rel_y; fin_y = out_h - rel_x - d_sensor_w; fin_w = d_sensor_h; fin_h = d_sensor_w; break;
-            }
-
-            return { x: Math.round(fin_x), y: Math.round(fin_y), w: Math.round(fin_w), h: Math.round(fin_h) };
+            return { x: Math.round(rel_x), y: Math.round(rel_y), w: Math.round(d_sensor_w), h: Math.round(d_sensor_h) };
         }
 
         function drawZones(zones, color, labelPrefix) {
@@ -983,7 +974,7 @@
                 lines.push(`  dials:`);
 
                 state.dials.forEach((d, i) => {
-                    // Calculate Scaled & Relativized Coordinates (Same logic as digits)
+                     // Calculate Scaled & Relativized Coordinates (Same logic as digits)
                     let res = calculateZoneCoordinates(d, off_x, off_y, scale_x, scale_y, w, h);
 
                     // Apply Final Output Scaling
@@ -993,8 +984,8 @@
                         res.w = Math.round(res.w * final_scale_x);
                         res.h = Math.round(res.h * final_scale_y);
                     }
-
-                    lines.push(`    - id: dial_${i + 1}`);
+                    
+                    lines.push(`    - id: dial_${i+1}`);
                     lines.push(`      scale: 0.1`);
                     lines.push(`      crop_x: ${res.x}`);
                     lines.push(`      crop_y: ${res.y}`);
