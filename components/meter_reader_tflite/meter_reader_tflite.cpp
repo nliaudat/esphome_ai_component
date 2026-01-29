@@ -538,6 +538,24 @@ void MeterReaderTFLite::loop() {
                 } else {
                      ESP_LOGI(TAG, "Result: INVALID (Raw: %.0f, Conf: %.3f, %s)", 
                               final_val, avg_conf, conf_list.c_str());
+
+                     #ifdef USE_DATA_COLLECTOR
+                     // Detect suspicious patterns (e.g. all 0s or all 1s) using logic in ValueValidator
+                     bool suspicious = false;
+                     if (validation_coord_.has_validator()) {
+                         suspicious = validation_coord_.get_validator()->is_hallucination_pattern(res_ptr->readings);
+                     }
+
+                     // Only collect if confidence is actually low OR if specific suspicious pattern detected OR if VALIDATION FAILED
+                     // "Result: INVALID" implies !valid OR low confidence.
+                     // We want to collect ALL invalid readings to catch High Confidence errors.
+                     
+                     if (true) { // Logic simplified: If we are in this block, it IS invalid.
+                         ESP_LOGW(TAG, "Data Collection Triggered: Reading Invalid (Conf: %.1f%%, Suspicious: %s)", 
+                                  avg_conf * 100.0f, suspicious ? "YES" : "NO");
+                         trigger_low_confidence_collection(final_val, avg_conf);
+                     }
+                     #endif
                 }
             }
             
@@ -895,10 +913,19 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
                      !valid ? "validation failed" : "confidence below threshold");
              
              #ifdef USE_DATA_COLLECTOR
-             // Only collect if confidence is actually low, attempting to filter out 
-             // validation failures like Max Rate Change (which usually have high confidence).
-             if (avg_conf < confidence_threshold_) {
-                trigger_low_confidence_collection(final_val, avg_conf);
+             // Detect suspicious patterns (e.g. all 0s or all 1s) using logic in ValueValidator
+             bool suspicious = false;
+             if (validation_coord_.has_validator()) {
+                 suspicious = validation_coord_.get_validator()->is_hallucination_pattern(readings);
+             }
+
+             // Only collect if confidence is actually low OR if specific suspicious pattern detected OR if VALIDATION FAILED
+             // We are in the 'else' block of 'if (valid ...)', so we know it's invalid.
+             
+             if (true) {
+                 ESP_LOGW(TAG, "Data Collection Triggered: Reading Invalid (Conf: %.1f%%, Suspicious: %s)", 
+                          avg_conf * 100.0f, suspicious ? "YES" : "NO");
+                 trigger_low_confidence_collection(final_val, avg_conf);
              }
              #endif
         }

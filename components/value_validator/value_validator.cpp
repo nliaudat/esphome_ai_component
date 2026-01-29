@@ -387,6 +387,12 @@ bool ValueValidator::validate_reading(const std::vector<float>& digits, const st
       return false;
   }
 
+  // Check for Hallucination Patterns (e.g. 11111111)
+  if (is_hallucination_pattern(digits)) { // Use the original float digits to check pattern
+      ESP_LOGW(TAG, "Rejected reading due to hallucination pattern (e.g. all identical digits)");
+      return false;
+  }
+
   // Now pass the FILTERED value to the standard validator
   // This will perform rate checks, consistency checks, etc.
   bool final_valid = validate_reading(filtered_val, avg_conf, validated_reading);
@@ -798,6 +804,7 @@ void ValueValidator::ensure_digit_history_size(size_t num_digits) {
 }
 
 int ValueValidator::get_stable_digit(int digit_index, int new_digit) {
+
   if (digit_index >= digit_history_num_digits_ || !digit_history_data_) return new_digit;
   
   // Access buffers
@@ -835,7 +842,50 @@ int ValueValidator::get_stable_digit(int digit_index, int new_digit) {
       }
   }
   
+
+  
   return mode_val;
+}
+
+bool ValueValidator::is_hallucination_pattern(const std::vector<float>& digits) const {
+  if (digits.empty()) return false;
+  
+  // Need at least 2 digits to form a "pattern" of identical digits
+  if (digits.size() < 2) return false;
+
+  int first = static_cast<int>(round(digits[0]));
+  
+  // Check if all digits are the same
+  for (size_t i = 1; i < digits.size(); i++) {
+     if (static_cast<int>(round(digits[i])) != first) {
+         return false;
+     }
+  }
+  
+  // If we found a pattern of identical digits (e.g. 11111111), check if it makes sense contextually.
+  
+  // Calculate value from digits
+  std::string val_str;
+  for (float d : digits) val_str += std::to_string(static_cast<int>(round(d)));
+  
+  long val = 0;
+  if (!val_str.empty()) {
+     char* end = nullptr;
+     long parsed = std::strtol(val_str.c_str(), &end, 10);
+     if (end != val_str.c_str() + val_str.length()) {
+         return true; // Parse error (shouldn't happen with digits)
+     }
+     val = parsed;
+
+  }
+  
+  if (!first_reading_ && val == last_valid_reading_) {
+      // If it matches exactly recent history, assume it's real.
+      return false;
+  }
+
+  // Otherwise, "All X's" is highly likely a hallucination (esp. All 1s, All 0s) if it CHANGED from last history.
+  return true;
 }
 
 }  // namespace value_validator
