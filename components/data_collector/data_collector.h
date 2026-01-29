@@ -25,7 +25,7 @@ class DataCollector : public Component {
 
   // Main entry point
   // raw_value and confidence are passed for metadata/logging
-  void collect_image(std::shared_ptr<camera::CameraImage> frame, float raw_value, float confidence);
+  void collect_image(std::shared_ptr<camera::CameraImage> frame, int width, int height, const std::string& format, float raw_value, float confidence);
 
  protected:
   std::string upload_url_;

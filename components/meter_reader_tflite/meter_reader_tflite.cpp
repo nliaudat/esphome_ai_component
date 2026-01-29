@@ -614,6 +614,12 @@ void MeterReaderTFLite::trigger_low_confidence_collection(float value, float con
     // if (confidence < low_confidence_trigger_threshold_) return; 
     if (this->collection_state_ != COLLECTION_IDLE) return; 
 
+    // Prevent collection during Setup Mode (Preview) or calibration
+    if (this->generate_preview_ || this->is_calibrating()) {
+        ESP_LOGD(TAG, "Data collection skipped (Setup Mode/Calibration active)");
+        return;
+    } 
+
     ESP_LOGI(TAG, "Low confidence (%.2f%%) detected. Retaking with flash for data collection...", confidence * 100.0f);
 
     pending_collection_ = {value, confidence};
@@ -647,7 +653,7 @@ void MeterReaderTFLite::process_available_frame() {
     #ifdef USE_DATA_COLLECTOR
     if (this->collection_state_ == COLLECTION_WAITING_FOR_FRAME) {
          if (this->data_collector_) {
-             this->data_collector_->collect_image(frame, pending_collection_.value, pending_collection_.confidence);
+             this->data_collector_->collect_image(frame, camera_coord_.get_width(), camera_coord_.get_height(), camera_coord_.get_format(), pending_collection_.value, pending_collection_.confidence);
          }
          this->collection_state_ = COLLECTION_IDLE;
          this->flashlight_coord_.disable_flash();

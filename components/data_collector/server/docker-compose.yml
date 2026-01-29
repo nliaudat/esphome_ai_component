@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  data-collector:
+    build: .
+    container_name: esphome-data-collector
+    restart: unless-stopped
+    ports:
+      - "5123:5123"
+    volumes:
+      - ./uploads:/app/uploads
+    environment:
+      - FLASK_ENV=production
+      - API_KEY=change-me-to-a-secure-key
