@@ -246,8 +246,8 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
   // Data Collection
   #ifdef USE_DATA_COLLECTOR
-  bool collect_low_confidence_{false};
-  float low_confidence_trigger_threshold_{0.0f}; // User requested 0%
+  bool collect_low_confidence_{true};
+  float low_confidence_trigger_threshold_{0.0f}; 
   
   enum CollectionState {
       COLLECTION_IDLE,
