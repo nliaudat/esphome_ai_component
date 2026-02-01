@@ -30,6 +30,7 @@ The repository allows you to use specific components based on your needs:
 | **[esp32_camera_utils](./components/esp32_camera_utils)** | Powerful image processing utilities. Handles cropping, scaling, rotation (JPEG/Raw), and format conversion using `esp_new_jpeg` library. |
 | **[tflite_micro_helper](./components/tflite_micro_helper)** | Wrapper for TensorFlow Lite Micro runtime (checking model CRC32, etc..) and `esp-nn` optimizations. Manages tensor arena and model loading. |
 | **[flash_light_controller](./components/flash_light_controller)** | Manages flash light timing for optimal image capture conditions. |
+| **[data_collector](./components/data_collector)** | **Active Learning** tool. Automatically collects "hard" images (low confidence) and uploads them to a server for training set improvement. |
 
 ### Legacy
 
@@ -62,6 +63,7 @@ external_components:
       - tflite_micro_helper   # Required for meter_reader_tflite
       - esp32_camera_utils    # Image processing utilities
       - flash_light_controller
+      - data_collector        # Optional: For collecting training data
 ```
 
 ### 2. Basic Configuration
@@ -134,6 +136,24 @@ analog_reader:
       max_value: 100
       radius_min: 20
       radius_max: 80
+
+#### Option D: Data Collector (Active Learning)
+
+This optional component automatically uploads images when the model is unsure, helping you improve your model over time.
+
+```yaml
+data_collector:
+  id: my_data_collector
+  upload_url: "http://192.168.1.50:5123/api/upload/my_meter"
+  # Optional: Secure your uploads
+  # api_key: "change-me-to-a-secure-key"
+
+meter_reader_tflite:
+  # ... existing config ...
+  data_collector: my_data_collector
+  collect_low_confidence: true # Trigger upload on low confidence
+```
+
 ```
 
 > [!NOTE]

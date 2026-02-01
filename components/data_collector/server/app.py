@@ -1,6 +1,8 @@
 from flask import Flask, request
 import os
 import time
+from werkzeug.utils import secure_filename
+from markupsafe import escape
 
 app = Flask(__name__)
 
@@ -20,10 +22,10 @@ def index():
     html += "<div style='display: flex; flex-wrap: wrap; gap: 10px;'>"
     for img in images:
         if img.endswith('.jpg'):
-            html += f"<div style='border: 1px solid #ccc; padding: 5px;'><a href='/uploads/{img}'><img src='/uploads/{img}' width='200'><br>{img}</a></div>"
+            # Security: Escape filename to prevent XSS
+            safe_img = escape(img)
+            html += f"<div style='border: 1px solid #ccc; padding: 5px;'><a href='/uploads/{safe_img}'><img src='/uploads/{safe_img}' width='200'><br>{safe_img}</a></div>"
     html += "</div>"
-    return html
-
     return html
 
 @app.route('/uploads/<path:filename>')
@@ -34,7 +36,7 @@ def uploaded_file(filename):
 @app.route('/api/upload/<device_id>', methods=['POST'])
 def upload(device_id):
     # Sanitize device_id to prevent directory traversal
-    device_id = os.path.basename(device_id)
+    device_id = secure_filename(device_id)
     
     # Create device specific folder
     device_folder = os.path.join(UPLOAD_FOLDER, device_id)
@@ -46,18 +48,18 @@ def upload(device_id):
     # Check Authorization header (Bearer token)
     auth_header = request.headers.get('Authorization')
     
-    authorized = False
-    if client_key and client_key == API_KEY:
-        authorized = True
-    if auth_header and auth_header == f"Bearer {API_KEY}":
-        authorized = True
+    authorized = (client_key and client_key == API_KEY) or \
+                 (auth_header and auth_header == f"Bearer {API_KEY}")
         
     if not authorized:
         return "Unauthorized", 401
 
     try:
         # Extract headers provided by ESPHome Data Collector
-        value = request.headers.get('X-Meter-Value', 'unknown')
+        # Security: sanitize headers used in file paths
+        raw_value = request.headers.get('X-Meter-Value', 'unknown')
+        value = secure_filename(raw_value)
+        
         conf = request.headers.get('X-Meter-Confidence', '0.0')
         
         # Create a descriptive filename
@@ -67,7 +69,9 @@ def upload(device_id):
             conf_val = float(conf)
             filename = f"collect_{timestamp}_{value}_{conf_val:.2f}.jpg"
         except ValueError:
-            filename = f"collect_{timestamp}_{value}_{conf}.jpg"
+            # Fallback for non-float confidence, ensuring safety
+            safe_conf = secure_filename(conf)
+            filename = f"collect_{timestamp}_{value}_{safe_conf}.jpg"
             
         filepath = os.path.join(device_folder, filename)
         
@@ -79,8 +83,9 @@ def upload(device_id):
         return "OK", 200
         
     except Exception as e:
+        # Security: Log error internally, do not expose details to client
         print(f"Error saving upload: {e}")
-        return f"Error: {e}", 500
+        return "Internal Server Error", 500
 
 if __name__ == '__main__':
     # Listen on all interfaces, port 5123

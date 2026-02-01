@@ -57,7 +57,6 @@ void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, in
   // Basic JPEG encoding
   uint8_t *jpeg_buf = nullptr;
   size_t jpeg_len = 0;
-  bool success = false;
   
   if (pix_fmt == PIXFORMAT_JPEG) {
       // Already JPEG, just cast (copy might be needed if upload logic modifies it, but here we likely just send)
@@ -79,7 +78,7 @@ void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, in
     return;
   }
   
-  success = this->upload_image(jpeg_buf, jpeg_len, raw_value, confidence);
+  this->upload_image(jpeg_buf, jpeg_len, raw_value, confidence);
   
   if (jpeg_buf) {
     free(jpeg_buf);
