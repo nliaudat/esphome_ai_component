@@ -7,6 +7,7 @@
 #include "esphome/core/log.h"
 #include "esphome/core/application.h"
 #include <esp_heap_caps.h>
+#include <cerrno>
 
 namespace esphome {
 namespace value_validator {
@@ -284,9 +285,14 @@ bool ValueValidator::validate_reading(const std::vector<float>& digits, const st
   raw_val = 0;
   if (!stabilized_digit_string.empty()) {
       char *end;
+      errno = 0; // Reset errno
       long val = strtol(stabilized_digit_string.c_str(), &end, 10);
-      if (end == stabilized_digit_string.c_str() + stabilized_digit_string.length()) { 
+      if (end == stabilized_digit_string.c_str() + stabilized_digit_string.length() && errno != ERANGE) { 
           raw_val = (int)val;
+      } else {
+           // Parse error or overflow
+           ESP_LOGW(TAG, "Failed to parse stabilized digit string: %s", stabilized_digit_string.c_str());
+           // Fallback or keep 0
       }
   }
   
