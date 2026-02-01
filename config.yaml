@@ -172,6 +172,8 @@ meter_reader_tflite:
 
   update_interval: 60s
 
+  # collect_low_confidence: true #default true / needed for datacollector
+
   debug: false
   debug_image: false # static embedded image (debug.jpg)
   debug_image_out_serial: false

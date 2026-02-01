@@ -60,6 +60,9 @@ class ValueValidatorCoordinator {
     }
   }
 
+  value_validator::ValueValidator* get_validator() const { return validator_; }
+
+
  protected:
   value_validator::ValueValidator *validator_{nullptr};
 };

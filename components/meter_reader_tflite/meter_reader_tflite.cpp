@@ -538,6 +538,24 @@ void MeterReaderTFLite::loop() {
                 } else {
                      ESP_LOGI(TAG, "Result: INVALID (Raw: %.0f, Conf: %.3f, %s)", 
                               final_val, avg_conf, conf_list.c_str());
+
+                     #ifdef USE_DATA_COLLECTOR
+                     // Detect suspicious patterns (e.g. all 0s or all 1s) using logic in ValueValidator
+                     bool suspicious = false;
+                     if (validation_coord_.has_validator()) {
+                         suspicious = validation_coord_.get_validator()->is_hallucination_pattern(res_ptr->readings);
+                     }
+
+                     // Only collect if confidence is actually low OR if specific suspicious pattern detected OR if VALIDATION FAILED
+                     // "Result: INVALID" implies !valid OR low confidence.
+                     // We want to collect ALL invalid readings to catch High Confidence errors.
+                     
+                     if (true) { // Logic simplified: If we are in this block, it IS invalid.
+                         ESP_LOGW(TAG, "Data Collection Triggered: Reading Invalid (Conf: %.1f%%, Suspicious: %s)", 
+                                  avg_conf * 100.0f, suspicious ? "YES" : "NO");
+                         trigger_low_confidence_collection(final_val, avg_conf);
+                     }
+                     #endif
                 }
             }
             
@@ -614,6 +632,12 @@ void MeterReaderTFLite::trigger_low_confidence_collection(float value, float con
     // if (confidence < low_confidence_trigger_threshold_) return; 
     if (this->collection_state_ != COLLECTION_IDLE) return; 
 
+    // Prevent collection during Setup Mode (Preview) or calibration
+    if (this->generate_preview_ || this->is_calibrating()) {
+        ESP_LOGD(TAG, "Data collection skipped (Setup Mode/Calibration active)");
+        return;
+    } 
+
     ESP_LOGI(TAG, "Low confidence (%.2f%%) detected. Retaking with flash for data collection...", confidence * 100.0f);
 
     pending_collection_ = {value, confidence};
@@ -647,7 +671,7 @@ void MeterReaderTFLite::process_available_frame() {
     #ifdef USE_DATA_COLLECTOR
     if (this->collection_state_ == COLLECTION_WAITING_FOR_FRAME) {
          if (this->data_collector_) {
-             this->data_collector_->collect_image(frame, pending_collection_.value, pending_collection_.confidence);
+             this->data_collector_->collect_image(frame, camera_coord_.get_width(), camera_coord_.get_height(), camera_coord_.get_format(), pending_collection_.value, pending_collection_.confidence);
          }
          this->collection_state_ = COLLECTION_IDLE;
          this->flashlight_coord_.disable_flash();
@@ -889,10 +913,19 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
                      !valid ? "validation failed" : "confidence below threshold");
              
              #ifdef USE_DATA_COLLECTOR
-             // Only collect if confidence is actually low, attempting to filter out 
-             // validation failures like Max Rate Change (which usually have high confidence).
-             if (avg_conf < confidence_threshold_) {
-                trigger_low_confidence_collection(final_val, avg_conf);
+             // Detect suspicious patterns (e.g. all 0s or all 1s) using logic in ValueValidator
+             bool suspicious = false;
+             if (validation_coord_.has_validator()) {
+                 suspicious = validation_coord_.get_validator()->is_hallucination_pattern(readings);
+             }
+
+             // Only collect if confidence is actually low OR if specific suspicious pattern detected OR if VALIDATION FAILED
+             // We are in the 'else' block of 'if (valid ...)', so we know it's invalid.
+             
+             if (true) {
+                 ESP_LOGW(TAG, "Data Collection Triggered: Reading Invalid (Conf: %.1f%%, Suspicious: %s)", 
+                          avg_conf * 100.0f, suspicious ? "YES" : "NO");
+                 trigger_low_confidence_collection(final_val, avg_conf);
              }
              #endif
         }

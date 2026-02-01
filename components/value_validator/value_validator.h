@@ -105,6 +105,8 @@ class ValueValidator : public Component {
   void set_debug(bool debug) { debug_ = debug; }
   void set_last_valid_reading(int value);
   void set_last_valid_reading(const std::string &value);
+  bool is_hallucination_pattern(const std::vector<float>& digits) const;
+
 
  private:
   ValidationConfig config_;

@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  esphome-data-collector:
+    build: .
+    container_name: esphome-data-collector
+    network_mode: 'host'
+    restart: unless-stopped
+    working_dir: /app
+    stop_signal: SIGINT
+    # Note: On Synology, mapping the entire folder ensures persistence and easy editing
+    volumes:
+      - /volume1/docker/esphome-data-collector:/app
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_ENV=production
+      - API_KEY=change-me-to-a-secure-key

@@ -110,7 +110,8 @@ CONFIG_SCHEMA = cv.Schema({
 
     cv.Optional(CONF_FLASH_LIGHT_CONTROLLER): cv.use_id(flash_light_controller.FlashLightController) if flash_light_controller else cv.string,
     cv.Optional(CONF_DATA_COLLECTOR): cv.use_id(data_collector.DataCollector) if data_collector else cv.string,
-    cv.Optional(CONF_COLLECT_LOW_CONFIDENCE, default=False): cv.boolean,
+    cv.Optional(CONF_COLLECT_LOW_CONFIDENCE, default=True): cv.boolean,
+
     cv.Optional(CONF_CROP_ZONES): cv.use_id(globals.GlobalsComponent),
     # cv.Optional(CONF_CAMERA_WINDOW): cv.Any(
     # cv.Schema({  # Or detailed configuration

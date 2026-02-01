@@ -70,24 +70,61 @@ When `collect_low_confidence: true` is set, the system follows this smart workfl
 
 The component sends a standard HTTP POST request with the raw JPEG image as the body. You can receive this with any web server, Node-RED, or N8N.
 
-### Python (Flask) Example
+### Deployment with Docker (Synology/Portainer)
 
-```python
-from flask import Flask, request
-import time
+A complete Docker solution is provided in the `components/data_collector/server` directory.
 
-app = Flask(__name__)
+#### 1. Copy Files to Server
+Create a folder on your NAS at `/volume1/docker/esphome-data-collector` (this matches the `docker-compose.yml` volume mapping) and upload the following files from `components/data_collector/server`:
+- `synology_container_compose.yaml` (rename to `docker-compose.yml` or use explicitly)
+- `docker-compose.yml` (Generic version)
+- `Dockerfile`
+- `app.py`
+- `requirements.txt`
 
-@app.route('/api/upload', methods=['POST'])
-def upload():
-    # Save file with timestamp and prediction value
-    value = request.headers.get('X-Meter-Value', 'unknown')
-    conf = request.headers.get('X-Meter-Confidence', '0.0')
-    filename = f"collect_{int(time.time())}_{value}_{float(conf):.2f}.jpg"
-    
-    with open(filename, "wb") as f:
-        f.write(request.data)
-        
-    print(f"Saved {filename}")
-    return "OK", 200
+#### 2. Configure & Run
+SSH into your NAS or use Portainer to run the stack.
+
+**For Synology Users:**
+Use `synology_container_compose.yaml`. This version uses `network_mode: host` and maps the entire `/volume1/docker/esphome-data-collector` directory.
+
+```bash
+cd /volume1/docker/esphome-data-collector
+# Rename if you want to use default command, or specify file:
+docker-compose -f synology_container_compose.yaml up -d --build
 ```
+
+**For Standard Docker:**
+Use the standard `docker-compose.yml`.
+
+```bash
+docker-compose up -d --build
+```
+
+**Using Portainer:**
+1. Create a new stack.
+2. Paste the contents of `docker-compose.yml`.
+3. Ensure the `build: .` context is handled or just use the local file method above.
+
+The server will start on port `5123`.
+
+#### 3. Mandatory Authentication
+You **must** set the `API_KEY` environment variable in your compose file to a secure secret. The server will fail to start without it.
+
+```yaml
+    environment:
+      - FLASK_ENV=production
+      - API_KEY=my-secret-token
+```
+
+Then update your ESPHome config:
+
+```yaml
+data_collector:
+  id: ${id_prefix}_data_collector
+  upload_url: "http://192.168.1.50:5123/api/upload/${id_prefix}"
+  api_key: "change-me-to-a-secure-key"
+```
+
+The server will automatically create a subfolder named after the prefix (e.g., `uploads/${id_prefix}/`) to store the images.
+

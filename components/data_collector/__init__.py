@@ -23,6 +23,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_PASSWORD): cv.string,
         cv.Optional(CONF_API_KEY): cv.string,
         cv.Optional(CONF_WEB_SUBMIT): switch.switch_schema(
+            switch.Switch,
             icon="mdi:cloud-upload",
             entity_category="config",
         ),

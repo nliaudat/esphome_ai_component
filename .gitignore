@@ -34,3 +34,4 @@ wiki_setup.md
 components/value_validator/__pycache__/__init__.cpython-312.pyc
 /components/value_validator/__pycache__
 /components/value_validator/__pycache__
+/components/data_collector/__pycache__

@@ -3,7 +3,7 @@
 #include "esphome/core/application.h"
 
 // For JPEG encoding
-#include "esphome/components/esp32_camera/camera_image.h"
+// #include "esphome/components/esp32_camera/camera_image.h"
 #include "img_converters.h" // ESP32 Camera Utils
 
 // For HTTP Client
@@ -26,7 +26,7 @@ void DataCollector::dump_config() {
   }
 }
 
-void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, float raw_value, float confidence) {
+void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, int width, int height, const std::string& format, float raw_value, float confidence) {
   if (!frame) {
     ESP_LOGW(TAG, "No frame provided for collection");
     return;
@@ -44,38 +44,46 @@ void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, fl
   }
 
   uint32_t start_time = millis();
-  ESP_LOGI(TAG, "Starting data collection (Value: %.2f, Confidence: %.2f%%)", raw_value, confidence * 100.0f);
+  ESP_LOGI(TAG, "Starting data collection (Value: %.2f, Confidence: %.2f%%, Size: %dx%d, Fmt: %s)", 
+           raw_value, confidence * 100.0f, width, height, format.c_str());
 
-  // Encode to JPEG
-  // We use fmt2jpg from esp32-camera lib
+  // Determine format
+  pixformat_t pix_fmt = PIXFORMAT_GRAYSCALE;
+  if (format == "JPEG") pix_fmt = PIXFORMAT_JPEG;
+  else if (format == "RGB565") pix_fmt = PIXFORMAT_RGB565;
+  else if (format == "RGB888") pix_fmt = PIXFORMAT_RGB888;
+  else if (format == "YUV422") pix_fmt = PIXFORMAT_YUV422;
+  
+  // Basic JPEG encoding
   uint8_t *jpeg_buf = nullptr;
   size_t jpeg_len = 0;
+  bool success = false;
   
-  // Assuming PIXFORMAT_GRAYSCALE or PIXFORMAT_RGB888 based on usage in meter_reader
-  // But camera::CameraImage buffer is raw. 
-  // We need to know width, height, format.
+  if (pix_fmt == PIXFORMAT_JPEG) {
+      // Already JPEG, just cast (copy might be needed if upload logic modifies it, but here we likely just send)
+      jpeg_buf = (uint8_t*)frame->get_data_buffer();
+      jpeg_len = frame->get_data_length();
+      
+      // We don't own this buffer, so we shouldn't free it unless we copied it.
+      // But upload_image takes raw pointer.
+      this->upload_image(jpeg_buf, jpeg_len, raw_value, confidence);
+      // No free needed for frame buffer
+      return; 
+  }
+
+  // Convert to JPEG
+  bool converted = fmt2jpg((uint8_t*)frame->get_data_buffer(), frame->get_data_length(), width, height, pix_fmt, 90, &jpeg_buf, &jpeg_len);
   
-  int w = frame->get_width();
-  int h = frame->get_height();
-  camera_pixelformat_t format = frame->get_format(); // Need to ensure cast compatibility or use raw value
-
-  bool converted = fmt2jpg(frame->get_data_buffer(), frame->get_data_length(), 
-                           w, h, format, 
-                           80, // Quality 
-                           &jpeg_buf, &jpeg_len);
-
   if (!converted || !jpeg_buf) {
     ESP_LOGE(TAG, "JPEG compression failed");
     return;
   }
-
-  ESP_LOGD(TAG, "Image encoded to JPEG (%u bytes) in %u ms", jpeg_len, millis() - start_time);
-
-  // Upload
-  this->upload_image(jpeg_buf, jpeg_len, raw_value, confidence);
-
-  // Cleanup
-  free(jpeg_buf);
+  
+  success = this->upload_image(jpeg_buf, jpeg_len, raw_value, confidence);
+  
+  if (jpeg_buf) {
+    free(jpeg_buf);
+  }
 }
 
 bool DataCollector::upload_image(const uint8_t *data, size_t len, float raw_value, float confidence) {
@@ -107,7 +115,6 @@ bool DataCollector::upload_image(const uint8_t *data, size_t len, float raw_valu
        // Check if it starts with "Bearer " or just a key
        if (api_key_.rfind("Bearer ", 0) == 0) {
            esp_http_client_set_header(client, "Authorization", api_key_.c_str());
-       } else {
        } else {
            // Default to X-Api-Key if no Bearer token structure is detected.
            esp_http_client_set_header(client, "X-Api-Key", api_key_.c_str());
