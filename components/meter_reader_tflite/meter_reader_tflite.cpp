@@ -384,6 +384,7 @@ void MeterReaderTFLite::set_debug(bool debug) {
 }
 
 void MeterReaderTFLite::on_camera_image(const std::shared_ptr<camera::CameraImage> &image) {
+    std::lock_guard<std::mutex> lock(frame_mutex_);
     if (frame_requested_.load() && !processing_frame_.load()) {
         pending_frame_ = image;
         pending_frame_acquisition_time_ = millis(); 
@@ -663,9 +664,14 @@ void MeterReaderTFLite::trigger_low_confidence_collection(float value, float con
 
 void MeterReaderTFLite::process_available_frame() {
     processing_frame_ = true;
-    std::shared_ptr<camera::CameraImage> frame = pending_frame_;
-    pending_frame_.reset();
-    frame_available_ = false;
+    
+    std::shared_ptr<camera::CameraImage> frame;
+    {
+        std::lock_guard<std::mutex> lock(frame_mutex_);
+        frame = pending_frame_;
+        pending_frame_.reset();
+        frame_available_ = false;
+    }
     
     // Data Collection Interception
     #ifdef USE_DATA_COLLECTOR

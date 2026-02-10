@@ -7,6 +7,7 @@
 #include <cfloat>
 #include <vector>
 #include <cstring>
+#include <esp_heap_caps.h>
 
 namespace esphome {
 namespace analog_reader {
@@ -16,18 +17,35 @@ static const char *const TAG = "multi_algorithm";
 // PREPROCESSING FUNCTIONS
 
 void AnalogReader::preprocess_image(const uint8_t* img, int w, int h, int cx, int cy, int radius, NeedleType needle_type, std::vector<uint8_t>& output) {
-    // Resize working buffer if needed
-    if (output.size() != w * h) {
-        output.resize(w * h);
-    }
+    // Safe Resize Logic
+    size_t required_size = w * h;
+    
+    // Helper lambda to safely resize standard vectors.
+    auto safe_resize = [&](std::vector<uint8_t>& vec, const char* name) -> bool {
+        if (vec.size() != required_size) {
+            // Check if we need to allocate new memory (capacity increase)
+            if (vec.capacity() < required_size) {
+                // Check if enough contiguous memory exists to avoid hard crash (abort)
+                // Note: std::vector resize often allocates new block then copies, so we need free block >= new size.
+                // However, overhead might be higher. This is a best-effort check.
+                size_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+                if (largest_block < required_size) {
+                    ESP_LOGE(TAG, "CRITICAL: Not enough memory to resize %s. Need %u, Largest Free %u", name, required_size, largest_block);
+                    return false;
+                }
+            }
+            vec.resize(required_size);
+        }
+        return true;
+    };
+
+    if (!safe_resize(output, "output")) return;
     
     // Copy data to working buffer
     memcpy(output.data(), img, w * h);
-    
-    // Resize second scratch buffer
-    if (scratch_buffer_2_.size() != w * h) {
-        scratch_buffer_2_.resize(w * h);
-    }
+
+    if (!safe_resize(scratch_buffer_, "scratch1")) return;
+    if (!safe_resize(scratch_buffer_2_, "scratch2")) return;
 
     // Step 1: CLAHE (Contrast Limited Adaptive Histogram Equalization)
     apply_clahe(output.data(), w, h);

@@ -8,6 +8,7 @@
 #include "flashlight_coordinator.h" 
 #include "value_validator_coordinator.h"
 #include <vector>
+#include <mutex>
 
 namespace esphome {
 namespace analog_reader {
@@ -142,6 +143,7 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   
   // Async processing
   std::shared_ptr<esphome::camera::CameraImage> pending_frame_{nullptr};
+  std::mutex frame_mutex_;
 
   // Optimization: Pre-allocated buffer and LUTs
   std::vector<uint8_t> working_buffer_;

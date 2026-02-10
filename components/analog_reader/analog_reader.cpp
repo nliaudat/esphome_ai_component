@@ -253,6 +253,7 @@ void AnalogReader::update() {
 }
 
 void AnalogReader::on_camera_image(const std::shared_ptr<esphome::camera::CameraImage> &image) {
+    std::lock_guard<std::mutex> lock(frame_mutex_);
     if (paused_) return;
     if (frame_requested_ && !processing_frame_) {
         // QUICKLY store frame and return to unblock camera thread
@@ -262,11 +263,17 @@ void AnalogReader::on_camera_image(const std::shared_ptr<esphome::camera::Camera
 
 void AnalogReader::loop() {
 // Process pending frame if available
-    if (pending_frame_) {
-        // Move to local standard pointer
-        std::shared_ptr<esphome::camera::CameraImage> frame = pending_frame_;
-        pending_frame_ = nullptr;
-        
+// Process pending frame if available
+    std::shared_ptr<esphome::camera::CameraImage> frame;
+    {
+        std::lock_guard<std::mutex> lock(frame_mutex_);
+        if (pending_frame_) {
+            frame = pending_frame_;
+            pending_frame_ = nullptr;
+        }
+    }
+
+    if (frame) {
         // OPTIMIZATION: Copy compressed data to local buffer and release frame IMMEDIATELY
         if (frame->get_data_length() > 0) {
              working_buffer_.assign(frame->get_data_buffer(), frame->get_data_buffer() + frame->get_data_length());
