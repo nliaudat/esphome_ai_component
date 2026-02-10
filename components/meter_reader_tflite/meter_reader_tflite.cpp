@@ -1248,7 +1248,9 @@ void MeterReaderTFLite::inference_task(void *arg) {
             
             // Invoke TFLite (Thread-Safe because only this task calls it)
             // Note: queues are thread safe.
+            self->is_inferencing_ = true;
             auto tflite_results = self->tflite_coord_.run_inference(job->crops);
+            self->is_inferencing_ = false;
             
             InferenceResult* res = allocate_inference_result();
             res->inference_time = millis() - start;
@@ -1407,6 +1409,21 @@ void MeterReaderTFLite::unload_resources() {
     
     // 2. Stop Flashlight (stop timers/sequences)
     flashlight_coord_.disable_flash();
+
+    #ifdef SUPPORT_DOUBLE_BUFFERING
+    // 2.5. Wait for active inference to finish (Race Condition Fix)
+    // Clear input queue first to prevent new jobs
+    xQueueReset(input_queue_);
+    
+    uint32_t wait_start = millis();
+    while (is_inferencing_.load()) {
+        if (millis() - wait_start > 5000) {
+            ESP_LOGE(TAG, "Timeout waiting for inference to finish!");
+            break; 
+        }
+        delay(10);
+    }
+    #endif
     
     // 3. Unload TFLite Model & Arena
     tflite_coord_.unload_model();

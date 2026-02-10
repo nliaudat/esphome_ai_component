@@ -352,6 +352,9 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   TaskHandle_t inference_task_handle_{nullptr};
   static void inference_task(void *arg);
 
+  // Sync state for safe unloading
+  std::atomic<bool> is_inferencing_{false};
+
 #endif
 };
 

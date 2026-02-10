@@ -115,6 +115,8 @@ class TFLiteCoordinator {
 
   bool allocate_tensor_arena();
   bool process_model_result(const esp32_camera_utils::ImageProcessor::ProcessResult& result, float* value, float* confidence);
+
+  mutable std::mutex model_mutex_; // Protects model_handler_ access
 };
 
 }  // namespace meter_reader_tflite
