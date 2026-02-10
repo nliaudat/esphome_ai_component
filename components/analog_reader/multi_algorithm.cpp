@@ -72,10 +72,13 @@ void AnalogReader::preprocess_image(const uint8_t* img, int w, int h, int cx, in
 
 void AnalogReader::apply_clahe(uint8_t* img, int w, int h, int tile_size) {
     // Simple tiled histogram equalization
+    // Pre-allocate scratch arrays outside the loop to avoid per-tile heap allocations
+    std::vector<int> hist(256);
+    std::vector<int> cdf(256);
     for (int tile_y = 0; tile_y < h; tile_y += tile_size) {
         for (int tile_x = 0; tile_x < w; tile_x += tile_size) {
             // Calculate local histogram
-            std::vector<int> hist(256, 0);
+            std::fill(hist.begin(), hist.end(), 0);
             int tile_pixels = 0;
             
             for (int y = tile_y; y < std::min(tile_y + tile_size, h); y++) {
@@ -86,7 +89,6 @@ void AnalogReader::apply_clahe(uint8_t* img, int w, int h, int tile_size) {
             }
             
             // Build CDF
-            std::vector<int> cdf(256, 0);
             cdf[0] = hist[0];
             for (int i = 1; i < 256; i++) {
                 cdf[i] = cdf[i-1] + hist[i];
@@ -139,15 +141,17 @@ void AnalogReader::median_filter_3x3(uint8_t* img, int w, int h) {
     std::vector<uint8_t> temp(w * h);
     memcpy(temp.data(), img, w * h);
     
+    // Fixed-size window on stack — avoids heap allocation per pixel
+    uint8_t window[9];
     for (int y = 1; y < h - 1; y++) {
         for (int x = 1; x < w - 1; x++) {
-            std::vector<uint8_t> window;
+            int count = 0;
             for (int dy = -1; dy <= 1; dy++) {
                 for (int dx = -1; dx <= 1; dx++) {
-                    window.push_back(temp[(y + dy) * w + (x + dx)]);
+                    window[count++] = temp[(y + dy) * w + (x + dx)];
                 }
             }
-            std::nth_element(window.begin(), window.begin() + 4, window.end());
+            std::nth_element(window, window + 4, window + count);
             img[y * w + x] = window[4];  // Median value
         }
     }
