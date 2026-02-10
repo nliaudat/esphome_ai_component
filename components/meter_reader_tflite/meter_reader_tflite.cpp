@@ -78,17 +78,21 @@ static size_t calculate_optimal_pool_size() {
   }
 }
 
+// Mutex protecting pool arrays from cross-core data races
+static std::mutex pool_mutex;
+
 static InferenceJob* allocate_inference_job() {
-  // ESP_LOGD(TAG, "Allocating InferenceJob..."); 
-  for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
-    if (!inference_job_used[i]) {
-      inference_job_used[i] = true;
-      inference_job_pool[i].frame = nullptr;
-      inference_job_pool[i].crops.clear();
-      inference_job_pool[i].start_time = 0;
-      pool_job_hits++;
-      // ESP_LOGD(TAG, "Allocated from pool (index %d)", i);
-      return &inference_job_pool[i];
+  {
+    std::lock_guard<std::mutex> lock(pool_mutex);
+    for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
+      if (!inference_job_used[i]) {
+        inference_job_used[i] = true;
+        inference_job_pool[i].frame = nullptr;
+        inference_job_pool[i].crops.clear();
+        inference_job_pool[i].start_time = 0;
+        pool_job_hits++;
+        return &inference_job_pool[i];
+      }
     }
   }
   
@@ -107,27 +111,34 @@ static void free_inference_job(InferenceJob* job) {
   job->frame.reset(); 
   job->crops.clear();
 
-  for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
-    if (job == &inference_job_pool[i]) {
-      inference_job_used[i] = false;
-      return;
+  {
+    std::lock_guard<std::mutex> lock(pool_mutex);
+    for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
+      if (job == &inference_job_pool[i]) {
+        inference_job_used[i] = false;
+        return;
+      }
     }
   }
+  // Not from pool — heap-allocated fallback
   delete job;
 }
 
 static InferenceResult* allocate_inference_result() {
-  for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
-    if (!inference_result_used[i]) {
-      inference_result_used[i] = true;
-      inference_result_pool[i].inference_time = 0;
-      inference_result_pool[i].success = false;
-      // Force memory release by swapping with empty temporary, 
-      // ensuring no hidden capacity grows indefinitely in the pool.
-      std::vector<float>().swap(inference_result_pool[i].readings);
-      std::vector<float>().swap(inference_result_pool[i].probabilities);
-      pool_result_hits++;
-      return &inference_result_pool[i];
+  {
+    std::lock_guard<std::mutex> lock(pool_mutex);
+    for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
+      if (!inference_result_used[i]) {
+        inference_result_used[i] = true;
+        inference_result_pool[i].inference_time = 0;
+        inference_result_pool[i].success = false;
+        // Force memory release by swapping with empty temporary, 
+        // ensuring no hidden capacity grows indefinitely in the pool.
+        std::vector<float>().swap(inference_result_pool[i].readings);
+        std::vector<float>().swap(inference_result_pool[i].probabilities);
+        pool_result_hits++;
+        return &inference_result_pool[i];
+      }
     }
   }
   
@@ -141,14 +152,19 @@ static InferenceResult* allocate_inference_result() {
 }
 
 static void free_inference_result(InferenceResult* res) {
-  for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
-    if (res == &inference_result_pool[i]) {
-      inference_result_used[i] = false;
-      return;
+  {
+    std::lock_guard<std::mutex> lock(pool_mutex);
+    for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
+      if (res == &inference_result_pool[i]) {
+        inference_result_used[i] = false;
+        return;
+      }
     }
   }
+  // Not from pool — heap-allocated fallback
   delete res;
 }
+
 #endif
 
 

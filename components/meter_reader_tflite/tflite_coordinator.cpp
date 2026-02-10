@@ -34,14 +34,17 @@ bool TFLiteCoordinator::allocate_tensor_arena() {
 
 void TFLiteCoordinator::unload_model() {
     ESP_LOGI(TAG, "Unloading TFLite model and freeing arena");
-    std::lock_guard<std::mutex> lock(model_mutex_);
-    
-    model_handler_.unload();
-    model_loaded_ = false;
-    
-    // Clear arena stats
-    std::lock_guard<std::mutex> stats_lock(arena_stats_mutex_);
-    cached_arena_stats_ = ArenaStats{};
+    {
+        std::lock_guard<std::mutex> lock(model_mutex_);
+        model_handler_.unload();
+        model_loaded_ = false;
+    }
+    // Clear arena stats outside model_mutex_ to avoid ABBA deadlock
+    // (get_arena_stats holds arena_stats_mutex_ then may wait for model_mutex_ via run_inference)
+    {
+        std::lock_guard<std::mutex> stats_lock(arena_stats_mutex_);
+        cached_arena_stats_ = ArenaStats{};
+    }
 }
 
 bool TFLiteCoordinator::load_model() {
