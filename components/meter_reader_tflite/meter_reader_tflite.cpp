@@ -1262,15 +1262,21 @@ void MeterReaderTFLite::inference_task(void *arg) {
     InferenceJob* job = nullptr;
     
     while (true) {
+        // Set inferencing flag BEFORE blocking on queue to close race window
+        // with unload_resources(). This ensures unload_resources() will wait
+        // until we finish processing any dequeued job.
+        self->is_inferencing_ = true;
         if (xQueueReceive(self->input_queue_, &job, portMAX_DELAY) == pdTRUE) {
-            if (!job) continue;
+            if (!job) {
+                self->is_inferencing_ = false;
+                continue;
+            }
             
             ESP_LOGD(TAG, "Inference Task: Job received. Starting TFLite...");
             uint32_t start = millis();
             
             // Invoke TFLite (Thread-Safe because only this task calls it)
             // Note: queues are thread safe.
-            self->is_inferencing_ = true;
             auto tflite_results = self->tflite_coord_.run_inference(job->crops);
             self->is_inferencing_ = false;
             
@@ -1297,6 +1303,8 @@ void MeterReaderTFLite::inference_task(void *arg) {
                 free_inference_result(res);
             }
             job = nullptr;
+        } else {
+            self->is_inferencing_ = false;
         }
     }
 }
@@ -1434,8 +1442,11 @@ void MeterReaderTFLite::unload_resources() {
 
     #ifdef SUPPORT_DOUBLE_BUFFERING
     // 2.5. Wait for active inference to finish (Race Condition Fix)
-    // Clear input queue first to prevent new jobs
-    xQueueReset(input_queue_);
+    // Drain input queue to free InferenceJob pointers (xQueueReset would leak them)
+    InferenceJob* leaked_job = nullptr;
+    while (xQueueReceive(input_queue_, &leaked_job, 0) == pdTRUE) {
+        if (leaked_job) free_inference_job(leaked_job);
+    }
     
     uint32_t wait_start = millis();
     while (is_inferencing_.load()) {

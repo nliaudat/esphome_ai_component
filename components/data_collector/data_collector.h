@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <atomic>
 
 namespace esphome {
 namespace data_collector {
@@ -16,6 +17,7 @@ class DataCollector : public Component {
  public:
   void setup() override;
   void dump_config() override;
+  ~DataCollector();
 
   void set_upload_url(const std::string &url) { upload_url_ = url; }
   void set_web_submit_switch(switch_::Switch *s) { web_submit_switch_ = s; }
@@ -48,6 +50,8 @@ class DataCollector : public Component {
   };
 
   QueueHandle_t upload_queue_{nullptr};
+  TaskHandle_t upload_task_handle_{nullptr};
+  std::atomic<bool> task_running_{true};
   void start_upload_task();
   static void upload_task(void *arg);
 };

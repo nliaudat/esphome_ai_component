@@ -9,6 +9,7 @@
 #include "value_validator_coordinator.h"
 #include <vector>
 #include <mutex>
+#include <atomic>
 
 namespace esphome {
 namespace analog_reader {
@@ -136,9 +137,9 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   std::vector<DialConfig> dials_;
   
   // State
-  bool processing_frame_{false};
+  std::atomic<bool> processing_frame_{false};
   bool debug_{false};
-  bool frame_requested_{false};
+  std::atomic<bool> frame_requested_{false};
   uint32_t last_request_time_{0};
   
   // Async processing
