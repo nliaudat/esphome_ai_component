@@ -34,15 +34,21 @@ bool TFLiteCoordinator::allocate_tensor_arena() {
 
 void TFLiteCoordinator::unload_model() {
     ESP_LOGI(TAG, "Unloading TFLite model and freeing arena");
-    model_handler_.unload();
-    model_loaded_ = false;
-    
-    // Clear arena stats
-    std::lock_guard<std::mutex> lock(arena_stats_mutex_);
-    cached_arena_stats_ = ArenaStats{};
+    {
+        std::lock_guard<std::mutex> lock(model_mutex_);
+        model_handler_.unload();
+        model_loaded_ = false;
+    }
+    // Clear arena stats outside model_mutex_ to avoid ABBA deadlock
+    // (get_arena_stats holds arena_stats_mutex_ then may wait for model_mutex_ via run_inference)
+    {
+        std::lock_guard<std::mutex> stats_lock(arena_stats_mutex_);
+        cached_arena_stats_ = ArenaStats{};
+    }
 }
 
 bool TFLiteCoordinator::load_model() {
+    std::lock_guard<std::mutex> lock(model_mutex_);
     ESP_LOGI(TAG, "Loading TFLite model...");
 
     // Get model configuration from model_config.h FIRST
@@ -104,6 +110,8 @@ bool TFLiteCoordinator::load_model() {
 
 std::vector<TFLiteCoordinator::InferenceResult> TFLiteCoordinator::run_inference(
       const std::vector<esp32_camera_utils::ImageProcessor::ProcessResult>& processed_zones) {
+    
+    std::lock_guard<std::mutex> lock(model_mutex_);
     
     std::vector<InferenceResult> results;
     if (!model_loaded_) {

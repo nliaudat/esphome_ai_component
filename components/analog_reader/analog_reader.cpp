@@ -127,6 +127,17 @@ void AnalogReader::setup() {
       this->camera_->add_listener(this);
   }
 
+   // Sort calibration mappings for correct interpolation
+   for (auto &dial : dials_) {
+       if (!dial.calibration_mapping.empty()) {
+           std::sort(dial.calibration_mapping.begin(), dial.calibration_mapping.end(), 
+               [](const std::pair<float, float>& a, const std::pair<float, float>& b) {
+                   return a.first < b.first;
+               });
+           ESP_LOGD(TAG, "Sorted calibration mapping for dial %s (%d points)", dial.id.c_str(), (int)dial.calibration_mapping.size());
+       }
+   }
+
    // Pre-allocate buffers to prevent heap fragmentation later
    // We prefer PSRAM for this large buffer (up to ~1MB for SVGA)
    if (pixel_format_str_ == "JPEG") {
@@ -242,6 +253,7 @@ void AnalogReader::update() {
 }
 
 void AnalogReader::on_camera_image(const std::shared_ptr<esphome::camera::CameraImage> &image) {
+    std::lock_guard<std::mutex> lock(frame_mutex_);
     if (paused_) return;
     if (frame_requested_ && !processing_frame_) {
         // QUICKLY store frame and return to unblock camera thread
@@ -251,11 +263,17 @@ void AnalogReader::on_camera_image(const std::shared_ptr<esphome::camera::Camera
 
 void AnalogReader::loop() {
 // Process pending frame if available
-    if (pending_frame_) {
-        // Move to local standard pointer
-        std::shared_ptr<esphome::camera::CameraImage> frame = pending_frame_;
-        pending_frame_ = nullptr;
-        
+// Process pending frame if available
+    std::shared_ptr<esphome::camera::CameraImage> frame;
+    {
+        std::lock_guard<std::mutex> lock(frame_mutex_);
+        if (pending_frame_) {
+            frame = pending_frame_;
+            pending_frame_ = nullptr;
+        }
+    }
+
+    if (frame) {
         // OPTIMIZATION: Copy compressed data to local buffer and release frame IMMEDIATELY
         if (frame->get_data_length() > 0) {
              working_buffer_.assign(frame->get_data_buffer(), frame->get_data_buffer() + frame->get_data_length());
@@ -843,10 +861,14 @@ void AnalogReader::debug_dial_image(const uint8_t* img, int w, int h, float dete
     for (int r = max_r/5; r < max_r; r++) { // Start 20% out
         // Map the needle angle to the grid coordinates.
         // We use a normalized coordinate system (0.0-1.0) and map it to the grid dimensions.
-        float scale = (float)r / max_r; // Scale factor for line drawing
+        float scale_x = (float)r / max_r; 
+        float scale_y = (float)r / max_r;
         
-        int draw_x = (int)( (0.5f + 0.5f * cos(rad) * scale) * grid_w );
-        int draw_y = (int)( (0.5f + 0.5f * sin(rad) * scale) * grid_h );
+        // Correct for grid aspect ratio if non-square (though here 40x40 is square logic)
+        // Center is (cx, cy)
+        
+        int draw_x = cx + (int)(cos(rad) * r * (float)grid_w / (max_r * 2));
+        int draw_y = cy + (int)(sin(rad) * r * (float)grid_h / (max_r * 2));
         
         if (draw_x >= 0 && draw_x < grid_w && draw_y >= 0 && draw_y < grid_h) {
             lines[draw_y][draw_x] = 'X';

@@ -8,6 +8,7 @@
 #include "flashlight_coordinator.h"
 #include "value_validator_coordinator.h"
 #include <vector>
+#include <mutex>
 
 namespace esphome {
 namespace ssocr_reader {
@@ -60,6 +61,7 @@ class SSOCRReader : public PollingComponent, public esphome::camera::CameraListe
   bool debug_{false};
   uint32_t last_request_time_{0};
   bool frame_requested_{false};
+  std::mutex frame_mutex_;  // Protects frame_requested_/processing_frame_ from camera callback
 
   void process_image(std::shared_ptr<esphome::camera::CameraImage> image);
   int recognize_digit(const std::vector<uint8_t> &binary_image, int width, int height);

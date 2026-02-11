@@ -33,6 +33,7 @@
 #include <vector>
 #include <string>
 #include <atomic>
+#include <mutex>
 
 // Check for Dual Core capability
 #if !defined(CONFIG_FREERTOS_UNICORE) && (portNUM_PROCESSORS > 1)
@@ -227,6 +228,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   std::atomic<bool> frame_available_{false};
   std::atomic<bool> processing_frame_{false};
   std::shared_ptr<camera::CameraImage> pending_frame_{nullptr};
+  std::mutex frame_mutex_;
   uint32_t last_request_time_{0};
   uint32_t pending_frame_acquisition_time_{0};
 
@@ -351,6 +353,9 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   QueueHandle_t output_queue_{nullptr};
   TaskHandle_t inference_task_handle_{nullptr};
   static void inference_task(void *arg);
+
+  // Sync state for safe unloading
+  std::atomic<bool> is_inferencing_{false};
 
 #endif
 };

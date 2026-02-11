@@ -78,17 +78,21 @@ static size_t calculate_optimal_pool_size() {
   }
 }
 
+// Mutex protecting pool arrays from cross-core data races
+static std::mutex pool_mutex;
+
 static InferenceJob* allocate_inference_job() {
-  // ESP_LOGD(TAG, "Allocating InferenceJob..."); 
-  for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
-    if (!inference_job_used[i]) {
-      inference_job_used[i] = true;
-      inference_job_pool[i].frame = nullptr;
-      inference_job_pool[i].crops.clear();
-      inference_job_pool[i].start_time = 0;
-      pool_job_hits++;
-      // ESP_LOGD(TAG, "Allocated from pool (index %d)", i);
-      return &inference_job_pool[i];
+  {
+    std::lock_guard<std::mutex> lock(pool_mutex);
+    for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
+      if (!inference_job_used[i]) {
+        inference_job_used[i] = true;
+        inference_job_pool[i].frame = nullptr;
+        inference_job_pool[i].crops.clear();
+        inference_job_pool[i].start_time = 0;
+        pool_job_hits++;
+        return &inference_job_pool[i];
+      }
     }
   }
   
@@ -107,27 +111,34 @@ static void free_inference_job(InferenceJob* job) {
   job->frame.reset(); 
   job->crops.clear();
 
-  for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
-    if (job == &inference_job_pool[i]) {
-      inference_job_used[i] = false;
-      return;
+  {
+    std::lock_guard<std::mutex> lock(pool_mutex);
+    for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
+      if (job == &inference_job_pool[i]) {
+        inference_job_used[i] = false;
+        return;
+      }
     }
   }
+  // Not from pool — heap-allocated fallback
   delete job;
 }
 
 static InferenceResult* allocate_inference_result() {
-  for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
-    if (!inference_result_used[i]) {
-      inference_result_used[i] = true;
-      inference_result_pool[i].inference_time = 0;
-      inference_result_pool[i].success = false;
-      // Force memory release by swapping with empty temporary, 
-      // ensuring no hidden capacity grows indefinitely in the pool.
-      std::vector<float>().swap(inference_result_pool[i].readings);
-      std::vector<float>().swap(inference_result_pool[i].probabilities);
-      pool_result_hits++;
-      return &inference_result_pool[i];
+  {
+    std::lock_guard<std::mutex> lock(pool_mutex);
+    for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
+      if (!inference_result_used[i]) {
+        inference_result_used[i] = true;
+        inference_result_pool[i].inference_time = 0;
+        inference_result_pool[i].success = false;
+        // Force memory release by swapping with empty temporary, 
+        // ensuring no hidden capacity grows indefinitely in the pool.
+        std::vector<float>().swap(inference_result_pool[i].readings);
+        std::vector<float>().swap(inference_result_pool[i].probabilities);
+        pool_result_hits++;
+        return &inference_result_pool[i];
+      }
     }
   }
   
@@ -141,14 +152,19 @@ static InferenceResult* allocate_inference_result() {
 }
 
 static void free_inference_result(InferenceResult* res) {
-  for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
-    if (res == &inference_result_pool[i]) {
-      inference_result_used[i] = false;
-      return;
+  {
+    std::lock_guard<std::mutex> lock(pool_mutex);
+    for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
+      if (res == &inference_result_pool[i]) {
+        inference_result_used[i] = false;
+        return;
+      }
     }
   }
+  // Not from pool — heap-allocated fallback
   delete res;
 }
+
 #endif
 
 
@@ -384,6 +400,7 @@ void MeterReaderTFLite::set_debug(bool debug) {
 }
 
 void MeterReaderTFLite::on_camera_image(const std::shared_ptr<camera::CameraImage> &image) {
+    std::lock_guard<std::mutex> lock(frame_mutex_);
     if (frame_requested_.load() && !processing_frame_.load()) {
         pending_frame_ = image;
         pending_frame_acquisition_time_ = millis(); 
@@ -663,9 +680,14 @@ void MeterReaderTFLite::trigger_low_confidence_collection(float value, float con
 
 void MeterReaderTFLite::process_available_frame() {
     processing_frame_ = true;
-    std::shared_ptr<camera::CameraImage> frame = pending_frame_;
-    pending_frame_.reset();
-    frame_available_ = false;
+    
+    std::shared_ptr<camera::CameraImage> frame;
+    {
+        std::lock_guard<std::mutex> lock(frame_mutex_);
+        frame = pending_frame_;
+        pending_frame_.reset();
+        frame_available_ = false;
+    }
     
     // Data Collection Interception
     #ifdef USE_DATA_COLLECTOR
@@ -1248,7 +1270,9 @@ void MeterReaderTFLite::inference_task(void *arg) {
             
             // Invoke TFLite (Thread-Safe because only this task calls it)
             // Note: queues are thread safe.
+            self->is_inferencing_ = true;
             auto tflite_results = self->tflite_coord_.run_inference(job->crops);
+            self->is_inferencing_ = false;
             
             InferenceResult* res = allocate_inference_result();
             res->inference_time = millis() - start;
@@ -1407,6 +1431,21 @@ void MeterReaderTFLite::unload_resources() {
     
     // 2. Stop Flashlight (stop timers/sequences)
     flashlight_coord_.disable_flash();
+
+    #ifdef SUPPORT_DOUBLE_BUFFERING
+    // 2.5. Wait for active inference to finish (Race Condition Fix)
+    // Clear input queue first to prevent new jobs
+    xQueueReset(input_queue_);
+    
+    uint32_t wait_start = millis();
+    while (is_inferencing_.load()) {
+        if (millis() - wait_start > 5000) {
+            ESP_LOGE(TAG, "Timeout waiting for inference to finish!");
+            break; 
+        }
+        delay(10);
+    }
+    #endif
     
     // 3. Unload TFLite Model & Arena
     tflite_coord_.unload_model();

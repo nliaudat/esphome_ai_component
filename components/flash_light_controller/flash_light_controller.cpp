@@ -55,8 +55,6 @@ void FlashLightController::initiate_capture_sequence(CaptureCallback callback) {
         this->set_timeout(flash_post_time_, [this]() {
             this->disable_flash();
             is_active_ = false;
-            this->disable_flash();
-            is_active_ = false;
             if (this->debug_) {
                 ESP_LOGD(TAG, "Flash sequence complete (Post-time %d ms finished)", flash_post_time_);
             } else {

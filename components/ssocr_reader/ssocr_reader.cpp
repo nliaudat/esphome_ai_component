@@ -75,6 +75,7 @@ void SSOCRReader::update() {
 }
 
 void SSOCRReader::on_camera_image(const std::shared_ptr<esphome::camera::CameraImage> &image) {
+    std::lock_guard<std::mutex> lock(frame_mutex_);
     if (frame_requested_ && !processing_frame_) {
         // Simple lock logic
         capture_next_ = true; // Flag for loop

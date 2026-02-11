@@ -37,6 +37,19 @@ class DataCollector : public Component {
 
   // Helper to upload
   bool upload_image(const uint8_t *data, size_t len, float raw_value, float confidence);
+  // Internal synchronous upload
+  bool process_upload_sync(const uint8_t *data, size_t len, float raw_value, float confidence);
+
+  struct UploadJob {
+      uint8_t *data;
+      size_t len;
+      float value;
+      float confidence;
+  };
+
+  QueueHandle_t upload_queue_{nullptr};
+  void start_upload_task();
+  static void upload_task(void *arg);
 };
 
 }  // namespace data_collector

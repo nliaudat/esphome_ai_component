@@ -7,6 +7,7 @@
 #include <cfloat>
 #include <vector>
 #include <cstring>
+#include <esp_heap_caps.h>
 
 namespace esphome {
 namespace analog_reader {
@@ -16,18 +17,35 @@ static const char *const TAG = "multi_algorithm";
 // PREPROCESSING FUNCTIONS
 
 void AnalogReader::preprocess_image(const uint8_t* img, int w, int h, int cx, int cy, int radius, NeedleType needle_type, std::vector<uint8_t>& output) {
-    // Resize working buffer if needed
-    if (output.size() != w * h) {
-        output.resize(w * h);
-    }
+    // Safe Resize Logic
+    size_t required_size = w * h;
+    
+    // Helper lambda to safely resize standard vectors.
+    auto safe_resize = [&](std::vector<uint8_t>& vec, const char* name) -> bool {
+        if (vec.size() != required_size) {
+            // Check if we need to allocate new memory (capacity increase)
+            if (vec.capacity() < required_size) {
+                // Check if enough contiguous memory exists to avoid hard crash (abort)
+                // Note: std::vector resize often allocates new block then copies, so we need free block >= new size.
+                // However, overhead might be higher. This is a best-effort check.
+                size_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+                if (largest_block < required_size) {
+                    ESP_LOGE(TAG, "CRITICAL: Not enough memory to resize %s. Need %u, Largest Free %u", name, required_size, largest_block);
+                    return false;
+                }
+            }
+            vec.resize(required_size);
+        }
+        return true;
+    };
+
+    if (!safe_resize(output, "output")) return;
     
     // Copy data to working buffer
     memcpy(output.data(), img, w * h);
-    
-    // Resize second scratch buffer
-    if (scratch_buffer_2_.size() != w * h) {
-        scratch_buffer_2_.resize(w * h);
-    }
+
+    if (!safe_resize(scratch_buffer_, "scratch1")) return;
+    if (!safe_resize(scratch_buffer_2_, "scratch2")) return;
 
     // Step 1: CLAHE (Contrast Limited Adaptive Histogram Equalization)
     apply_clahe(output.data(), w, h);
@@ -54,10 +72,13 @@ void AnalogReader::preprocess_image(const uint8_t* img, int w, int h, int cx, in
 
 void AnalogReader::apply_clahe(uint8_t* img, int w, int h, int tile_size) {
     // Simple tiled histogram equalization
+    // Pre-allocate scratch arrays outside the loop to avoid per-tile heap allocations
+    std::vector<int> hist(256);
+    std::vector<int> cdf(256);
     for (int tile_y = 0; tile_y < h; tile_y += tile_size) {
         for (int tile_x = 0; tile_x < w; tile_x += tile_size) {
             // Calculate local histogram
-            std::vector<int> hist(256, 0);
+            std::fill(hist.begin(), hist.end(), 0);
             int tile_pixels = 0;
             
             for (int y = tile_y; y < std::min(tile_y + tile_size, h); y++) {
@@ -68,7 +89,6 @@ void AnalogReader::apply_clahe(uint8_t* img, int w, int h, int tile_size) {
             }
             
             // Build CDF
-            std::vector<int> cdf(256, 0);
             cdf[0] = hist[0];
             for (int i = 1; i < 256; i++) {
                 cdf[i] = cdf[i-1] + hist[i];
@@ -121,15 +141,17 @@ void AnalogReader::median_filter_3x3(uint8_t* img, int w, int h) {
     std::vector<uint8_t> temp(w * h);
     memcpy(temp.data(), img, w * h);
     
+    // Fixed-size window on stack — avoids heap allocation per pixel
+    uint8_t window[9];
     for (int y = 1; y < h - 1; y++) {
         for (int x = 1; x < w - 1; x++) {
-            std::vector<uint8_t> window;
+            int count = 0;
             for (int dy = -1; dy <= 1; dy++) {
                 for (int dx = -1; dx <= 1; dx++) {
-                    window.push_back(temp[(y + dy) * w + (x + dx)]);
+                    window[count++] = temp[(y + dy) * w + (x + dx)];
                 }
             }
-            std::nth_element(window.begin(), window.begin() + 4, window.end());
+            std::nth_element(window, window + 4, window + count);
             img[y * w + x] = window[4];  // Median value
         }
     }

@@ -8,6 +8,9 @@
 
 // For HTTP Client
 #include "esp_http_client.h"
+#include "freertos/queue.h"
+#include "freertos/task.h"
+#include <cstring>
 
 namespace esphome {
 namespace data_collector {
@@ -16,6 +19,7 @@ static const char *const TAG = "data_collector";
 
 void DataCollector::setup() {
   ESP_LOGCONFIG(TAG, "Setting up Data Collector...");
+  this->start_upload_task();
 }
 
 void DataCollector::dump_config() {
@@ -81,11 +85,75 @@ void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, in
   this->upload_image(jpeg_buf, jpeg_len, raw_value, confidence);
   
   if (jpeg_buf) {
-    free(jpeg_buf);
+    // If we converted, we MUST free the temporary buffer.
+    // If we passed frame buffer (JPEG case), we do nothing.
+    // Logic: if pix_fmt == JPEG, jpeg_buf = frame->buf (no free).
+    // If pix_fmt != JPEG, converted=true, jpeg_buf allocated (needs free).
+    if (pix_fmt != PIXFORMAT_JPEG) {
+        free(jpeg_buf);
+    }
   }
 }
 
+// Async wrapper
 bool DataCollector::upload_image(const uint8_t *data, size_t len, float raw_value, float confidence) {
+    if (!upload_queue_) {
+        ESP_LOGE(TAG, "Upload queue not initialized");
+        return false;
+    }
+
+    // Allocate copy for the queue
+    uint8_t *copy = (uint8_t*)malloc(len);
+    if (!copy) {
+        ESP_LOGE(TAG, "Failed to allocate memory for upload queue (%d bytes)", len);
+        return false;
+    }
+    memcpy(copy, data, len);
+
+    UploadJob job;
+    job.data = copy;
+    job.len = len;
+    job.value = raw_value;
+    job.confidence = confidence;
+
+    // Send to queue (non-blocking or small timeout)
+    if (xQueueSend(upload_queue_, &job, 10 / portTICK_PERIOD_MS) != pdTRUE) {
+        ESP_LOGE(TAG, "Upload queue full! Dropping image.");
+        free(copy);
+        return false;
+    }
+    
+    return true;
+}
+
+void DataCollector::start_upload_task() {
+    // Create queue for 5 items (approx 250KB if 50KB each)
+    upload_queue_ = xQueueCreate(5, sizeof(UploadJob));
+    if (!upload_queue_) {
+        ESP_LOGE(TAG, "Failed to create upload queue");
+        return;
+    }
+
+    // Create task
+    xTaskCreate(upload_task, "upload_worker", 4096, this, tskIDLE_PRIORITY + 1, nullptr);
+}
+
+void DataCollector::upload_task(void *arg) {
+    DataCollector *collector = static_cast<DataCollector*>(arg);
+    UploadJob job;
+    
+    while (true) {
+        if (xQueueReceive(collector->upload_queue_, &job, portMAX_DELAY) == pdTRUE) {
+            // Process upload
+            collector->process_upload_sync(job.data, job.len, job.value, job.confidence);
+            
+            // Free the memory we allocated in upload_image
+            free(job.data);
+        }
+    }
+}
+
+bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, float raw_value, float confidence) {
   if (this->upload_url_.empty()) return false;
 
   ESP_LOGI(TAG, "Uploading image to %s...", this->upload_url_.c_str());
