@@ -1,6 +1,6 @@
 #pragma once
 
-// #define USE_CAMERA_ROTATOR
+#define USE_CAMERA_ROTATOR
 
 #ifdef USE_CAMERA_ROTATOR
 
