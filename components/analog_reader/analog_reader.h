@@ -106,8 +106,9 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   void add_dial(DialConfig config) { dials_.push_back(config); }
   
   // Services
-  void set_dial_range(std::string dial_id, float min_val, float max_val);
-  void set_dial_angle(std::string dial_id, float min_deg, float max_deg);
+  // Services
+  void set_dial_range(const std::string &dial_id, float min_val, float max_val);
+  void set_dial_angle(const std::string &dial_id, float min_deg, float max_deg);
 
  protected:
   // Detection algorithms

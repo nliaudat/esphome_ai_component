@@ -11,6 +11,7 @@
 #include "freertos/queue.h"
 #include "freertos/task.h"
 #include <cstring>
+#include <esp_heap_caps.h>
 
 namespace esphome {
 namespace data_collector {
@@ -19,14 +20,14 @@ static const char *const TAG = "data_collector";
 
 void DataCollector::setup() {
   ESP_LOGCONFIG(TAG, "Setting up Data Collector...");
-  this->start_upload_task();
+  start_upload_task();
 }
 
 void DataCollector::dump_config() {
   ESP_LOGCONFIG(TAG, "Data Collector:");
-  ESP_LOGCONFIG(TAG, "  Upload URL: %s", this->upload_url_.c_str());
-  if (this->web_submit_switch_) {
-    ESP_LOGCONFIG(TAG, "  Web Submit Switch: %s", this->web_submit_switch_->get_name().c_str());
+  ESP_LOGCONFIG(TAG, "  Upload URL: %s", upload_url_.c_str());
+  if (web_submit_switch_) {
+    ESP_LOGCONFIG(TAG, "  Web Submit Switch: %s", web_submit_switch_->get_name().c_str());
   }
 }
 
@@ -37,12 +38,12 @@ void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, in
   }
 
   // Check switch state if configured
-  if (this->web_submit_switch_ && !this->web_submit_switch_->state) {
+  if (web_submit_switch_ && !web_submit_switch_->state) {
     ESP_LOGD(TAG, "Data collection skipped (switch off)");
     return;
   }
 
-  if (this->upload_url_.empty()) {
+  if (upload_url_.empty()) {
     ESP_LOGW(TAG, "No upload URL configured");
     return;
   }
@@ -64,35 +65,28 @@ void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, in
   
   if (pix_fmt == PIXFORMAT_JPEG) {
       // Already JPEG, just cast (copy might be needed if upload logic modifies it, but here we likely just send)
-      jpeg_buf = (uint8_t*)frame->get_data_buffer();
+      jpeg_buf = const_cast<uint8_t *>(frame->get_data_buffer());
       jpeg_len = frame->get_data_length();
       
       // We don't own this buffer, so we shouldn't free it unless we copied it.
       // But upload_image takes raw pointer.
-      this->upload_image(jpeg_buf, jpeg_len, raw_value, confidence);
+      upload_image(jpeg_buf, jpeg_len, raw_value, confidence);
       // No free needed for frame buffer
       return; 
   }
 
   // Convert to JPEG
-  bool converted = fmt2jpg((uint8_t*)frame->get_data_buffer(), frame->get_data_length(), width, height, pix_fmt, 90, &jpeg_buf, &jpeg_len);
+  bool converted = fmt2jpg(const_cast<uint8_t *>(frame->get_data_buffer()), frame->get_data_length(), width, height, pix_fmt, 90, &jpeg_buf, &jpeg_len);
   
   if (!converted || !jpeg_buf) {
     ESP_LOGE(TAG, "JPEG compression failed");
     return;
   }
   
-  this->upload_image(jpeg_buf, jpeg_len, raw_value, confidence);
+  upload_image(jpeg_buf, jpeg_len, raw_value, confidence);
   
-  if (jpeg_buf) {
-    // If we converted, we MUST free the temporary buffer.
-    // If we passed frame buffer (JPEG case), we do nothing.
-    // Logic: if pix_fmt == JPEG, jpeg_buf = frame->buf (no free).
-    // If pix_fmt != JPEG, converted=true, jpeg_buf allocated (needs free).
-    if (pix_fmt != PIXFORMAT_JPEG) {
-        free(jpeg_buf);
-    }
-  }
+  // fmt2jpg allocates jpeg_buf on success — free it
+  free(jpeg_buf);
 }
 
 // Async wrapper
@@ -102,10 +96,15 @@ bool DataCollector::upload_image(const uint8_t *data, size_t len, float raw_valu
         return false;
     }
 
-    // Allocate copy for the queue
-    uint8_t *copy = (uint8_t*)malloc(len);
+    // Allocate copy for the queue (Prefer PSRAM for large image buffers)
+    uint8_t *copy = static_cast<uint8_t *>(heap_caps_malloc(len, MALLOC_CAP_SPIRAM));
     if (!copy) {
-        ESP_LOGE(TAG, "Failed to allocate memory for upload queue (%d bytes)", len);
+        // Fallback to internal RAM if PSRAM not available or full
+        copy = static_cast<uint8_t *>(malloc(len));
+    }
+    
+    if (!copy) {
+        ESP_LOGE(TAG, "Failed to allocate memory for upload queue (%zu bytes)", len);
         return false;
     }
     memcpy(copy, data, len);
@@ -183,12 +182,12 @@ DataCollector::~DataCollector() {
 }
 
 bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, float raw_value, float confidence) {
-  if (this->upload_url_.empty()) return false;
+  if (upload_url_.empty()) return false;
 
-  ESP_LOGI(TAG, "Uploading image to %s...", this->upload_url_.c_str());
+  ESP_LOGI(TAG, "Uploading image to %s...", upload_url_.c_str());
 
   esp_http_client_config_t config = {};
-  config.url = this->upload_url_.c_str();
+  config.url = upload_url_.c_str();
   config.method = HTTP_METHOD_POST;
   config.timeout_ms = 10000;
 
@@ -200,7 +199,7 @@ bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, float r
 
   esp_http_client_handle_t client = esp_http_client_init(&config);
   if (!client) {
-    ESP_LOGE(TAG, "Failed to allow http client");
+    ESP_LOGE(TAG, "Failed to allocate HTTP client");
     return false;
   }
 
@@ -234,7 +233,7 @@ bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, float r
     int status_code = esp_http_client_get_status_code(client);
     ESP_LOGI(TAG, "HTTP POST Status = %d, content_length = %lld", 
              status_code, esp_http_client_get_content_length(client));
-    if (this->debug_) {
+    if (debug_) {
         // Log response body if small? Or just detailed info
         // esp_http_client_read handling requires event loop or full read.
         // For now, log that we finished.

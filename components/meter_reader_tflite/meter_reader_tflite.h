@@ -356,6 +356,10 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
   // Sync state for safe unloading
   std::atomic<bool> is_inferencing_{false};
+  std::atomic<bool> task_running_{false};
+
+  void start_inference_pipeline();
+  void stop_inference_pipeline();
 
 #endif
 };

@@ -70,7 +70,7 @@ bool CameraWindowControl::set_window_from_crop_zones(esp32_camera::ESP32Camera* 
   }
   
   ESP_LOGI(TAG, "Setting camera window from %d crop zones: %s", 
-           (int)zones.size(), config.to_string().c_str());
+           static_cast<int>(zones.size()), config.to_string().c_str());
   
   return set_window(camera, config);
 }
@@ -380,7 +380,7 @@ CameraWindowControl::WindowConfig CameraWindowControl::calculate_window_from_zon
   config.height = (config.height / 4) * 4;
   
   ESP_LOGD(TAG, "Calculated window from %d zones: %s", 
-           (int)zones.size(), config.to_string().c_str());
+           static_cast<int>(zones.size()), config.to_string().c_str());
   
   return config;
 }

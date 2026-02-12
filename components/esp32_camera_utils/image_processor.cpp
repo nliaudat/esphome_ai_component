@@ -173,7 +173,7 @@ ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t* data, s
     }
     
     size_t out_size = w * h * channels;
-    uint8_t* raw_buf = (uint8_t*)jpeg_calloc_align(out_size, 16);
+    uint8_t* raw_buf = static_cast<uint8_t*>(jpeg_calloc_align(out_size, 16));
     if (!raw_buf) {
         ESP_LOGE(TAG, "CRITICAL: Failed to allocate JPEG output buffer (aligned) of size %zu", out_size);
         return nullptr;
@@ -418,7 +418,7 @@ ImageProcessor::ImageProcessor(const ImageProcessorConfig &config)
   
   #ifdef USE_CAMERA_ROTATOR
   if (config_.rotation != ROTATION_0) {
-    ESP_LOGI(TAG, "Image rotation enabled: %d degrees clockwise", (int)config_.rotation);
+    ESP_LOGI(TAG, "Image rotation enabled: %d degrees clockwise", static_cast<int>(config_.rotation));
   }
   #endif
 
@@ -494,7 +494,7 @@ ImageProcessor::UniqueBufferPtr ImageProcessor::allocate_image_buffer(size_t siz
 ImageProcessor::JpegBufferPtr ImageProcessor::allocate_jpeg_buffer(size_t size) {
     // We use jpeg_calloc_align because the deleter (JpegBufferDeleter) calls jpeg_free_align.
     // 16-byte alignment is standard for ESP JPEG lib.
-    uint8_t* ptr = (uint8_t*)jpeg_calloc_align(size, 16);
+    uint8_t* ptr = static_cast<uint8_t*>(jpeg_calloc_align(size, 16));
     return JpegBufferPtr(ptr);
 }
 
@@ -636,7 +636,7 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
            
            // We use jpeg_calloc_align for consistency since master_decoded_buffer is JpegBufferPtr (uptr with free_align)
            // Actually decode_jpeg returns a smart pointer compatible with jpeg_free_align.
-           uint8_t* raw_rot = (uint8_t*)jpeg_calloc_align(rot_size, 16);
+           uint8_t* raw_rot = static_cast<uint8_t*>(jpeg_calloc_align(rot_size, 16));
            if (raw_rot) {
                bool rot_success = Rotator::perform_rotation(
                    master_decoded_buffer.get(), raw_rot,
@@ -837,7 +837,7 @@ bool ImageProcessor::process_zone_to_buffer(
 
     if (zone.x1 < 0 || zone.y1 < 0 || zone.x2 > max_w || zone.y2 > max_h) {
         ESP_LOGE(TAG, "Zone out of bounds: [%d,%d->%d,%d] for image %dx%d (rot %d)",
-                 zone.x1, zone.y1, zone.x2, zone.y2, max_w, max_h, (int)config_.rotation);
+                 zone.x1, zone.y1, zone.x2, zone.y2, max_w, max_h, static_cast<int>(config_.rotation));
         return false;
     }
     
@@ -1292,13 +1292,13 @@ bool ImageProcessor::scale_rgb888_to_float32(
     return Scaler::scale_rgb888_to_float32(src, src_w, src_h, dst, dst_w, dst_h, channels, normalize);
 #else
     float* dst_float = reinterpret_cast<float*>(dst);
-    float scale_x = (float)src_w / dst_w;
-    float scale_y = (float)src_h / dst_h;
+    float scale_x = static_cast<float>(src_w) / dst_w;
+    float scale_y = static_cast<float>(src_h) / dst_h;
     
     for (int y = 0; y < dst_h; y++) {
         for (int x = 0; x < dst_w; x++) {
-            int src_x = (int)(x * scale_x);
-            int src_y = (int)(y * scale_y);
+            int src_x = static_cast<int>(x * scale_x);
+            int src_y = static_cast<int>(y * scale_y);
             
             int src_idx = (src_y * src_w + src_x) * 3;
             int dst_idx = (y * dst_w + x) * channels;
@@ -1325,13 +1325,13 @@ bool ImageProcessor::scale_rgb888_to_uint8(
 #ifdef USE_CAMERA_SCALER
     return Scaler::scale_rgb888_to_uint8(src, src_w, src_h, dst, dst_w, dst_h, channels);
 #else
-    float scale_x = (float)src_w / dst_w;
-    float scale_y = (float)src_h / dst_h;
+    float scale_x = static_cast<float>(src_w) / dst_w;
+    float scale_y = static_cast<float>(src_h) / dst_h;
     
     for (int y = 0; y < dst_h; y++) {
         for (int x = 0; x < dst_w; x++) {
-            int src_x = (int)(x * scale_x);
-            int src_y = (int)(y * scale_y);
+            int src_x = static_cast<int>(x * scale_x);
+            int src_y = static_cast<int>(y * scale_y);
             
             int src_idx = (src_y * src_w + src_x) * 3;
             int dst_idx = (y * dst_w + x) * channels;
@@ -1341,7 +1341,7 @@ bool ImageProcessor::scale_rgb888_to_uint8(
                 dst[dst_idx+1] = src[src_idx+1];
                 dst[dst_idx+2] = src[src_idx+2];
             } else if (channels == 1) {
-                dst[dst_idx] = (uint8_t)(0.299f * src[src_idx] + 0.587f * src[src_idx+1] + 0.114f * src[src_idx+2]);
+                dst[dst_idx] = static_cast<uint8_t>(0.299f * src[src_idx] + 0.587f * src[src_idx+1] + 0.114f * src[src_idx+2]);
             }
         }
     }
@@ -1359,8 +1359,8 @@ bool ImageProcessor::process_rgb888_crop_and_scale_to_float32(
     // Create a temporary buffer pointing to the crop start is tricky because of stride
     // So we do crop and scale in one go
     float* float_output = reinterpret_cast<float*>(output_buffer);
-    float x_scale = (float)crop_width / model_width;
-    float y_scale = (float)crop_height / model_height;
+    float x_scale = static_cast<float>(crop_width) / model_width;
+    float y_scale = static_cast<float>(crop_height) / model_height;
     
     for (int y = 0; y < model_height; y++) {
         int src_y = static_cast<int>(y * y_scale);
@@ -1394,8 +1394,8 @@ bool ImageProcessor::process_rgb888_crop_and_scale_to_uint8(
     const uint8_t* input_data, const CropZone& zone, int crop_width, int crop_height,
     uint8_t* output_buffer, int model_width, int model_height, int channels, int src_stride_width) {
     
-    float x_scale = (float)crop_width / model_width;
-    float y_scale = (float)crop_height / model_height;
+    float x_scale = static_cast<float>(crop_width) / model_width;
+    float y_scale = static_cast<float>(crop_height) / model_height;
     
     for (int y = 0; y < model_height; y++) {
         int src_y = static_cast<int>(y * y_scale);
@@ -1675,8 +1675,8 @@ bool ImageProcessor::apply_software_rotation(
     float abs_c = std::abs(c);
     float abs_s = std::abs(s);
     
-    out_w = (int)(width * abs_c + height * abs_s);
-    out_h = (int)(width * abs_s + height * abs_c);
+    out_w = static_cast<int>(width * abs_c + height * abs_s);
+    out_h = static_cast<int>(width * abs_s + height * abs_c);
 
     int cx = width / 2;
     int cy = height / 2;
@@ -1694,8 +1694,8 @@ bool ImageProcessor::apply_software_rotation(
             int tx = x - ncx;
             int ty = y - ncy;
             
-            int xs = (int)(tx * c + ty * s + cx);
-            int ys = (int)(-tx * s + ty * c + cy);
+            int xs = static_cast<int>(tx * c + ty * s + cx);
+            int ys = static_cast<int>(-tx * s + ty * c + cy);
             
             if (xs >= 0 && xs < width && ys >= 0 && ys < height) {
                  int src_idx = (ys * width + xs) * bytes_per_pixel;
@@ -1744,9 +1744,9 @@ void ImageProcessor::debug_log_image_stats(const uint8_t* data, size_t size,
     ESP_LOGD(TAG, "DEBUG %s first 10 values:", stage.c_str());
     char buf[64]; // Sufficient for 10 * 4 chars ("255 ")
     size_t offset = 0;
-    for (int i = 0; i < std::min(10, (int)size); i++) {
+    for (int i = 0; i < std::min(10, static_cast<int>(size)); i++) {
         int w = snprintf(buf + offset, sizeof(buf) - offset, "%u ", data[i]);
-        if (w < 0 || (size_t)w >= sizeof(buf) - offset) break;
+        if (w < 0 || static_cast<size_t>(w) >= sizeof(buf) - offset) break;
         offset += w;
     }
     ESP_LOGD(TAG, "  %s", buf);
@@ -1774,9 +1774,9 @@ void ImageProcessor::debug_log_float_stats(const float* data, size_t count,
              
     char buf[128]; // Sufficient for 10 * 8 chars ("1.234 ")
     size_t offset = 0;
-    for (int i = 0; i < std::min(10, (int)count); i++) {
+    for (int i = 0; i < std::min(10, static_cast<int>(count)); i++) {
         int w = snprintf(buf + offset, sizeof(buf) - offset, "%.3f ", data[i]);
-        if (w < 0 || (size_t)w >= sizeof(buf) - offset) break;
+        if (w < 0 || static_cast<size_t>(w) >= sizeof(buf) - offset) break;
         offset += w;
     }
     ESP_LOGD(TAG, "  %s", buf);

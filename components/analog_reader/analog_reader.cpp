@@ -134,7 +134,7 @@ void AnalogReader::setup() {
                [](const std::pair<float, float>& a, const std::pair<float, float>& b) {
                    return a.first < b.first;
                });
-           ESP_LOGD(TAG, "Sorted calibration mapping for dial %s (%d points)", dial.id.c_str(), (int)dial.calibration_mapping.size());
+           ESP_LOGD(TAG, "Sorted calibration mapping for dial %s (%d points)", dial.id.c_str(), static_cast<int>(dial.calibration_mapping.size()));
        }
    }
 
@@ -183,13 +183,13 @@ void AnalogReader::setup() {
         ESP_LOGI(TAG, "Allocating persistent buffer: %u bytes (%dx%d)", persistent_buffer_size_, img_width_, img_height_);
         
         // Try PSRAM first
-        persistent_buffer_ = (uint8_t*)heap_caps_malloc(persistent_buffer_size_, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        persistent_buffer_ = static_cast<uint8_t *>(heap_caps_malloc(persistent_buffer_size_, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
         
         if (persistent_buffer_) {
             ESP_LOGI(TAG, "Success: Buffer allocated in PSRAM");
         } else {
             ESP_LOGW(TAG, "Failed to allocate in PSRAM, falling back to internal RAM");
-            persistent_buffer_ = (uint8_t*)malloc(persistent_buffer_size_);
+            persistent_buffer_ = static_cast<uint8_t *>(malloc(persistent_buffer_size_));
         }
 
         if (persistent_buffer_) {
@@ -217,8 +217,8 @@ void AnalogReader::setup() {
 
 void AnalogReader::dump_config() {
   ESP_LOGCONFIG(TAG, "Analog Reader:");
-  ESP_LOGCONFIG(TAG, "  Debug: %s", this->debug_ ? "YES" : "NO");
-  ESP_LOGCONFIG(TAG, "  Update Interval: %u ms", this->get_update_interval());
+  ESP_LOGCONFIG(TAG, "  Debug: %s", debug_ ? "YES" : "NO");
+  ESP_LOGCONFIG(TAG, "  Update Interval: %u ms", get_update_interval());
   for (const auto &dial : dials_) {
       ESP_LOGCONFIG(TAG, "  Dial '%s': Scale=%.3f, Crop=[%d,%d,%d,%d], AutoContrast=%s, Contrast=%.2f", 
           dial.id.c_str(), dial.scale, dial.crop_x, dial.crop_y, dial.crop_w, dial.crop_h,
@@ -274,14 +274,12 @@ void AnalogReader::loop() {
     }
 
     if (frame) {
-        // OPTIMIZATION: Copy compressed data to local buffer and release frame IMMEDIATELY
+        // OPTIMIZATION: Pass frame buffer directly to processing instead of copying to working_buffer_.
+        // We hold the frame during processing, which is fine since we don't request a new one until we are done.
         if (frame->get_data_length() > 0) {
-             working_buffer_.assign(frame->get_data_buffer(), frame->get_data_buffer() + frame->get_data_length());
-             frame.reset(); 
-             if (!working_buffer_.empty()) {
-                  process_image_from_buffer(working_buffer_.data(), working_buffer_.size());
-             }
+             process_image_from_buffer(frame->get_data_buffer(), frame->get_data_length());
         }
+        frame.reset(); // Release frame after processing
         
         frame_requested_ = false;
     }
@@ -308,7 +306,7 @@ static void apply_auto_contrast(uint8_t* data, int size) {
     if (max_val > min_val) {
         float scale = 255.0f / (max_val - min_val);
         for (int i = 0; i < size; i++) {
-            data[i] = (uint8_t)((data[i] - min_val) * scale);
+            data[i] = static_cast<uint8_t>((data[i] - min_val) * scale);
         }
     }
 }
@@ -316,11 +314,11 @@ static void apply_auto_contrast(uint8_t* data, int size) {
 static void apply_contrast(uint8_t* data, int size, float contrast) {
     if (std::abs(contrast - 1.0f) < 0.01f) return;
     for (int i = 0; i < size; i++) {
-        float val = (float)data[i];
+        float val = static_cast<float>(data[i]);
         val = (val - 128.0f) * contrast + 128.0f;
         if (val < 0) val = 0; 
         if (val > 255) val = 255;
-        data[i] = (uint8_t)val;
+        data[i] = static_cast<uint8_t>(val);
     }
 }
 
@@ -358,7 +356,7 @@ void AnalogReader::process_image(std::shared_ptr<esphome::camera::CameraImage> i
 }
 
 void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
-  if (this->camera_ == nullptr || dials_.empty()) return;
+  if (camera_ == nullptr || dials_.empty()) return;
 
   if (processing_frame_) {
       ESP_LOGW(TAG, "Already processing, skipping");
@@ -371,7 +369,7 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
 
   // Basic validation
   ESP_LOGD(TAG, "Process Image From Buffer Start. Len: %u, Free Heap: %u", 
-           len, (uint32_t)esp_get_free_heap_size());
+           len, static_cast<uint32_t>(esp_get_free_heap_size()));
            
   // Basic validation
   if (data == nullptr || len == 0) {
@@ -429,7 +427,7 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
               data, len, &w, &h);
           
           if (decoded_buf) {
-              processing_image = std::make_shared<DecodedImage>(std::move(decoded_buf), (size_t)w, (size_t)h);
+              processing_image = std::make_shared<DecodedImage>(std::move(decoded_buf), static_cast<size_t>(w), static_cast<size_t>(h));
               is_decoded = true;
               processing_w = w;
               processing_h = h;
@@ -543,7 +541,7 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
           } else {
              // Fallback if somehow we got grayscale (shouldn't happen if logic is correct below)
              // input_for_algo already points to raw (grayscale)
-             ESP_LOGW(TAG, "Dial %s configured for channel %d but input is Grayscale", dial.id.c_str(), (int)dial.process_channel);
+             ESP_LOGW(TAG, "Dial %s configured for channel %d but input is Grayscale", dial.id.c_str(), static_cast<int>(dial.process_channel));
           }
       } 
       // Existing Color Mode: Convert RGB to Distance Map (Grayscale)
@@ -566,7 +564,7 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
               // This ensures compatibility with default needle_type (DARK)
               float val = (dist * 255.0f / 442.0f);
               if (val > 255) val = 255;
-              scratch_buffer_[i] = (uint8_t)val;
+              scratch_buffer_[i] = static_cast<uint8_t>(val);
           }
           input_for_algo = scratch_buffer_.data();
       } else if (dial.process_channel == PROCESS_CHANNEL_GRAYSCALE) {
@@ -589,7 +587,7 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
       float confidence = result.confidence;
 
       // Debug angle calculation (detailed logging)
-      if (this->debug_) {
+      if (debug_) {
           debug_angle_calculation(angle, dial);
       }
       
@@ -859,8 +857,8 @@ void AnalogReader::debug_dial_image(const uint8_t* img, int w, int h, float dete
     int max_r = std::min(cx, cy);
     
     for (int r = max_r/5; r < max_r; r++) { // Start 20% out
-        int draw_x = cx + (int)(cos(rad) * r * (float)grid_w / (max_r * 2));
-        int draw_y = cy + (int)(sin(rad) * r * (float)grid_h / (max_r * 2));
+        int draw_x = cx + static_cast<int>(cos(rad) * r * static_cast<float>(grid_w) / (max_r * 2));
+        int draw_y = cy + static_cast<int>(sin(rad) * r * static_cast<float>(grid_h) / (max_r * 2));
         
         if (draw_x >= 0 && draw_x < grid_w && draw_y >= 0 && draw_y < grid_h) {
             lines[draw_y][draw_x] = 'X';
@@ -918,7 +916,7 @@ void AnalogReader::debug_dial_image(const uint8_t* img, int w, int h, float dete
     }
 }
 
-void AnalogReader::set_dial_range(std::string dial_id, float min_val, float max_val) {
+void AnalogReader::set_dial_range(const std::string &dial_id, float min_val, float max_val) {
     for (auto &dial : dials_) {
         if (dial.id == dial_id) {
             dial.min_value = min_val;
@@ -930,7 +928,7 @@ void AnalogReader::set_dial_range(std::string dial_id, float min_val, float max_
     ESP_LOGW(TAG, "Dial '%s' not found for set_dial_range", dial_id.c_str());
 }
 
-void AnalogReader::set_dial_angle(std::string dial_id, float min_deg, float max_deg) {
+void AnalogReader::set_dial_angle(const std::string &dial_id, float min_deg, float max_deg) {
     for (auto &dial : dials_) {
         if (dial.id == dial_id) {
             dial.min_angle = min_deg;

@@ -99,7 +99,7 @@ void AnalogReader::apply_clahe(uint8_t* img, int w, int h, int tile_size) {
                 for (int x = tile_x; x < std::min(tile_x + tile_size, w); x++) {
                     uint8_t val = img[y * w + x];
                     if (tile_pixels > 0) {
-                        img[y * w + x] = (uint8_t)((cdf[val] * 255) / tile_pixels);
+                        img[y * w + x] = static_cast<uint8_t>((cdf[val] * 255) / tile_pixels);
                     }
                 }
             }
@@ -117,9 +117,9 @@ void AnalogReader::remove_background(uint8_t* img, int w, int h, int cx, int cy,
         float r_cos = cos_lut_[deg];
         float r_sin = sin_lut_[deg];
         
-        for (int r = (int)(radius * 0.8f); r < radius; r++) {
-            int px = cx + (int)(r * r_cos);
-            int py = cy + (int)(r * r_sin);
+        for (int r = static_cast<int>(radius * 0.8f); r < radius; r++) {
+            int px = cx + static_cast<int>(r * r_cos);
+            int py = cy + static_cast<int>(r * r_sin);
             if (px >= 0 && px < w && py >= 0 && py < h) {
                 bg_sum += img[py * w + px];
                 bg_count++;
@@ -131,8 +131,8 @@ void AnalogReader::remove_background(uint8_t* img, int w, int h, int cx, int cy,
         float bg_avg = bg_sum / bg_count;
         // Subtract background and enhance contrast
         for (int i = 0; i < w * h; i++) {
-            float diff = (float)img[i] - bg_avg;
-            img[i] = (uint8_t)std::max(0.0f, std::min(255.0f, diff * 2.0f + 128.0f));
+            float diff = static_cast<float>(img[i]) - bg_avg;
+            img[i] = static_cast<uint8_t>(std::max(0.0f, std::min(255.0f, diff * 2.0f + 128.0f)));
         }
     }
 }
@@ -221,8 +221,8 @@ void AnalogReader::apply_tophat(uint8_t* img, int w, int h, int kernel_size, std
         
         // 3. Original - Scratch (Opening)
         for (int i = 0; i < w * h; i++) {
-            int val = (int)img[i] - (int)scratch[i];
-            img[i] = (val < 0) ? 0 : (uint8_t)val;
+            int val = static_cast<int>(img[i]) - static_cast<int>(scratch[i]);
+            img[i] = (val < 0) ? 0 : static_cast<uint8_t>(val);
         }
     } else {
         // Black Top Hat: Closing - Original
@@ -240,8 +240,8 @@ void AnalogReader::apply_tophat(uint8_t* img, int w, int h, int kernel_size, std
         // Now Scratch2 is Closing.
         // 3. Scratch2 - Original
         for (int i = 0; i < w * h; i++) {
-            int val = (int)scratch2[i] - (int)img[i];
-            img[i] = (val < 0) ? 0 : (uint8_t)val;
+            int val = static_cast<int>(scratch2[i]) - static_cast<int>(img[i]);
+            img[i] = (val < 0) ? 0 : static_cast<uint8_t>(val);
         }
     }
 }
@@ -258,7 +258,7 @@ AnalogReader::DetectionResult AnalogReader::detect_radial_profile(const uint8_t*
     
     // Connectivity Scan
     int start_r = 5; // Start close to center (skip nut)
-    int max_radius_scan = (int)(radius * dial.max_scan_radius);
+    int max_radius_scan = static_cast<int>(radius * dial.max_scan_radius);
     
     // Configurable gap threshold
     const int MAX_GAP = 5;
@@ -273,8 +273,8 @@ AnalogReader::DetectionResult AnalogReader::detect_radial_profile(const uint8_t*
 
         // Trace ray from center outwards
         for (int r = start_r; r < max_radius_scan; r++) {
-            int px = cx + (int)(r * dx);
-            int py = cy + (int)(r * dy);
+            int px = cx + static_cast<int>(r * dx);
+            int py = cy + static_cast<int>(r * dy);
             
             if (px >= 0 && px < w && py >= 0 && py < h) {
                 uint8_t val = img[py * w + px];
@@ -327,7 +327,7 @@ AnalogReader::DetectionResult AnalogReader::detect_radial_profile(const uint8_t*
     }
     
     // Sub-pixel Interpolation
-    float best_angle = (float)best_angle_int;
+    float best_angle = static_cast<float>(best_angle_int);
     
     // Get valid neighbors (wrap around)
     int prev = (best_angle_int - 1 + 360) % 360;
@@ -387,16 +387,16 @@ AnalogReader::DetectionResult AnalogReader::detect_hough_transform(const uint8_t
             int gy = -img[(y-1)*w + (x-1)] - 2*img[(y-1)*w + x] - img[(y-1)*w + (x+1)]
                     + img[(y+1)*w + (x-1)] + 2*img[(y+1)*w + x] + img[(y+1)*w + (x+1)];
             
-            int magnitude = (int)sqrt(gx * gx + gy * gy);
+            int magnitude = static_cast<int>(sqrt(gx * gx + gy * gy));
             // edges[y*w + x] = (magnitude > 30) ? 255 : 0;
             
             // NMS (Non-Maximum Suppression) Lite
             // Determine gradient direction
             // 0: Horizontal, 1: 45deg, 2: Vertical, 3: 135deg
             if (magnitude > 30) {
-                 float angle = atan2((float)gy, (float)gx) * 180.0f / M_PI;
+                 float angle = atan2(static_cast<float>(gy), static_cast<float>(gx)) * 180.0f / M_PI;
                  if (angle < 0) angle += 180.0f;
-                 int q = ((int)(angle + 22.5f) % 180) / 45;
+                 int q = (static_cast<int>(angle + 22.5f) % 180) / 45;
                  
                  bool is_max = true;
                  int n1 = 0, n2 = 0;
@@ -417,7 +417,7 @@ AnalogReader::DetectionResult AnalogReader::detect_hough_transform(const uint8_t
                  
                  // Fallback: Just store magnitude in edges, doing NMS requires 2 passes or full buffer.
                  // We have edges buffer (w*h). Store magnitude there (uint8 clamped).
-                 edges[y*w + x] = (uint8_t)std::min(255, magnitude);
+                 edges[y*w + x] = static_cast<uint8_t>(std::min(255, magnitude));
             }
         }
     }
@@ -427,8 +427,8 @@ AnalogReader::DetectionResult AnalogReader::detect_hough_transform(const uint8_t
     std::vector<int> accumulator(NUM_ANGLES, 0);
     
     // Only consider edges in the dial area (30-90% radius)
-    int min_r = (int)(radius * dial.min_scan_radius);
-    int max_r = (int)(radius * dial.max_scan_radius);
+    int min_r = static_cast<int>(radius * dial.min_scan_radius);
+    int max_r = static_cast<int>(radius * dial.max_scan_radius);
     
     // Step 1.5: NMS Pass on edges buffer -> Voting
     // We iterate edges and vote
@@ -446,7 +446,7 @@ AnalogReader::DetectionResult AnalogReader::detect_hough_transform(const uint8_t
                     float theta = atan2(dy, dx) * 180.0f / M_PI;
                     if (theta < 0) theta += 360.0f;
                     
-                    int angle_idx = (int)theta % NUM_ANGLES;
+                    int angle_idx = static_cast<int>(theta) % NUM_ANGLES;
                     accumulator[angle_idx] += mag; // Weighted Vote
                 }
             }
@@ -464,12 +464,12 @@ AnalogReader::DetectionResult AnalogReader::detect_hough_transform(const uint8_t
         }
     }
     
-    float confidence = std::min(1.0f, (float)max_votes / (radius * 0.1f));  // Normalized
+    float confidence = std::min(1.0f, static_cast<float>(max_votes) / (radius * 0.1f));  // Normalized
     
     if (debug_) {
         ESP_LOGD(TAG, "Hough Transform: Best Angle Index=%d, Conf=%.2f", best_angle_idx, confidence);
     }
-    return {(float)best_angle_idx, confidence, "hough_transform"};
+    return {static_cast<float>(best_angle_idx), confidence, "hough_transform"};
 }
 
 AnalogReader::DetectionResult AnalogReader::detect_template_match(const uint8_t* img, int w, int h, const DialConfig& dial) {
@@ -491,12 +491,12 @@ AnalogReader::DetectionResult AnalogReader::detect_template_match(const uint8_t*
         int count = 0;
         
         // Sample along needle direction (30-90% radius)
-        int start_r = (int)(radius * dial.min_scan_radius);
-        int end_r = (int)(radius * dial.max_scan_radius);
+        int start_r = static_cast<int>(radius * dial.min_scan_radius);
+        int end_r = static_cast<int>(radius * dial.max_scan_radius);
         
         for (int r = start_r; r < end_r; r++) {
-            int px = cx + (int)(r * dx);
-            int py = cy + (int)(r * dy);
+            int px = cx + static_cast<int>(r * dx);
+            int py = cy + static_cast<int>(r * dy);
             
             if (px >= 0 && px < w && py >= 0 && py < h) {
                 // Score based on needle type - Preprocessed is always Bright
@@ -510,7 +510,7 @@ AnalogReader::DetectionResult AnalogReader::detect_template_match(const uint8_t*
             score /= count;
             if (score > best_score) {
                 best_score = score;
-                best_angle = (float)deg;
+                best_angle = static_cast<float>(deg);
             }
         }
     }
@@ -525,7 +525,7 @@ AnalogReader::DetectionResult AnalogReader::detect_template_match(const uint8_t*
         if (test_angle >= 360.0f) test_angle -= 360.0f;
         
         // Use LUT (wrap angle to integer 0-359)
-        int lut_angle = (int)test_angle;
+        int lut_angle = static_cast<int>(test_angle);
         if (lut_angle < 0) lut_angle += 360;
         if (lut_angle >= 360) lut_angle -= 360;
         
@@ -535,12 +535,12 @@ AnalogReader::DetectionResult AnalogReader::detect_template_match(const uint8_t*
         float score = 0.0f;
         int count = 0;
         
-        int start_r = (int)(radius * dial.min_scan_radius);
-        int end_r = (int)(radius * dial.max_scan_radius);
+        int start_r = static_cast<int>(radius * dial.min_scan_radius);
+        int end_r = static_cast<int>(radius * dial.max_scan_radius);
         
         for (int r = start_r; r < end_r; r++) {
-            int px = cx + (int)(r * dx);
-            int py = cy + (int)(r * dy);
+            int px = cx + static_cast<int>(r * dx);
+            int py = cy + static_cast<int>(r * dy);
             
             if (px >= 0 && px < w && py >= 0 && py < h) {
                 // Preprocessed image (TopHat) always has Bright Needle
@@ -581,8 +581,8 @@ AnalogReader::DetectionResult AnalogReader::detect_legacy(const uint8_t* img, in
     std::vector<float> edge_strength(360, 0.0f);
     
     // Ray Continuity Scan
-    int start_r = (int)(radius * 0.15f); // Start close to center
-    int end_r = (int)(radius * kScanEndRadius); // Use existing end_r
+    int start_r = static_cast<int>(radius * 0.15f); // Start close to center
+    int end_r = static_cast<int>(radius * kScanEndRadius); // Use existing end_r
     
     const int MAX_GAP = 5;
 
@@ -650,7 +650,7 @@ AnalogReader::DetectionResult AnalogReader::detect_legacy(const uint8_t* img, in
         
         if (combined_score > best_score) {
             best_score = combined_score;
-            best_angle = (float)deg;
+            best_angle = static_cast<float>(deg);
         }
     }
     

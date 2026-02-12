@@ -1,6 +1,6 @@
 #pragma once
 
-// #define USE_CAMERA_ROTATOR
+#define USE_CAMERA_ROTATOR
 
 #ifdef USE_CAMERA_ROTATOR
 
@@ -57,8 +57,8 @@ inline void Rotator::get_rotated_dimensions(int src_w, int src_h, float angle_de
     float cos_a = std::abs(std::cos(angle_rad));
     float sin_a = std::abs(std::sin(angle_rad));
 
-    out_w = (int)(src_w * cos_a + src_h * sin_a);
-    out_h = (int)(src_w * sin_a + src_h * cos_a);
+    out_w = static_cast<int>(src_w * cos_a + src_h * sin_a);
+    out_h = static_cast<int>(src_w * sin_a + src_h * cos_a);
     
     // Ensure even dimensions for compatibility usually
     if (out_w % 2 != 0) out_w++;
@@ -186,8 +186,8 @@ inline bool Rotator::perform_rotation(const uint8_t* input, uint8_t* output,
             float dx = x - ox;
             float dy = y - oy;
 
-            int sx = (int)(dx * cos_a + dy * sin_a + cx);
-            int sy = (int)(-dx * sin_a + dy * cos_a + cy);
+            int sx = static_cast<int>(dx * cos_a + dy * sin_a + cx);
+            int sy = static_cast<int>(-dx * sin_a + dy * cos_a + cy);
 
             if (sx >= 0 && sx < src_w && sy >= 0 && sy < src_h) {
                 int src_idx = (sy * src_w + sx) * channels;

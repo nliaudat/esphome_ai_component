@@ -25,6 +25,14 @@ static const char *const TAG = "meter_reader_tflite";
 using InferenceJob = MeterReaderTFLite::InferenceJob;
 using InferenceResult = MeterReaderTFLite::InferenceResult;
 
+// Forward declaration of free functions for custom deleters
+static void free_inference_job(InferenceJob* job);
+static void free_inference_result(InferenceResult* res);
+
+// Safe Ptr Types with Custom Deleters
+using InferenceJobPtr = std::unique_ptr<InferenceJob, decltype(&free_inference_job)>;
+using InferenceResultPtr = std::unique_ptr<InferenceResult, decltype(&free_inference_result)>;
+
 // Pool size determined at runtime based on available memory
 static size_t INFERENCE_POOL_SIZE = 4; // Will be adjusted in setup
 static constexpr size_t MIN_POOL_SIZE = 2;
@@ -81,7 +89,7 @@ static size_t calculate_optimal_pool_size() {
 // Mutex protecting pool arrays from cross-core data races
 static std::mutex pool_mutex;
 
-static InferenceJob* allocate_inference_job() {
+static InferenceJobPtr allocate_inference_job() {
   {
     std::lock_guard<std::mutex> lock(pool_mutex);
     for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
@@ -91,7 +99,7 @@ static InferenceJob* allocate_inference_job() {
         inference_job_pool[i].crops.clear();
         inference_job_pool[i].start_time = 0;
         pool_job_hits++;
-        return &inference_job_pool[i];
+        return InferenceJobPtr(&inference_job_pool[i], free_inference_job);
       }
     }
   }
@@ -103,7 +111,7 @@ static InferenceJob* allocate_inference_job() {
              100.0f * pool_job_hits / total);
   }
   ESP_LOGI(TAG, "Pool exhausted. Allocating new InferenceJob on heap.");
-  return new InferenceJob();
+  return InferenceJobPtr(new InferenceJob(), free_inference_job);
 }
 
 static void free_inference_job(InferenceJob* job) {
@@ -124,7 +132,7 @@ static void free_inference_job(InferenceJob* job) {
   delete job;
 }
 
-static InferenceResult* allocate_inference_result() {
+static InferenceResultPtr allocate_inference_result() {
   {
     std::lock_guard<std::mutex> lock(pool_mutex);
     for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
@@ -137,7 +145,7 @@ static InferenceResult* allocate_inference_result() {
         std::vector<float>().swap(inference_result_pool[i].readings);
         std::vector<float>().swap(inference_result_pool[i].probabilities);
         pool_result_hits++;
-        return &inference_result_pool[i];
+        return InferenceResultPtr(&inference_result_pool[i], free_inference_result);
       }
     }
   }
@@ -148,8 +156,9 @@ static InferenceResult* allocate_inference_result() {
     ESP_LOGW(TAG, "InferenceResult pool exhausted (efficiency: %.1f%%) – allocating on heap",
              100.0f * pool_result_hits / total);
   }
-  return new InferenceResult();
+  return InferenceResultPtr(new InferenceResult(), free_inference_result);
 }
+
 
 static void free_inference_result(InferenceResult* res) {
   {
@@ -200,7 +209,7 @@ void MeterReaderTFLite::setup() {
     // Load model first to ensure we can retrieve input specifications for camera configuration.
     ESP_LOGI(TAG, "Model loading will begin in %u ms...", MODEL_LOAD_DELAY_MS);
     // Delayed to ensure WiFi logger captures these startup logs
-    this->set_timeout(MODEL_LOAD_DELAY_MS, [this]() {
+    set_timeout(MODEL_LOAD_DELAY_MS, [this]() {
          ESP_LOGI(TAG, "Starting model loading...");
          esphome::App.feed_wdt(); // Feed before potentially long load
          if (!tflite_coord_.load_model()) {
@@ -218,15 +227,15 @@ void MeterReaderTFLite::setup() {
          // [MOVED] Sync Rotation FIRST
          if (esp32_camera_utils_) {
               // Sync rotation from Utils (Centralized Configuration)
-              this->rotation_ = esp32_camera_utils_->get_rotation();
-              ESP_LOGI(TAG, "Synced rotation from esp32_camera_utils: %.1f", this->rotation_);
+              rotation_ = esp32_camera_utils_->get_rotation();
+              ESP_LOGI(TAG, "Synced rotation from esp32_camera_utils: %.1f", rotation_);
               
               // Pass rotation to coordinator BEFORE updating processor config
-              camera_coord_.set_rotation(this->rotation_);
+              camera_coord_.set_rotation(rotation_);
          }
          
          // Pass preview setting to coordinator to enable caching if needed
-         camera_coord_.set_enable_preview(this->generate_preview_);
+         camera_coord_.set_enable_preview(generate_preview_);
          
          camera_coord_.update_image_processor_config(
              spec.input_width, 
@@ -284,7 +293,7 @@ void MeterReaderTFLite::setup() {
           #ifdef DEV_ENABLE_ROTATION
           if (web_server_) {
               web_server_->add_handler(new esphome::esp32_camera_utils::PreviewWebHandler([this]() {
-                  return this->get_preview_image();
+                  return get_preview_image();
               }));
           }
           #endif
@@ -292,7 +301,7 @@ void MeterReaderTFLite::setup() {
 
           // Print debug info on success (legacy behavior)
           #ifdef DEBUG_METER_READER_TFLITE
-          this->print_debug_info();
+          print_debug_info();
           #endif
           
           // Publish static memory stats
@@ -313,8 +322,8 @@ void MeterReaderTFLite::setup() {
     
     // 5. Setup Flashlight Coordinator Callback
     flashlight_coord_.set_request_frame_callback([this](){
-        this->frame_requested_ = true;
-        this->last_request_time_ = millis();
+        frame_requested_ = true;
+        last_request_time_ = millis();
         ESP_LOGD(TAG, "Frame requested via coordinator callback");
     });
     
@@ -338,32 +347,7 @@ void MeterReaderTFLite::setup() {
     }
     
     // 7. Setup Double Buffering Pipeline
-    ESP_LOGI(TAG, "Initializing Double Buffering (Dual Core mode)...");
-    input_queue_ = xQueueCreate(1, sizeof(InferenceJob*)); // Pointer depth 1 (Backpressure)
-    output_queue_ = xQueueCreate(2, sizeof(InferenceResult*)); // Pointer depth 2
-    
-    if (!input_queue_ || !output_queue_) {
-        ESP_LOGE(TAG, "Failed to create queues!");
-        if (main_logs_) main_logs_->publish_state("CRITICAL: Failed to create queues!");
-        mark_failed(); return;
-    }
-    
-    BaseType_t res = xTaskCreatePinnedToCore(
-        MeterReaderTFLite::inference_task, 
-        "inference_task", 
-        16384, // Stack size
-        this, // Pass this instance
-        1,    // Priority (Low)
-        &inference_task_handle_, 
-        0     // Pin to Core 0 (Main Loop is usually Core 1)
-    );
-    
-    if (res != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create inference task!");
-        if (main_logs_) main_logs_->publish_state("CRITICAL: Failed to create inference task!");
-        mark_failed(); return;
-    }
-    ESP_LOGI(TAG, "Double Buffering active on Core 0");
+    start_inference_pipeline();
     #endif
    
 
@@ -373,10 +357,10 @@ void MeterReaderTFLite::setup() {
     // Let's check the global pixel format config if feasible, or just force it if the model is V4 GRAY.
     // 8. Setup Dynamic Resource Buttons
     if (unload_button_) {
-        unload_button_->add_on_press_callback([this]() { this->unload_resources(); });
+        unload_button_->add_on_press_callback([this]() { unload_resources(); });
     }
     if (reload_button_) {
-        reload_button_->add_on_press_callback([this]() { this->reload_resources(); });
+        reload_button_->add_on_press_callback([this]() { reload_resources(); });
     }
 }
 
@@ -388,14 +372,14 @@ void MeterReaderTFLite::set_camera(camera::Camera *camera) { // -> CameraCoord c
 }
 
 void MeterReaderTFLite::set_debug(bool debug) {
-    this->debug_ = debug;
-    this->tflite_coord_.set_debug(debug);
-    this->camera_coord_.set_debug(debug);
-    this->flashlight_coord_.set_debug(debug);
+    debug_ = debug;
+    tflite_coord_.set_debug(debug);
+    camera_coord_.set_debug(debug);
+    flashlight_coord_.set_debug(debug);
     
     // Also enable legacy debug mode if it exists but ideally we use debug_ everywhere
     #ifdef DEBUG_METER_READER_TFLITE
-    this->set_debug_mode(debug);
+    set_debug_mode(debug);
     #endif
 }
 
@@ -471,7 +455,7 @@ void MeterReaderTFLite::update() {
 
 
 void MeterReaderTFLite::loop() {
-    if (this->is_failed()) return;
+    if (is_failed()) return;
 
     // Watchdog: If frame requested but not arrived, reset state
     if (frame_requested_ && (millis() - last_request_time_ > frame_request_timeout_ms_)) {
@@ -622,7 +606,7 @@ void MeterReaderTFLite::loop() {
                     // Lower is better. 0% = no fragmentation, 100% = highly fragmented
                     float fragmentation = 0.0f;
                     if (info.total_free_bytes > 0) {
-                        float efficiency = (float)info.largest_free_block / info.total_free_bytes;
+                        float efficiency = static_cast<float>(info.largest_free_block) / info.total_free_bytes;
                         fragmentation = (1.0f - efficiency) * 100.0f;
                     }
                     
@@ -647,10 +631,10 @@ void MeterReaderTFLite::trigger_low_confidence_collection(float value, float con
     if (!collect_low_confidence_ || !data_collector_) return;
     // User requested 0% to Threshold range.
     // if (confidence < low_confidence_trigger_threshold_) return; 
-    if (this->collection_state_ != COLLECTION_IDLE) return; 
+    if (collection_state_ != COLLECTION_IDLE) return; 
 
     // Prevent collection during Setup Mode (Preview) or calibration
-    if (this->generate_preview_ || this->is_calibrating()) {
+    if (generate_preview_ || is_calibrating()) {
         ESP_LOGD(TAG, "Data collection skipped (Setup Mode/Calibration active)");
         return;
     } 
@@ -658,7 +642,7 @@ void MeterReaderTFLite::trigger_low_confidence_collection(float value, float con
     ESP_LOGI(TAG, "Low confidence (%.2f%%) detected. Retaking with flash for data collection...", confidence * 100.0f);
 
     pending_collection_ = {value, confidence};
-    this->collection_state_ = COLLECTION_WAITING_FOR_FLASH;
+    collection_state_ = COLLECTION_WAITING_FOR_FLASH;
     
     // Force Flash via Coordinator
     flashlight_coord_.enable_flash();
@@ -669,11 +653,11 @@ void MeterReaderTFLite::trigger_low_confidence_collection(float value, float con
     if (delay < 500) delay = 500;
     if (delay > 5000) delay = 5000;
 
-    this->set_timeout(delay, [this]() {
+    set_timeout(delay, [this]() {
         ESP_LOGD(TAG, "Flash stabilized. Requesting data collection frame.");
-        this->collection_state_ = COLLECTION_WAITING_FOR_FRAME;
-        this->frame_requested_ = true;
-        this->last_request_time_ = millis();
+        collection_state_ = COLLECTION_WAITING_FOR_FRAME;
+        frame_requested_ = true;
+        last_request_time_ = millis();
     });
 }
 #endif
@@ -691,12 +675,12 @@ void MeterReaderTFLite::process_available_frame() {
     
     // Data Collection Interception
     #ifdef USE_DATA_COLLECTOR
-    if (this->collection_state_ == COLLECTION_WAITING_FOR_FRAME) {
-         if (this->data_collector_) {
-             this->data_collector_->collect_image(frame, camera_coord_.get_width(), camera_coord_.get_height(), camera_coord_.get_format(), pending_collection_.value, pending_collection_.confidence);
+    if (collection_state_ == COLLECTION_WAITING_FOR_FRAME) {
+         if (data_collector_) {
+             data_collector_->collect_image(frame, camera_coord_.get_width(), camera_coord_.get_height(), camera_coord_.get_format(), pending_collection_.value, pending_collection_.confidence);
          }
-         this->collection_state_ = COLLECTION_IDLE;
-         this->flashlight_coord_.disable_flash();
+         collection_state_ = COLLECTION_IDLE;
+         flashlight_coord_.disable_flash();
          processing_frame_ = false;
          return; 
     }
@@ -749,7 +733,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     esphome::App.feed_wdt();
     
     uint32_t preprocess_start = millis();
-    if (this->debug_) {
+    if (debug_) {
         ESP_LOGD(TAG, "Processing full image: Requesting frame processing from CameraCoordinator");
     }
     auto processed_buffers = camera_coord_.process_frame(frame, zones);
@@ -822,7 +806,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
         return;
     }
     
-    InferenceJob* job = allocate_inference_job();
+    InferenceJobPtr job = allocate_inference_job();
     ESP_LOGI(TAG, "Allocated InferenceJob. Assigning resources...");
 
     job->frame = frame; // Keep alive
@@ -832,12 +816,14 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     
     ESP_LOGI(TAG, "Job prepared. Enqueuing... (Preprocessing took %u ms)", millis() - start_time);
 
-    if (xQueueSend(input_queue_, &job, 0) != pdTRUE) {
+    InferenceJob* job_ptr = job.get();
+    if (xQueueSend(input_queue_, &job_ptr, 0) != pdTRUE) {
         ESP_LOGW(TAG, "Inference Queue Full - Dropping Frame");
-        free_inference_job(job);
+        // job destructor will cleanup automatically (calls free_inference_job)
         processing_frame_ = false;
     } else {
         ESP_LOGI(TAG, "Job successfully enqueued.");
+        job.release(); // Ownership transferred to queue
     }
     // Return immediately, loop() will handle result
     return;
@@ -890,7 +876,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
              ESP_LOGW(TAG, "Digit %d: Failed to infer", digit_index);
         }
         
-        if (this->debug_) {
+        if (debug_) {
             ESP_LOGD(TAG, "Digit %d: Val=%.2f, Conf=%.2f, Success=%s", 
                      digit_index, res.value, res.confidence, res.success ? "YES" : "NO");
         }
@@ -982,7 +968,7 @@ void MeterReaderTFLite::set_camera_image_format(int w, int h, const std::string 
 
 void MeterReaderTFLite::set_last_valid_value(float value) {
     ESP_LOGI(TAG, "Manual override: Setting last valid value to %.1f", value);
-    validation_coord_.set_last_valid_reading((int)value);
+    validation_coord_.set_last_valid_reading(static_cast<int>(value));
     
     // Immediately publish this as the truth to the sensor
     if (value_sensor_) {
@@ -1183,19 +1169,7 @@ bool MeterReaderTFLite::set_camera_window(int offset_x, int offset_y, int width,
 // Destructor
 MeterReaderTFLite::~MeterReaderTFLite() {
 #ifdef SUPPORT_DOUBLE_BUFFERING
-    // Clean up FreeRTOS resources
-    if (inference_task_handle_) {
-        vTaskDelete(inference_task_handle_);
-        inference_task_handle_ = nullptr;
-    }
-    if (input_queue_) {
-        vQueueDelete(input_queue_);
-        input_queue_ = nullptr;
-    }
-    if (output_queue_) {
-        vQueueDelete(output_queue_);
-        output_queue_ = nullptr;
-    }
+    stop_inference_pipeline();
 #endif
 } 
 
@@ -1234,8 +1208,8 @@ void MeterReaderTFLite::print_debug_info() {
 
 void MeterReaderTFLite::dump_config() {
   ESP_LOGCONFIG(TAG, "Meter Reader TFLite:");
-  ESP_LOGCONFIG(TAG, "  Confidence Threshold: %.2f", this->confidence_threshold_);
-  ESP_LOGCONFIG(TAG, "  Update Interval: %u ms", this->get_update_interval());
+  ESP_LOGCONFIG(TAG, "  Confidence Threshold: %.2f", confidence_threshold_);
+  ESP_LOGCONFIG(TAG, "  Update Interval: %u ms", get_update_interval());
   
   #ifdef SUPPORT_DOUBLE_BUFFERING
   ESP_LOGCONFIG(TAG, "  Pipeline: Double Buffering (Dual Core) ENABLED");
@@ -1243,7 +1217,7 @@ void MeterReaderTFLite::dump_config() {
   ESP_LOGCONFIG(TAG, "  Pipeline: Single Core (Sequential)");
   #endif
 
-  if (this->is_failed()) {
+  if (is_failed()) {
     ESP_LOGE(TAG, "  Component FAILED to setup");
   }
 }
@@ -1261,12 +1235,12 @@ void MeterReaderTFLite::inference_task(void *arg) {
     MeterReaderTFLite* self = (MeterReaderTFLite*)arg;
     InferenceJob* job = nullptr;
     
-    while (true) {
+    while (self->task_running_.load()) {
         // Set inferencing flag BEFORE blocking on queue to close race window
-        // with unload_resources(). This ensures unload_resources() will wait
-        // until we finish processing any dequeued job.
         self->is_inferencing_ = true;
-        if (xQueueReceive(self->input_queue_, &job, portMAX_DELAY) == pdTRUE) {
+        
+        // Use timeout to allow periodic checking of task_running_
+        if (xQueueReceive(self->input_queue_, &job, 500 / portTICK_PERIOD_MS) == pdTRUE) {
             if (!job) {
                 self->is_inferencing_ = false;
                 continue;
@@ -1276,11 +1250,10 @@ void MeterReaderTFLite::inference_task(void *arg) {
             uint32_t start = millis();
             
             // Invoke TFLite (Thread-Safe because only this task calls it)
-            // Note: queues are thread safe.
             auto tflite_results = self->tflite_coord_.run_inference(job->crops);
             self->is_inferencing_ = false;
             
-            InferenceResult* res = allocate_inference_result();
+            InferenceResultPtr res = allocate_inference_result();
             res->inference_time = millis() - start;
             res->total_start_time = job->start_time;
             #ifdef DEBUG_METER_READER_MEMORY
@@ -1298,16 +1271,93 @@ void MeterReaderTFLite::inference_task(void *arg) {
             
             // Send back
             ESP_LOGD(TAG, "Inference Task: TFLite done in %u ms. Sending to output queue...", millis() - start);
-            if (xQueueSend(self->output_queue_, &res, 100 / portTICK_PERIOD_MS) != pdTRUE) {
+            InferenceResult* res_ptr = res.get();
+            if (xQueueSend(self->output_queue_, &res_ptr, 100 / portTICK_PERIOD_MS) != pdTRUE) {
                 // Queue push failed, likely due to main loop backpressure. Drop result to prevent blocking.
-                free_inference_result(res);
+            } else {
+                res.release(); // Ownership transferred
             }
             job = nullptr;
         } else {
             self->is_inferencing_ = false;
         }
     }
+    ESP_LOGI(TAG, "Inference task stopping...");
+    vTaskDelete(NULL);
 }
+
+void MeterReaderTFLite::start_inference_pipeline() {
+    if (inference_task_handle_ != nullptr) return; // Already running
+
+    ESP_LOGI(TAG, "Initializing Double Buffering Pipeline...");
+    input_queue_ = xQueueCreate(1, sizeof(InferenceJob*)); // Pointer depth 1 (Backpressure)
+    output_queue_ = xQueueCreate(2, sizeof(InferenceResult*)); // Pointer depth 2
+    
+    if (!input_queue_ || !output_queue_) {
+        ESP_LOGE(TAG, "Failed to create queues!");
+        if (main_logs_) main_logs_->publish_state("CRITICAL: Failed to create queues!");
+        mark_failed(); return;
+    }
+    
+    task_running_ = true;
+    BaseType_t res = xTaskCreatePinnedToCore(
+        MeterReaderTFLite::inference_task, 
+        "inference_task", 
+        16384, // Stack size
+        this, // Pass this instance
+        1,    // Priority (Low)
+        &inference_task_handle_, 
+        0     // Pin to Core 0 (Main Loop is usually Core 1)
+    );
+    
+    if (res != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create inference task!");
+        if (main_logs_) main_logs_->publish_state("CRITICAL: Failed to create inference task!");
+        task_running_ = false;
+        mark_failed(); return;
+    }
+    ESP_LOGI(TAG, "Double Buffering active on Core 0");
+}
+
+void MeterReaderTFLite::stop_inference_pipeline() {
+    if (!inference_task_handle_) return;
+
+    ESP_LOGI(TAG, "Stopping Inference Pipeline...");
+    task_running_ = false;
+    
+    // Wait for task to exit
+    // Give it 2 seconds to finish current job and exit loop
+    uint32_t start = millis();
+    while (eTaskGetState(inference_task_handle_) != eDeleted) {
+        if (millis() - start > 2000) {
+             ESP_LOGW(TAG, "Timeout waiting for inference task to exit. Force deleting.");
+             vTaskDelete(inference_task_handle_);
+             break;
+        }
+        delay(10);
+    }
+    inference_task_handle_ = nullptr;
+    
+    // Drain input queue to free InferenceJob pointers
+    InferenceJob* leaked_job = nullptr;
+    while (xQueueReceive(input_queue_, &leaked_job, 0) == pdTRUE) {
+        if (leaked_job) free_inference_job(leaked_job);
+    }
+    
+    // Drain output queue
+    InferenceResult* res_ptr = nullptr;
+    while (xQueueReceive(output_queue_, &res_ptr, 0) == pdTRUE) {
+        if (res_ptr) free_inference_result(res_ptr);
+    }
+    
+    vQueueDelete(input_queue_);
+    vQueueDelete(output_queue_);
+    input_queue_ = nullptr;
+    output_queue_ = nullptr;
+    
+    ESP_LOGI(TAG, "Inference Pipeline Stopped");
+}
+
 #endif
 
 
@@ -1417,7 +1467,7 @@ void MeterReaderTFLite::update_calibration(float confidence) {
 
     if (calibration_.state != FlashCalibrationHandler::FINISHED) { 
         flashlight_coord_.set_timing(calibration_.current_pre, calibration_.current_post); 
-        this->set_timeout(1000, [this](){ 
+        set_timeout(1000, [this](){ 
             force_flash_inference(); 
         }); 
     } else { 
@@ -1441,21 +1491,7 @@ void MeterReaderTFLite::unload_resources() {
     flashlight_coord_.disable_flash();
 
     #ifdef SUPPORT_DOUBLE_BUFFERING
-    // 2.5. Wait for active inference to finish (Race Condition Fix)
-    // Drain input queue to free InferenceJob pointers (xQueueReset would leak them)
-    InferenceJob* leaked_job = nullptr;
-    while (xQueueReceive(input_queue_, &leaked_job, 0) == pdTRUE) {
-        if (leaked_job) free_inference_job(leaked_job);
-    }
-    
-    uint32_t wait_start = millis();
-    while (is_inferencing_.load()) {
-        if (millis() - wait_start > 5000) {
-            ESP_LOGE(TAG, "Timeout waiting for inference to finish!");
-            break; 
-        }
-        delay(10);
-    }
+    stop_inference_pipeline();
     #endif
     
     // 3. Unload TFLite Model & Arena
@@ -1495,11 +1531,13 @@ void MeterReaderTFLite::reload_resources() {
         inference_job_used[i] = false;
         inference_result_used[i] = false;
     }
+
+    start_inference_pipeline();
     #endif
 
     // 2. Reload Model & Config
     // Use timeout to schedule on main loop tick to avoid stack issues/recursion
-    this->set_timeout(100, [this]() {
+    set_timeout(100, [this]() {
          if (!tflite_coord_.load_model()) {
              ESP_LOGE(TAG, "Failed to reload model!");
              return;

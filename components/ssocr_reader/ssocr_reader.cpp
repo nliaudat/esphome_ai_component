@@ -17,8 +17,8 @@ void SSOCRReader::setup() {
 
 
   // 2. Setup Camera Coordinator
-  if (this->camera_) {
-      camera_coord_.set_camera((esp32_camera::ESP32Camera*)this->camera_);
+  if (camera_) {
+      camera_coord_.set_camera(static_cast<esp32_camera::ESP32Camera*>(camera_));
       
       // We assume img_width_ and img_height_ were set via set_resolution
       std::string fmt_str = "JPEG"; // Default
@@ -34,8 +34,8 @@ void SSOCRReader::setup() {
   flashlight_coord_.setup(this, nullptr, nullptr);
 
   // 4. Register Listener
-  if (this->camera_) {
-      this->camera_->add_listener(this);
+  if (camera_) {
+      camera_->add_listener(this);
   }
   
   // 5. Configure Image Processor
@@ -55,9 +55,9 @@ void SSOCRReader::setup() {
 
 void SSOCRReader::dump_config() {
   ESP_LOGCONFIG(TAG, "SSOCR Reader:");
-  ESP_LOGCONFIG(TAG, "  Threshold Level: %d", this->threshold_level_);
-  ESP_LOGCONFIG(TAG, "  Crop: x=%d, y=%d, w=%d, h=%d", this->crop_x_, this->crop_y_, this->crop_w_, this->crop_h_);
-  ESP_LOGCONFIG(TAG, "  Digit Count: %d", this->digit_count_);
+  ESP_LOGCONFIG(TAG, "  Threshold Level: %d", threshold_level_);
+  ESP_LOGCONFIG(TAG, "  Crop: x=%d, y=%d, w=%d, h=%d", crop_x_, crop_y_, crop_w_, crop_h_);
+  ESP_LOGCONFIG(TAG, "  Digit Count: %d", digit_count_);
 }
 
 void SSOCRReader::update() {
@@ -98,7 +98,7 @@ void SSOCRReader::set_pixel_format_str(const std::string &fmt) {
 }
 
 void SSOCRReader::process_image(std::shared_ptr<esphome::camera::CameraImage> image) {
-  if (this->camera_ == nullptr) return;
+  if (camera_ == nullptr) return;
   
   processing_frame_ = true;
   
@@ -120,14 +120,6 @@ void SSOCRReader::process_image(std::shared_ptr<esphome::camera::CameraImage> im
   
   if (results.empty() || !results[0].data) {
       ESP_LOGE(TAG, "Failed to process image via coordinator");
-      processing_frame_ = false;
-      return;
-  }
-  
-  // 3. Get ROI Buffer
-  // ProcessResult contains UniqueBufferPtr (unique_ptr<TrackedBuffer>)
-  if (!results[0].data) {
-      ESP_LOGE(TAG, "No data in result");
       processing_frame_ = false;
       return;
   }
@@ -188,13 +180,13 @@ void SSOCRReader::process_image(std::shared_ptr<esphome::camera::CameraImage> im
   }
 
   if (debug_) {
-      ESP_LOGD(TAG, "Found %d potential digits", (int)digit_bounds.size());
+      ESP_LOGD(TAG, "Found %d potential digits", static_cast<int>(digit_bounds.size()));
   }
 
   // Recognize
   std::string result_str = "";
   for (size_t k = 0; k < digit_bounds.size(); k++) {
-      if (k >= (size_t)this->digit_count_) break;
+      if (k >= static_cast<size_t>(digit_count_)) break;
       
       int d_x = digit_bounds[k].first;
       int d_w = digit_bounds[k].second - d_x;
@@ -208,7 +200,7 @@ void SSOCRReader::process_image(std::shared_ptr<esphome::camera::CameraImage> im
           }
       }
       
-      int val = this->recognize_digit(digit_roi, d_w, roi_h);
+      int val = recognize_digit(digit_roi, d_w, roi_h);
       if (val >= 0) {
           result_str += std::to_string(val);
       } else {
@@ -218,13 +210,13 @@ void SSOCRReader::process_image(std::shared_ptr<esphome::camera::CameraImage> im
 
   // Publish
   ESP_LOGI(TAG, "SSOCR Result: %s", result_str.c_str());
-  if (this->value_sensor_) {
+  if (value_sensor_) {
       if (result_str.find('?') == std::string::npos && !result_str.empty()) {
           // Parse as int first because validator expects int
           // This assumes the result is an integer number.
           // If we need float support, we must update ValueValidator or implement float logic.
           long v_long = strtol(result_str.c_str(), nullptr, 10);
-          int v = (int)v_long;
+          int v = static_cast<int>(v_long);
           
           // Validate
           int validated_v = v;
@@ -232,14 +224,14 @@ void SSOCRReader::process_image(std::shared_ptr<esphome::camera::CameraImage> im
 
           
           if (valid) {
-              this->value_sensor_->publish_state((float)validated_v);
-              if (this->confidence_sensor_) this->confidence_sensor_->publish_state(100.0f);
+              value_sensor_->publish_state(static_cast<float>(validated_v));
+              if (confidence_sensor_) confidence_sensor_->publish_state(100.0f);
           } else {
               ESP_LOGW(TAG, "Result invalid check logs");
           }
       } else {
            ESP_LOGW(TAG, "SSOCR Failed to read all digits");
-           this->value_sensor_->publish_state(NAN); 
+           value_sensor_->publish_state(NAN); 
       }
   }
   
@@ -284,8 +276,8 @@ int SSOCRReader::recognize_digit(const std::vector<uint8_t> &img, int w, int h) 
     uint8_t mask = 0;
     
     for (int i=0; i<7; i++) {
-        int sx = (int)(segments[i].x * w);
-        int sy = (int)(segments[i].y * h);
+        int sx = static_cast<int>(segments[i].x * w);
+        int sy = static_cast<int>(segments[i].y * h);
         
         // Sampling: Check a 3x3 window around point to be robust
         int on_pixels = 0;
@@ -301,7 +293,7 @@ int SSOCRReader::recognize_digit(const std::vector<uint8_t> &img, int w, int h) 
             }
         }
         
-        if ((float)on_pixels / count > 0.5) {
+        if (static_cast<float>(on_pixels) / static_cast<float>(count) > 0.5f) {
             mask |= (1 << i);
         }
     }
@@ -312,7 +304,7 @@ int SSOCRReader::recognize_digit(const std::vector<uint8_t> &img, int w, int h) 
     }
     
     if (debug_) {
-        ESP_LOGD(TAG, "Unknown mask: %d (Binary: " BYTE_TO_BINARY_PATTERN ")", mask, BYTE_TO_BINARY(mask));
+        ESP_LOGD(TAG, "Unknown mask: %d (0x%02X)", mask, mask);
     } else {
         ESP_LOGV(TAG, "Unknown mask: %d", mask);
     }

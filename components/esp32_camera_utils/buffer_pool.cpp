@@ -36,12 +36,12 @@ BufferPool::Buffer BufferPool::acquire(size_t size) {
   // Prefer SPIRAM for buffers >1KB
   uint8_t* data = nullptr;
   if (size > 1024) {
-    data = (uint8_t*)heap_caps_aligned_alloc(64, size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    data = static_cast<uint8_t *>(heap_caps_aligned_alloc(64, size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
   }
   
   // Fallback to internal RAM
   if (!data) {
-    data = (uint8_t*)heap_caps_aligned_alloc(64, size, MALLOC_CAP_8BIT);
+    data = static_cast<uint8_t *>(heap_caps_aligned_alloc(64, size, MALLOC_CAP_8BIT));
   }
   
   if (!data) {

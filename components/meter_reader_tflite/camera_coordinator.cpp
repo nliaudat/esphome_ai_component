@@ -37,7 +37,7 @@ bool CameraCoordinator::supports_window() const {
 
 bool CameraCoordinator::set_window(int offset_x, int offset_y, int width, int height) {
     if (!camera_) return false;
-    if (this->debug_) {
+    if (debug_) {
         ESP_LOGD(TAG, "Setting camera window: off(%d,%d) size(%dx%d)", 
                  offset_x, offset_y, width, height);
     } else {
@@ -135,20 +135,20 @@ void CameraCoordinator::update_image_processor_config(int model_width, int model
     config.model_height = model_height;
     config.model_channels = model_channels;
     
-    switch((int)rotation_) {
+    switch(static_cast<int>(rotation_)) {
         case 90:  config.rotation = esp32_camera_utils::ROTATION_90;  break;
         case 180: config.rotation = esp32_camera_utils::ROTATION_180; break;
         case 270: config.rotation = esp32_camera_utils::ROTATION_270; break;
         default:  config.rotation = esp32_camera_utils::ROTATION_0;   break;
     }
     
-    config.input_type = (esp32_camera_utils::ImageProcessorInputType)input_type;
+    config.input_type = static_cast<esp32_camera_utils::ImageProcessorInputType>(input_type);
     config.normalize = normalize;
     config.input_order = input_order;
     config.cache_preview_image = enable_preview_;
 
     image_processor_ = std::make_unique<esp32_camera_utils::ImageProcessor>(config);
-    if (this->debug_) {
+    if (debug_) {
         ESP_LOGD(TAG, "ImageProcessor initialized: %dx%d %s -> Model %dx%d (InputType: %d)", 
                  current_width_, current_height_, current_format_.c_str(), config.model_width, config.model_height, input_type);
     } else {
