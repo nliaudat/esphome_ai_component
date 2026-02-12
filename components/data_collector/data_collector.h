@@ -49,7 +49,7 @@ class DataCollector : public Component {
 
   QueueHandle_t upload_queue_{nullptr};
   TaskHandle_t upload_task_handle_{nullptr};
-  std::atomic<bool> task_running_{true};
+  std::atomic<bool> task_running_{false};
   void start_upload_task();
   static void upload_task(void *arg);
 };

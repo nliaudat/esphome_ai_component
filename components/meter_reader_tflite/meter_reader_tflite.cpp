@@ -347,32 +347,7 @@ void MeterReaderTFLite::setup() {
     }
     
     // 7. Setup Double Buffering Pipeline
-    ESP_LOGI(TAG, "Initializing Double Buffering (Dual Core mode)...");
-    input_queue_ = xQueueCreate(1, sizeof(InferenceJob*)); // Pointer depth 1 (Backpressure)
-    output_queue_ = xQueueCreate(2, sizeof(InferenceResult*)); // Pointer depth 2
-    
-    if (!input_queue_ || !output_queue_) {
-        ESP_LOGE(TAG, "Failed to create queues!");
-        if (main_logs_) main_logs_->publish_state("CRITICAL: Failed to create queues!");
-        mark_failed(); return;
-    }
-    
-    BaseType_t res = xTaskCreatePinnedToCore(
-        MeterReaderTFLite::inference_task, 
-        "inference_task", 
-        16384, // Stack size
-        this, // Pass this instance
-        1,    // Priority (Low)
-        &inference_task_handle_, 
-        0     // Pin to Core 0 (Main Loop is usually Core 1)
-    );
-    
-    if (res != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create inference task!");
-        if (main_logs_) main_logs_->publish_state("CRITICAL: Failed to create inference task!");
-        mark_failed(); return;
-    }
-    ESP_LOGI(TAG, "Double Buffering active on Core 0");
+    start_inference_pipeline();
     #endif
    
 
@@ -1194,19 +1169,7 @@ bool MeterReaderTFLite::set_camera_window(int offset_x, int offset_y, int width,
 // Destructor
 MeterReaderTFLite::~MeterReaderTFLite() {
 #ifdef SUPPORT_DOUBLE_BUFFERING
-    // Clean up FreeRTOS resources
-    if (inference_task_handle_) {
-        vTaskDelete(inference_task_handle_);
-        inference_task_handle_ = nullptr;
-    }
-    if (input_queue_) {
-        vQueueDelete(input_queue_);
-        input_queue_ = nullptr;
-    }
-    if (output_queue_) {
-        vQueueDelete(output_queue_);
-        output_queue_ = nullptr;
-    }
+    stop_inference_pipeline();
 #endif
 } 
 
@@ -1272,12 +1235,12 @@ void MeterReaderTFLite::inference_task(void *arg) {
     MeterReaderTFLite* self = (MeterReaderTFLite*)arg;
     InferenceJob* job = nullptr;
     
-    while (true) {
+    while (self->task_running_.load()) {
         // Set inferencing flag BEFORE blocking on queue to close race window
-        // with unload_resources(). This ensures unload_resources() will wait
-        // until we finish processing any dequeued job.
         self->is_inferencing_ = true;
-        if (xQueueReceive(self->input_queue_, &job, portMAX_DELAY) == pdTRUE) {
+        
+        // Use timeout to allow periodic checking of task_running_
+        if (xQueueReceive(self->input_queue_, &job, 500 / portTICK_PERIOD_MS) == pdTRUE) {
             if (!job) {
                 self->is_inferencing_ = false;
                 continue;
@@ -1287,7 +1250,6 @@ void MeterReaderTFLite::inference_task(void *arg) {
             uint32_t start = millis();
             
             // Invoke TFLite (Thread-Safe because only this task calls it)
-            // Note: queues are thread safe.
             auto tflite_results = self->tflite_coord_.run_inference(job->crops);
             self->is_inferencing_ = false;
             
@@ -1312,7 +1274,6 @@ void MeterReaderTFLite::inference_task(void *arg) {
             InferenceResult* res_ptr = res.get();
             if (xQueueSend(self->output_queue_, &res_ptr, 100 / portTICK_PERIOD_MS) != pdTRUE) {
                 // Queue push failed, likely due to main loop backpressure. Drop result to prevent blocking.
-                // res destructor will cleanup automatically
             } else {
                 res.release(); // Ownership transferred
             }
@@ -1321,7 +1282,82 @@ void MeterReaderTFLite::inference_task(void *arg) {
             self->is_inferencing_ = false;
         }
     }
+    ESP_LOGI(TAG, "Inference task stopping...");
+    vTaskDelete(NULL);
 }
+
+void MeterReaderTFLite::start_inference_pipeline() {
+    if (inference_task_handle_ != nullptr) return; // Already running
+
+    ESP_LOGI(TAG, "Initializing Double Buffering Pipeline...");
+    input_queue_ = xQueueCreate(1, sizeof(InferenceJob*)); // Pointer depth 1 (Backpressure)
+    output_queue_ = xQueueCreate(2, sizeof(InferenceResult*)); // Pointer depth 2
+    
+    if (!input_queue_ || !output_queue_) {
+        ESP_LOGE(TAG, "Failed to create queues!");
+        if (main_logs_) main_logs_->publish_state("CRITICAL: Failed to create queues!");
+        mark_failed(); return;
+    }
+    
+    task_running_ = true;
+    BaseType_t res = xTaskCreatePinnedToCore(
+        MeterReaderTFLite::inference_task, 
+        "inference_task", 
+        16384, // Stack size
+        this, // Pass this instance
+        1,    // Priority (Low)
+        &inference_task_handle_, 
+        0     // Pin to Core 0 (Main Loop is usually Core 1)
+    );
+    
+    if (res != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create inference task!");
+        if (main_logs_) main_logs_->publish_state("CRITICAL: Failed to create inference task!");
+        task_running_ = false;
+        mark_failed(); return;
+    }
+    ESP_LOGI(TAG, "Double Buffering active on Core 0");
+}
+
+void MeterReaderTFLite::stop_inference_pipeline() {
+    if (!inference_task_handle_) return;
+
+    ESP_LOGI(TAG, "Stopping Inference Pipeline...");
+    task_running_ = false;
+    
+    // Wait for task to exit
+    // Give it 2 seconds to finish current job and exit loop
+    uint32_t start = millis();
+    while (eTaskGetState(inference_task_handle_) != eDeleted) {
+        if (millis() - start > 2000) {
+             ESP_LOGW(TAG, "Timeout waiting for inference task to exit. Force deleting.");
+             vTaskDelete(inference_task_handle_);
+             break;
+        }
+        delay(10);
+    }
+    inference_task_handle_ = nullptr;
+    
+    // Drain input queue to free InferenceJob pointers
+    InferenceJob* leaked_job = nullptr;
+    while (xQueueReceive(input_queue_, &leaked_job, 0) == pdTRUE) {
+        if (leaked_job) free_inference_job(leaked_job);
+    }
+    
+    // Drain output queue
+    InferenceResult* res_ptr = nullptr;
+    while (xQueueReceive(output_queue_, &res_ptr, 0) == pdTRUE) {
+        if (res_ptr) free_inference_result(res_ptr);
+    }
+    
+    vQueueDelete(input_queue_);
+    vQueueDelete(output_queue_);
+    input_queue_ = nullptr;
+    output_queue_ = nullptr;
+    
+    ESP_LOGI(TAG, "Inference Pipeline Stopped");
+}
+
 #endif
 
 
@@ -1455,21 +1491,7 @@ void MeterReaderTFLite::unload_resources() {
     flashlight_coord_.disable_flash();
 
     #ifdef SUPPORT_DOUBLE_BUFFERING
-    // 2.5. Wait for active inference to finish (Race Condition Fix)
-    // Drain input queue to free InferenceJob pointers (xQueueReset would leak them)
-    InferenceJob* leaked_job = nullptr;
-    while (xQueueReceive(input_queue_, &leaked_job, 0) == pdTRUE) {
-        if (leaked_job) free_inference_job(leaked_job);
-    }
-    
-    uint32_t wait_start = millis();
-    while (is_inferencing_.load()) {
-        if (millis() - wait_start > 5000) {
-            ESP_LOGE(TAG, "Timeout waiting for inference to finish!");
-            break; 
-        }
-        delay(10);
-    }
+    stop_inference_pipeline();
     #endif
     
     // 3. Unload TFLite Model & Arena
@@ -1509,6 +1531,8 @@ void MeterReaderTFLite::reload_resources() {
         inference_job_used[i] = false;
         inference_result_used[i] = false;
     }
+
+    start_inference_pipeline();
     #endif
 
     // 2. Reload Model & Config
