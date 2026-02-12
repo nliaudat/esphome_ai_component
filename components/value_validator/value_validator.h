@@ -11,10 +11,6 @@
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include <vector>
-#include <deque>
-#include <algorithm>
-#include <numeric>
-#include <cmath>
 
 namespace esphome {
 namespace value_validator {
@@ -39,10 +35,10 @@ class ReadingHistory {
   float get_last_confidence() const;
   int get_hour_median() const;
   int get_day_median() const;
+  int get_median_within_ms(uint32_t max_elapsed_ms) const;
   std::vector<int> get_recent_readings(size_t count) const;
   std::vector<std::pair<int, float>> get_recent_readings_with_confidence(size_t count) const;
   
-  size_t get_hour_count() const;
   size_t get_day_count() const { return count_; }
   
   void clear();
@@ -68,7 +64,7 @@ class ValueValidator : public Component {
   struct ValidationConfig {
     bool allow_negative_rates{false};
     int max_absolute_diff{100};
-    float max_rate_change{0.15f}; // 15% maximum change per reading
+    float max_rate_change{0.15f}; // Maximum relative change as fraction (0.15 = 15%)
     bool enable_smart_validation{true};
     int smart_validation_window{5};
     float high_confidence_threshold{0.90f}; // Threshold for validation override
@@ -138,7 +134,7 @@ class ValueValidator : public Component {
   uint8_t* digit_history_counts_{nullptr}; // [num_digits]
   uint8_t* digit_history_heads_{nullptr};  // [num_digits]
   size_t digit_history_num_digits_{0};
-  static const size_t DIGIT_HISTORY_SIZE = 5;
+  static constexpr size_t DIGIT_HISTORY_SIZE = 5;
 
   bool first_reading_{true};
   int first_reading_count_{0}; // Count of consistent first readings
@@ -167,7 +163,7 @@ class ValueValidator : public Component {
   int find_most_plausible_reading(int new_reading, const std::vector<int>& recent_readings);
   bool is_small_increment(int new_reading, int last_reading) const;
   int calculate_digit_difference(int reading1, int reading2) const;
-  int get_stable_digit(int digit_index, int new_digit);
+  int get_stable_digit(size_t digit_index, int new_digit);
   void ensure_digit_history_size(size_t num_digits);
   void ensure_last_valid_digits_size(size_t num_digits);
   void ensure_last_good_values_capacity(size_t capacity);
