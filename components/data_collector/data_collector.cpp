@@ -11,6 +11,7 @@
 #include "freertos/queue.h"
 #include "freertos/task.h"
 #include <cstring>
+#include <esp_heap_caps.h>
 
 namespace esphome {
 namespace data_collector {
@@ -95,8 +96,13 @@ bool DataCollector::upload_image(const uint8_t *data, size_t len, float raw_valu
         return false;
     }
 
-    // Allocate copy for the queue
-    uint8_t *copy = static_cast<uint8_t *>(malloc(len));
+    // Allocate copy for the queue (Prefer PSRAM for large image buffers)
+    uint8_t *copy = static_cast<uint8_t *>(heap_caps_malloc(len, MALLOC_CAP_SPIRAM));
+    if (!copy) {
+        // Fallback to internal RAM if PSRAM not available or full
+        copy = static_cast<uint8_t *>(malloc(len));
+    }
+    
     if (!copy) {
         ESP_LOGE(TAG, "Failed to allocate memory for upload queue (%zu bytes)", len);
         return false;
