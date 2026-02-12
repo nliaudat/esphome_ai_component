@@ -82,17 +82,15 @@ float ReadingHistory::get_last_confidence() const {
 int ReadingHistory::get_hour_median() const {
   if (count_ == 0 || !buffer_) return 0;
   
-  // Iterate backwards
-  // Access last reading directly
   size_t last_idx = (head_ == 0) ? (capacity_ - 1) : (head_ - 1);
   uint32_t now = buffer_[last_idx].timestamp;
-  
-  uint32_t threshold = (now >= 3600000) ? (now - 3600000) : 0;
 
   std::vector<int> values;
   size_t curr = last_idx;
   for (size_t i = 0; i < count_; i++) {
-      if (buffer_[curr].timestamp < threshold) break;
+      // Unsigned subtraction handles millis() overflow correctly
+      uint32_t elapsed = now - buffer_[curr].timestamp;
+      if (elapsed > 3600000) break;
       values.push_back(buffer_[curr].value);
       
       if (curr == 0) curr = capacity_ - 1;
@@ -116,17 +114,15 @@ int ReadingHistory::get_hour_median() const {
 int ReadingHistory::get_day_median() const {
   if (count_ == 0 || !buffer_) return 0;
   
-  // Need timestamp of last reading
   size_t last_idx = (head_ == 0) ? (capacity_ - 1) : (head_ - 1);
   uint32_t now = buffer_[last_idx].timestamp;
-  
-  // 24 hours = 86400000 ms
-  uint32_t threshold = (now >= 86400000) ? (now - 86400000) : 0;
 
   std::vector<int> values;
   size_t curr = last_idx;
   for (size_t i = 0; i < count_; i++) {
-      if (buffer_[curr].timestamp < threshold) break;
+      // Unsigned subtraction handles millis() overflow correctly
+      uint32_t elapsed = now - buffer_[curr].timestamp;
+      if (elapsed > 86400000) break;
       values.push_back(buffer_[curr].value);
       
       if (curr == 0) curr = capacity_ - 1;
@@ -168,6 +164,24 @@ std::vector<int> ReadingHistory::get_recent_readings(size_t count) const {
   return recent;
 }
 
+std::vector<std::pair<int, float>> ReadingHistory::get_recent_readings_with_confidence(size_t count) const {
+  std::vector<std::pair<int, float>> recent;
+  if (count_ == 0 || !buffer_) return recent;
+  
+  size_t actual_count = std::min(count, count_);
+  
+  for (size_t k = 0; k < actual_count; k++) {
+      size_t offset = actual_count - 1 - k;
+      size_t idx;
+      if (head_ > offset) idx = head_ - 1 - offset;
+      else idx = head_ - 1 - offset + capacity_;
+      
+      recent.push_back({buffer_[idx].value, buffer_[idx].confidence});
+  }
+  
+  return recent;
+}
+
 void ReadingHistory::clear() {
   head_ = 0;
   count_ = 0;
@@ -178,6 +192,8 @@ void ValueValidator::setup() {
   history_.set_max_history_size_bytes(config_.max_history_size_bytes);
   last_valid_reading_ = 0;
   first_reading_ = true;
+  first_reading_count_ = 0;
+  first_reading_candidate_ = 0;
   last_good_values_count_ = 0;
   last_good_values_head_ = 0;
   consecutive_rejections_ = 0;
@@ -186,6 +202,21 @@ void ValueValidator::setup() {
   
   // Initialize with some capacity
   ensure_last_good_values_capacity(config_.smart_validation_window);
+  
+  // Restore persistent state if enabled
+  if (config_.persist_state) {
+    pref_ = global_preferences->make_preference<int>(fnv1_hash("value_validator"));
+    int restored = 0;
+    if (pref_.load(&restored) && restored > 0) {
+      last_valid_reading_ = restored;
+      first_reading_ = false;
+      // Seed good values with restored reading
+      for (int i = 0; i < config_.smart_validation_window; i++) {
+        add_good_value(restored);
+      }
+      ESP_LOGI(TAG, "Restored persistent state: last_valid_reading = %d", restored);
+    }
+  }
 }
 
 void ValueValidator::dump_config() {
@@ -195,11 +226,18 @@ void ValueValidator::dump_config() {
   ESP_LOGCONFIG(TAG, "  Strict Confidence Check: %s", YESNO(config_.strict_confidence_check));
   ESP_LOGCONFIG(TAG, "  Per Digit Conf Threshold: %.2f", config_.per_digit_confidence_threshold);
   ESP_LOGCONFIG(TAG, "  Max Consecutive Rejections: %d", config_.max_consecutive_rejections);
+  ESP_LOGCONFIG(TAG, "  Small Negative Tolerance: %d", config_.small_negative_tolerance);
+  ESP_LOGCONFIG(TAG, "  Persist State: %s", YESNO(config_.persist_state));
   ESP_LOGCONFIG(TAG, "  Max History Size: %d bytes", (int)config_.max_history_size_bytes);
 }
 
 bool ValueValidator::validate_reading(int new_reading, float confidence, int& validated_reading) {
   uint32_t current_time = millis();
+  
+  // Publish raw reading diagnostic
+  if (raw_reading_sensor_) {
+    raw_reading_sensor_->publish_state(new_reading);
+  }
   
   // Capture last confidence before adding the new reading
   float last_confidence = history_.get_last_confidence();
@@ -207,19 +245,54 @@ bool ValueValidator::validate_reading(int new_reading, float confidence, int& va
   // Always add to history for tracking
   history_.add_reading(new_reading, current_time, confidence);
   
-  // First reading is always accepted
+  // First reading: require high confidence or 3 consistent readings
   if (first_reading_) {
-    last_valid_reading_ = new_reading;
-    first_reading_ = false;
-    validated_reading = new_reading;
+    if (confidence >= config_.high_confidence_threshold) {
+      // High confidence — accept immediately
+      last_valid_reading_ = new_reading;
+      first_reading_ = false;
+      first_reading_count_ = 0;
+      validated_reading = new_reading;
+      
+      last_good_values_count_ = 0;
+      last_good_values_head_ = 0;
+      add_good_value(new_reading);
+      
+      ESP_LOGI(TAG, "First reading accepted (high confidence): %d (confidence: %.2f)", new_reading, confidence);
+      publish_diagnostics_("normal");
+      save_state_();
+      return true;
+    }
     
-    // Initialize last good values
-    last_good_values_count_ = 0;
-    last_good_values_head_ = 0;
-    add_good_value(new_reading);
+    // Low confidence — require consistency
+    if (new_reading == first_reading_candidate_) {
+      first_reading_count_++;
+    } else {
+      first_reading_candidate_ = new_reading;
+      first_reading_count_ = 1;
+    }
     
-    ESP_LOGI(TAG, "First reading accepted: %d (confidence: %.2f)", new_reading, confidence);
-    return true;
+    if (first_reading_count_ >= 3) {
+      // 3 consistent readings — accept
+      last_valid_reading_ = new_reading;
+      first_reading_ = false;
+      first_reading_count_ = 0;
+      validated_reading = new_reading;
+      
+      last_good_values_count_ = 0;
+      last_good_values_head_ = 0;
+      add_good_value(new_reading);
+      
+      ESP_LOGI(TAG, "First reading accepted (3 consistent): %d (confidence: %.2f)", new_reading, confidence);
+      publish_diagnostics_("normal");
+      save_state_();
+      return true;
+    }
+    
+    ESP_LOGW(TAG, "First reading %d rejected (conf: %.2f < %.2f, consistent: %d/3)", 
+             new_reading, confidence, config_.high_confidence_threshold, first_reading_count_);
+    publish_diagnostics_("initializing");
+    return false;
   }
   
   // Apply smart validation
@@ -230,8 +303,16 @@ bool ValueValidator::validate_reading(int new_reading, float confidence, int& va
   if (is_valid) {
     // Update last good values
     add_good_value(new_reading);
-    // Capacity managed by ring buffer logic automatically
     last_valid_reading_ = new_reading;
+    save_state_();
+    publish_diagnostics_("normal");
+  } else {
+    // Publish diagnostic state based on rejection count
+    if (consecutive_rejections_ >= config_.max_consecutive_rejections) {
+      publish_diagnostics_("stuck");
+    } else if (consecutive_rejections_ > 0) {
+      publish_diagnostics_("rejecting");
+    }
   }
   
   if (this->debug_) {
@@ -309,6 +390,10 @@ bool ValueValidator::validate_reading(const std::vector<float>& digits, const st
   int filtered_val = raw_val;
   bool final_valid_check = true; // Assumed valid unless strict check fails
   
+  if (!first_reading_ && last_valid_digits_count_ != current_digits.size()) {
+      ESP_LOGW(TAG, "Digit count changed: %d -> %d. Resetting digit history.",
+               (int)last_valid_digits_count_, (int)current_digits.size());
+  }
   if (!first_reading_ && last_valid_digits_count_ == current_digits.size()) {
       std::string filtered_digit_string;
       bool modified = false;
@@ -448,9 +533,9 @@ bool ValueValidator::is_digit_plausible(int new_reading, int last_reading) const
   if (!config_.allow_negative_rates && new_reading < last_reading) {
     // Allow small negative fluctuations (meter reset or small calibration issues)
     int negative_diff = last_reading - new_reading;
-    if (negative_diff > 5) { // Allow very small negative changes (up to 5 units)
-      ESP_LOGW(TAG, "Negative rate detected: %d -> %d (diff: %d)", 
-               last_reading, new_reading, negative_diff);
+    if (negative_diff > config_.small_negative_tolerance) {
+      ESP_LOGW(TAG, "Negative rate detected: %d -> %d (diff: %d, tolerance: %d)", 
+               last_reading, new_reading, negative_diff, config_.small_negative_tolerance);
     return false;
     }
   }
@@ -491,7 +576,7 @@ int ValueValidator::apply_smart_validation(int new_reading, float confidence, fl
            // If consistent but negative, check if we should self-correct
            if (!config_.allow_negative_rates && new_reading < last_valid_reading_) {
                int negative_diff = last_valid_reading_ - new_reading;
-               if (negative_diff <= 5) {
+               if (negative_diff <= config_.small_negative_tolerance) {
                    // Small fluctuation — always allowed
                } else if (consecutive_rejections_ >= config_.max_consecutive_rejections) {
                    // Too many consecutive rejections with high confidence — likely last_valid was wrong
@@ -575,32 +660,53 @@ int ValueValidator::apply_smart_validation(int new_reading, float confidence, fl
   // Self-correction for fluctuating readings:
   // When readings alternate between OCR variants (e.g. 256517/256617), the consistency 
   // check (3 identical) never passes. After enough rejections with high confidence,
-  // find the consensus (most frequent) value from recent history and accept it.
+  // find the consensus (most frequent) value from recent history, weighted by confidence.
   if (consecutive_rejections_ >= config_.max_consecutive_rejections) {
       float avg_conf = (consecutive_rejections_ > 0) ? 
           (rejection_confidence_sum_ / consecutive_rejections_) : 0.0f;
       if (avg_conf >= config_.high_confidence_threshold) {
-          // Find the most frequent reading in recent history as consensus
-          auto recent_all = history_.get_recent_readings(config_.max_consecutive_rejections);
+          // Find the confidence-weighted best reading from recent history
+          auto recent_all = history_.get_recent_readings_with_confidence(config_.max_consecutive_rejections);
           if (!recent_all.empty()) {
-              // Count occurrences of each value
-              int best_val = recent_all[0];
-              int best_count = 0;
-              for (size_t i = 0; i < recent_all.size(); i++) {
-                  int count = 0;
-                  for (size_t j = 0; j < recent_all.size(); j++) {
-                      if (recent_all[j] == recent_all[i]) count++;
+              // Accumulate confidence weight per unique value
+              // Use simple parallel arrays to avoid std::map on ESP32
+              std::vector<int> unique_vals;
+              std::vector<float> conf_sums;
+              std::vector<int> counts;
+              
+              for (auto& pair : recent_all) {
+                  bool found = false;
+                  for (size_t i = 0; i < unique_vals.size(); i++) {
+                      if (unique_vals[i] == pair.first) {
+                          conf_sums[i] += pair.second;
+                          counts[i]++;
+                          found = true;
+                          break;
+                      }
                   }
-                  if (count > best_count) {
-                      best_count = count;
-                      best_val = recent_all[i];
+                  if (!found) {
+                      unique_vals.push_back(pair.first);
+                      conf_sums.push_back(pair.second);
+                      counts.push_back(1);
                   }
               }
               
+              // Pick value with highest total confidence weight
+              int best_idx = 0;
+              for (size_t i = 1; i < unique_vals.size(); i++) {
+                  if (conf_sums[i] > conf_sums[best_idx]) {
+                      best_idx = i;
+                  }
+              }
+              
+              int best_val = unique_vals[best_idx];
+              int best_count = counts[best_idx];
+              float best_conf = conf_sums[best_idx];
+              
               ESP_LOGW(TAG, "Self-correcting via consensus: %d consecutive rejections (avg conf: %.2f >= %.2f). "
-                       "Consensus value %d (seen %d/%d times). Was stuck at %d",
+                       "Consensus value %d (seen %d/%d, total conf weight: %.1f). Was stuck at %d",
                        consecutive_rejections_, avg_conf, config_.high_confidence_threshold,
-                       best_val, best_count, (int)recent_all.size(), last_valid_reading_);
+                       best_val, best_count, (int)recent_all.size(), best_conf, last_valid_reading_);
               consecutive_rejections_ = 0;
               rejection_confidence_sum_ = 0.0f;
               return best_val;
@@ -676,12 +782,15 @@ void ValueValidator::reset() {
   history_.clear();
   last_valid_reading_ = 0;
   first_reading_ = true;
+  first_reading_count_ = 0;
+  first_reading_candidate_ = 0;
   last_good_values_count_ = 0;
   last_good_values_head_ = 0;
   consecutive_rejections_ = 0;
   rejection_confidence_sum_ = 0.0f;
   free_digit_history();
   last_valid_digits_count_ = 0;
+  publish_diagnostics_("initializing");
   ESP_LOGI(TAG, "Value validator reset");
 }
 
@@ -972,6 +1081,21 @@ bool ValueValidator::is_hallucination_pattern(const std::vector<float>& digits) 
 
   // Otherwise, "All X's" is highly likely a hallucination (esp. All 1s, All 0s) if it CHANGED from last history.
   return true;
+}
+
+void ValueValidator::publish_diagnostics_(const char* state) {
+  if (rejection_count_sensor_) {
+    rejection_count_sensor_->publish_state(consecutive_rejections_);
+  }
+  if (validator_state_sensor_) {
+    validator_state_sensor_->publish_state(state);
+  }
+}
+
+void ValueValidator::save_state_() {
+  if (config_.persist_state && last_valid_reading_ > 0) {
+    pref_.save(&last_valid_reading_);
+  }
 }
 
 }  // namespace value_validator

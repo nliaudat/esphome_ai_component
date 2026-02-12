@@ -47,6 +47,7 @@ value_validator:
 - **allow_negative_rates**: Set to `true` for bidirectional meters (e.g., solar with grid feedback)
 - **max_absolute_diff**: Absolute maximum change allowed between consecutive readings
 - **max_rate_change**: Percentage-based rate limit (e.g., 0.15 = 15% change maximum)
+- **small_negative_tolerance** *(default: 5)*: Allow negative changes up to this many units without triggering rejection. Applies both in `is_digit_plausible` and the consistency check.
 
 ### Smart Validation
 
@@ -67,6 +68,10 @@ value_validator:
 
 - **max_history_size**: Limits memory usage for history tracking (accepts: B, kB, MB)
 
+### Persistent State
+
+- **persist_state** *(default: false)*: When enabled, saves `last_valid_reading` to flash across reboots. Prevents the validator from starting fresh after power cycles, avoiding the risk of accepting a bad first reading.
+
 ## Integration Examples
 
 ### Meter Reader TFLite
@@ -78,7 +83,16 @@ value_validator:
   strict_confidence_check: true
   per_digit_confidence_threshold: 0.95
   high_confidence_threshold: 0.95
-  max_consecutive_rejections: 10  # self-correct after 10 consecutive rejections
+  max_consecutive_rejections: 10
+  small_negative_tolerance: 5
+  persist_state: true
+  # Optional diagnostic sensors
+  rejection_count_sensor:
+    name: "Validator Rejection Count"
+  raw_reading_sensor:
+    name: "Validator Raw Reading"
+  validator_state_sensor:
+    name: "Validator State"
 
 meter_reader_tflite:
   validator: water_validator
@@ -122,6 +136,20 @@ When the validator accepts an incorrect high-confidence reading (e.g., a misread
 3. The counter resets when a reading is accepted, or when the validator is reset/manually set
 
 With a ~1 minute reading interval, self-correction triggers within ~10 minutes by default.
+
+## Diagnostic Sensors
+
+Optional sensors that expose the validator's internal state to Home Assistant:
+
+- **rejection_count_sensor**: Current count of consecutive rejected readings (0 during normal operation)
+- **raw_reading_sensor**: The raw value from the model before any validation
+- **validator_state_sensor**: Text state — one of `initializing`, `normal`, `rejecting`, `stuck`
+
+These enable HA automations (e.g., notify when rejection count exceeds a threshold) and make debugging stuck episodes possible without reading ESP logs.
+
+## Persistent State
+
+When `persist_state: true`, the last valid reading is saved to flash memory. After a reboot, the validator resumes from the saved value instead of waiting for a new first reading. This prevents the risk of blindly accepting a bad first reading after power cycles.
 
 ## Runtime Control
 
