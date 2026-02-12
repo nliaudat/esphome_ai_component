@@ -304,7 +304,7 @@ int SSOCRReader::recognize_digit(const std::vector<uint8_t> &img, int w, int h) 
     }
     
     if (debug_) {
-        ESP_LOGD(TAG, "Unknown mask: %d (Binary: " BYTE_TO_BINARY_PATTERN ")", mask, BYTE_TO_BINARY(mask));
+        ESP_LOGD(TAG, "Unknown mask: %d (0x%02X)", mask, mask);
     } else {
         ESP_LOGV(TAG, "Unknown mask: %d", mask);
     }
