@@ -859,14 +859,6 @@ void AnalogReader::debug_dial_image(const uint8_t* img, int w, int h, float dete
     int max_r = std::min(cx, cy);
     
     for (int r = max_r/5; r < max_r; r++) { // Start 20% out
-        // Map the needle angle to the grid coordinates.
-        // We use a normalized coordinate system (0.0-1.0) and map it to the grid dimensions.
-        float scale_x = (float)r / max_r; 
-        float scale_y = (float)r / max_r;
-        
-        // Correct for grid aspect ratio if non-square (though here 40x40 is square logic)
-        // Center is (cx, cy)
-        
         int draw_x = cx + (int)(cos(rad) * r * (float)grid_w / (max_r * 2));
         int draw_y = cy + (int)(sin(rad) * r * (float)grid_h / (max_r * 2));
         

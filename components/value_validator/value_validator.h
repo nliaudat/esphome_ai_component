@@ -8,11 +8,9 @@
 #include "esphome/core/component.h"
 #include "esphome/core/helpers.h"
 #include "esphome/core/preferences.h"
+#include "esphome/components/sensor/sensor.h"
+#include "esphome/components/text_sensor/text_sensor.h"
 #include <vector>
-#include <deque>
-#include <algorithm>
-#include <numeric>
-#include <cmath>
 
 namespace esphome {
 namespace value_validator {
@@ -37,9 +35,10 @@ class ReadingHistory {
   float get_last_confidence() const;
   int get_hour_median() const;
   int get_day_median() const;
+  int get_median_within_ms(uint32_t max_elapsed_ms) const;
   std::vector<int> get_recent_readings(size_t count) const;
+  std::vector<std::pair<int, float>> get_recent_readings_with_confidence(size_t count) const;
   
-  size_t get_hour_count() const;
   size_t get_day_count() const { return count_; }
   
   void clear();
@@ -65,13 +64,16 @@ class ValueValidator : public Component {
   struct ValidationConfig {
     bool allow_negative_rates{false};
     int max_absolute_diff{100};
-    float max_rate_change{0.15f}; // 15% maximum change per reading
+    float max_rate_change{0.15f}; // Maximum relative change as fraction (0.15 = 15%)
     bool enable_smart_validation{true};
     int smart_validation_window{5};
     float high_confidence_threshold{0.90f}; // Threshold for validation override
     size_t max_history_size_bytes{51200}; // 50KB limit for history buffer
     float per_digit_confidence_threshold{0.85f}; // Minimum confidence to accept a changed digit
     bool strict_confidence_check{false}; // If true, requires all digits to be above threshold
+    int max_consecutive_rejections{10}; // Self-correct after N consecutive high-confidence rejections
+    int small_negative_tolerance{5}; // Allow negative changes up to this many units
+    bool persist_state{false}; // Persist last_valid_reading_ across reboots
   };
 
   ~ValueValidator();
@@ -97,8 +99,17 @@ class ValueValidator : public Component {
   void set_max_history_size_bytes(size_t v) { config_.max_history_size_bytes = v; }
   void set_per_digit_confidence_threshold(float v) { config_.per_digit_confidence_threshold = v; }
   void set_strict_confidence_check(bool v) { config_.strict_confidence_check = v; }
+  void set_max_consecutive_rejections(int v) { config_.max_consecutive_rejections = v; }
+  void set_small_negative_tolerance(int v) { config_.small_negative_tolerance = v; }
+  void set_persist_state(bool v) { config_.persist_state = v; }
+
+  // Diagnostic sensors (optional)
+  void set_rejection_count_sensor(sensor::Sensor *s) { rejection_count_sensor_ = s; }
+  void set_raw_reading_sensor(sensor::Sensor *s) { raw_reading_sensor_ = s; }
+  void set_validator_state_sensor(text_sensor::TextSensor *s) { validator_state_sensor_ = s; }
 
   int get_last_valid_reading() const { return last_valid_reading_; }
+  int get_consecutive_rejections() const { return consecutive_rejections_; }
   const ReadingHistory& get_history() const { return history_; }
   
   void reset();
@@ -123,9 +134,23 @@ class ValueValidator : public Component {
   uint8_t* digit_history_counts_{nullptr}; // [num_digits]
   uint8_t* digit_history_heads_{nullptr};  // [num_digits]
   size_t digit_history_num_digits_{0};
-  static const size_t DIGIT_HISTORY_SIZE = 5;
+  static constexpr size_t DIGIT_HISTORY_SIZE = 5;
 
   bool first_reading_{true};
+  int first_reading_count_{0}; // Count of consistent first readings
+  int first_reading_candidate_{0}; // Candidate first reading value
+  
+  // Self-correction tracking
+  int consecutive_rejections_{0};
+  float rejection_confidence_sum_{0.0f};
+  
+  // Diagnostic sensors (optional)
+  sensor::Sensor *rejection_count_sensor_{nullptr};
+  sensor::Sensor *raw_reading_sensor_{nullptr};
+  text_sensor::TextSensor *validator_state_sensor_{nullptr};
+  
+  // Persistent state
+  ESPPreferenceObject pref_;
   
   // Recent good values ring buffer (PSRAM)
   int* last_good_values_data_{nullptr};
@@ -138,12 +163,14 @@ class ValueValidator : public Component {
   int find_most_plausible_reading(int new_reading, const std::vector<int>& recent_readings);
   bool is_small_increment(int new_reading, int last_reading) const;
   int calculate_digit_difference(int reading1, int reading2) const;
-  int get_stable_digit(int digit_index, int new_digit);
+  int get_stable_digit(size_t digit_index, int new_digit);
   void ensure_digit_history_size(size_t num_digits);
   void ensure_last_valid_digits_size(size_t num_digits);
   void ensure_last_good_values_capacity(size_t capacity);
   void add_good_value(int value);
   int get_good_values_median() const;
+  void publish_diagnostics_(const char* state);
+  void save_state_();
   
   void free_digit_history();
   void free_resources();

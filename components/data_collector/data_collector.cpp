@@ -134,22 +134,51 @@ void DataCollector::start_upload_task() {
         return;
     }
 
-    // Create task
-    xTaskCreate(upload_task, "upload_worker", 4096, this, tskIDLE_PRIORITY + 1, nullptr);
+    // Create task and store handle for cleanup
+    task_running_ = true;
+    xTaskCreate(upload_task, "upload_worker", 4096, this, tskIDLE_PRIORITY + 1, &upload_task_handle_);
 }
 
 void DataCollector::upload_task(void *arg) {
     DataCollector *collector = static_cast<DataCollector*>(arg);
     UploadJob job;
     
-    while (true) {
-        if (xQueueReceive(collector->upload_queue_, &job, portMAX_DELAY) == pdTRUE) {
+    while (collector->task_running_.load()) {
+        // Use a timeout so we periodically check task_running_
+        if (xQueueReceive(collector->upload_queue_, &job, 1000 / portTICK_PERIOD_MS) == pdTRUE) {
             // Process upload
             collector->process_upload_sync(job.data, job.len, job.value, job.confidence);
             
             // Free the memory we allocated in upload_image
             free(job.data);
         }
+    }
+    vTaskDelete(nullptr);
+}
+
+DataCollector::~DataCollector() {
+    // Signal task to stop
+    task_running_ = false;
+    
+    // Wait briefly for task to exit
+    if (upload_task_handle_) {
+        vTaskDelay(1100 / portTICK_PERIOD_MS); // Slightly longer than queue timeout
+        // If task hasn't exited yet, force delete
+        eTaskState state = eTaskGetState(upload_task_handle_);
+        if (state != eDeleted) {
+            vTaskDelete(upload_task_handle_);
+        }
+        upload_task_handle_ = nullptr;
+    }
+    
+    // Drain remaining queue items to free memory
+    if (upload_queue_) {
+        UploadJob job;
+        while (xQueueReceive(upload_queue_, &job, 0) == pdTRUE) {
+            free(job.data);
+        }
+        vQueueDelete(upload_queue_);
+        upload_queue_ = nullptr;
     }
 }
 

@@ -9,6 +9,7 @@
 #include "value_validator_coordinator.h"
 #include <vector>
 #include <mutex>
+#include <atomic>
 
 namespace esphome {
 namespace ssocr_reader {
@@ -57,10 +58,10 @@ class SSOCRReader : public PollingComponent, public esphome::camera::CameraListe
   int digit_count_{6};
   
   // State
-  bool processing_frame_{false};
+  std::atomic<bool> processing_frame_{false};
   bool debug_{false};
   uint32_t last_request_time_{0};
-  bool frame_requested_{false};
+  std::atomic<bool> frame_requested_{false};
   std::mutex frame_mutex_;  // Protects frame_requested_/processing_frame_ from camera callback
 
   void process_image(std::shared_ptr<esphome::camera::CameraImage> image);
