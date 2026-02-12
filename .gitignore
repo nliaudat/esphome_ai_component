@@ -1,35 +1,40 @@
 # Gitignore settings for ESPHome
-# This is an example and may include too much for your use-case.
-# You can modify this file to suit your needs.
+
+# Core & Build
 /.esphome/
 **/.pioenvs/
 **/.piolibdeps/
 **/lib/
 **/src/
 **/platformio.ini
-/secrets.yaml
 compile.bat
-secrets.yaml
-/components/meter_reader_tflite/__pycache__
 
-.vscode/settings.json
-/components/esp32_camera_utils/__pycache__
-/components/flash_light_controller/__pycache__
-/components/tflite_micro_helper/__pycache__
-.github/workflows/ci.yml
-.clang-format
+# Python
+**/__pycache__/
+*.pyc
+
+# IDE
+.vscode/
+
+# Configuration & Secrets
+secrets.yaml
+config_*.yaml
 test.yaml
+config.yaml
+
+# Documentation & Logs
+wiki_boards.md
+wiki_setup.md
+AI_code_review.txt
 /fuzz_logs
 fuzz_test_*.yaml
-wiki_boards.md
-/components/ssocr_reader/__pycache__
-config_test.yaml
-/components/analog_reader/__pycache__
+
+# CI
+.github/workflows/ci.yml
+.clang-format
+
+# Scripts
 analyze_heap.py
-config_coldwater.yaml
-config_hotwater.yaml
+
+# Specific large files / models
 dig-class100-0180-s2-q.tflite
-/components/value_validator/__pycache__
-wiki_setup.md
-/components/data_collector/__pycache__
-AI_code_review.txt
