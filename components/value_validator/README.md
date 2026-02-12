@@ -7,6 +7,7 @@ The `value_validator` component provides robust validation and filtering of mete
 - **Rate of Change Validation**: Rejects readings with impossible flow rates using configurable thresholds
 - **Negative Rate Detection**: Optional rejection of decreasing values (e.g., for non-reversible meters)
 - **Smart Validation**: Analyzes recent reading patterns to adapt validation thresholds
+- **Self-Correction**: Automatically recovers from stuck readings after consecutive high-confidence rejections
 - **Per-Digit Confidence**: Validates individual digit confidence for multi-digit readings
 - **History Tracking**: Maintains reading history with configurable memory limits
 - **PSRAM Optimized**: Efficiently manages memory for ESP32 devices
@@ -52,9 +53,13 @@ value_validator:
 - **enable_smart_validation**: Analyzes recent patterns to adapt thresholds dynamically
 - **smart_validation_window**: Number of recent readings to analyze for patterns
 
+### Self-Correction
+
+- **max_consecutive_rejections** *(default: 10)*: Number of consecutive high-confidence rejections before the validator self-corrects. When the validator gets stuck on an incorrect reading (e.g., due to a misread digit), it counts rejected readings. After this many rejections with average confidence ≥ `high_confidence_threshold`, the most frequent recent value is accepted as the corrected reading — even if it would normally be blocked by `allow_negative_rates: false`.
+
 ### Confidence Settings
 
-- **high_confidence_threshold**: Readings above this are trusted more in validation
+- **high_confidence_threshold**: Readings above this are trusted more in validation. Also used as the minimum average confidence required for self-correction.
 - **per_digit_confidence_threshold**: Minimum confidence required for each digit
 - **strict_confidence_check**: When `true`, ALL digits must meet the confidence threshold
 
@@ -72,6 +77,8 @@ value_validator:
   max_absolute_diff: 300
   strict_confidence_check: true
   per_digit_confidence_threshold: 0.95
+  high_confidence_threshold: 0.95
+  max_consecutive_rejections: 10  # self-correct after 10 consecutive rejections
 
 meter_reader_tflite:
   validator: water_validator
@@ -103,6 +110,18 @@ analog_reader:
   validator: analog_validator
   # ...
 ```
+
+## Self-Correction Behavior
+
+When the validator accepts an incorrect high-confidence reading (e.g., a misread digit), it can become "stuck" — all subsequent correct readings are rejected because they appear as negative rates. The self-correction mechanism detects this by tracking consecutive rejections:
+
+1. Each rejected reading increments a counter and accumulates the confidence score
+2. After `max_consecutive_rejections` (default: 10) rejections:
+   - If average confidence ≥ `high_confidence_threshold`: the **most frequent** value from recent history is accepted as the corrected reading
+   - This works even when OCR produces fluctuating values (e.g., alternating between 256517 and 256617)
+3. The counter resets when a reading is accepted, or when the validator is reset/manually set
+
+With a ~1 minute reading interval, self-correction triggers within ~10 minutes by default.
 
 ## Runtime Control
 

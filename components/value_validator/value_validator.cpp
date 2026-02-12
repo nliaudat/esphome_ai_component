@@ -180,6 +180,8 @@ void ValueValidator::setup() {
   first_reading_ = true;
   last_good_values_count_ = 0;
   last_good_values_head_ = 0;
+  consecutive_rejections_ = 0;
+  rejection_confidence_sum_ = 0.0f;
   free_digit_history();
   
   // Initialize with some capacity
@@ -192,6 +194,7 @@ void ValueValidator::dump_config() {
   ESP_LOGCONFIG(TAG, "  Allow Negative Rates: %s", YESNO(config_.allow_negative_rates));
   ESP_LOGCONFIG(TAG, "  Strict Confidence Check: %s", YESNO(config_.strict_confidence_check));
   ESP_LOGCONFIG(TAG, "  Per Digit Conf Threshold: %.2f", config_.per_digit_confidence_threshold);
+  ESP_LOGCONFIG(TAG, "  Max Consecutive Rejections: %d", config_.max_consecutive_rejections);
   ESP_LOGCONFIG(TAG, "  Max History Size: %d bytes", (int)config_.max_history_size_bytes);
 }
 
@@ -461,6 +464,8 @@ int ValueValidator::apply_smart_validation(int new_reading, float confidence, fl
     if (this->debug_) {
         ESP_LOGD(TAG, "SmartValidation: Reading %d is plausible (Last: %d). Accepted.", new_reading, last_valid_reading_);
     }
+    consecutive_rejections_ = 0;
+    rejection_confidence_sum_ = 0.0f;
     return new_reading;
   }
 
@@ -483,12 +488,38 @@ int ValueValidator::apply_smart_validation(int new_reading, float confidence, fl
       }
       
       if (consistent) {
-           // STRICT ENFORCEMENT: Even if consistent, do not allow negative rates if forbidden.
+           // If consistent but negative, check if we should self-correct
            if (!config_.allow_negative_rates && new_reading < last_valid_reading_) {
-               // Allow small fluctuations only
-               if ((last_valid_reading_ - new_reading) > 5) {
-                   ESP_LOGW(TAG, "Consistent negative reading rejected (AllowNegativeRates=false): %d -> %d", 
+               int negative_diff = last_valid_reading_ - new_reading;
+               if (negative_diff <= 5) {
+                   // Small fluctuation — always allowed
+               } else if (consecutive_rejections_ >= config_.max_consecutive_rejections) {
+                   // Too many consecutive rejections with high confidence — likely last_valid was wrong
+                   float avg_rejection_conf = (consecutive_rejections_ > 0) ? 
+                       (rejection_confidence_sum_ / consecutive_rejections_) : 0.0f;
+                   if (avg_rejection_conf >= config_.high_confidence_threshold) {
+                       ESP_LOGW(TAG, "Self-correcting: %d consecutive high-confidence rejections (avg conf: %.2f >= %.2f). "
+                                "Accepting consistent value %d (was %d)",
+                                consecutive_rejections_, avg_rejection_conf, config_.high_confidence_threshold,
+                                new_reading, last_valid_reading_);
+                       consecutive_rejections_ = 0;
+                       rejection_confidence_sum_ = 0.0f;
+                       // Fall through to accept
+                   } else {
+                       ESP_LOGW(TAG, "Consistent negative reading rejected - avg confidence too low "
+                                "(%.2f < %.2f): %d -> %d", 
+                                avg_rejection_conf, config_.high_confidence_threshold,
+                                last_valid_reading_, new_reading);
+                       consecutive_rejections_++;
+                       rejection_confidence_sum_ += confidence;
+                       return last_valid_reading_;
+                   }
+               } else {
+                   ESP_LOGW(TAG, "Consistent negative reading rejected (%d/%d): %d -> %d",
+                            consecutive_rejections_, config_.max_consecutive_rejections,
                             last_valid_reading_, new_reading);
+                   consecutive_rejections_++;
+                   rejection_confidence_sum_ += confidence;
                    return last_valid_reading_;
                }
            }
@@ -500,6 +531,8 @@ int ValueValidator::apply_smart_validation(int new_reading, float confidence, fl
            if (std::abs(new_reading - last_valid_reading_) > (config_.max_absolute_diff * 5)) {
                last_good_values_count_ = 0;
            }
+           consecutive_rejections_ = 0;
+           rejection_confidence_sum_ = 0.0f;
            return new_reading;
       }
   }
@@ -516,6 +549,8 @@ int ValueValidator::apply_smart_validation(int new_reading, float confidence, fl
         is_digit_plausible(plausible_reading, last_valid_reading_)) {
       ESP_LOGD(TAG, "Using plausible reading from history: %d (was: %d)", 
                plausible_reading, new_reading);
+      consecutive_rejections_ = 0;
+      rejection_confidence_sum_ = 0.0f;
       return plausible_reading;
     }
   }
@@ -527,15 +562,54 @@ int ValueValidator::apply_smart_validation(int new_reading, float confidence, fl
     // Only use median if it's somewhat close to the last valid
     if (std::abs(median - last_valid_reading_) <= config_.max_absolute_diff) {
       ESP_LOGD(TAG, "Using median of last good values: %d (was: %d)", median, new_reading);
+      consecutive_rejections_ = 0;
+      rejection_confidence_sum_ = 0.0f;
       return median;
     }
   }
     
-  // 3. Last resort: use last valid reading
-  // Note: We intentionally avoid small_increment logic here if it failed is_digit_plausible
-  // because is_digit_plausible usually allows small increments.
+  // 3. Last resort: use last valid reading — this is a rejection
+  consecutive_rejections_++;
+  rejection_confidence_sum_ += confidence;
   
-  ESP_LOGW(TAG, "No plausible alternative found, keeping last valid: %d (Ignored: %d)", last_valid_reading_, new_reading);
+  // Self-correction for fluctuating readings:
+  // When readings alternate between OCR variants (e.g. 256517/256617), the consistency 
+  // check (3 identical) never passes. After enough rejections with high confidence,
+  // find the consensus (most frequent) value from recent history and accept it.
+  if (consecutive_rejections_ >= config_.max_consecutive_rejections) {
+      float avg_conf = (consecutive_rejections_ > 0) ? 
+          (rejection_confidence_sum_ / consecutive_rejections_) : 0.0f;
+      if (avg_conf >= config_.high_confidence_threshold) {
+          // Find the most frequent reading in recent history as consensus
+          auto recent_all = history_.get_recent_readings(config_.max_consecutive_rejections);
+          if (!recent_all.empty()) {
+              // Count occurrences of each value
+              int best_val = recent_all[0];
+              int best_count = 0;
+              for (size_t i = 0; i < recent_all.size(); i++) {
+                  int count = 0;
+                  for (size_t j = 0; j < recent_all.size(); j++) {
+                      if (recent_all[j] == recent_all[i]) count++;
+                  }
+                  if (count > best_count) {
+                      best_count = count;
+                      best_val = recent_all[i];
+                  }
+              }
+              
+              ESP_LOGW(TAG, "Self-correcting via consensus: %d consecutive rejections (avg conf: %.2f >= %.2f). "
+                       "Consensus value %d (seen %d/%d times). Was stuck at %d",
+                       consecutive_rejections_, avg_conf, config_.high_confidence_threshold,
+                       best_val, best_count, (int)recent_all.size(), last_valid_reading_);
+              consecutive_rejections_ = 0;
+              rejection_confidence_sum_ = 0.0f;
+              return best_val;
+          }
+      }
+  }
+  
+  ESP_LOGW(TAG, "No plausible alternative found, keeping last valid: %d (Ignored: %d, rejections: %d/%d)", 
+           last_valid_reading_, new_reading, consecutive_rejections_, config_.max_consecutive_rejections);
   return last_valid_reading_;
 }
 
@@ -604,6 +678,8 @@ void ValueValidator::reset() {
   first_reading_ = true;
   last_good_values_count_ = 0;
   last_good_values_head_ = 0;
+  consecutive_rejections_ = 0;
+  rejection_confidence_sum_ = 0.0f;
   free_digit_history();
   last_valid_digits_count_ = 0;
   ESP_LOGI(TAG, "Value validator reset");
@@ -628,7 +704,9 @@ void ValueValidator::set_last_valid_reading(int value) {
   }
   
   // Also clear raw history to prevent "consistency check" from reverting back to old values
-  history_.clear();  
+  history_.clear();
+  consecutive_rejections_ = 0;
+  rejection_confidence_sum_ = 0.0f;
   ESP_LOGW(TAG, "Manually set last valid reading to: %d", value);
 }
 
@@ -669,7 +747,9 @@ void ValueValidator::set_last_valid_reading(const std::string &value) {
      add_good_value(int_val);
   }
   
-  history_.clear();  
+  history_.clear();
+  consecutive_rejections_ = 0;
+  rejection_confidence_sum_ = 0.0f;
   ESP_LOGW(TAG, "Manually set last valid reading to: %d (Digits: %d, Str: %s)", int_val, (int)value.length(), value.c_str());
 }
 

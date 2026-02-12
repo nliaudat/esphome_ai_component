@@ -17,6 +17,7 @@ CONF_HIGH_CONFIDENCE_THRESHOLD = "high_confidence_threshold"
 CONF_MAX_HISTORY_SIZE = "max_history_size"
 CONF_PER_DIGIT_CONFIDENCE_THRESHOLD = "per_digit_confidence_threshold"
 CONF_STRICT_CONFIDENCE_CHECK = "strict_confidence_check"
+CONF_MAX_CONSECUTIVE_REJECTIONS = "max_consecutive_rejections"
 
 CONFIG_SCHEMA = cv.All(cv.ensure_list(cv.Schema({
     cv.GenerateID(): cv.declare_id(ValueValidator),
@@ -29,6 +30,7 @@ CONFIG_SCHEMA = cv.All(cv.ensure_list(cv.Schema({
     cv.Optional(CONF_MAX_HISTORY_SIZE, default="50kB"): cv.validate_bytes,
     cv.Optional(CONF_PER_DIGIT_CONFIDENCE_THRESHOLD, default=0.85): cv.percentage,
     cv.Optional(CONF_STRICT_CONFIDENCE_CHECK, default=False): cv.boolean,
+    cv.Optional(CONF_MAX_CONSECUTIVE_REJECTIONS, default=10): cv.positive_int,
     cv.Optional("debug", default=False): cv.boolean,
 }).extend(cv.COMPONENT_SCHEMA)))
 
@@ -47,4 +49,5 @@ async def to_code(config):
         cg.add(var.set_max_history_size_bytes(conf[CONF_MAX_HISTORY_SIZE]))
         cg.add(var.set_per_digit_confidence_threshold(conf[CONF_PER_DIGIT_CONFIDENCE_THRESHOLD]))
         cg.add(var.set_strict_confidence_check(conf[CONF_STRICT_CONFIDENCE_CHECK]))
+        cg.add(var.set_max_consecutive_rejections(conf[CONF_MAX_CONSECUTIVE_REJECTIONS]))
         cg.add(var.set_debug(conf["debug"]))
