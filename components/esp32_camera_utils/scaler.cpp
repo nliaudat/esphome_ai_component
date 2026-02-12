@@ -40,7 +40,7 @@ bool Scaler::scale_rgb888_to_uint8(const uint8_t* src, int src_w, int src_h,
                 // Integer approximation: Y = (19595*R + 38469*G + 7472*B) >> 16
                 // Or simpler: (77*R + 150*G + 29*B) >> 8
                 uint16_t gray = (77 * src_pixel[0] + 150 * src_pixel[1] + 29 * src_pixel[2]) >> 8;
-                *dst_row++ = (uint8_t)gray;
+                *dst_row++ = static_cast<uint8_t>(gray);
             }
         }
     }
@@ -72,16 +72,16 @@ bool Scaler::scale_rgb888_to_float32(const uint8_t* src, int src_w, int src_h,
                     *dst_row++ = src_pixel[1] * (1.0f / 255.0f);
                     *dst_row++ = src_pixel[2] * (1.0f / 255.0f);
                 } else {
-                    *dst_row++ = (float)src_pixel[0];
-                    *dst_row++ = (float)src_pixel[1];
-                    *dst_row++ = (float)src_pixel[2];
+                    *dst_row++ = static_cast<float>(src_pixel[0]);
+                    *dst_row++ = static_cast<float>(src_pixel[1]);
+                    *dst_row++ = static_cast<float>(src_pixel[2]);
                 }
             } else if (channels == 1) {
                 uint16_t gray = (77 * src_pixel[0] + 150 * src_pixel[1] + 29 * src_pixel[2]) >> 8;
                 if (normalize) {
                     *dst_row++ = gray * (1.0f / 255.0f);
                 } else {
-                    *dst_row++ = (float)gray;
+                    *dst_row++ = static_cast<float>(gray);
                 }
             }
         }

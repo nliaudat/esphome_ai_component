@@ -2,7 +2,6 @@
 
 #include "esphome/core/component.h"
 #include "esphome/components/light/light_state.h"
-#include "esphome/core/log.h"
 #include <functional>
 
 namespace esphome {

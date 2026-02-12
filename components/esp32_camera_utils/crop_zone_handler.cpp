@@ -101,13 +101,13 @@ void CropZoneHandler::parse_zones(const std::string &zones_json) {
       zones_.push_back({coords[0], coords[1], coords[2], coords[3]});
     } else {
       ESP_LOGE(TAG, "Invalid zone format (expected 4 coordinates, got %d): %s", 
-               (int)coords.size(), zone_str.c_str());
+               static_cast<int>(coords.size()), zone_str.c_str());
     }
 
     pos = end + 1;
   }
 
-  ESP_LOGI(TAG, "Parsed %d crop zones", (int)zones_.size());
+  ESP_LOGI(TAG, "Parsed %d crop zones", static_cast<int>(zones_.size()));
   DURATION_END("parse_zones");
 }
 

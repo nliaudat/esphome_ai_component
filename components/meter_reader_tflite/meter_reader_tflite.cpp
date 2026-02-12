@@ -200,7 +200,7 @@ void MeterReaderTFLite::setup() {
     // Load model first to ensure we can retrieve input specifications for camera configuration.
     ESP_LOGI(TAG, "Model loading will begin in %u ms...", MODEL_LOAD_DELAY_MS);
     // Delayed to ensure WiFi logger captures these startup logs
-    this->set_timeout(MODEL_LOAD_DELAY_MS, [this]() {
+    set_timeout(MODEL_LOAD_DELAY_MS, [this]() {
          ESP_LOGI(TAG, "Starting model loading...");
          esphome::App.feed_wdt(); // Feed before potentially long load
          if (!tflite_coord_.load_model()) {
@@ -218,15 +218,15 @@ void MeterReaderTFLite::setup() {
          // [MOVED] Sync Rotation FIRST
          if (esp32_camera_utils_) {
               // Sync rotation from Utils (Centralized Configuration)
-              this->rotation_ = esp32_camera_utils_->get_rotation();
-              ESP_LOGI(TAG, "Synced rotation from esp32_camera_utils: %.1f", this->rotation_);
+              rotation_ = esp32_camera_utils_->get_rotation();
+              ESP_LOGI(TAG, "Synced rotation from esp32_camera_utils: %.1f", rotation_);
               
               // Pass rotation to coordinator BEFORE updating processor config
-              camera_coord_.set_rotation(this->rotation_);
+              camera_coord_.set_rotation(rotation_);
          }
          
          // Pass preview setting to coordinator to enable caching if needed
-         camera_coord_.set_enable_preview(this->generate_preview_);
+         camera_coord_.set_enable_preview(generate_preview_);
          
          camera_coord_.update_image_processor_config(
              spec.input_width, 
@@ -284,7 +284,7 @@ void MeterReaderTFLite::setup() {
           #ifdef DEV_ENABLE_ROTATION
           if (web_server_) {
               web_server_->add_handler(new esphome::esp32_camera_utils::PreviewWebHandler([this]() {
-                  return this->get_preview_image();
+                  return get_preview_image();
               }));
           }
           #endif
@@ -292,7 +292,7 @@ void MeterReaderTFLite::setup() {
 
           // Print debug info on success (legacy behavior)
           #ifdef DEBUG_METER_READER_TFLITE
-          this->print_debug_info();
+          print_debug_info();
           #endif
           
           // Publish static memory stats
@@ -313,8 +313,8 @@ void MeterReaderTFLite::setup() {
     
     // 5. Setup Flashlight Coordinator Callback
     flashlight_coord_.set_request_frame_callback([this](){
-        this->frame_requested_ = true;
-        this->last_request_time_ = millis();
+        frame_requested_ = true;
+        last_request_time_ = millis();
         ESP_LOGD(TAG, "Frame requested via coordinator callback");
     });
     
@@ -373,10 +373,10 @@ void MeterReaderTFLite::setup() {
     // Let's check the global pixel format config if feasible, or just force it if the model is V4 GRAY.
     // 8. Setup Dynamic Resource Buttons
     if (unload_button_) {
-        unload_button_->add_on_press_callback([this]() { this->unload_resources(); });
+        unload_button_->add_on_press_callback([this]() { unload_resources(); });
     }
     if (reload_button_) {
-        reload_button_->add_on_press_callback([this]() { this->reload_resources(); });
+        reload_button_->add_on_press_callback([this]() { reload_resources(); });
     }
 }
 
@@ -388,14 +388,14 @@ void MeterReaderTFLite::set_camera(camera::Camera *camera) { // -> CameraCoord c
 }
 
 void MeterReaderTFLite::set_debug(bool debug) {
-    this->debug_ = debug;
-    this->tflite_coord_.set_debug(debug);
-    this->camera_coord_.set_debug(debug);
-    this->flashlight_coord_.set_debug(debug);
+    debug_ = debug;
+    tflite_coord_.set_debug(debug);
+    camera_coord_.set_debug(debug);
+    flashlight_coord_.set_debug(debug);
     
     // Also enable legacy debug mode if it exists but ideally we use debug_ everywhere
     #ifdef DEBUG_METER_READER_TFLITE
-    this->set_debug_mode(debug);
+    set_debug_mode(debug);
     #endif
 }
 
@@ -471,7 +471,7 @@ void MeterReaderTFLite::update() {
 
 
 void MeterReaderTFLite::loop() {
-    if (this->is_failed()) return;
+    if (is_failed()) return;
 
     // Watchdog: If frame requested but not arrived, reset state
     if (frame_requested_ && (millis() - last_request_time_ > frame_request_timeout_ms_)) {
@@ -622,7 +622,7 @@ void MeterReaderTFLite::loop() {
                     // Lower is better. 0% = no fragmentation, 100% = highly fragmented
                     float fragmentation = 0.0f;
                     if (info.total_free_bytes > 0) {
-                        float efficiency = (float)info.largest_free_block / info.total_free_bytes;
+                        float efficiency = static_cast<float>(info.largest_free_block) / info.total_free_bytes;
                         fragmentation = (1.0f - efficiency) * 100.0f;
                     }
                     
@@ -647,10 +647,10 @@ void MeterReaderTFLite::trigger_low_confidence_collection(float value, float con
     if (!collect_low_confidence_ || !data_collector_) return;
     // User requested 0% to Threshold range.
     // if (confidence < low_confidence_trigger_threshold_) return; 
-    if (this->collection_state_ != COLLECTION_IDLE) return; 
+    if (collection_state_ != COLLECTION_IDLE) return; 
 
     // Prevent collection during Setup Mode (Preview) or calibration
-    if (this->generate_preview_ || this->is_calibrating()) {
+    if (generate_preview_ || is_calibrating()) {
         ESP_LOGD(TAG, "Data collection skipped (Setup Mode/Calibration active)");
         return;
     } 
@@ -658,7 +658,7 @@ void MeterReaderTFLite::trigger_low_confidence_collection(float value, float con
     ESP_LOGI(TAG, "Low confidence (%.2f%%) detected. Retaking with flash for data collection...", confidence * 100.0f);
 
     pending_collection_ = {value, confidence};
-    this->collection_state_ = COLLECTION_WAITING_FOR_FLASH;
+    collection_state_ = COLLECTION_WAITING_FOR_FLASH;
     
     // Force Flash via Coordinator
     flashlight_coord_.enable_flash();
@@ -669,11 +669,11 @@ void MeterReaderTFLite::trigger_low_confidence_collection(float value, float con
     if (delay < 500) delay = 500;
     if (delay > 5000) delay = 5000;
 
-    this->set_timeout(delay, [this]() {
+    set_timeout(delay, [this]() {
         ESP_LOGD(TAG, "Flash stabilized. Requesting data collection frame.");
-        this->collection_state_ = COLLECTION_WAITING_FOR_FRAME;
-        this->frame_requested_ = true;
-        this->last_request_time_ = millis();
+        collection_state_ = COLLECTION_WAITING_FOR_FRAME;
+        frame_requested_ = true;
+        last_request_time_ = millis();
     });
 }
 #endif
@@ -691,12 +691,12 @@ void MeterReaderTFLite::process_available_frame() {
     
     // Data Collection Interception
     #ifdef USE_DATA_COLLECTOR
-    if (this->collection_state_ == COLLECTION_WAITING_FOR_FRAME) {
-         if (this->data_collector_) {
-             this->data_collector_->collect_image(frame, camera_coord_.get_width(), camera_coord_.get_height(), camera_coord_.get_format(), pending_collection_.value, pending_collection_.confidence);
+    if (collection_state_ == COLLECTION_WAITING_FOR_FRAME) {
+         if (data_collector_) {
+             data_collector_->collect_image(frame, camera_coord_.get_width(), camera_coord_.get_height(), camera_coord_.get_format(), pending_collection_.value, pending_collection_.confidence);
          }
-         this->collection_state_ = COLLECTION_IDLE;
-         this->flashlight_coord_.disable_flash();
+         collection_state_ = COLLECTION_IDLE;
+         flashlight_coord_.disable_flash();
          processing_frame_ = false;
          return; 
     }
@@ -749,7 +749,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     esphome::App.feed_wdt();
     
     uint32_t preprocess_start = millis();
-    if (this->debug_) {
+    if (debug_) {
         ESP_LOGD(TAG, "Processing full image: Requesting frame processing from CameraCoordinator");
     }
     auto processed_buffers = camera_coord_.process_frame(frame, zones);
@@ -890,7 +890,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
              ESP_LOGW(TAG, "Digit %d: Failed to infer", digit_index);
         }
         
-        if (this->debug_) {
+        if (debug_) {
             ESP_LOGD(TAG, "Digit %d: Val=%.2f, Conf=%.2f, Success=%s", 
                      digit_index, res.value, res.confidence, res.success ? "YES" : "NO");
         }
@@ -982,7 +982,7 @@ void MeterReaderTFLite::set_camera_image_format(int w, int h, const std::string 
 
 void MeterReaderTFLite::set_last_valid_value(float value) {
     ESP_LOGI(TAG, "Manual override: Setting last valid value to %.1f", value);
-    validation_coord_.set_last_valid_reading((int)value);
+    validation_coord_.set_last_valid_reading(static_cast<int>(value));
     
     // Immediately publish this as the truth to the sensor
     if (value_sensor_) {
@@ -1234,8 +1234,8 @@ void MeterReaderTFLite::print_debug_info() {
 
 void MeterReaderTFLite::dump_config() {
   ESP_LOGCONFIG(TAG, "Meter Reader TFLite:");
-  ESP_LOGCONFIG(TAG, "  Confidence Threshold: %.2f", this->confidence_threshold_);
-  ESP_LOGCONFIG(TAG, "  Update Interval: %u ms", this->get_update_interval());
+  ESP_LOGCONFIG(TAG, "  Confidence Threshold: %.2f", confidence_threshold_);
+  ESP_LOGCONFIG(TAG, "  Update Interval: %u ms", get_update_interval());
   
   #ifdef SUPPORT_DOUBLE_BUFFERING
   ESP_LOGCONFIG(TAG, "  Pipeline: Double Buffering (Dual Core) ENABLED");
@@ -1243,7 +1243,7 @@ void MeterReaderTFLite::dump_config() {
   ESP_LOGCONFIG(TAG, "  Pipeline: Single Core (Sequential)");
   #endif
 
-  if (this->is_failed()) {
+  if (is_failed()) {
     ESP_LOGE(TAG, "  Component FAILED to setup");
   }
 }
@@ -1417,7 +1417,7 @@ void MeterReaderTFLite::update_calibration(float confidence) {
 
     if (calibration_.state != FlashCalibrationHandler::FINISHED) { 
         flashlight_coord_.set_timing(calibration_.current_pre, calibration_.current_post); 
-        this->set_timeout(1000, [this](){ 
+        set_timeout(1000, [this](){ 
             force_flash_inference(); 
         }); 
     } else { 
@@ -1499,7 +1499,7 @@ void MeterReaderTFLite::reload_resources() {
 
     // 2. Reload Model & Config
     // Use timeout to schedule on main loop tick to avoid stack issues/recursion
-    this->set_timeout(100, [this]() {
+    set_timeout(100, [this]() {
          if (!tflite_coord_.load_model()) {
              ESP_LOGE(TAG, "Failed to reload model!");
              return;

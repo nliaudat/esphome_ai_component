@@ -125,14 +125,14 @@ void CameraCoordinator::update_image_processor_config(int model_width, int model
     config.model_height = model_height;
     config.model_channels = model_channels;
     
-    switch((int)rotation_) {
+    switch(static_cast<int>(rotation_)) {
         case 90:  config.rotation = esp32_camera_utils::ROTATION_90;  break;
         case 180: config.rotation = esp32_camera_utils::ROTATION_180; break;
         case 270: config.rotation = esp32_camera_utils::ROTATION_270; break;
         default:  config.rotation = esp32_camera_utils::ROTATION_0;   break;
     }
     
-    config.input_type = (esp32_camera_utils::ImageProcessorInputType)input_type;
+    config.input_type = static_cast<esp32_camera_utils::ImageProcessorInputType>(input_type);
     config.normalize = normalize;
     config.input_order = input_order;
 

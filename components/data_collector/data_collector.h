@@ -2,12 +2,10 @@
 
 #include "esphome/core/component.h"
 #include "esphome/components/switch/switch.h"
-#include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/esp32_camera/esp32_camera.h"
 
 #include <memory>
 #include <string>
-#include <vector>
 #include <atomic>
 
 namespace esphome {

@@ -265,7 +265,7 @@ void ModelHandler::test_configuration(const ModelConfig& config,
     
     // config_ = config; // Dangerous if not thread safe or if methods rely on it
     // Actually, process_output relies on config_.
-    const_cast<ModelHandler*>(this)->config_ = config;
+    config_ = config;
     
     float total_conf = 0;
     int success = 0;
@@ -287,7 +287,7 @@ void ModelHandler::test_configuration(const ModelConfig& config,
     if (success > 0) res.avg_confidence = total_conf / success;
     results.push_back(res);
     
-    const_cast<ModelHandler*>(this)->config_ = original;
+    config_ = original;
 }
 
 void ModelHandler::debug_test_parameters(const std::vector<std::vector<uint8_t>>& zone_data) {
@@ -309,7 +309,7 @@ void ModelHandler::debug_test_parameters(const std::vector<std::vector<uint8_t>>
         });
         
     ESP_LOGI(TAG, "=== TOP CONFIGURATIONS ===");
-    for (int j = 0; j < std::min((size_t)10, results.size()); j++) {
+    for (size_t j = 0; j < std::min(static_cast<size_t>(10), results.size()); j++) {
         const auto& r = results[j];
         ESP_LOGI(TAG, "#%d: Conf=%.4f [%s %dx%d %s %s]", j+1, r.avg_confidence,
                  r.config.input_order.c_str(), r.config.input_size[0], r.config.input_size[1],

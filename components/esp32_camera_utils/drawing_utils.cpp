@@ -19,8 +19,8 @@ void DrawingUtils::draw_pixel(uint8_t* buffer, int x, int y, int w, int h, int c
 
   if (channels == 2) {
     // RGB565
-    buffer[index] = (uint8_t)(color & 0xFF);     // Low byte
-    buffer[index + 1] = (uint8_t)(color >> 8);   // High byte (ESP32 is Little Endian usually, but check camera format)
+    buffer[index] = static_cast<uint8_t>(color & 0xFF);     // Low byte
+    buffer[index + 1] = static_cast<uint8_t>(color >> 8);   // High byte (ESP32 is Little Endian usually, but check camera format)
     // Standard RGB565 handling: Low byte first, then High byte.
     // This matches common ESP32 camera configurations.
     // If colors look swapped, we swap these.

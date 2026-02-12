@@ -76,11 +76,11 @@ struct ProcessingStats {
   uint32_t jpeg_decoding_errors{0};
   
   float get_avg_processing_time() const {
-    return total_frames > 0 ? (float)total_processing_time_ms / total_frames : 0.0f;
+    return total_frames > 0 ? static_cast<float>(total_processing_time_ms) / total_frames : 0.0f;
   }
   
   float get_success_rate() const {
-    return total_frames > 0 ? 100.0f * (1.0f - (float)failed_frames / total_frames) : 0.0f;
+    return total_frames > 0 ? 100.0f * (1.0f - static_cast<float>(failed_frames) / total_frames) : 0.0f;
   }
 };
 

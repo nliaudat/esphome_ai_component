@@ -34,7 +34,7 @@ void FlashLightController::initiate_capture_sequence(CaptureCallback callback) {
     }
 
     is_active_ = true;
-    if (this->debug_) {
+    if (debug_) {
         ESP_LOGD(TAG, "Starting flash sequence (Pre: %d ms, Post: %d ms)", flash_pre_time_, flash_post_time_);
     } else {
         ESP_LOGD(TAG, "Starting flash sequence");
@@ -44,7 +44,7 @@ void FlashLightController::initiate_capture_sequence(CaptureCallback callback) {
 
     // Schedule callback after pre-time
     this->set_timeout(flash_pre_time_, [this, callback]() {
-        if (this->debug_) {
+        if (debug_) {
             ESP_LOGD(TAG, "Flash warmup complete (%d ms elapsed), executing capture callback", flash_pre_time_);
         } else {
             ESP_LOGD(TAG, "Flash warmup complete, executing capture callback");
@@ -55,7 +55,7 @@ void FlashLightController::initiate_capture_sequence(CaptureCallback callback) {
         this->set_timeout(flash_post_time_, [this]() {
             this->disable_flash();
             is_active_ = false;
-            if (this->debug_) {
+            if (debug_) {
                 ESP_LOGD(TAG, "Flash sequence complete (Post-time %d ms finished)", flash_post_time_);
             } else {
                 ESP_LOGD(TAG, "Flash sequence complete");
