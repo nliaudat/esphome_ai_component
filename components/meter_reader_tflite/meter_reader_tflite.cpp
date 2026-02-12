@@ -25,6 +25,14 @@ static const char *const TAG = "meter_reader_tflite";
 using InferenceJob = MeterReaderTFLite::InferenceJob;
 using InferenceResult = MeterReaderTFLite::InferenceResult;
 
+// Forward declaration of free functions for custom deleters
+static void free_inference_job(InferenceJob* job);
+static void free_inference_result(InferenceResult* res);
+
+// Safe Ptr Types with Custom Deleters
+using InferenceJobPtr = std::unique_ptr<InferenceJob, decltype(&free_inference_job)>;
+using InferenceResultPtr = std::unique_ptr<InferenceResult, decltype(&free_inference_result)>;
+
 // Pool size determined at runtime based on available memory
 static size_t INFERENCE_POOL_SIZE = 4; // Will be adjusted in setup
 static constexpr size_t MIN_POOL_SIZE = 2;
@@ -81,7 +89,7 @@ static size_t calculate_optimal_pool_size() {
 // Mutex protecting pool arrays from cross-core data races
 static std::mutex pool_mutex;
 
-static InferenceJob* allocate_inference_job() {
+static InferenceJobPtr allocate_inference_job() {
   {
     std::lock_guard<std::mutex> lock(pool_mutex);
     for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
@@ -91,7 +99,7 @@ static InferenceJob* allocate_inference_job() {
         inference_job_pool[i].crops.clear();
         inference_job_pool[i].start_time = 0;
         pool_job_hits++;
-        return &inference_job_pool[i];
+        return InferenceJobPtr(&inference_job_pool[i], free_inference_job);
       }
     }
   }
@@ -103,7 +111,7 @@ static InferenceJob* allocate_inference_job() {
              100.0f * pool_job_hits / total);
   }
   ESP_LOGI(TAG, "Pool exhausted. Allocating new InferenceJob on heap.");
-  return new InferenceJob();
+  return InferenceJobPtr(new InferenceJob(), free_inference_job);
 }
 
 static void free_inference_job(InferenceJob* job) {
@@ -124,7 +132,7 @@ static void free_inference_job(InferenceJob* job) {
   delete job;
 }
 
-static InferenceResult* allocate_inference_result() {
+static InferenceResultPtr allocate_inference_result() {
   {
     std::lock_guard<std::mutex> lock(pool_mutex);
     for (size_t i = 0; i < INFERENCE_POOL_SIZE; ++i) {
@@ -137,7 +145,7 @@ static InferenceResult* allocate_inference_result() {
         std::vector<float>().swap(inference_result_pool[i].readings);
         std::vector<float>().swap(inference_result_pool[i].probabilities);
         pool_result_hits++;
-        return &inference_result_pool[i];
+        return InferenceResultPtr(&inference_result_pool[i], free_inference_result);
       }
     }
   }
@@ -148,8 +156,9 @@ static InferenceResult* allocate_inference_result() {
     ESP_LOGW(TAG, "InferenceResult pool exhausted (efficiency: %.1f%%) – allocating on heap",
              100.0f * pool_result_hits / total);
   }
-  return new InferenceResult();
+  return InferenceResultPtr(new InferenceResult(), free_inference_result);
 }
+
 
 static void free_inference_result(InferenceResult* res) {
   {
@@ -822,7 +831,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
         return;
     }
     
-    InferenceJob* job = allocate_inference_job();
+    InferenceJobPtr job = allocate_inference_job();
     ESP_LOGI(TAG, "Allocated InferenceJob. Assigning resources...");
 
     job->frame = frame; // Keep alive
@@ -832,12 +841,14 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     
     ESP_LOGI(TAG, "Job prepared. Enqueuing... (Preprocessing took %u ms)", millis() - start_time);
 
-    if (xQueueSend(input_queue_, &job, 0) != pdTRUE) {
+    InferenceJob* job_ptr = job.get();
+    if (xQueueSend(input_queue_, &job_ptr, 0) != pdTRUE) {
         ESP_LOGW(TAG, "Inference Queue Full - Dropping Frame");
-        free_inference_job(job);
+        // job destructor will cleanup automatically (calls free_inference_job)
         processing_frame_ = false;
     } else {
         ESP_LOGI(TAG, "Job successfully enqueued.");
+        job.release(); // Ownership transferred to queue
     }
     // Return immediately, loop() will handle result
     return;
@@ -1280,7 +1291,7 @@ void MeterReaderTFLite::inference_task(void *arg) {
             auto tflite_results = self->tflite_coord_.run_inference(job->crops);
             self->is_inferencing_ = false;
             
-            InferenceResult* res = allocate_inference_result();
+            InferenceResultPtr res = allocate_inference_result();
             res->inference_time = millis() - start;
             res->total_start_time = job->start_time;
             #ifdef DEBUG_METER_READER_MEMORY
@@ -1298,9 +1309,12 @@ void MeterReaderTFLite::inference_task(void *arg) {
             
             // Send back
             ESP_LOGD(TAG, "Inference Task: TFLite done in %u ms. Sending to output queue...", millis() - start);
-            if (xQueueSend(self->output_queue_, &res, 100 / portTICK_PERIOD_MS) != pdTRUE) {
+            InferenceResult* res_ptr = res.get();
+            if (xQueueSend(self->output_queue_, &res_ptr, 100 / portTICK_PERIOD_MS) != pdTRUE) {
                 // Queue push failed, likely due to main loop backpressure. Drop result to prevent blocking.
-                free_inference_result(res);
+                // res destructor will cleanup automatically
+            } else {
+                res.release(); // Ownership transferred
             }
             job = nullptr;
         } else {

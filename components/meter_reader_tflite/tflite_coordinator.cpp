@@ -150,6 +150,12 @@ bool TFLiteCoordinator::process_model_result(const esp32_camera_utils::ImageProc
          return false;
     }
     
+    // Verify input tensor type avoids implicit reinterpretation risks if model changes
+    if (input->type != kTfLiteUInt8 && input->type != kTfLiteInt8 && input->type != kTfLiteFloat32) {
+         ESP_LOGE(TAG, "Unsupported input tensor type: %d", input->type);
+         return false;
+    }
+    
     memcpy(input->data.uint8, result.data->get(), result.size);
     
     if (model_handler_.invoke() != kTfLiteOk) {

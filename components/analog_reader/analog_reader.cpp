@@ -274,14 +274,12 @@ void AnalogReader::loop() {
     }
 
     if (frame) {
-        // OPTIMIZATION: Copy compressed data to local buffer and release frame IMMEDIATELY
+        // OPTIMIZATION: Pass frame buffer directly to processing instead of copying to working_buffer_.
+        // We hold the frame during processing, which is fine since we don't request a new one until we are done.
         if (frame->get_data_length() > 0) {
-             working_buffer_.assign(frame->get_data_buffer(), frame->get_data_buffer() + frame->get_data_length());
-             frame.reset(); 
-             if (!working_buffer_.empty()) {
-                  process_image_from_buffer(working_buffer_.data(), working_buffer_.size());
-             }
+             process_image_from_buffer(frame->get_data_buffer(), frame->get_data_length());
         }
+        frame.reset(); // Release frame after processing
         
         frame_requested_ = false;
     }
@@ -918,7 +916,7 @@ void AnalogReader::debug_dial_image(const uint8_t* img, int w, int h, float dete
     }
 }
 
-void AnalogReader::set_dial_range(std::string dial_id, float min_val, float max_val) {
+void AnalogReader::set_dial_range(const std::string &dial_id, float min_val, float max_val) {
     for (auto &dial : dials_) {
         if (dial.id == dial_id) {
             dial.min_value = min_val;
@@ -930,7 +928,7 @@ void AnalogReader::set_dial_range(std::string dial_id, float min_val, float max_
     ESP_LOGW(TAG, "Dial '%s' not found for set_dial_range", dial_id.c_str());
 }
 
-void AnalogReader::set_dial_angle(std::string dial_id, float min_deg, float max_deg) {
+void AnalogReader::set_dial_angle(const std::string &dial_id, float min_deg, float max_deg) {
     for (auto &dial : dials_) {
         if (dial.id == dial_id) {
             dial.min_angle = min_deg;
