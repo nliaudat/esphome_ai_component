@@ -142,7 +142,7 @@ void SSOCRReader::process_image(std::shared_ptr<esphome::camera::CameraImage> im
   int roi_h = ch;
   
   // Binarize
-  for(int i=0; i < roi_w * roi_h; i++) {
+  for(size_t i=0; i < static_cast<size_t>(roi_w) * static_cast<size_t>(roi_h); i++) {
       raw_roi[i] = (raw_roi[i] > this->threshold_level_) ? 255 : 0;
   }
   

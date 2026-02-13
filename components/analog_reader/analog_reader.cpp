@@ -212,9 +212,9 @@ void AnalogReader::setup() {
   this->flashlight_coord_.setup(this, nullptr, nullptr);
 
   // Pre-allocate scratch buffers to max crop size to prevent reallocations during loop
-  int max_crop_area = 0;
+  size_t max_crop_area = 0;
   for (const auto &dial : this->dials_) {
-      int area = dial.crop_w * dial.crop_h;
+      size_t area = static_cast<size_t>(dial.crop_w) * static_cast<size_t>(dial.crop_h);
       if (area > max_crop_area) max_crop_area = area;
   }
   if (max_crop_area > 0) {

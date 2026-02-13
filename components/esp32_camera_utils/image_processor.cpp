@@ -500,9 +500,13 @@ ImageProcessor::JpegBufferPtr ImageProcessor::allocate_jpeg_buffer(size_t size) 
 
 size_t ImageProcessor::get_required_buffer_size() const {
     if (this->config_.input_type == kInputTypeFloat32) {
-        return this->config_.model_width * this->config_.model_height * this->config_.model_channels * sizeof(float);
+        uint64_t size = static_cast<uint64_t>(this->config_.model_width) * this->config_.model_height * this->config_.model_channels * sizeof(float);
+        if (size > SIZE_MAX) return 0;
+        return static_cast<size_t>(size);
     } else if (this->config_.input_type == kInputTypeUInt8) {
-        return this->config_.model_width * this->config_.model_height * this->config_.model_channels;
+        uint64_t size = static_cast<uint64_t>(this->config_.model_width) * this->config_.model_height * this->config_.model_channels;
+        if (size > SIZE_MAX) return 0;
+        return static_cast<size_t>(size);
     }
     return 0;
 }
