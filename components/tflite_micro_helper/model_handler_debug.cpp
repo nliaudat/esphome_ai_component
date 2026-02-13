@@ -22,7 +22,7 @@ static const char *const TAG = "ModelHandler";
 void ModelHandler::debug_input_quantization_analysis(const uint8_t* input_data, 
                                                    size_t input_size,
                                                    const std::string& stage) const {
-    TfLiteTensor* input = input_tensor();
+    TfLiteTensor* input = const_cast<ModelHandler*>(this)->input_tensor();
     if (!input || !input_data || input_size == 0) return;
     
     ESP_LOGI(TAG, "=== INPUT QUANTIZATION ANALYSIS: %s ===", stage.c_str());
@@ -68,7 +68,7 @@ void ModelHandler::debug_input_quantization_analysis(const uint8_t* input_data,
 }
 
 void ModelHandler::debug_input_tensor_details() const {
-    TfLiteTensor* input = input_tensor();
+    TfLiteTensor* input = const_cast<ModelHandler*>(this)->input_tensor();
     if (!input) return;
     
     ESP_LOGI(TAG, "=== INPUT TENSOR DETAILS ===");
@@ -84,8 +84,8 @@ void ModelHandler::debug_input_tensor_details() const {
 }
 
 void ModelHandler::debug_tensor_types() const {
-    TfLiteTensor* input = input_tensor();
-    TfLiteTensor* output = output_tensor();
+    TfLiteTensor* input = const_cast<ModelHandler*>(this)->input_tensor();
+    TfLiteTensor* output = const_cast<ModelHandler*>(this)->output_tensor();
     
     ESP_LOGI(TAG, "=== TENSOR TYPE VERIFICATION ===");
     if (input) {
@@ -144,7 +144,7 @@ void ModelHandler::debug_int8_conversion_details(TfLiteTensor* input, const uint
 }
 
 void ModelHandler::debug_pre_inference_state() const {
-    TfLiteTensor* input = input_tensor();
+    TfLiteTensor* input = const_cast<ModelHandler*>(this)->input_tensor();
     if (input) {
         ESP_LOGI(TAG, "Pre-inference: Input type %s, bytes %zu", 
                  tflite_type_to_string(input->type), input->bytes);
@@ -156,17 +156,17 @@ void ModelHandler::debug_output_tensor_details(TfLiteTensor* output) const {
     ESP_LOGI(TAG, "=== OUTPUT TENSOR DETAILS ===");
     ESP_LOGI(TAG, "Type: %s, Scale: %.6f, ZP: %d, Size: %d",
              tflite_type_to_string(output->type), 
-             output->params.scale, output->params.zero_point, output_size_);
+             output->params.scale, output->params.zero_point, this->output_size_);
 }
 
 void ModelHandler::debug_raw_outputs(TfLiteTensor* output) const {
     ESP_LOGI(TAG, "=== RAW OUTPUTS ===");
     if (output->type == kTfLiteUInt8) {
-        for (int i = 0; i < output_size_ && i < 10; i++) {
+        for (int i = 0; i < this->output_size_ && i < 10; i++) {
             ESP_LOGI(TAG, "  [%d]: %u", i, output->data.uint8[i]);
         }
     } else if (output->type == kTfLiteFloat32) {
-        for (int i = 0; i < output_size_ && i < 10; i++) {
+        for (int i = 0; i < this->output_size_ && i < 10; i++) {
             ESP_LOGI(TAG, "  [%d]: %.6f", i, output->data.f[i]);
         }
     }
@@ -174,9 +174,9 @@ void ModelHandler::debug_raw_outputs(TfLiteTensor* output) const {
 
 void ModelHandler::debug_qat_model_output() const {
     // Basic implementation for QAT debugging
-    TfLiteTensor* output = output_tensor();
+    TfLiteTensor* output = const_cast<ModelHandler*>(this)->output_tensor();
     if (!output) return;
-    debug_raw_outputs(output);
+    this->debug_raw_outputs(output);
 }
 
 std::vector<ModelConfig> ModelHandler::generate_debug_configs() const {
@@ -213,8 +213,8 @@ std::vector<ModelConfig> ModelHandler::generate_debug_configs() const {
 }
 
 bool ModelHandler::invoke_model(const uint8_t* data, size_t len) {
-    if (!interpreter_) return false;
-    TfLiteTensor* input = input_tensor();
+    if (!this->interpreter_) return false;
+    TfLiteTensor* input = this->input_tensor();
     if (!input) return false;
     
     // Simple copy for now - assuming size matches
@@ -236,7 +236,7 @@ bool ModelHandler::invoke_model(const uint8_t* data, size_t len) {
         memcpy(input->data.uint8, data, copy_len);
     }
     
-    return (interpreter_->Invoke() == kTfLiteOk);
+    return (this->interpreter_->Invoke() == kTfLiteOk);
 }
 
 void ModelHandler::test_configuration(const ModelConfig& config, 
@@ -246,7 +246,7 @@ void ModelHandler::test_configuration(const ModelConfig& config,
              config.input_order.c_str(), config.input_size[0], config.input_size[1],
              config.normalize, config.input_type.c_str(), config.output_processing.c_str());
              
-    ModelConfig original = config_;
+    ModelConfig original = this->config_;
     // Hack: we modify internal config to affect how output is processed
     // But we cannot easily re-allocate the model input tensor size without Init.
     // So 'input_size' changes here might be ignored by the actual interpreter 
@@ -258,24 +258,24 @@ void ModelHandler::test_configuration(const ModelConfig& config,
     res.config = config;
     
     // Only test if input size matches model expectation
-    if (get_input_width() != config.input_size[0] || get_input_height() != config.input_size[1]) {
+    if (this->get_input_width() != config.input_size[0] || this->get_input_height() != config.input_size[1]) {
         ESP_LOGD(TAG, "Skipping config due to size mismatch with loaded model");
         return; 
     }
     
     // config_ = config; // Dangerous if not thread safe or if methods rely on it
     // Actually, process_output relies on config_.
-    config_ = config;
+    this->config_ = config;
     
     float total_conf = 0;
     int success = 0;
     
     for (const auto& zone : zone_data) {
-        if (invoke_model(zone.data(), zone.size())) {
+        if (this->invoke_model(zone.data(), zone.size())) {
             // Get output tensor manually
-            TfLiteTensor* output = output_tensor();
+            TfLiteTensor* output = this->output_tensor();
             if (output->type == kTfLiteFloat32) {
-                ProcessedOutput out = process_output(output->data.f);
+                ProcessedOutput out = this->process_output(output->data.f);
                 res.zone_confidences.push_back(out.confidence);
                 res.zone_values.push_back(out.value);
                 total_conf += out.confidence;
@@ -287,20 +287,20 @@ void ModelHandler::test_configuration(const ModelConfig& config,
     if (success > 0) res.avg_confidence = total_conf / success;
     results.push_back(res);
     
-    config_ = original;
+    this->config_ = original;
 }
 
 void ModelHandler::debug_test_parameters(const std::vector<std::vector<uint8_t>>& zone_data) {
     ESP_LOGI(TAG, "=== DEBUG PARAMETER TESTING ===");
-    feed_watchdog();
+    this->feed_watchdog();
     
     std::vector<ConfigTestResult> results;
-    auto configs = generate_debug_configs();
+    auto configs = this->generate_debug_configs();
     
     int i = 0;
     for (const auto& cfg : configs) {
-        test_configuration(cfg, zone_data, results);
-        if (++i % 5 == 0) feed_watchdog();
+        this->test_configuration(cfg, zone_data, results);
+        if (++i % 5 == 0) this->feed_watchdog();
     }
     
     std::sort(results.begin(), results.end(), 

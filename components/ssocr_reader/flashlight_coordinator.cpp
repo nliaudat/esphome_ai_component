@@ -9,37 +9,37 @@ static const char *const TAG = "flashlight_coordinator";
 
 void FlashlightCoordinator::setup(Component* parent, light::LightState* legacy_light, 
                                   flash_light_controller::FlashLightController* controller) {
-    parent_ = parent;
-    legacy_light_ = legacy_light;
-    controller_ = controller;
+    this->parent_ = parent;
+    this->legacy_light_ = legacy_light;
+    this->controller_ = controller;
 }
 
 void FlashlightCoordinator::set_timing(uint32_t pre_time, uint32_t post_time) {
-    pre_time_ = pre_time;
-    post_time_ = post_time;
+    this->pre_time_ = pre_time;
+    this->post_time_ = post_time;
 }
 
 void FlashlightCoordinator::set_update_interval(uint32_t interval_ms) {
-    update_interval_ = interval_ms;
+    this->update_interval_ = interval_ms;
 }
 
 void FlashlightCoordinator::enable_flash() {
-    if (controller_) {
-        controller_->enable_flash();
-    } else if (legacy_light_) {
-        auto_controlled_.store(true);
-        auto call = legacy_light_->turn_on();
+    if (this->controller_) {
+        this->controller_->enable_flash();
+    } else if (this->legacy_light_) {
+        this->auto_controlled_.store(true);
+        auto call = this->legacy_light_->turn_on();
         call.set_transition_length(0);
         call.perform();
     }
 }
 
 void FlashlightCoordinator::disable_flash() {
-    if (controller_) {
-        controller_->disable_flash();
-    } else if (legacy_light_ && auto_controlled_.load()) {
-        auto_controlled_.store(false);
-        auto call = legacy_light_->turn_off();
+    if (this->controller_) {
+        this->controller_->disable_flash();
+    } else if (this->legacy_light_ && this->auto_controlled_.load()) {
+        this->auto_controlled_.store(false);
+        auto call = this->legacy_light_->turn_off();
         call.set_transition_length(0);
         call.perform();
     }
@@ -47,12 +47,12 @@ void FlashlightCoordinator::disable_flash() {
 
 bool FlashlightCoordinator::update_scheduling() {
     // If controller is present, it handles everything
-    if (controller_) {
-        if (!controller_->is_active()) {
+    if (this->controller_) {
+        if (!this->controller_->is_active()) {
              // Not running: Start it
              ESP_LOGD(TAG, "Controller idle, initiating sequence");
-             controller_->initiate_capture_sequence([this]() {
-                 if (request_frame_callback_) request_frame_callback_();
+             this->controller_->initiate_capture_sequence([this]() {
+                 if (this->request_frame_callback_) this->request_frame_callback_();
              });
              return true; // We initiated, so we are "busy" in a sense, or rather we handled it.
         } else {
@@ -63,28 +63,28 @@ bool FlashlightCoordinator::update_scheduling() {
     }
     
     // Legacy Logic
-    if (legacy_light_ && !scheduled_) {
-        uint32_t schedule_time = (update_interval_ > pre_time_) ? update_interval_ - pre_time_ : 0;
+    if (this->legacy_light_ && !this->scheduled_) {
+        uint32_t schedule_time = (this->update_interval_ > this->pre_time_) ? this->update_interval_ - this->pre_time_ : 0;
         
-        if (schedule_time > 0 && parent_) {
+        if (schedule_time > 0 && this->parent_) {
             ESP_LOGI(TAG, "Scheduling flash for next cycle in %u ms", schedule_time);
             
-            App.scheduler.set_timeout(parent_, "flash_on", schedule_time, [this]() {
-                enable_flash();
-                scheduled_ = true;
+            App.scheduler.set_timeout(this->parent_, "flash_on", schedule_time, [this]() {
+                this->enable_flash();
+                this->scheduled_ = true;
                 
                 // Then wait for pre-time to capture
-                uint32_t capture_delay = (pre_time_ > 500) ? pre_time_ - 500 : 0;
+                uint32_t capture_delay = (this->pre_time_ > 500) ? this->pre_time_ - 500 : 0;
                 
-                App.scheduler.set_timeout(parent_, "flash_capture", capture_delay, [this]() {
-                    if (request_frame_callback_) request_frame_callback_();
+                App.scheduler.set_timeout(this->parent_, "flash_capture", capture_delay, [this]() {
+                    if (this->request_frame_callback_) this->request_frame_callback_();
                 });
                 
                 // Then off
-                uint32_t off_delay = pre_time_ + post_time_;
-                App.scheduler.set_timeout(parent_, "flash_off", off_delay, [this]() {
-                    disable_flash();
-                    scheduled_ = false;
+                uint32_t off_delay = this->pre_time_ + this->post_time_;
+                App.scheduler.set_timeout(this->parent_, "flash_off", off_delay, [this]() {
+                    this->disable_flash();
+                    this->scheduled_ = false;
                 });
             });
             return true; // Scheduled
@@ -95,37 +95,37 @@ bool FlashlightCoordinator::update_scheduling() {
 }
 
 void FlashlightCoordinator::force_inference(std::function<void()> frame_request_callback) {
-    if (!legacy_light_ && !controller_) return;
+    if (!this->legacy_light_ && !this->controller_) return;
     
     ESP_LOGI(TAG, "Forcing flash inference");
-    enable_flash();
+    this->enable_flash();
     
-    if (parent_) {
+    if (this->parent_) {
         // Warmup 3s
-        App.scheduler.set_timeout(parent_, "force_flash_warmup", 3000, [this, frame_request_callback]() {
+        App.scheduler.set_timeout(this->parent_, "force_flash_warmup", 3000, [this, frame_request_callback]() {
              frame_request_callback();
              
              // Off after 500ms safety
-             App.scheduler.set_timeout(parent_, "force_flash_off", 500, [this]() {
-                 disable_flash();
+             App.scheduler.set_timeout(this->parent_, "force_flash_off", 500, [this]() {
+                 this->disable_flash();
              });
         });
     }
 }
 
 void FlashlightCoordinator::capture_preview_sequence(std::function<void()> frame_request_callback) {
-    enable_flash();
+    this->enable_flash();
     
-    uint32_t warmup = controller_ ? controller_->get_flash_pre_time() : pre_time_;
+    uint32_t warmup = this->controller_ ? this->controller_->get_flash_pre_time() : this->pre_time_;
     if (warmup < 1000) warmup = 1000;
     
-    if (parent_) {
-        App.scheduler.set_timeout(parent_, "preview_warmup", warmup, [this, frame_request_callback]() {
+    if (this->parent_) {
+        App.scheduler.set_timeout(this->parent_, "preview_warmup", warmup, [this, frame_request_callback]() {
             frame_request_callback();
             
-            uint32_t post = controller_ ? controller_->get_flash_post_time() : post_time_;
-            App.scheduler.set_timeout(parent_, "preview_off", post, [this]() {
-                disable_flash(); 
+            uint32_t post = this->controller_ ? this->controller_->get_flash_post_time() : this->post_time_;
+            App.scheduler.set_timeout(this->parent_, "preview_off", post, [this]() {
+                this->disable_flash(); 
             });
         });
     }

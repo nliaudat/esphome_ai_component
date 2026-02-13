@@ -355,7 +355,7 @@ bool ImageProcessor::validate_input_image(std::shared_ptr<camera::CameraImage> i
         return false;
     }
     
-    if (config_.pixel_format == "JPEG") {
+    if (this->config_.pixel_format == "JPEG") {
         if (image->get_data_length() < 2) {
             ESP_LOGE(TAG, "JPEG data too short");
             return false;
@@ -410,31 +410,31 @@ CropZone adjust_zone_for_jpeg(const CropZone &zone, int max_width, int max_heigh
 ImageProcessor::ImageProcessor(const ImageProcessorConfig &config)
   : config_(config) {
   
-  if (!config_.validate()) {
+  if (!this->config_.validate()) {
     ESP_LOGE(TAG, "Invalid image processor configuration");
     ESP_LOGE(TAG, "  Camera: %dx%d, Format: %s", 
-             config_.camera_width, config_.camera_height, config_.pixel_format.c_str());
+             this->config_.camera_width, this->config_.camera_height, this->config_.pixel_format.c_str());
   }
   
   #ifdef USE_CAMERA_ROTATOR
-  if (config_.rotation != ROTATION_0) {
-    ESP_LOGI(TAG, "Image rotation enabled: %d degrees clockwise", static_cast<int>(config_.rotation));
+  if (this->config_.rotation != ROTATION_0) {
+    ESP_LOGI(TAG, "Image rotation enabled: %d degrees clockwise", static_cast<int>(this->config_.rotation));
   }
   #endif
 
-  if (config_.pixel_format == "RGB888") {
-    bytes_per_pixel_ = 3;
-  } else if (config_.pixel_format == "RGB565") {
-    bytes_per_pixel_ = 2;
-  } else if (config_.pixel_format == "YUV422") {
-    bytes_per_pixel_ = 2;
-  } else if (config_.pixel_format == "GRAYSCALE") {
-    bytes_per_pixel_ = 1;
-  } else if (config_.pixel_format == "JPEG") {
-    bytes_per_pixel_ = 3;
+  if (this->config_.pixel_format == "RGB888") {
+    this->bytes_per_pixel_ = 3;
+  } else if (this->config_.pixel_format == "RGB565") {
+    this->bytes_per_pixel_ = 2;
+  } else if (this->config_.pixel_format == "YUV422") {
+    this->bytes_per_pixel_ = 2;
+  } else if (this->config_.pixel_format == "GRAYSCALE") {
+    this->bytes_per_pixel_ = 1;
+  } else if (this->config_.pixel_format == "JPEG") {
+    this->bytes_per_pixel_ = 3;
   } else {
-    ESP_LOGE(TAG, "Unsupported pixel format: %s", config_.pixel_format.c_str());
-    bytes_per_pixel_ = 3;
+    ESP_LOGE(TAG, "Unsupported pixel format: %s", this->config_.pixel_format.c_str());
+    this->bytes_per_pixel_ = 3;
   }
 }
 
@@ -499,10 +499,10 @@ ImageProcessor::JpegBufferPtr ImageProcessor::allocate_jpeg_buffer(size_t size) 
 }
 
 size_t ImageProcessor::get_required_buffer_size() const {
-    if (config_.input_type == kInputTypeFloat32) {
-        return config_.model_width * config_.model_height * config_.model_channels * sizeof(float);
-    } else if (config_.input_type == kInputTypeUInt8) {
-        return config_.model_width * config_.model_height * config_.model_channels;
+    if (this->config_.input_type == kInputTypeFloat32) {
+        return this->config_.model_width * this->config_.model_height * this->config_.model_channels * sizeof(float);
+    } else if (this->config_.input_type == kInputTypeUInt8) {
+        return this->config_.model_width * this->config_.model_height * this->config_.model_channels;
     }
     return 0;
 }
@@ -511,14 +511,14 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
     std::shared_ptr<camera::CameraImage> image,
     const std::vector<CropZone> &zones) {
    
-  std::lock_guard<std::mutex> lock(processing_mutex_);
+  std::lock_guard<std::mutex> lock(this->processing_mutex_);
   std::vector<ProcessResult> results;
   
-  stats_.total_frames++;
+  this->stats_.total_frames++;
   uint32_t start_time = millis();
   
-  if (!validate_input_image(image)) {
-    stats_.failed_frames++;
+  if (!this->validate_input_image(image)) {
+    this->stats_.failed_frames++;
     return results;
   }
 
@@ -528,9 +528,9 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
   std::vector<CropZone> effective_zones = zones;
   if (effective_zones.empty()) {
       // Create a full-frame zone if none provided
-      int w = config_.camera_width;
-      int h = config_.camera_height;
-      if (config_.pixel_format == "JPEG") {
+      int w = this->config_.camera_width;
+      int h = this->config_.camera_height;
+      if (this->config_.pixel_format == "JPEG") {
         get_jpeg_dimensions(image->get_data_buffer(), image->get_data_length(), w, h);
       }
       effective_zones.push_back({0, 0, w, h});
@@ -538,8 +538,8 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
 
   // Intermediate buffer state
   JpegBufferPtr master_decoded_buffer; // Holds decoded JPEG or rotated raw
-  int master_width = config_.camera_width;
-  int master_height = config_.camera_height;
+  int master_width = this->config_.camera_width;
+  int master_height = this->config_.camera_height;
   int master_channels = 3; 
 
   bool use_master_buffer = false;
@@ -553,7 +553,7 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
   
   // Log memory state for debugging invisible failures
   ESP_LOGI(TAG, "Image Processing Start. PSRAM Free: %zu KB (Threshold: %zu KB). Format: %s", 
-           free_spiram/1024, SPIRAM_RESERVE_THRESHOLD/1024, config_.pixel_format.c_str());
+           free_spiram/1024, SPIRAM_RESERVE_THRESHOLD/1024, this->config_.pixel_format.c_str());
 
   bool low_memory = false;
   if (free_spiram > 0) {
@@ -572,7 +572,7 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
   
   // Decide if we should decode once
   // Use master buffer for JPEG if memory is available, otherwise process zone-by-zone
-  if (config_.pixel_format == "JPEG" && !low_memory) {
+  if (this->config_.pixel_format == "JPEG" && !low_memory) {
       use_master_buffer = true;
       
       const uint8_t *jpeg_data = image->get_data_buffer();
@@ -581,7 +581,7 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
       // 1. Determine format and rotation optimization
       jpeg_pixel_format_t decode_format = JPEG_PIXEL_FORMAT_RGB888;
       int decode_channels = 3;
-      if (config_.pixel_format == "GRAYSCALE") {
+      if (this->config_.pixel_format == "GRAYSCALE") {
           decode_format = JPEG_PIXEL_FORMAT_GRAY;
           decode_channels = 1;
       }
@@ -591,7 +591,7 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
       bool software_rotation_needed = false;
       
       // Normalize rotation for check
-      float rot = config_.rotation;
+      float rot = this->config_.rotation;
       while (rot < 0) rot += 360.0f;
       while (rot >= 360.0f) rot -= 360.0f;
       
@@ -614,8 +614,8 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
       
       if (!master_decoded_buffer) {
           ESP_LOGE(TAG, "CRITICAL: Image Decoding Failed (Master Buffer). Check heap/format.");
-          stats_.jpeg_decoding_errors++;
-          stats_.failed_frames++;
+          this->stats_.jpeg_decoding_errors++;
+          this->stats_.failed_frames++;
           return results;
       }
       master_width = dec_w;
@@ -624,9 +624,9 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
 
       // 3. Rotate Master if needed (Software fallback for fine angles)
       #ifdef USE_CAMERA_ROTATOR
-      if (software_rotation_needed && std::abs(config_.rotation) > 0.01f) {
+      if (software_rotation_needed && std::abs(this->config_.rotation) > 0.01f) {
            // ... (Existing software rotation logic) ...
-           float rads = config_.rotation * M_PI / 180.0f;
+           float rads = this->config_.rotation * static_cast<float>(M_PI) / 180.0f;
            float abs_cos = std::abs(std::cos(rads));
            float abs_sin = std::abs(std::sin(rads));
            int rot_w = static_cast<int>(master_width * abs_cos + master_height * abs_sin);
@@ -641,7 +641,7 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
                bool rot_success = Rotator::perform_rotation(
                    master_decoded_buffer.get(), raw_rot,
                    master_width, master_height, master_channels,
-                   config_.rotation, rot_w, rot_h
+                   this->config_.rotation, rot_w, rot_h
                );
                
                if (rot_success) {
@@ -683,7 +683,7 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
              // ESP_LOGW(TAG, "ImageProcessor: Skipping BGR->RGB Swap. Channels=%d", master_channels);
         }
 
-        if (config_.cache_preview_image) {
+        if (this->config_.cache_preview_image) {
             uint8_t* raw = master_decoded_buffer.release();
             // Wrap in TrackedBuffer (jpeg aligned)
             // Constructor: ptr, spiram, jpeg_aligned, pooled, size
@@ -741,16 +741,16 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
               
               if (master_channels == 1) {
                   // Grayscale
-                   if (config_.input_type == kInputTypeFloat32) {
-                        crop_success = process_grayscale_crop_and_scale_to_float32(
+                   if (this->config_.input_type == kInputTypeFloat32) {
+                        crop_success = this->process_grayscale_crop_and_scale_to_float32(
                             processing_source_ptr, zone, crop_w, crop_h,
-                            out_buf->get(), config_.model_width, config_.model_height,
-                            config_.model_channels, config_.normalize, stride);
+                            out_buf->get(), this->config_.model_width, this->config_.model_height,
+                            this->config_.model_channels, this->config_.normalize, stride);
                    } else {
-                        crop_success = process_grayscale_crop_and_scale_to_uint8(
+                        crop_success = this->process_grayscale_crop_and_scale_to_uint8(
                             processing_source_ptr, zone, crop_w, crop_h,
-                            out_buf->get(), config_.model_width, config_.model_height,
-                            config_.model_channels, stride);
+                            out_buf->get(), this->config_.model_width, this->config_.model_height,
+                            this->config_.model_channels, stride);
                         if (!crop_success) {
                              ESP_LOGE(TAG, "process_grayscale... failed for zone [%d,%d,%d,%d]", 
                                       zone.x1, zone.y1, zone.x2, zone.y2);
@@ -758,16 +758,16 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
                    }
               } else {
                   // RGB
-                   if (config_.input_type == kInputTypeFloat32) {
-                        crop_success = process_rgb888_crop_and_scale_to_float32(
+                   if (this->config_.input_type == kInputTypeFloat32) {
+                        crop_success = this->process_rgb888_crop_and_scale_to_float32(
                             processing_source_ptr, zone, crop_w, crop_h,
-                            out_buf->get(), config_.model_width, config_.model_height,
-                            config_.model_channels, config_.normalize, stride);
+                            out_buf->get(), this->config_.model_width, this->config_.model_height,
+                            this->config_.model_channels, this->config_.normalize, stride);
                    } else {
-                        crop_success = process_rgb888_crop_and_scale_to_uint8(
+                        crop_success = this->process_rgb888_crop_and_scale_to_uint8(
                             processing_source_ptr, zone, crop_w, crop_h,
-                            out_buf->get(), config_.model_width, config_.model_height,
-                            config_.model_channels, stride);
+                            out_buf->get(), this->config_.model_width, this->config_.model_height,
+                            this->config_.model_channels, stride);
                    }
               }
           } else {
@@ -776,7 +776,7 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
           }
       } else {
           // Legacy/Raw CameraImage path
-          if (process_raw_zone_to_buffer(image, zone, out_buf->get(), required_size)) {
+          if (this->process_raw_zone_to_buffer(image, zone, out_buf->get(), required_size)) {
               crop_success = true;
           }
       }
@@ -787,7 +787,7 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
           results.push_back(std::move(result));
           
           #ifdef DEBUG_ESP32_CAMERA_UTILS
-          DEBUG_ZONE_INFO(zone, (zone.x2 - zone.x1), (zone.y2 - zone.y1), config_.model_width, config_.model_height);
+          DEBUG_ZONE_INFO(zone, (zone.x2 - zone.x1), (zone.y2 - zone.y1), this->config_.model_width, this->config_.model_height);
           #endif
       } else {
           all_zones_successful = false;
@@ -795,11 +795,11 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
   }
   
   if (!all_zones_successful) {
-      stats_.failed_frames++;
+      this->stats_.failed_frames++;
   }
   
   uint32_t processing_time = millis() - start_time;
-  stats_.total_processing_time_ms += processing_time;
+  this->stats_.total_processing_time_ms += processing_time;
   
   return results;
 }
@@ -810,10 +810,10 @@ bool ImageProcessor::process_zone_to_buffer(
     uint8_t* output_buffer,
     size_t output_buffer_size) {
     
-    std::lock_guard<std::mutex> lock(processing_mutex_);
+    std::lock_guard<std::mutex> lock(this->processing_mutex_);
     DURATION_START();
     
-    if (!validate_input_image(image)) {
+    if (!this->validate_input_image(image)) {
         return false;
     }
     
@@ -822,14 +822,14 @@ bool ImageProcessor::process_zone_to_buffer(
     // but the 'zone' targets the rotated result.
     // We must validate against the "logical" dimensions of the source corresponding to the operation.
     
-    int max_w = config_.camera_width;
-    int max_h = config_.camera_height;
+    int max_w = this->config_.camera_width;
+    int max_h = this->config_.camera_height;
     
     #ifdef USE_CAMERA_ROTATOR
-    if (config_.pixel_format == "JPEG" && config_.rotation != ROTATION_0) {
+    if (this->config_.pixel_format == "JPEG" && this->config_.rotation != ROTATION_0) {
         // Use preview config dimensions if available, as they represent the target rotation
         // But better: swap max_w/max_h if 90/270 rotation is active
-        if (config_.rotation == ROTATION_90 || config_.rotation == ROTATION_270) {
+        if (this->config_.rotation == ROTATION_90 || this->config_.rotation == ROTATION_270) {
             std::swap(max_w, max_h); 
         }
     }
@@ -837,7 +837,7 @@ bool ImageProcessor::process_zone_to_buffer(
 
     if (zone.x1 < 0 || zone.y1 < 0 || zone.x2 > max_w || zone.y2 > max_h) {
         ESP_LOGE(TAG, "Zone out of bounds: [%d,%d->%d,%d] for image %dx%d (rot %d)",
-                 zone.x1, zone.y1, zone.x2, zone.y2, max_w, max_h, static_cast<int>(config_.rotation));
+                 zone.x1, zone.y1, zone.x2, zone.y2, max_w, max_h, static_cast<int>(this->config_.rotation));
         return false;
     }
     
@@ -848,11 +848,11 @@ bool ImageProcessor::process_zone_to_buffer(
 
     bool success = false;
     
-    if (config_.pixel_format == "JPEG") {
-        CropZone adjusted_zone = adjust_zone_for_jpeg(zone, config_.camera_width, config_.camera_height);
-        success = process_jpeg_zone_to_buffer(image, adjusted_zone, output_buffer, output_buffer_size);
+    if (this->config_.pixel_format == "JPEG") {
+        CropZone adjusted_zone = adjust_zone_for_jpeg(zone, this->config_.camera_width, this->config_.camera_height);
+        success = this->process_jpeg_zone_to_buffer(image, adjusted_zone, output_buffer, output_buffer_size);
     } else {
-        success = process_raw_zone_to_buffer(image, zone, output_buffer, output_buffer_size);
+        success = this->process_raw_zone_to_buffer(image, zone, output_buffer, output_buffer_size);
     }
     
     DURATION_END("process_zone_to_buffer");
@@ -900,22 +900,22 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
     
     if (!jpeg_data || jpeg_size == 0) return false;
 
-    size_t required_size = get_required_buffer_size();
+    size_t required_size = this->get_required_buffer_size();
     
-    if (!validate_buffer_size(required_size, output_buffer_size, "JPEG processing")) {
+    if (!this->validate_buffer_size(required_size, output_buffer_size, "JPEG processing")) {
         return false;
     }
 
     // Determine actual JPEG dimensions to avoid resize errors
-    int jpeg_width = config_.camera_width;
-    int jpeg_height = config_.camera_height;
+    int jpeg_width = this->config_.camera_width;
+    int jpeg_height = this->config_.camera_height;
     
     // Always attempt to get actual dimensions from JPEG header
     if (get_jpeg_dimensions(jpeg_data, jpeg_size, jpeg_width, jpeg_height)) {
-        if (jpeg_width != config_.camera_width || jpeg_height != config_.camera_height) {
+        if (jpeg_width != this->config_.camera_width || jpeg_height != this->config_.camera_height) {
              // Just debug log, this is expected in windowed mode or if using debug image
             ESP_LOGD(TAG, "JPEG dimensions (%dx%d) differ from config (%dx%d). Using actual dimensions.",
-                     jpeg_width, jpeg_height, config_.camera_width, config_.camera_height);
+                     jpeg_width, jpeg_height, this->config_.camera_width, this->config_.camera_height);
         }
     } else {
         ESP_LOGW(TAG, "Failed to parse JPEG dimensions, using config");
@@ -927,7 +927,7 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
     int decode_channels = 3;
     
     // Explicit grayscale request
-    if (config_.pixel_format == "GRAYSCALE") {
+    if (this->config_.pixel_format == "GRAYSCALE") {
         decode_format = JPEG_PIXEL_FORMAT_GRAY;
         decode_channels = 1;
     }
@@ -940,7 +940,7 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
     bool software_rotation_needed = false;
     
     // Normalize rotation for check
-    float rot = config_.rotation;
+    float rot = this->config_.rotation;
     while (rot < 0) rot += 360.0f;
     while (rot >= 360.0f) rot -= 360.0f;
     
@@ -959,7 +959,7 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
     JpegBufferPtr full_image_buf = decode_jpeg(jpeg_data, jpeg_size, &dec_w, &dec_h, decode_format, hw_rotation);
     
     if (!full_image_buf) {
-        stats_.jpeg_decoding_errors++;
+        this->stats_.jpeg_decoding_errors++;
         return false;
     }
 
@@ -976,7 +976,7 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
         zone.x2 > jpeg_width || zone.y2 > jpeg_height) {
         ESP_LOGE(TAG, "Crop zone (%d,%d -> %d,%d) out of bounds for actual image (%dx%d) - Config: %dx%d",
                  zone.x1, zone.y1, zone.x2, zone.y2, jpeg_width, jpeg_height,
-                 config_.camera_width, config_.camera_height);
+                 this->config_.camera_width, this->config_.camera_height);
         return false;
     }
 
@@ -987,20 +987,20 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
     UniqueBufferPtr rotated_buffer_storage;
 
     #ifdef USE_CAMERA_ROTATOR
-    if (software_rotation_needed && std::abs(config_.rotation) > 0.01f) {
+    if (software_rotation_needed && std::abs(this->config_.rotation) > 0.01f) {
         
         // Allocate buffer for rotated image with new bounding box
         int out_w = 0, out_h = 0;
         
         // First calculate size
-        float rads = config_.rotation * M_PI / 180.0f;
+        float rads = this->config_.rotation * static_cast<float>(M_PI) / 180.0f;
         float abs_cos = std::abs(std::cos(rads));
         float abs_sin = std::abs(std::sin(rads));
         out_w = static_cast<int>(jpeg_width * abs_cos + jpeg_height * abs_sin);
         out_h = static_cast<int>(jpeg_width * abs_sin + jpeg_height * abs_cos);
         
         size_t rotated_size = out_w * out_h * decode_channels;
-        rotated_buffer_storage = allocate_image_buffer(rotated_size);
+        rotated_buffer_storage = this->allocate_image_buffer(rotated_size);
         
         if (!rotated_buffer_storage) {
             ESP_LOGE(TAG, "Failed to allocate rotation buffer: %zu bytes", rotated_size);
@@ -1012,7 +1012,7 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
         // Use helper to Rotate: Full -> Rotated
         bool rot_success = Rotator::perform_rotation(full_image_buf.get(), rotated_buf, 
                                                  jpeg_width, jpeg_height, 
-                                                 decode_channels, config_.rotation, out_w, out_h); 
+                                                 decode_channels, this->config_.rotation, out_w, out_h); 
         
         if (rot_success) {
             // Update processing context to new dimensions
@@ -1023,7 +1023,7 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
             full_image_buf.reset();
             
             // Wrap in RotatedPreviewImage to keep it alive and accessible for preview ONLY if requested
-            if (config_.cache_preview_image) {
+            if (this->config_.cache_preview_image) {
                 // We transfer ownership of the UniqueBufferPtr to the shared_ptr<RotatedPreviewImage>
                 std::shared_ptr<RotatedPreviewImage> cached_img = std::make_shared<RotatedPreviewImage>(
                     std::move(rotated_buffer_storage), 
@@ -1061,29 +1061,29 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
     
     if (decode_channels == 1) {
         // Grayscale Path
-        if (config_.input_type == kInputTypeFloat32) {
-            scale_success = process_grayscale_crop_and_scale_to_float32(
+        if (this->config_.input_type == kInputTypeFloat32) {
+            scale_success = this->process_grayscale_crop_and_scale_to_float32(
                 processing_buf, zone, crop_width, crop_height,
-                output_buffer, config_.model_width, config_.model_height,
-                config_.model_channels, config_.normalize, stride);
-        } else if (config_.input_type == kInputTypeUInt8) {
-            scale_success = process_grayscale_crop_and_scale_to_uint8(
+                output_buffer, this->config_.model_width, this->config_.model_height,
+                this->config_.model_channels, this->config_.normalize, stride);
+        } else if (this->config_.input_type == kInputTypeUInt8) {
+            scale_success = this->process_grayscale_crop_and_scale_to_uint8(
                 processing_buf, zone, crop_width, crop_height,
-                output_buffer, config_.model_width, config_.model_height,
-                config_.model_channels, stride);
+                output_buffer, this->config_.model_width, this->config_.model_height,
+                this->config_.model_channels, stride);
         }
     } else {
         // RGB Path (Default)
-        if (config_.input_type == kInputTypeFloat32) {
-            scale_success = process_rgb888_crop_and_scale_to_float32(
+        if (this->config_.input_type == kInputTypeFloat32) {
+            scale_success = this->process_rgb888_crop_and_scale_to_float32(
                 processing_buf, zone, crop_width, crop_height,
-                output_buffer, config_.model_width, config_.model_height,
-                config_.model_channels, config_.normalize, stride);
-        } else if (config_.input_type == kInputTypeUInt8) {
-            scale_success = process_rgb888_crop_and_scale_to_uint8(
+                output_buffer, this->config_.model_width, this->config_.model_height,
+                this->config_.model_channels, this->config_.normalize, stride);
+        } else if (this->config_.input_type == kInputTypeUInt8) {
+            scale_success = this->process_rgb888_crop_and_scale_to_uint8(
                 processing_buf, zone, crop_width, crop_height,
-                output_buffer, config_.model_width, config_.model_height,
-                config_.model_channels, stride);
+                output_buffer, this->config_.model_width, this->config_.model_height,
+                this->config_.model_channels, stride);
         }
     }
     
@@ -1104,13 +1104,13 @@ ImageProcessor::ProcessResult ImageProcessor::process_zone(
     DURATION_START();
     ProcessResult result;
     
-    if (!validate_input_image(image)) return result;
-    if (!validate_zone(zone)) return result;
+    if (!this->validate_input_image(image)) return result;
+    if (!this->validate_zone(zone)) return result;
 
-    size_t required_size = get_required_buffer_size();
+    size_t required_size = this->get_required_buffer_size();
     if (required_size == 0) return result;
 
-    UniqueBufferPtr buffer = allocate_image_buffer(required_size);
+    UniqueBufferPtr buffer = this->allocate_image_buffer(required_size);
     if (!buffer) {
         ESP_LOGE(TAG, "Failed to allocate output buffer size: %zu", required_size);
         return result; 
@@ -1118,11 +1118,11 @@ ImageProcessor::ProcessResult ImageProcessor::process_zone(
     
     bool success = false;
     
-    if (config_.pixel_format == "JPEG") {
-        CropZone adjusted_zone = adjust_zone_for_jpeg(zone, config_.camera_width, config_.camera_height);
-        success = process_jpeg_zone_to_buffer(image, adjusted_zone, buffer->get(), required_size);
+    if (this->config_.pixel_format == "JPEG") {
+        CropZone adjusted_zone = adjust_zone_for_jpeg(zone, this->config_.camera_width, this->config_.camera_height);
+        success = this->process_jpeg_zone_to_buffer(image, adjusted_zone, buffer->get(), required_size);
     } else {
-        success = process_raw_zone_to_buffer(image, zone, buffer->get(), required_size);
+        success = this->process_raw_zone_to_buffer(image, zone, buffer->get(), required_size);
     }
     
     if (success) {
@@ -1135,19 +1135,19 @@ ImageProcessor::ProcessResult ImageProcessor::process_zone(
 }
 
 bool ImageProcessor::validate_zone(const CropZone &zone) const {
-    int max_w = config_.camera_width;
-    int max_h = config_.camera_height;
+    int max_w = this->config_.camera_width;
+    int max_h = this->config_.camera_height;
     
     // Calculate effective max dimensions after rotation
     #ifdef USE_CAMERA_ROTATOR
-    if (config_.pixel_format == "JPEG" && std::abs(config_.rotation) > 0.01f) {
-        float rads = config_.rotation * M_PI / 180.0f;
+    if (this->config_.pixel_format == "JPEG" && std::abs(this->config_.rotation) > 0.01f) {
+        float rads = this->config_.rotation * static_cast<float>(M_PI) / 180.0f;
         float abs_cos = std::abs(std::cos(rads));
         float abs_sin = std::abs(std::sin(rads));
         
         // Calculate new bounding box size
-        int rot_w = static_cast<int>(config_.camera_width * abs_cos + config_.camera_height * abs_sin);
-        int rot_h = static_cast<int>(config_.camera_width * abs_sin + config_.camera_height * abs_cos);
+        int rot_w = static_cast<int>(this->config_.camera_width * abs_cos + this->config_.camera_height * abs_sin);
+        int rot_h = static_cast<int>(this->config_.camera_width * abs_sin + this->config_.camera_height * abs_cos);
         
         max_w = rot_w;
         max_h = rot_h;
@@ -1157,7 +1157,7 @@ bool ImageProcessor::validate_zone(const CropZone &zone) const {
     if (zone.x1 < 0 || zone.y1 < 0 || 
         zone.x2 > max_w || zone.y2 > max_h) {
         ESP_LOGE(TAG, "Zone validation failed: [%d,%d->%d,%d] vs Max [%d,%d] (Rot: %.1f)", 
-                 zone.x1, zone.y1, zone.x2, zone.y2, max_w, max_h, config_.rotation);
+                 zone.x1, zone.y1, zone.x2, zone.y2, max_w, max_h, this->config_.rotation);
         return false;
     }
     
@@ -1180,9 +1180,9 @@ bool ImageProcessor::process_raw_zone_to_buffer(
     
     if (!input_data || input_size == 0) return false;
 
-    size_t required_size = get_required_buffer_size();
+    size_t required_size = this->get_required_buffer_size();
     
-    if (!validate_buffer_size(required_size, output_buffer_size, "raw processing")) {
+    if (!this->validate_buffer_size(required_size, output_buffer_size, "raw processing")) {
         return false;
     }
 
@@ -1190,7 +1190,7 @@ bool ImageProcessor::process_raw_zone_to_buffer(
     int crop_height = zone.y2 - zone.y1;
     
     if (zone.x1 < 0 || zone.y1 < 0 || 
-        zone.x2 > config_.camera_width || zone.y2 > config_.camera_height) {
+        zone.x2 > this->config_.camera_width || zone.y2 > this->config_.camera_height) {
         return false;
     }
 
@@ -1198,22 +1198,22 @@ bool ImageProcessor::process_raw_zone_to_buffer(
     
     // Determine target dimensions for the scaling step
     // If rotating 90 or 270, we need to swap dimensions for the intermediate (unrotated) buffer
-    int scale_width = config_.model_width;
+    int scale_width = this->config_.model_width;
 
-    int scale_height = config_.model_height;
+    int scale_height = this->config_.model_height;
     
-    bool needs_rotation = (config_.rotation != ROTATION_0);
+    bool needs_rotation = (this->config_.rotation != ROTATION_0);
     uint8_t* target_buffer = output_buffer;
     UniqueBufferPtr temp_buffer_storage;
 
 #ifdef USE_CAMERA_ROTATOR
-    if (needs_rotation && (config_.rotation == ROTATION_90 || config_.rotation == ROTATION_270)) {
+    if (needs_rotation && (this->config_.rotation == ROTATION_90 || this->config_.rotation == ROTATION_270)) {
         std::swap(scale_width, scale_height);
     }
     
     // If rotating, we need a temporary buffer for the unrotated scaled image
     if (needs_rotation) {
-        temp_buffer_storage = allocate_image_buffer(output_buffer_size);
+        temp_buffer_storage = this->allocate_image_buffer(output_buffer_size);
         if (!temp_buffer_storage) {
             ESP_LOGE(TAG, "Failed to allocate temp buffer for rotation");
             return false;
@@ -1222,41 +1222,41 @@ bool ImageProcessor::process_raw_zone_to_buffer(
     }
     #endif
     
-    if (config_.pixel_format == "RGB888") {
-        if (config_.input_type == kInputTypeFloat32) {
-            success = process_rgb888_crop_and_scale_to_float32(
+    if (this->config_.pixel_format == "RGB888") {
+        if (this->config_.input_type == kInputTypeFloat32) {
+            success = this->process_rgb888_crop_and_scale_to_float32(
                 input_data, zone, crop_width, crop_height,
-                target_buffer, scale_width, scale_height, config_.model_channels,
-                config_.normalize, config_.camera_width);
-        } else if (config_.input_type == kInputTypeUInt8) {
-            success = process_rgb888_crop_and_scale_to_uint8(
+                target_buffer, scale_width, scale_height, this->config_.model_channels,
+                this->config_.normalize, this->config_.camera_width);
+        } else if (this->config_.input_type == kInputTypeUInt8) {
+            success = this->process_rgb888_crop_and_scale_to_uint8(
                 input_data, zone, crop_width, crop_height,
-                target_buffer, scale_width, scale_height, config_.model_channels, config_.camera_width);
+                target_buffer, scale_width, scale_height, this->config_.model_channels, this->config_.camera_width);
         }
-    } else if (config_.pixel_format == "RGB565") {
-        if (config_.input_type == kInputTypeFloat32) {
-            success = process_rgb565_crop_and_scale_to_float32(
+    } else if (this->config_.pixel_format == "RGB565") {
+        if (this->config_.input_type == kInputTypeFloat32) {
+            success = this->process_rgb565_crop_and_scale_to_float32(
                 input_data, zone, crop_width, crop_height,
-                target_buffer, scale_width, scale_height, config_.model_channels,
-                config_.normalize, config_.camera_width);
-        } else if (config_.input_type == kInputTypeUInt8) {
-            success = process_rgb565_crop_and_scale_to_uint8(
+                target_buffer, scale_width, scale_height, this->config_.model_channels,
+                this->config_.normalize, this->config_.camera_width);
+        } else if (this->config_.input_type == kInputTypeUInt8) {
+            success = this->process_rgb565_crop_and_scale_to_uint8(
                 input_data, zone, crop_width, crop_height,
-                target_buffer, scale_width, scale_height, config_.model_channels, config_.camera_width);
+                target_buffer, scale_width, scale_height, this->config_.model_channels, this->config_.camera_width);
         }
-    } else if (config_.pixel_format == "GRAYSCALE") {
-        if (config_.input_type == kInputTypeFloat32) {
-            success = process_grayscale_crop_and_scale_to_float32(
+    } else if (this->config_.pixel_format == "GRAYSCALE") {
+        if (this->config_.input_type == kInputTypeFloat32) {
+            success = this->process_grayscale_crop_and_scale_to_float32(
                 input_data, zone, crop_width, crop_height,
-                target_buffer, scale_width, scale_height, config_.model_channels,
-                config_.normalize, config_.camera_width);
-        } else if (config_.input_type == kInputTypeUInt8) {
-            success = process_grayscale_crop_and_scale_to_uint8(
+                target_buffer, scale_width, scale_height, this->config_.model_channels,
+                this->config_.normalize, this->config_.camera_width);
+        } else if (this->config_.input_type == kInputTypeUInt8) {
+            success = this->process_grayscale_crop_and_scale_to_uint8(
                 input_data, zone, crop_width, crop_height,
-                target_buffer, scale_width, scale_height, config_.model_channels, config_.camera_width);
+                target_buffer, scale_width, scale_height, this->config_.model_channels, this->config_.camera_width);
         }
     } else {
-        ESP_LOGE(TAG, "ProcessRawZone: Unsupported pixel format '%s'", config_.pixel_format.c_str());
+        ESP_LOGE(TAG, "ProcessRawZone: Unsupported pixel format '%s'", this->config_.pixel_format.c_str());
         return false;
     }
 
@@ -1264,14 +1264,14 @@ bool ImageProcessor::process_raw_zone_to_buffer(
     // Apply rotation if needed
     #ifdef USE_CAMERA_ROTATOR
     if (success && needs_rotation) {
-        int element_size = (config_.input_type == kInputTypeFloat32) ? sizeof(float) : sizeof(uint8_t);
-        int bytes_per_pixel = config_.model_channels * element_size;
+        int element_size = (this->config_.input_type == kInputTypeFloat32) ? sizeof(float) : sizeof(uint8_t);
+        int bytes_per_pixel = this->config_.model_channels * element_size;
         
         // rotate temp_buffer (scale_width x scale_height) -> output_buffer (model_width x model_height)
         int rotated_w, rotated_h;
-        success = apply_software_rotation(target_buffer, output_buffer, 
+        success = this->apply_software_rotation(target_buffer, output_buffer, 
                                         scale_width, scale_height, 
-                                        bytes_per_pixel, config_.rotation, rotated_w, rotated_h);
+                                        bytes_per_pixel, this->config_.rotation, rotated_w, rotated_h);
     }
     #endif
     
@@ -1555,7 +1555,7 @@ bool ImageProcessor::process_grayscale_crop_and_scale_to_uint8(
 void ImageProcessor::arrange_channels(float* output, uint8_t r, uint8_t g, uint8_t b, 
                                     int output_channels, bool normalize) const {
     if (output_channels >= 3) {
-        if (config_.input_order == "BGR") {
+        if (this->config_.input_order == "BGR") {
             output[0] = normalize ? b / 255.0f : b;
             output[1] = normalize ? g / 255.0f : g;
             output[2] = normalize ? r / 255.0f : r;
@@ -1573,7 +1573,7 @@ void ImageProcessor::arrange_channels(float* output, uint8_t r, uint8_t g, uint8
 void ImageProcessor::arrange_channels(uint8_t* output, uint8_t r, uint8_t g, uint8_t b, 
                                     int output_channels) const {
     if (output_channels >= 3) {
-        if (config_.input_order == "BGR") {
+        if (this->config_.input_order == "BGR") {
             output[0] = b;
             output[1] = g;
             output[2] = r;
@@ -1587,7 +1587,7 @@ void ImageProcessor::arrange_channels(uint8_t* output, uint8_t r, uint8_t g, uin
     }
 }
 
-#ifdef DEV_ENABLE_ROTATION
+#ifdef USE_CAMERA_ROTATOR
 bool ImageProcessor::apply_software_rotation(
     const uint8_t* input, uint8_t* output,
     int width, int height, int bytes_per_pixel,

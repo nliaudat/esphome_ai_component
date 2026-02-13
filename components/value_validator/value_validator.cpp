@@ -159,31 +159,31 @@ void ReadingHistory::clear() {
 }
 
 void ValueValidator::setup() {
-  history_.set_max_history_size_bytes(config_.max_history_size_bytes);
-  history_.setup();
-  last_valid_reading_ = 0;
-  first_reading_ = true;
-  first_reading_count_ = 0;
-  first_reading_candidate_ = 0;
-  last_good_values_count_ = 0;
-  last_good_values_head_ = 0;
-  consecutive_rejections_ = 0;
-  rejection_confidence_sum_ = 0.0f;
-  free_digit_history();
+  this->history_.set_max_history_size_bytes(this->config_.max_history_size_bytes);
+  this->history_.setup();
+  this->last_valid_reading_ = 0;
+  this->first_reading_ = true;
+  this->first_reading_count_ = 0;
+  this->first_reading_candidate_ = 0;
+  this->last_good_values_count_ = 0;
+  this->last_good_values_head_ = 0;
+  this->consecutive_rejections_ = 0;
+  this->rejection_confidence_sum_ = 0.0f;
+  this->free_digit_history();
   
   // Initialize with some capacity
-  ensure_last_good_values_capacity(config_.smart_validation_window);
+  this->ensure_last_good_values_capacity(this->config_.smart_validation_window);
   
   // Restore persistent state if enabled
-  if (config_.persist_state) {
-    pref_ = global_preferences->make_preference<int>(fnv1_hash("value_validator"));
+  if (this->config_.persist_state) {
+    this->pref_ = global_preferences->make_preference<int>(fnv1_hash("value_validator"));
     int restored = 0;
-    if (pref_.load(&restored) && restored > 0) {
-      last_valid_reading_ = restored;
-      first_reading_ = false;
+    if (this->pref_.load(&restored) && restored > 0) {
+      this->last_valid_reading_ = restored;
+      this->first_reading_ = false;
       // Seed good values with restored reading
-      for (int i = 0; i < config_.smart_validation_window; i++) {
-        add_good_value(restored);
+      for (int i = 0; i < this->config_.smart_validation_window; i++) {
+        this->add_good_value(restored);
       }
       ESP_LOGI(TAG, "Restored persistent state: last_valid_reading = %d", restored);
     }
@@ -192,102 +192,102 @@ void ValueValidator::setup() {
 
 void ValueValidator::dump_config() {
   ESP_LOGCONFIG(TAG, "Value Validator:");
-  ESP_LOGCONFIG(TAG, "  Max Absolute Diff: %d", config_.max_absolute_diff);
-  ESP_LOGCONFIG(TAG, "  Max Rate Change: %.0f%%", config_.max_rate_change * 100.0f);
-  ESP_LOGCONFIG(TAG, "  Allow Negative Rates: %s", YESNO(config_.allow_negative_rates));
-  ESP_LOGCONFIG(TAG, "  Strict Confidence Check: %s", YESNO(config_.strict_confidence_check));
-  ESP_LOGCONFIG(TAG, "  Per Digit Conf Threshold: %.2f", config_.per_digit_confidence_threshold);
-  ESP_LOGCONFIG(TAG, "  Max Consecutive Rejections: %d", config_.max_consecutive_rejections);
-  ESP_LOGCONFIG(TAG, "  Small Negative Tolerance: %d", config_.small_negative_tolerance);
-  ESP_LOGCONFIG(TAG, "  Persist State: %s", YESNO(config_.persist_state));
-  ESP_LOGCONFIG(TAG, "  Max History Size: %d bytes", (int)config_.max_history_size_bytes);
+  ESP_LOGCONFIG(TAG, "  Max Absolute Diff: %d", this->config_.max_absolute_diff);
+  ESP_LOGCONFIG(TAG, "  Max Rate Change: %.0f%%", this->config_.max_rate_change * 100.0f);
+  ESP_LOGCONFIG(TAG, "  Allow Negative Rates: %s", YESNO(this->config_.allow_negative_rates));
+  ESP_LOGCONFIG(TAG, "  Strict Confidence Check: %s", YESNO(this->config_.strict_confidence_check));
+  ESP_LOGCONFIG(TAG, "  Per Digit Conf Threshold: %.2f", this->config_.per_digit_confidence_threshold);
+  ESP_LOGCONFIG(TAG, "  Max Consecutive Rejections: %d", this->config_.max_consecutive_rejections);
+  ESP_LOGCONFIG(TAG, "  Small Negative Tolerance: %d", this->config_.small_negative_tolerance);
+  ESP_LOGCONFIG(TAG, "  Persist State: %s", YESNO(this->config_.persist_state));
+  ESP_LOGCONFIG(TAG, "  Max History Size: %d bytes", (int)this->config_.max_history_size_bytes);
 }
 
 bool ValueValidator::validate_reading(int new_reading, float confidence, int& validated_reading) {
   uint32_t current_time = millis();
   
   // Publish raw reading diagnostic
-  if (raw_reading_sensor_) {
-    raw_reading_sensor_->publish_state(new_reading);
+  if (this->raw_reading_sensor_) {
+    this->raw_reading_sensor_->publish_state(new_reading);
   }
   
   // Capture last confidence before adding the new reading
-  float last_confidence = history_.get_last_confidence();
+  float last_confidence = this->history_.get_last_confidence();
 
   // Always add to history for tracking
-  history_.add_reading(new_reading, current_time, confidence);
+  this->history_.add_reading(new_reading, current_time, confidence);
   
   // First reading: require high confidence or 3 consistent readings
-  if (first_reading_) {
-    if (confidence >= config_.high_confidence_threshold) {
+  if (this->first_reading_) {
+    if (confidence >= this->config_.high_confidence_threshold) {
       // High confidence — accept immediately
-      last_valid_reading_ = new_reading;
-      first_reading_ = false;
-      first_reading_count_ = 0;
+      this->last_valid_reading_ = new_reading;
+      this->first_reading_ = false;
+      this->first_reading_count_ = 0;
       validated_reading = new_reading;
       
-      last_good_values_count_ = 0;
-      last_good_values_head_ = 0;
-      add_good_value(new_reading);
+      this->last_good_values_count_ = 0;
+      this->last_good_values_head_ = 0;
+      this->add_good_value(new_reading);
       
       ESP_LOGI(TAG, "First reading accepted (high confidence): %d (confidence: %.2f)", new_reading, confidence);
-      publish_diagnostics_("normal");
-      save_state_();
+      this->publish_diagnostics_("normal");
+      this->save_state_();
       return true;
     }
     
     // Low confidence — require consistency
-    if (new_reading == first_reading_candidate_) {
-      first_reading_count_++;
+    if (new_reading == this->first_reading_candidate_) {
+      this->first_reading_count_++;
     } else {
-      first_reading_candidate_ = new_reading;
-      first_reading_count_ = 1;
+      this->first_reading_candidate_ = new_reading;
+      this->first_reading_count_ = 1;
     }
     
-    if (first_reading_count_ >= 3) {
+    if (this->first_reading_count_ >= 3) {
       // 3 consistent readings — accept
-      last_valid_reading_ = new_reading;
-      first_reading_ = false;
-      first_reading_count_ = 0;
+      this->last_valid_reading_ = new_reading;
+      this->first_reading_ = false;
+      this->first_reading_count_ = 0;
       validated_reading = new_reading;
       
-      last_good_values_count_ = 0;
-      last_good_values_head_ = 0;
-      add_good_value(new_reading);
+      this->last_good_values_count_ = 0;
+      this->last_good_values_head_ = 0;
+      this->add_good_value(new_reading);
       
       ESP_LOGI(TAG, "First reading accepted (3 consistent): %d (confidence: %.2f)", new_reading, confidence);
-      publish_diagnostics_("normal");
-      save_state_();
+      this->publish_diagnostics_("normal");
+      this->save_state_();
       return true;
     }
     
     ESP_LOGW(TAG, "First reading %d rejected (conf: %.2f < %.2f, consistent: %d/3)", 
-             new_reading, confidence, config_.high_confidence_threshold, first_reading_count_);
-    publish_diagnostics_("initializing");
+             new_reading, confidence, this->config_.high_confidence_threshold, this->first_reading_count_);
+    this->publish_diagnostics_("initializing");
     return false;
   }
   
   // Apply smart validation
-  validated_reading = apply_smart_validation(new_reading, confidence, last_confidence);
+  validated_reading = this->apply_smart_validation(new_reading, confidence, last_confidence);
   
   bool is_valid = (validated_reading == new_reading);
   
   if (is_valid) {
     // Update last good values
-    add_good_value(new_reading);
-    last_valid_reading_ = new_reading;
-    save_state_();
-    publish_diagnostics_("normal");
+    this->add_good_value(new_reading);
+    this->last_valid_reading_ = new_reading;
+    this->save_state_();
+    this->publish_diagnostics_("normal");
   } else {
     // Publish diagnostic state based on rejection count
-    if (consecutive_rejections_ >= config_.max_consecutive_rejections) {
-      publish_diagnostics_("stuck");
-    } else if (consecutive_rejections_ > 0) {
-      publish_diagnostics_("rejecting");
+    if (this->consecutive_rejections_ >= this->config_.max_consecutive_rejections) {
+      this->publish_diagnostics_("stuck");
+    } else if (this->consecutive_rejections_ > 0) {
+      this->publish_diagnostics_("rejecting");
     }
   }
   
-  if (debug_) {
+  if (this->debug_) {
     ESP_LOGD(TAG, "Validation: %d -> %d (valid: %s, confidence: %.2f)", 
              new_reading, validated_reading, is_valid ? "yes" : "no", confidence);
   }
@@ -727,7 +727,7 @@ int ValueValidator::calculate_digit_difference(int reading1, int reading2) const
 }
 
 void ValueValidator::reset() {
-  history_.clear();
+  this->history_.clear();
   last_valid_reading_ = 0;
   first_reading_ = true;
   first_reading_count_ = 0;
@@ -761,7 +761,7 @@ void ValueValidator::set_last_valid_reading(int value) {
   }
   
   // Also clear raw history to prevent "consistency check" from reverting back to old values
-  history_.clear();
+  this->history_.clear();
   consecutive_rejections_ = 0;
   rejection_confidence_sum_ = 0.0f;
   ESP_LOGW(TAG, "Manually set last valid reading to: %d", value);
@@ -805,7 +805,7 @@ void ValueValidator::set_last_valid_reading(const std::string &value) {
      add_good_value(int_val);
   }
   
-  history_.clear();
+  this->history_.clear();
   consecutive_rejections_ = 0;
   rejection_confidence_sum_ = 0.0f;
   ESP_LOGW(TAG, "Manually set last valid reading to: %d (Digits: %d, Str: %s)", int_val, static_cast<int>(value.length()), value.c_str());
@@ -1006,7 +1006,7 @@ void ValueValidator::publish_diagnostics_(const char* state) {
 
 void ValueValidator::save_state_() {
   if (config_.persist_state && last_valid_reading_ >= 0) {
-    pref_.save(&last_valid_reading_);
+    this->pref_.save(&last_valid_reading_);
   }
 }
 

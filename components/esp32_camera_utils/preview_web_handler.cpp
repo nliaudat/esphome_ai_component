@@ -22,12 +22,12 @@ bool PreviewWebHandler::canHandle(web_server_idf::AsyncWebServerRequest *request
 }
 
 void PreviewWebHandler::handleRequest(web_server_idf::AsyncWebServerRequest *request) {
-  if (!image_provider_) {
+  if (!this->image_provider_) {
       request->send(500, "text/plain", "Image provider not configured");
       return;
   }
 
-  std::shared_ptr<camera::CameraImage> img_ptr = image_provider_();
+  std::shared_ptr<camera::CameraImage> img_ptr = this->image_provider_();
   // Safe downcast functionality should be provided by image_processor.h or static_pointer_cast
   // We use the std::static_pointer_cast approach as defined in the plan
   auto image = std::static_pointer_cast<RotatedPreviewImage>(img_ptr);

@@ -44,11 +44,11 @@ void AnalogReader::preprocess_image(const uint8_t* img, int w, int h, int cx, in
     // Copy data to working buffer
     memcpy(output.data(), img, w * h);
 
-    if (!safe_resize(scratch_buffer_, "scratch1")) return;
-    if (!safe_resize(scratch_buffer_2_, "scratch2")) return;
+    if (!safe_resize(this->scratch_buffer_, "scratch1")) return;
+    if (!safe_resize(this->scratch_buffer_2_, "scratch2")) return;
 
     // Step 1: CLAHE (Contrast Limited Adaptive Histogram Equalization)
-    apply_clahe(output.data(), w, h);
+    this->apply_clahe(output.data(), w, h);
     
     // Step 1.5: Top-Hat Filter (if enabled/configured, currently hardcoded enabled for testing robustness)
     // We use radius / 10 as kernel size (approx 5-10 pixels)
@@ -56,15 +56,15 @@ void AnalogReader::preprocess_image(const uint8_t* img, int w, int h, int cx, in
     // Ensure kernel is odd
     if (kernel % 2 == 0) kernel++;
     
-    apply_tophat(output.data(), w, h, kernel, scratch_buffer_, scratch_buffer_2_, needle_type);
+    this->apply_tophat(output.data(), w, h, kernel, this->scratch_buffer_, this->scratch_buffer_2_, needle_type);
 
     // Step 2: Remove circular background
     // (Disabled as Top-hat covers it, but keeping placeholder comment)
     
     // Step 3: Median filter to reduce noise
-    median_filter_3x3(output.data(), w, h);
+    this->median_filter_3x3(output.data(), w, h);
 
-    if (debug_) {
+    if (this->debug_) {
         ESP_LOGD(TAG, "Preprocessing complete. NeedleType: %s, Kernel: %d", 
                  needle_type == NEEDLE_TYPE_LIGHT ? "Light" : "Dark", kernel);
     }
@@ -114,8 +114,8 @@ void AnalogReader::remove_background(uint8_t* img, int w, int h, int cx, int cy,
     
     for (int deg = 0; deg < 360; deg += 5) {
         // Use LUT
-        float r_cos = cos_lut_[deg];
-        float r_sin = sin_lut_[deg];
+        float r_cos = AnalogReader::cos_lut_[deg];
+        float r_sin = AnalogReader::sin_lut_[deg];
         
         for (int r = static_cast<int>(radius * 0.8f); r < radius; r++) {
             int px = cx + static_cast<int>(r * r_cos);
@@ -203,8 +203,8 @@ static void dilate_in_place(uint8_t* img, int w, int h, int k, uint8_t* temp_buf
 }
 
 void AnalogReader::apply_tophat(uint8_t* img, int w, int h, int kernel_size, std::vector<uint8_t>& scratch, std::vector<uint8_t>& scratch2, NeedleType needle_type) {
-    if (scratch.size() != w * h) scratch.resize(w * h);
-    if (scratch2.size() != w * h) scratch2.resize(w * h); // Should be resized by caller but safety
+    if (scratch.size() != static_cast<size_t>(w * h)) scratch.resize(w * h);
+    if (scratch2.size() != static_cast<size_t>(w * h)) scratch2.resize(w * h); // Should be resized by caller but safety
     
     // White Top Hat: Original - Opening (Dilate(Erode(Img)))
     // Black Top Hat: Closing(Img) - Original. Closing = Erode(Dilate(Img))
@@ -264,8 +264,8 @@ AnalogReader::DetectionResult AnalogReader::detect_radial_profile(const uint8_t*
     const int MAX_GAP = 5;
 
     for (int deg = 0; deg < 360; deg++) {
-        float dx = cos_lut_[deg];
-        float dy = sin_lut_[deg];
+        float dx = AnalogReader::cos_lut_[deg];
+        float dy = AnalogReader::sin_lut_[deg];
         
         float score = 0.0f;
         int gap_count = 0;
@@ -365,7 +365,7 @@ AnalogReader::DetectionResult AnalogReader::detect_radial_profile(const uint8_t*
     else confidence = range / 100.0f;
     if (confidence > 1.0f) confidence = 1.0f;
     
-    if (debug_) {
+    if (this->debug_) {
         ESP_LOGD(TAG, "Radial Profile: Best Angle=%.1f, Conf=%.2f", best_angle, confidence);
     }
     return {best_angle, confidence, "radial_profile"};
@@ -394,7 +394,7 @@ AnalogReader::DetectionResult AnalogReader::detect_hough_transform(const uint8_t
             // Determine gradient direction
             // 0: Horizontal, 1: 45deg, 2: Vertical, 3: 135deg
             if (magnitude > 30) {
-                 float angle = atan2(static_cast<float>(gy), static_cast<float>(gx)) * 180.0f / M_PI;
+                 float angle = atan2(static_cast<float>(gy), static_cast<float>(gx)) * 180.0f / static_cast<float>(M_PI);
                  if (angle < 0) angle += 180.0f;
                  int q = (static_cast<int>(angle + 22.5f) % 180) / 45;
                  
@@ -443,7 +443,7 @@ AnalogReader::DetectionResult AnalogReader::detect_hough_transform(const uint8_t
                 float r = sqrt(dx * dx + dy * dy);
                 
                 if (r >= min_r && r <= max_r) {
-                    float theta = atan2(dy, dx) * 180.0f / M_PI;
+                    float theta = atan2(dy, dx) * 180.0f / static_cast<float>(M_PI);
                     if (theta < 0) theta += 360.0f;
                     
                     int angle_idx = static_cast<int>(theta) % NUM_ANGLES;
@@ -466,7 +466,7 @@ AnalogReader::DetectionResult AnalogReader::detect_hough_transform(const uint8_t
     
     float confidence = std::min(1.0f, static_cast<float>(max_votes) / (radius * 0.1f));  // Normalized
     
-    if (debug_) {
+    if (this->debug_) {
         ESP_LOGD(TAG, "Hough Transform: Best Angle Index=%d, Conf=%.2f", best_angle_idx, confidence);
     }
     return {static_cast<float>(best_angle_idx), confidence, "hough_transform"};
@@ -484,8 +484,8 @@ AnalogReader::DetectionResult AnalogReader::detect_template_match(const uint8_t*
     
     for (int deg = 0; deg < 360; deg += COARSE_STEP) {
         // Use LUT
-        float dx = cos_lut_[deg];
-        float dy = sin_lut_[deg];
+        float dx = AnalogReader::cos_lut_[deg];
+        float dy = AnalogReader::sin_lut_[deg];
         
         float score = 0.0f;
         int count = 0;
@@ -529,8 +529,8 @@ AnalogReader::DetectionResult AnalogReader::detect_template_match(const uint8_t*
         if (lut_angle < 0) lut_angle += 360;
         if (lut_angle >= 360) lut_angle -= 360;
         
-        float dx = cos_lut_[lut_angle];
-        float dy = sin_lut_[lut_angle];
+        float dx = AnalogReader::cos_lut_[lut_angle];
+        float dy = AnalogReader::sin_lut_[lut_angle];
         
         float score = 0.0f;
         int count = 0;
@@ -561,7 +561,7 @@ AnalogReader::DetectionResult AnalogReader::detect_template_match(const uint8_t*
     
     float confidence = refined_score / 255.0f;
     
-    if (debug_) {
+    if (this->debug_) {
         ESP_LOGD(TAG, "Template Match: Refined Angle=%.1f, Conf=%.2f", refined_angle, confidence);
     }
     return {refined_angle, confidence, "template_match"};
@@ -587,7 +587,7 @@ AnalogReader::DetectionResult AnalogReader::detect_legacy(const uint8_t* img, in
     const int MAX_GAP = 5;
 
     for (int deg = 0; deg < 360; deg++) {
-        float rad = deg * M_PI / 180.0f;
+        float rad = deg * static_cast<float>(M_PI) / 180.0f;
         float dx = cos(rad);
         float dy = sin(rad);
         
@@ -625,7 +625,7 @@ AnalogReader::DetectionResult AnalogReader::detect_legacy(const uint8_t* img, in
         }
         radial_profile[deg] = score;
         
-        // Edge Strength is hard to do with varying lengths. Set to 0 or derive from score.
+        // Edge strength is hard to do with varying lengths. Set to 0 or derive from score.
         // We will just use the score.
         edge_strength[deg] = 0; 
     }

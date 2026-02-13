@@ -9,8 +9,16 @@
 #include <cmath>
 #include <cstring>
 #include "esphome/core/log.h"
-#include "../tflite_micro_helper/debug_utils.h"
+#include "esphome/core/hal.h"
 
+// Define profiling macros locally to avoid dependency on tflite_micro_helper
+#ifdef DEBUG_DURATION
+#define DURATION_START() uint32_t duration_start_ = millis()
+#define DURATION_END(func) ESP_LOGD(TAG, "%s duration: %lums", func, millis() - duration_start_)
+#else
+#define DURATION_START()
+#define DURATION_END(func)
+#endif
 namespace esphome {
 namespace esp32_camera_utils {
 
