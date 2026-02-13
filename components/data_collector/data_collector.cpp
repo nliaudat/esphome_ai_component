@@ -20,14 +20,14 @@ static const char *const TAG = "data_collector";
 
 void DataCollector::setup() {
   ESP_LOGCONFIG(TAG, "Setting up Data Collector...");
-  start_upload_task();
+  this->start_upload_task();
 }
 
 void DataCollector::dump_config() {
   ESP_LOGCONFIG(TAG, "Data Collector:");
-  ESP_LOGCONFIG(TAG, "  Upload URL: %s", upload_url_.c_str());
-  if (web_submit_switch_) {
-    ESP_LOGCONFIG(TAG, "  Web Submit Switch: %s", web_submit_switch_->get_name().c_str());
+  ESP_LOGCONFIG(TAG, "  Upload URL: %s", this->upload_url_.c_str());
+  if (this->web_submit_switch_) {
+    ESP_LOGCONFIG(TAG, "  Web Submit Switch: %s", this->web_submit_switch_->get_name().c_str());
   }
 }
 
@@ -38,12 +38,12 @@ void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, in
   }
 
   // Check switch state if configured
-  if (web_submit_switch_ && !web_submit_switch_->state) {
+  if (this->web_submit_switch_ && !this->web_submit_switch_->state) {
     ESP_LOGD(TAG, "Data collection skipped (switch off)");
     return;
   }
 
-  if (upload_url_.empty()) {
+  if (this->upload_url_.empty()) {
     ESP_LOGW(TAG, "No upload URL configured");
     return;
   }
@@ -70,7 +70,7 @@ void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, in
       
       // We don't own this buffer, so we shouldn't free it unless we copied it.
       // But upload_image takes raw pointer.
-      upload_image(jpeg_buf, jpeg_len, raw_value, confidence);
+      this->upload_image(jpeg_buf, jpeg_len, raw_value, confidence);
       // No free needed for frame buffer
       return; 
   }
@@ -83,7 +83,7 @@ void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, in
     return;
   }
   
-  upload_image(jpeg_buf, jpeg_len, raw_value, confidence);
+  this->upload_image(jpeg_buf, jpeg_len, raw_value, confidence);
   
   // fmt2jpg allocates jpeg_buf on success — free it
   free(jpeg_buf);
@@ -91,7 +91,7 @@ void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, in
 
 // Async wrapper
 bool DataCollector::upload_image(const uint8_t *data, size_t len, float raw_value, float confidence) {
-    if (!upload_queue_) {
+    if (!this->upload_queue_) {
         ESP_LOGE(TAG, "Upload queue not initialized");
         return false;
     }
@@ -116,7 +116,7 @@ bool DataCollector::upload_image(const uint8_t *data, size_t len, float raw_valu
     job.confidence = confidence;
 
     // Send to queue (non-blocking or small timeout)
-    if (xQueueSend(upload_queue_, &job, 10 / portTICK_PERIOD_MS) != pdTRUE) {
+    if (xQueueSend(this->upload_queue_, &job, 10 / portTICK_PERIOD_MS) != pdTRUE) {
         ESP_LOGE(TAG, "Upload queue full! Dropping image.");
         free(copy);
         return false;
@@ -127,15 +127,15 @@ bool DataCollector::upload_image(const uint8_t *data, size_t len, float raw_valu
 
 void DataCollector::start_upload_task() {
     // Create queue for 5 items (approx 250KB if 50KB each)
-    upload_queue_ = xQueueCreate(5, sizeof(UploadJob));
-    if (!upload_queue_) {
+    this->upload_queue_ = xQueueCreate(5, sizeof(UploadJob));
+    if (!this->upload_queue_) {
         ESP_LOGE(TAG, "Failed to create upload queue");
         return;
     }
 
     // Create task and store handle for cleanup
-    task_running_ = true;
-    xTaskCreate(upload_task, "upload_worker", 4096, this, tskIDLE_PRIORITY + 1, &upload_task_handle_);
+    this->task_running_ = true;
+    xTaskCreate(DataCollector::upload_task, "upload_worker", 4096, this, tskIDLE_PRIORITY + 1, &this->upload_task_handle_);
 }
 
 void DataCollector::upload_task(void *arg) {
@@ -157,43 +157,43 @@ void DataCollector::upload_task(void *arg) {
 
 DataCollector::~DataCollector() {
     // Signal task to stop
-    task_running_ = false;
+    this->task_running_ = false;
     
     // Wait briefly for task to exit
-    if (upload_task_handle_) {
+    if (this->upload_task_handle_) {
         vTaskDelay(1100 / portTICK_PERIOD_MS); // Slightly longer than queue timeout
         // If task hasn't exited yet, force delete
-        eTaskState state = eTaskGetState(upload_task_handle_);
+        eTaskState state = eTaskGetState(this->upload_task_handle_);
         if (state != eDeleted) {
-            vTaskDelete(upload_task_handle_);
+            vTaskDelete(this->upload_task_handle_);
         }
-        upload_task_handle_ = nullptr;
+        this->upload_task_handle_ = nullptr;
     }
     
     // Drain remaining queue items to free memory
-    if (upload_queue_) {
+    if (this->upload_queue_) {
         UploadJob job;
-        while (xQueueReceive(upload_queue_, &job, 0) == pdTRUE) {
+        while (xQueueReceive(this->upload_queue_, &job, 0) == pdTRUE) {
             free(job.data);
         }
-        vQueueDelete(upload_queue_);
-        upload_queue_ = nullptr;
+        vQueueDelete(this->upload_queue_);
+        this->upload_queue_ = nullptr;
     }
 }
 
 bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, float raw_value, float confidence) {
-  if (upload_url_.empty()) return false;
+  if (this->upload_url_.empty()) return false;
 
-  ESP_LOGI(TAG, "Uploading image to %s...", upload_url_.c_str());
+  ESP_LOGI(TAG, "Uploading image to %s...", this->upload_url_.c_str());
 
   esp_http_client_config_t config = {};
-  config.url = upload_url_.c_str();
+  config.url = this->upload_url_.c_str();
   config.method = HTTP_METHOD_POST;
   config.timeout_ms = 10000;
 
-  if (!username_.empty()) {
-      config.username = username_.c_str();
-      config.password = password_.c_str();
+  if (!this->username_.empty()) {
+      config.username = this->username_.c_str();
+      config.password = this->password_.c_str();
       config.auth_type = HTTP_AUTH_TYPE_BASIC;
   }
 
@@ -206,13 +206,13 @@ bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, float r
   // Set Headers
   esp_http_client_set_header(client, "Content-Type", "image/jpeg");
   
-  if (!api_key_.empty()) {
+  if (!this->api_key_.empty()) {
        // Check if it starts with "Bearer " or just a key
-       if (api_key_.rfind("Bearer ", 0) == 0) {
-           esp_http_client_set_header(client, "Authorization", api_key_.c_str());
+       if (this->api_key_.rfind("Bearer ", 0) == 0) {
+           esp_http_client_set_header(client, "Authorization", this->api_key_.c_str());
        } else {
            // Default to X-Api-Key if no Bearer token structure is detected.
-           esp_http_client_set_header(client, "X-Api-Key", api_key_.c_str());
+           esp_http_client_set_header(client, "X-Api-Key", this->api_key_.c_str());
        }
   }
   
@@ -233,7 +233,7 @@ bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, float r
     int status_code = esp_http_client_get_status_code(client);
     ESP_LOGI(TAG, "HTTP POST Status = %d, content_length = %lld", 
              status_code, esp_http_client_get_content_length(client));
-    if (debug_) {
+    if (this->debug_) {
         // Log response body if small? Or just detailed info
         // esp_http_client_read handling requires event loop or full read.
         // For now, log that we finished.

@@ -11,6 +11,7 @@
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include <vector>
+#include <span>
 
 namespace esphome {
 namespace value_validator {
@@ -84,7 +85,7 @@ class ValueValidator : public Component {
   // Legacy single-value validation
   bool validate_reading(int new_reading, float confidence, int& validated_reading);
   // Per-digit validation
-  bool validate_reading(const std::vector<float>& digits, const std::vector<float>& confidences, int& validated_reading);
+  bool validate_reading(std::span<const float> digits, std::span<const float> confidences, int& validated_reading);
   
   void set_config(const ValidationConfig& config) { config_ = config; }
   const ValidationConfig& get_config() const { return config_; }
@@ -116,7 +117,7 @@ class ValueValidator : public Component {
   void set_debug(bool debug) { debug_ = debug; }
   void set_last_valid_reading(int value);
   void set_last_valid_reading(const std::string &value);
-  bool is_hallucination_pattern(const std::vector<float>& digits) const;
+  bool is_hallucination_pattern(std::span<const float> digits) const;
 
 
  private:

@@ -4,7 +4,7 @@
 **Primary Goal:** Run TensorFlow Lite Micro models and computer vision algorithms on ESP32 devices within the ESPHome ecosystem  
 **License:** 🚨 **CC-BY-NC-SA (NO COMMERCIAL USE)** - This is NON-NEGOTIABLE  
 **Target Boards:** ESP32, ESP32-S2, ESP32-S3 (optimized), ESP32-C3, ESP8266 (limited)  
-**ESPHome Version:** 2025.11+ (C++20, ESP-IDF 5.3.2/Arduino 3)  
+**ESPHome Version:** 2026.1.0+ (C++20, ESP-IDF 5.5.2)  
 
 ---
 
@@ -224,12 +224,19 @@ if (buffer) {
 - Full JSON parsing in hot path
 - Synchronous network during inference
 
+**🚀 KEY OPTIMIZATIONS:**
+- `StaticVector` and `FixedVector` replacing `std::vector` where sizes are known
+- `const char*` for static strings instead of `std::string`
+- Pre-allocated buffers instead of dynamic allocation in hot paths
+- Stack allocation where possible
+- Audio/video components using pre-allocated ring buffers
+
 ### 4.3 Profiling Requirement
 
 **BEFORE merging any performance-sensitive PR:**
 ```bash
 # ESP32-S3 (optimized target)
-esphome compile config.yaml && esphome upload config.yaml
+esphome compile config.yaml
 # Monitor serial, measure end-to-end inference time
 # Report: before (ms) -> after (ms) -> improvement (%)
 

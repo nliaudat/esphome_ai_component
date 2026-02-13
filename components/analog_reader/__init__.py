@@ -171,13 +171,9 @@ async def to_code(config):
         # Handle calibration mapping
         if CONF_CALIBRATION in dial:
             # Convert list of dicts to list of pairs for C++ vector<pair<float,float>>
-            cal_list = []
-            for item in dial[CONF_CALIBRATION]:
-                cal_list.append((item[CONF_RAW], item[CONF_MAPPED]))
-            
-            # StructInitializer can take a list for vector initialization if backend supports it.
-            # Explicitly adding it to the initializer list above:
-            s.args.append(("calibration_mapping", cal_list))
+            # Generate C++ initializer list string: {{r1, m1}, {r2, m2}, ...}
+            cal_str = ", ".join([f"{{ {item[CONF_RAW]}f, {item[CONF_MAPPED]}f }}" for item in dial[CONF_CALIBRATION]])
+            s.args["calibration_mapping"] = cg.RawExpression(f"{{ {cal_str} }}")
         
         cg.add(var.add_dial(s))
 

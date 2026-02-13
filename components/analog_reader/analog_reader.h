@@ -152,9 +152,12 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   std::vector<uint8_t> scratch_buffer_;
   std::vector<uint8_t> scratch_buffer_2_; // Second scratch for allocation-free morphology
   
-  // Persistent Buffer (Manual allocation for PSRAM control)
+  // Persistent Buffer (RAII managed)
   // Can be RGB888 or GRAYSCALE depending on configuration and available RAM
-  uint8_t* persistent_buffer_{nullptr};
+  struct FreeDeleter {
+      void operator()(uint8_t* ptr) const { free(ptr); }
+  };
+  std::unique_ptr<uint8_t[], FreeDeleter> persistent_buffer_{nullptr};
   size_t persistent_buffer_size_{0};
   bool requires_color_{false};
   // Store the actual format of the persistent buffer

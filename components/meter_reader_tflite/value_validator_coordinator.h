@@ -3,6 +3,7 @@
 #include "esphome/core/component.h"
 #include "esphome/components/value_validator/value_validator.h"
 #include <limits>
+#include <span>
 
 namespace esphome {
 namespace meter_reader_tflite {
@@ -21,7 +22,7 @@ class ValueValidatorCoordinator {
     return validator_->validate_reading(raw_value, confidence, validated_value);
   }
 
-  bool validate_reading(const std::vector<float> &digits, const std::vector<float> &confidences, int &validated_value) {
+  bool validate_reading(std::span<const float> digits, std::span<const float> confidences, int &validated_value) {
     if (validator_ == nullptr) {
         // Fallback: No validator = No strict per-digit check here.
         // We need to convert digits to value manually as fallback.
