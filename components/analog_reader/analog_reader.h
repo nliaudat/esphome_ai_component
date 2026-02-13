@@ -33,32 +33,32 @@ enum ProcessChannel {
 };
 
 struct DialConfig {
-  std::string id;
-  NeedleType needle_type{NEEDLE_TYPE_DARK};
-  std::string algorithm{"radial_profile"};  // Algorithm: radial_profile, hough_transform, template_match, auto
-  float scale{1.0f};
-  int crop_x{0};
-  int crop_y{0};
-  int crop_w{0};
-  int crop_h{0};
-  float min_angle{0.0f};   // Degrees
-  float max_angle{360.0f}; // Degrees
-  float angle_offset{0.0f}; // 0 = North, 90 = East
-  float min_value{0.0f};
-  float max_value{10.0f};
-  bool auto_contrast{true}; // Normalization (Min-Max Stretch)
-  float contrast{1.0f};      // Multiplier (1.0 = original)
-  uint32_t target_color{0};  // RGB hex
-  bool use_color{false};
-  ProcessChannel process_channel{PROCESS_CHANNEL_GRAYSCALE};
+  std::string id = "";
+  NeedleType needle_type = NEEDLE_TYPE_DARK;
+  std::string algorithm = "radial_profile";  // Algorithm: radial_profile, hough_transform, template_match, auto
+  float scale = 1.0f;
+  int crop_x = 0;
+  int crop_y = 0;
+  int crop_w = 0;
+  int crop_h = 0;
+  float min_angle = 0.0f;   // Degrees
+  float max_angle = 360.0f; // Degrees
+  float angle_offset = 0.0f; // 0 = North, 90 = East
+  float min_value = 0.0f;
+  float max_value = 10.0f;
+  bool auto_contrast = true; // Normalization (Min-Max Stretch)
+  float contrast = 1.0f;      // Multiplier (1.0 = original)
+  uint32_t target_color = 0;  // RGB hex
+  bool use_color = false;
+  ProcessChannel process_channel = PROCESS_CHANNEL_GRAYSCALE;
   // Scan Parameters
-  float min_scan_radius{0.3f}; // % of radius (0.0-1.0)
-  float max_scan_radius{0.9f}; // % of radius (0.0-1.0)
+  float min_scan_radius = 0.3f; // % of radius (0.0-1.0)
+  float max_scan_radius = 0.9f; // % of radius (0.0-1.0)
   
   // Sensors
-  sensor::Sensor *value_sensor{nullptr};
-  sensor::Sensor *confidence_sensor{nullptr};
-  sensor::Sensor *angle_sensor{nullptr};
+  sensor::Sensor *value_sensor = nullptr;
+  sensor::Sensor *confidence_sensor = nullptr;
+  sensor::Sensor *angle_sensor = nullptr;
   
   // Calibration (Raw Angle -> Corrected Value, overrides Min/Max logic if non-empty)
   std::vector<std::pair<float, float>> calibration_mapping; 
@@ -168,7 +168,7 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
 
   void process_image(std::shared_ptr<esphome::camera::CameraImage> image);
   void process_image_from_buffer(const uint8_t* data, size_t len);
-  DetectionResult find_needle_angle(const uint8_t* img, int w, int h, const DialConfig& dial);
+  [[nodiscard]] DetectionResult find_needle_angle(const uint8_t* img, int w, int h, const DialConfig& dial);
   
   // Detection algorithms
 
@@ -186,7 +186,7 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   void median_filter_3x3(uint8_t* img, int w, int h);
   
   // Helpers
-  float angle_to_value(float angle, const DialConfig& dial);
+  [[nodiscard]] float angle_to_value(float angle, const DialConfig& dial);
   void debug_dial_image(const uint8_t* img, int w, int h, float detected_angle);
   void debug_angle_calculation(float image_angle, const DialConfig& dial);
 };

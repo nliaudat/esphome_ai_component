@@ -136,6 +136,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_RELOAD_BUTTON): cv.use_id(button.Button),
 
     cv.Optional("total_inference_time_sensor"): cv.use_id(sensor.Sensor),
+    cv.Optional("capture_to_publish_time_sensor"): cv.use_id(sensor.Sensor),
     cv.Optional("debug_timing", default=False): cv.boolean,
     # cv.Optional(CONF_PREVIEW): camera_component.CAMERA_SCHEMA.extend({
     #     cv.GenerateID(): cv.declare_id(MeterPreviewCamera),
@@ -445,6 +446,10 @@ async def to_code(config):
     if "total_inference_time_sensor" in config:
         s = await cg.get_variable(config["total_inference_time_sensor"])
         cg.add(var.set_total_inference_time_sensor(s))
+
+    if "capture_to_publish_time_sensor" in config:
+        s = await cg.get_variable(config["capture_to_publish_time_sensor"])
+        cg.add(var.set_capture_to_publish_time_sensor(s))
 
     if CONF_UNLOAD_BUTTON in config:
         b = await cg.get_variable(config[CONF_UNLOAD_BUTTON])

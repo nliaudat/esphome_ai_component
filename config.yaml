@@ -201,7 +201,8 @@ meter_reader_tflite:
   inference_logs: ${id_prefix}_inference_logs
   main_logs: ${id_prefix}_main_logs
   
-  
+  total_inference_time_sensor: ${id_prefix}_inference_time
+  capture_to_publish_time_sensor: ${id_prefix}_capture_to_publish_time
   
   # enable_flash_calibration: false # still in dev
 

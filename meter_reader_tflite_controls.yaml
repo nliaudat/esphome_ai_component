@@ -209,6 +209,24 @@ sensor:
 
 
 
+  # Inference Time
+  - platform: template
+    id: ${id_prefix}_inference_time
+    name: "Inference Time"
+    unit_of_measurement: "ms"
+    accuracy_decimals: 0
+    state_class: measurement
+    icon: mdi:timer-outline
+    
+  # Capture to Publish Time
+  - platform: template
+    id: ${id_prefix}_capture_to_publish_time
+    name: "Capture to Publish Time"
+    unit_of_measurement: "ms"
+    accuracy_decimals: 0
+    state_class: measurement
+    icon: mdi:timer-sand
+
 text:
   # Set Last Valid Value (String) - Supports leading zeros
   - platform: template

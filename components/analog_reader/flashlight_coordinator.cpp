@@ -48,12 +48,6 @@ void FlashlightCoordinator::disable_flash() {
 bool FlashlightCoordinator::update_scheduling() {
     // If controller is present, it handles everything
     if (this->controller_) {
-        // Assuming controller has public is_active(). If checking implementation...
-        // Assuming interface exists.
-        // Wait, I should check if is_active is valid? 
-        // Based on context, code existed and compiled?
-        // Let's assume yes.
-        // However, I see `controller_->is_active()` in line 51 of original.
         if (!this->controller_->is_active()) {
              // Not running: Start it
              ESP_LOGD(TAG, "Controller idle, initiating sequence");

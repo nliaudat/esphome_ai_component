@@ -11,6 +11,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <span>
 #include <mutex>
 #include "esphome/components/esp32_camera/esp32_camera.h"
 #include "crop_zone_handler.h"
@@ -184,9 +185,11 @@ class ImageProcessor {
   /**
    * Process an image and split it into the requested zones (cropping + resizing).
    */
-  std::vector<ProcessResult> split_image_in_zone(
-      std::shared_ptr<camera::CameraImage> image,
-      const std::vector<CropZone> &zones);
+  // C++20: Span-based overload for safer processing
+  std::vector<ProcessResult> split_image_in_zone(std::span<uint8_t> image_data, int width, int height, const std::vector<CropZone> &zones);
+  
+  // Legacy wrapper
+  std::vector<ProcessResult> split_image_in_zone(std::shared_ptr<camera::CameraImage> image, const std::vector<CropZone> &zones);
 
   /**
    * Process a single zone.
@@ -260,6 +263,9 @@ private:
       uint8_t* output_buffer,
       size_t output_buffer_size);
 
+  // Helper for raw pointer processing (no CameraImage dependency)
+  bool process_raw_zone_pointer(const uint8_t* input_data, size_t input_len, int width, int height, const CropZone &zone, uint8_t *output_buffer, size_t output_buffer_size);
+      
   // Helper processing methods
   bool process_rgb888_crop_and_scale_to_float32(const uint8_t* input_data, const CropZone& zone, int crop_width, int crop_height, uint8_t* output_buffer, int model_width, int model_height, int channels, bool normalize, int src_stride_width);
   bool process_rgb888_crop_and_scale_to_uint8(const uint8_t* input_data, const CropZone& zone, int crop_width, int crop_height, uint8_t* output_buffer, int model_width, int model_height, int channels, int src_stride_width);
