@@ -510,6 +510,32 @@ size_t ImageProcessor::get_required_buffer_size() const {
 std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
     std::shared_ptr<camera::CameraImage> image,
     const std::vector<CropZone> &zones) {
+    
+    if (!this->validate_input_image(image)) {
+        this->stats_.failed_frames++;
+        return {};
+    }
+    
+    // Create a span from the image data
+    std::span<uint8_t> data_span(image->get_data_buffer(), image->get_data_length());
+    
+    // Call the span-based implementation (assuming dimensions are needed, we extract them here or pass them)
+    // Note: The span version needs width/height. We can try to extract them if it's JPEG, or use config/image props.
+    // For JPEG, width/height in config might be camera dims.
+    int w = this->config_.camera_width;
+    int h = this->config_.camera_height;
+    
+    // Try to get actual dims from JPEG header if available
+    if (this->config_.pixel_format == "JPEG") {
+         get_jpeg_dimensions(image->get_data_buffer(), image->get_data_length(), w, h);
+    }
+    
+    return this->split_image_in_zone(data_span, w, h, zones);
+}
+
+std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
+    std::span<uint8_t> image_data, int width, int height,
+    const std::vector<CropZone> &zones) {
    
   std::lock_guard<std::mutex> lock(this->processing_mutex_);
   std::vector<ProcessResult> results;
@@ -517,10 +543,11 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
   this->stats_.total_frames++;
   uint32_t start_time = millis();
   
-  if (!this->validate_input_image(image)) {
+  if (image_data.empty()) {
     this->stats_.failed_frames++;
     return results;
   }
+
 
   // Optimization: Decode and Rotate ONCE if multiple zones exist
   // Only applies if format is JPEG (ProcessRaw is already efficient-ish, though strict raw doesn't allocate intermediate usually)
@@ -531,15 +558,15 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
       int w = this->config_.camera_width;
       int h = this->config_.camera_height;
       if (this->config_.pixel_format == "JPEG") {
-        get_jpeg_dimensions(image->get_data_buffer(), image->get_data_length(), w, h);
+        get_jpeg_dimensions(image_data.data(), image_data.size(), w, h);
       }
       effective_zones.push_back({0, 0, w, h});
   }
 
   // Intermediate buffer state
   JpegBufferPtr master_decoded_buffer; // Holds decoded JPEG or rotated raw
-  int master_width = this->config_.camera_width;
-  int master_height = this->config_.camera_height;
+  int master_width = width;
+  int master_height = height;
   int master_channels = 3; 
 
   bool use_master_buffer = false;
@@ -575,8 +602,8 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
   if (this->config_.pixel_format == "JPEG" && !low_memory) {
       use_master_buffer = true;
       
-      const uint8_t *jpeg_data = image->get_data_buffer();
-      size_t jpeg_size = image->get_data_length();
+      const uint8_t *jpeg_data = image_data.data();
+      size_t jpeg_size = image_data.size();
 
       // 1. Determine format and rotation optimization
       jpeg_pixel_format_t decode_format = JPEG_PIXEL_FORMAT_RGB888;
@@ -775,10 +802,14 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
                   zone.x1, zone.y1, zone.x2, zone.y2, master_width, master_height);
           }
       } else {
-          // Legacy/Raw CameraImage path
-          if (this->process_raw_zone_to_buffer(image, zone, out_buf->get(), required_size)) {
+          // Legacy/Raw CameraImage path - adapted for span
+          // Implementation of raw zone extraction using the span data:
+           if (this->process_raw_zone_pointer(image_data.data(), image_data.size(), width, height, zone, out_buf->get(), required_size)) {
               crop_success = true;
-          }
+           } else {
+               // Fallback or error log
+               ESP_LOGE(TAG, "Raw zone processing failed");
+           }
       }
       
       if (crop_success) {
@@ -1172,34 +1203,71 @@ bool ImageProcessor::validate_zone(const CropZone &zone) const {
 bool ImageProcessor::process_raw_zone_to_buffer(
     std::shared_ptr<camera::CameraImage> image,
     const CropZone &zone,
-    uint8_t* output_buffer,
+    uint8_t *output_buffer,
     size_t output_buffer_size) {
-    
-    const uint8_t *input_data = image->get_data_buffer();
-    size_t input_size = image->get_data_length();
-    
-    if (!input_data || input_size == 0) return false;
 
-    size_t required_size = this->get_required_buffer_size();
+    if (!this->validate_input_image(image)) return false;
     
-    if (!this->validate_buffer_size(required_size, output_buffer_size, "raw processing")) {
+    return this->process_raw_zone_pointer(
+        image->get_data_buffer(),
+        image->get_data_length(),
+        this->config_.camera_width,
+        this->config_.camera_height,
+        zone, 
+        output_buffer, 
+        output_buffer_size
+    );
+}
+
+bool ImageProcessor::process_raw_zone_pointer(
+    const uint8_t* input_data, 
+    size_t input_len, 
+    int width, 
+    int height, 
+    const CropZone &zone, 
+    uint8_t *output_buffer, 
+    size_t output_buffer_size) {
+
+    // Validate buffer size against requirements
+    size_t required_size = this->get_required_buffer_size();
+    if (!this->validate_buffer_size(required_size, output_buffer_size, "Raw zone processing")) {
         return false;
     }
 
     int crop_width = zone.x2 - zone.x1;
     int crop_height = zone.y2 - zone.y1;
-    
-    if (zone.x1 < 0 || zone.y1 < 0 || 
-        zone.x2 > this->config_.camera_width || zone.y2 > this->config_.camera_height) {
+
+    // Check bounds
+    if (zone.x1 < 0 || zone.y1 < 0 || zone.x2 > width || zone.y2 > height) {
+        ESP_LOGE(TAG, "Zone out of bounds for raw processing: [%d,%d->%d,%d] in %dx%d", 
+                 zone.x1, zone.y1, zone.x2, zone.y2, width, height);
         return false;
     }
 
-    bool success = false;
-    
+    // Determine Stride and Channels
+    int stride = width; 
+    int channels = 1;
+
+    if (this->config_.pixel_format == "RGB888") {
+        stride = width * 3;
+        channels = 3;
+    } else if (this->config_.pixel_format == "RGB565") {
+        stride = width * 2;
+        channels = 2;
+    } else if (this->config_.pixel_format == "YUV422") {
+        stride = width * 2;
+        channels = 2; // Packed
+    } else if (this->config_.pixel_format == "GRAYSCALE") {
+        stride = width;
+        channels = 1;
+    } else {
+        ESP_LOGE(TAG, "Unsupported format for raw processing: %s", this->config_.pixel_format.c_str());
+        return false;
+    }
+
     // Determine target dimensions for the scaling step
     // If rotating 90 or 270, we need to swap dimensions for the intermediate (unrotated) buffer
     int scale_width = this->config_.model_width;
-
     int scale_height = this->config_.model_height;
     
     bool needs_rotation = (this->config_.rotation != ROTATION_0);
@@ -1220,36 +1288,38 @@ bool ImageProcessor::process_raw_zone_to_buffer(
         }
         target_buffer = temp_buffer_storage->get();
     }
-    #endif
-    
+#endif
+
+    // Dispatch
+    bool success = false;
     if (this->config_.pixel_format == "RGB888") {
         if (this->config_.input_type == kInputTypeFloat32) {
             success = this->process_rgb888_crop_and_scale_to_float32(
                 input_data, zone, crop_width, crop_height,
                 target_buffer, scale_width, scale_height, this->config_.model_channels,
-                this->config_.normalize, this->config_.camera_width);
+                this->config_.normalize, width); // Use original width for stride
         } else if (this->config_.input_type == kInputTypeUInt8) {
             success = this->process_rgb888_crop_and_scale_to_uint8(
                 input_data, zone, crop_width, crop_height,
-                target_buffer, scale_width, scale_height, this->config_.model_channels, this->config_.camera_width);
+                target_buffer, scale_width, scale_height, this->config_.model_channels, width); // Use original width for stride
         }
     } else if (this->config_.pixel_format == "RGB565") {
         if (this->config_.input_type == kInputTypeFloat32) {
             success = this->process_rgb565_crop_and_scale_to_float32(
                 input_data, zone, crop_width, crop_height,
                 target_buffer, scale_width, scale_height, this->config_.model_channels,
-                this->config_.normalize, this->config_.camera_width);
+                this->config_.normalize, width); // Use original width for stride
         } else if (this->config_.input_type == kInputTypeUInt8) {
             success = this->process_rgb565_crop_and_scale_to_uint8(
                 input_data, zone, crop_width, crop_height,
-                target_buffer, scale_width, scale_height, this->config_.model_channels, this->config_.camera_width);
+                target_buffer, scale_width, scale_height, this->config_.model_channels, width); // Use original width for stride
         }
     } else if (this->config_.pixel_format == "GRAYSCALE") {
         if (this->config_.input_type == kInputTypeFloat32) {
             success = this->process_grayscale_crop_and_scale_to_float32(
                 input_data, zone, crop_width, crop_height,
                 target_buffer, scale_width, scale_height, this->config_.model_channels,
-                this->config_.normalize, this->config_.camera_width);
+                this->config_.normalize, width); // Use original width for stride
         } else if (this->config_.input_type == kInputTypeUInt8) {
             success = this->process_grayscale_crop_and_scale_to_uint8(
                 input_data, zone, crop_width, crop_height,

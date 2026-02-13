@@ -520,11 +520,16 @@ void MeterReaderTFLite::loop() {
 
                 // Build confidence list string
                 std::string conf_list = "[";
-                for (size_t i = 0; i < res_ptr->probabilities.size(); i++) {
+                // C++20: Range-based for loop with init-statement
+                for (int i = 0; const auto &score : res_ptr->probabilities) {
+                    if (i < 5) { // Limit logging to top 5 categories
+                         ESP_LOGD(TAG, "  Class %d: %.3f", i, score);
+                    }
                     if (i > 0) conf_list += ", ";
                     char buf[8];
-                    snprintf(buf, sizeof(buf), "%.3f", res_ptr->probabilities[i]);
+                    snprintf(buf, sizeof(buf), "%.3f", score);
                     conf_list += buf;
+                    i++;
                 }
                 conf_list += "]";
 
@@ -716,7 +721,11 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     // Inference
     auto zones = this->crop_zone_handler_.get_zones();
     ESP_LOGI(TAG, "Processing Image: Found %d crop zones", zones.size());
-    
+
+    // C++20: Range-based for loop
+    for (const auto& zone : zones) {
+        ESP_LOGD(TAG, "  Zone: [%d,%d, %d,%d]", zone.x1, zone.y1, zone.x2, zone.y2);
+    }
     // Process frame -> buffers
     esphome::App.feed_wdt();
     
