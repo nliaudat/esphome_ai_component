@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 #include <mutex>
+#include <span>
 
 namespace esphome {
 namespace meter_reader_tflite {
@@ -49,7 +50,7 @@ class TFLiteCoordinator {
   
   // Inference
   using ProcessResult = esphome::esp32_camera_utils::ImageProcessor::ProcessResult;
-  std::vector<InferenceResult> run_inference(const std::vector<ProcessResult>& processed_zones);
+  std::vector<InferenceResult> run_inference(std::span<const ProcessResult> processed_zones);
 
   // Getters (const correctness with nodiscard)
   [[nodiscard]] ModelSpec get_model_spec() const;

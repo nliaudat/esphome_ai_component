@@ -150,57 +150,56 @@ void SSOCRReader::process_image(std::shared_ptr<esphome::camera::CameraImage> im
   // Logic adapted to use raw_roi pointer
   
   // Sum pixels
-  std::vector<int> col_sums(roi_w, 0);
+  if (this->col_sums_.size() != static_cast<size_t>(roi_w)) {
+      this->col_sums_.resize(roi_w);
+  }
+  std::fill(this->col_sums_.begin(), this->col_sums_.end(), 0);
+
   for (int j = 0; j < roi_w; j++) {
     for (int i = 0; i < roi_h; i++) {
        if (raw_roi[i * roi_w + j] == 255) {
-           col_sums[j]++;
+           this->col_sums_[j]++;
        }
     }
   }
 
   // Find gaps
-  std::vector<std::pair<int, int>> digit_bounds;
+  this->digit_bounds_.clear();
   bool in_digit = false;
   int start_x = 0;
   for (int j = 0; j < roi_w; j++) {
-      bool has_signal = col_sums[j] > (roi_h * 0.05); 
+      bool has_signal = this->col_sums_[j] > (roi_h * 0.05); 
       if (has_signal && !in_digit) {
           in_digit = true;
           start_x = j;
       } else if (!has_signal && in_digit) {
           in_digit = false;
           if (j - start_x > 5) { 
-              digit_bounds.push_back({start_x, j});
+              this->digit_bounds_.push_back({start_x, j});
           }
       }
   }
   if (in_digit) {
-      digit_bounds.push_back({start_x, roi_w});
+      this->digit_bounds_.push_back({start_x, roi_w});
   }
 
   if (this->debug_) {
-      ESP_LOGD(TAG, "Found %d potential digits", static_cast<int>(digit_bounds.size()));
+      ESP_LOGD(TAG, "Found %d potential digits", static_cast<int>(this->digit_bounds_.size()));
   }
 
   // Recognize
-  std::string result_str = "";
-  for (size_t k = 0; k < digit_bounds.size(); k++) {
+  std::string result_str;
+  result_str.reserve(this->digit_bounds_.size() + 1);
+
+  for (size_t k = 0; k < this->digit_bounds_.size(); k++) {
       if (k >= static_cast<size_t>(this->digit_count_)) break;
       
-      int d_x = digit_bounds[k].first;
-      int d_w = digit_bounds[k].second - d_x;
+      int d_x = this->digit_bounds_[k].first;
+      int d_w = this->digit_bounds_[k].second - d_x;
       if (d_w < 3) continue;
 
-      // Extract digit sub-roi
-      std::vector<uint8_t> digit_roi(d_w * roi_h);
-      for(int r=0; r<roi_h; r++) {
-          for(int c=0; c<d_w; c++) {
-              digit_roi[r*d_w + c] = raw_roi[r*roi_w + (d_x + c)];
-          }
-      }
-      
-      int val = this->recognize_digit(digit_roi, d_w, roi_h);
+      // Use zero-copy recognition
+      int val = this->recognize_digit(raw_roi + d_x, d_w, roi_h, roi_w);
       if (val >= 0) {
           result_str += std::to_string(val);
       } else {
@@ -221,7 +220,6 @@ void SSOCRReader::process_image(std::shared_ptr<esphome::camera::CameraImage> im
           // Validate
           int validated_v = v;
           bool valid = this->validation_coord_.validate_reading(v, 1.0f, validated_v); 
-
           
           if (valid) {
               this->value_sensor_->publish_state(static_cast<float>(validated_v));
@@ -238,7 +236,7 @@ void SSOCRReader::process_image(std::shared_ptr<esphome::camera::CameraImage> im
   this->processing_frame_ = false;
 }
 
-int SSOCRReader::recognize_digit(const std::vector<uint8_t> &img, int w, int h) {
+int SSOCRReader::recognize_digit(const uint8_t* img, int w, int h, int stride) {
     // 7-segment sampling points logic
     // We define 7 segments: A(Top), B(TopRight), C(BotRight), D(Bot), E(BotLeft), F(TopLeft), G(Mid)
     // We sample small patches.
@@ -288,7 +286,7 @@ int SSOCRReader::recognize_digit(const std::vector<uint8_t> &img, int w, int h) 
                 int ny = sy+dy;
                 if (nx >=0 && nx < w && ny >=0 && ny < h) {
                     count++;
-                    if (img[ny*w + nx] == 255) on_pixels++;
+                    if (img[ny*stride + nx] == 255) on_pixels++;
                 }
             }
         }

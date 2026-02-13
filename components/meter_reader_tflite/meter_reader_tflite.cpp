@@ -142,8 +142,8 @@ static InferenceResultPtr allocate_inference_result() {
         inference_result_pool[i].success = false;
         // Force memory release by swapping with empty temporary, 
         // ensuring no hidden capacity grows indefinitely in the pool.
-        std::vector<float>().swap(inference_result_pool[i].readings);
-        std::vector<float>().swap(inference_result_pool[i].probabilities);
+        inference_result_pool[i].readings = {};
+        inference_result_pool[i].probabilities = {};
         pool_result_hits++;
         return InferenceResultPtr(&inference_result_pool[i], free_inference_result);
       }
@@ -853,7 +853,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
 
     
     // Collect readings
-    std::vector<float> readings, confidences;
+    esphome::StaticVector<float, 16> readings, confidences;
     int digit_index = 0;
     for (const auto& res : results) {
         if (res.success) {
@@ -1043,7 +1043,7 @@ void MeterReaderTFLite::set_web_server(web_server_base::WebServerBase *web_serve
 #endif
 
 // Logic Helpers
-float MeterReaderTFLite::combine_readings(const std::vector<float>& readings) {
+float MeterReaderTFLite::combine_readings(const esphome::StaticVector<float, 16>& readings) {
     std::string digit_string;
     
     ESP_LOGI(TAG, "Processing %d readings:", readings.size());
@@ -1094,7 +1094,7 @@ bool MeterReaderTFLite::validate_and_update_reading(float raw, float conf, float
     return valid;
 }
 
-bool MeterReaderTFLite::validate_and_update_reading(const std::vector<float>& digits, const std::vector<float>& confidences, float& val) {
+bool MeterReaderTFLite::validate_and_update_reading(const esphome::StaticVector<float, 16>& digits, const esphome::StaticVector<float, 16>& confidences, float& val) {
     int oval = 0;
     bool valid = this->validation_coord_.validate_reading(digits, confidences, oval);
     val = static_cast<float>(oval);

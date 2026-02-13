@@ -1720,7 +1720,7 @@ bool ImageProcessor::apply_software_rotation(
 // Debug functions implementation
 
 void ImageProcessor::debug_log_image_stats(const uint8_t* data, size_t size,
-                                         const std::string& stage) {
+                                         const char* stage) {
     if (!data || size == 0) return;
     
     uint8_t min_val = 255;
@@ -1738,10 +1738,10 @@ void ImageProcessor::debug_log_image_stats(const uint8_t* data, size_t size,
     float mean = static_cast<float>(sum) / size;
     
     ESP_LOGD(TAG, "DEBUG %s: size=%zu, min=%u, max=%u, mean=%.1f, zeros=%d/%zu (%.1f%%)",
-             stage.c_str(), size, min_val, max_val, mean, 
+             stage, size, min_val, max_val, mean, 
              zero_count, size, (zero_count * 100.0f) / size);
              
-    ESP_LOGD(TAG, "DEBUG %s first 10 values:", stage.c_str());
+    ESP_LOGD(TAG, "DEBUG %s first 10 values:", stage);
     char buf[64]; // Sufficient for 10 * 4 chars ("255 ")
     size_t offset = 0;
     for (int i = 0; i < std::min(10, static_cast<int>(size)); i++) {
@@ -1753,7 +1753,7 @@ void ImageProcessor::debug_log_image_stats(const uint8_t* data, size_t size,
 }
 
 void ImageProcessor::debug_log_float_stats(const float* data, size_t count,
-                                         const std::string& stage) {
+                                         const char* stage) {
     if (!data || count == 0) return;
     
     float min_val = 1e9;
@@ -1770,7 +1770,7 @@ void ImageProcessor::debug_log_float_stats(const float* data, size_t count,
     float mean = sum / count;
     
     ESP_LOGD(TAG, "DEBUG %s: count=%zu, min=%.3f, max=%.3f, mean=%.3f",
-             stage.c_str(), count, min_val, max_val, mean);
+             stage, count, min_val, max_val, mean);
              
     char buf[128]; // Sufficient for 10 * 8 chars ("1.234 ")
     size_t offset = 0;
@@ -1784,35 +1784,35 @@ void ImageProcessor::debug_log_float_stats(const float* data, size_t count,
 
 void ImageProcessor::debug_log_image(const uint8_t* data, size_t size, 
                                    int width, int height, int channels,
-                                   const std::string& stage) {
+                                   const char* stage) {
     if (!data || size == 0) return;
     ESP_LOGD(TAG, "DEBUG %s: %dx%dx%d (%zu bytes)", 
-             stage.c_str(), width, height, channels, size);
+             stage, width, height, channels, size);
     debug_log_image_stats(data, size, stage);
 }
 
 void ImageProcessor::debug_log_float_image(const float* data, size_t count,
                                          int width, int height, int channels,
-                                         const std::string& stage) {
+                                         const char* stage) {
     if (!data || count == 0) return;
     ESP_LOGD(TAG, "DEBUG %s: %dx%dx%d (%zu floats)", 
-             stage.c_str(), width, height, channels, count);
+             stage, width, height, channels, count);
     debug_log_float_stats(data, count, stage);
 }
 
 void ImageProcessor::debug_log_rgb888_image(const uint8_t* data, 
                                           int width, int height,
-                                          const std::string& stage) {
+                                          const char* stage) {
     debug_log_image(data, width * height * 3, width, height, 3, stage);
 }
 
 void ImageProcessor::debug_analyze_processed_zone(const uint8_t* data, 
                                                  int width, int height, 
                                                  int channels,
-                                                 const std::string& zone_name) {
+                                                 const char* zone_name) {
     if (!data || width <= 0 || height <= 0) return;
     
-    ESP_LOGI(TAG, "ZONE_ANALYSIS:%s:%dx%dx%d", zone_name.c_str(), width, height, channels);
+    ESP_LOGI(TAG, "ZONE_ANALYSIS:%s:%dx%dx%d", zone_name, width, height, channels);
     /* Too verbose for full analysis every time, enabled only for small check */
     if (width <= 10 && height <= 10) {
         for (int y = 0; y < height; y++) {
@@ -1827,7 +1827,7 @@ void ImageProcessor::debug_analyze_processed_zone(const uint8_t* data,
 void ImageProcessor::debug_analyze_float_zone(const float* data, 
                                              int width, int height, 
                                              int channels,
-                                             const std::string& zone_name,
+                                             const char* zone_name,
                                              bool normalized) {
     if (!data || width <= 0 || height <= 0) return;
     debug_log_float_stats(data, width * height * channels, zone_name);
@@ -1836,10 +1836,10 @@ void ImageProcessor::debug_analyze_float_zone(const float* data,
 void ImageProcessor::debug_output_zone_preview(const uint8_t* data,
                                               int width, int height,
                                               int channels,
-                                              const std::string& zone_name) {
+                                              const char* zone_name) {
     if (width > 64 || height > 64) return; // Too big for log
     
-    ESP_LOGI(TAG, "PREVIEW:%s", zone_name.c_str());
+    ESP_LOGI(TAG, "PREVIEW:%s", zone_name);
     char line[70]; // 64 chars + null
     for (int y = 0; y < height; y++) {
         int x;
@@ -1857,11 +1857,11 @@ void ImageProcessor::debug_output_zone_preview(const uint8_t* data,
 void ImageProcessor::debug_output_float_preview(const float* data,
                                                int width, int height,
                                                int channels,
-                                               const std::string& zone_name,
+                                               const char* zone_name,
                                                bool normalized) {
      if (width > 64 || height > 64) return;
      
-     ESP_LOGI(TAG, "FLOAT_PREVIEW:%s", zone_name.c_str());
+     ESP_LOGI(TAG, "FLOAT_PREVIEW:%s", zone_name);
      char line[70];
      for (int y = 0; y < height; y++) {
         int x;

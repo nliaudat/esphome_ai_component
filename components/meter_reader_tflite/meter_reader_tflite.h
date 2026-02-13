@@ -8,6 +8,7 @@
 #include "esphome/components/button/button.h"
 #include "esphome/components/light/light_state.h"
 #include "esphome/components/globals/globals_component.h"
+#include "esphome/core/helpers.h"
 
 // Coordinators
 #include "tflite_coordinator.h"
@@ -321,9 +322,9 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   // Helper
   void process_available_frame();
   void process_full_image(std::shared_ptr<camera::CameraImage> frame);
-  float combine_readings(const std::vector<float>& readings);
+  float combine_readings(const esphome::StaticVector<float, 16>& readings);
   bool validate_and_update_reading(float raw, float conf, float& val);
-  bool validate_and_update_reading(const std::vector<float>& digits, const std::vector<float>& confidences, float& val);
+  bool validate_and_update_reading(const esphome::StaticVector<float, 16>& digits, const esphome::StaticVector<float, 16>& confidences, float& val);
 
 #ifdef USE_WEB_SERVER
   web_server_base::WebServerBase *web_server_{nullptr};
@@ -339,8 +340,8 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   };
 
   struct InferenceResult {
-      std::vector<float> readings;
-      std::vector<float> probabilities; // Confidence
+      esphome::StaticVector<float, 16> readings;
+      esphome::StaticVector<float, 16> probabilities; // Confidence
       uint32_t inference_time;
       uint32_t total_start_time;
       #ifdef DEBUG_METER_READER_MEMORY

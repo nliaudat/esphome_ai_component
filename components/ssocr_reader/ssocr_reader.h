@@ -63,9 +63,13 @@ class SSOCRReader : public PollingComponent, public esphome::camera::CameraListe
   uint32_t last_request_time_{0};
   std::atomic<bool> frame_requested_{false};
   std::mutex frame_mutex_;  // Protects frame_requested_/processing_frame_ from camera callback
+  
+  // Optimization: Pre-allocated buffers
+  std::vector<int> col_sums_;
+  std::vector<std::pair<int, int>> digit_bounds_;
 
   void process_image(std::shared_ptr<esphome::camera::CameraImage> image);
-  int recognize_digit(const std::vector<uint8_t> &binary_image, int width, int height);
+  int recognize_digit(const uint8_t* img, int width, int height, int stride);
 };
 
 }  // namespace ssocr_reader

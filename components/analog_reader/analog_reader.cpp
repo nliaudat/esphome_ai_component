@@ -210,6 +210,19 @@ void AnalogReader::setup() {
   
   // Setup Flashlight (Default: None)
   this->flashlight_coord_.setup(this, nullptr, nullptr);
+
+  // Pre-allocate scratch buffers to max crop size to prevent reallocations during loop
+  int max_crop_area = 0;
+  for (const auto &dial : this->dials_) {
+      int area = dial.crop_w * dial.crop_h;
+      if (area > max_crop_area) max_crop_area = area;
+  }
+  if (max_crop_area > 0) {
+      // Reserve capacity strictly, don't resize (size remains 0 until used)
+      this->scratch_buffer_.reserve(max_crop_area);
+      this->scratch_buffer_2_.reserve(max_crop_area);
+      ESP_LOGD(TAG, "Reserved scratch buffers for max area: %d pixels", max_crop_area);
+  }
 }
 
 void AnalogReader::dump_config() {
@@ -446,7 +459,8 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
   }
   
   float total_value = 0.0f;
-  std::string debug_str = "";
+  std::string debug_str;
+  debug_str.reserve(this->dials_.size() * 10); // reserve space for "XX.X, " per dial
   
   for (const auto& dial : this->dials_) {
       // Determine effective image dimensions for checking
@@ -613,7 +627,8 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
       
       char val_buf[16];
       snprintf(val_buf, sizeof(val_buf), "%.1f", val);
-      debug_str += (debug_str.empty() ? "" : ", ") + std::string(val_buf);
+      if (!debug_str.empty()) debug_str += ", ";
+      debug_str += val_buf;
   }
   
   // Truncate to configured decimal precision

@@ -336,15 +336,15 @@ public:
 
 #ifdef DEBUG_ESP32_CAMERA_UTILS
   // Debug functions for image analysis
-  void debug_log_image_stats(const uint8_t* data, size_t size, const std::string& stage);
-  void debug_log_float_stats(const float* data, size_t count, const std::string& stage);
-  void debug_log_image(const uint8_t* data, size_t size, int width, int height, int channels, const std::string& stage);
-  void debug_log_float_image(const float* data, size_t count, int width, int height, int channels, const std::string& stage);
-  void debug_log_rgb888_image(const uint8_t* data, int width, int height, const std::string& stage);
-  void debug_analyze_processed_zone(const uint8_t* data, int width, int height, int channels, const std::string& zone_name);
-  void debug_analyze_float_zone(const float* data, int width, int height, int channels, const std::string& zone_name, bool normalized);
-  void debug_output_zone_preview(const uint8_t* data, int width, int height, int channels, const std::string& zone_name);
-  void debug_output_float_preview(const float* data, int width, int height, int channels, const std::string& zone_name, bool normalized);
+  void debug_log_image_stats(const uint8_t* data, size_t size, const char* stage);
+  void debug_log_float_stats(const float* data, size_t count, const char* stage);
+  void debug_log_image(const uint8_t* data, size_t size, int width, int height, int channels, const char* stage);
+  void debug_log_float_image(const float* data, size_t count, int width, int height, int channels, const char* stage);
+  void debug_log_rgb888_image(const uint8_t* data, int width, int height, const char* stage);
+  void debug_analyze_processed_zone(const uint8_t* data, int width, int height, int channels, const char* zone_name);
+  void debug_analyze_float_zone(const float* data, int width, int height, int channels, const char* zone_name, bool normalized);
+  void debug_output_zone_preview(const uint8_t* data, int width, int height, int channels, const char* zone_name);
+  void debug_output_float_preview(const float* data, int width, int height, int channels, const char* zone_name, bool normalized);
 #endif
 };
 

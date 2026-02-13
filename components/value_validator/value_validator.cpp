@@ -295,7 +295,7 @@ bool ValueValidator::validate_reading(int new_reading, float confidence, int& va
   return is_valid;
 }
 
-bool ValueValidator::validate_reading(const std::vector<float>& digits, const std::vector<float>& confidences, int& validated_reading) {
+bool ValueValidator::validate_reading(std::span<const float> digits, std::span<const float> confidences, int& validated_reading) {
   // If we don't have per-digit history yet, fallback to standard validation
   
   std::vector<int> current_digits;
@@ -970,7 +970,7 @@ int ValueValidator::get_stable_digit(size_t digit_index, int new_digit) {
   return mode_val;
 }
 
-bool ValueValidator::is_hallucination_pattern(const std::vector<float>& digits) const {
+bool ValueValidator::is_hallucination_pattern(std::span<const float> digits) const {
   if (digits.size() < 2) return false;
 
   // Single pass: check all-identical AND compute integer value

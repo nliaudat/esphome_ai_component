@@ -109,7 +109,7 @@ bool TFLiteCoordinator::load_model() {
 }
 
 std::vector<TFLiteCoordinator::InferenceResult> TFLiteCoordinator::run_inference(
-      const std::vector<esp32_camera_utils::ImageProcessor::ProcessResult>& processed_zones) {
+      std::span<const esp32_camera_utils::ImageProcessor::ProcessResult> processed_zones) {
     
     std::lock_guard<std::mutex> lock(model_mutex_);
     
