@@ -494,6 +494,9 @@ void MeterReaderTFLite::loop() {
             if (this->total_inference_time_sensor_) {
                 this->total_inference_time_sensor_->publish_state(millis() - res_ptr->total_start_time);
             }
+            if (this->capture_to_publish_time_sensor_) {
+                this->capture_to_publish_time_sensor_->publish_state(millis() - res_ptr->request_time);
+            }
 
             // Validate
             // Use Average Confidence to match Single Core logic
@@ -810,6 +813,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     job->crops = std::move(processed_buffers);
     // Use the start_time from METER_DURATION_START (defined at start of function)
     job->start_time = start_time; 
+    job->request_time = this->last_request_time_; // Pass request time for cycle calculation 
     
     ESP_LOGI(TAG, "Job prepared. Enqueuing... (Preprocessing took %u ms)", millis() - start_time);
 
@@ -859,6 +863,14 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
           // tensor_arena_used_sensor_->publish_state(tflite_coord_.get_arena_used_bytes());
     }
     #endif
+
+    // Publish Timing Sensors (Sync Path)
+    if (this->total_inference_time_sensor_) {
+        this->total_inference_time_sensor_->publish_state(millis() - start_time);
+    }
+    if (this->capture_to_publish_time_sensor_) {
+        this->capture_to_publish_time_sensor_->publish_state(millis() - this->last_request_time_);
+    }
 
     
     // Collect readings
@@ -1253,6 +1265,7 @@ void MeterReaderTFLite::inference_task(void *arg) {
             InferenceResultPtr res = allocate_inference_result();
             res->inference_time = millis() - start;
             res->total_start_time = job->start_time;
+            res->request_time = job->request_time;
             #ifdef DEBUG_METER_READER_MEMORY
             res->arena_used_bytes = self->tflite_coord_.get_arena_used_bytes();
             #endif

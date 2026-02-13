@@ -191,6 +191,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 #endif
 
   void set_total_inference_time_sensor(sensor::Sensor *s) { total_inference_time_sensor_ = s; }
+  void set_capture_to_publish_time_sensor(sensor::Sensor *s) { capture_to_publish_time_sensor_ = s; }
   void set_debug_timing(bool enabled) { debug_timing_ = enabled; }
 
 #ifdef USE_WEB_SERVER
@@ -313,6 +314,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 #endif
 
   sensor::Sensor *total_inference_time_sensor_{nullptr};
+  sensor::Sensor *capture_to_publish_time_sensor_{nullptr};
   bool debug_timing_{false};
 
   button::Button *unload_button_{nullptr};
@@ -337,6 +339,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
       std::shared_ptr<camera::CameraImage> frame; // Keep managed
       std::vector<esp32_camera_utils::ImageProcessor::ProcessResult> crops;
       uint32_t start_time;
+      uint32_t request_time; // Added for cycle time calculation
   };
 
   struct InferenceResult {
@@ -344,6 +347,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
       esphome::StaticVector<float, 16> probabilities; // Confidence
       uint32_t inference_time;
       uint32_t total_start_time;
+      uint32_t request_time; // Added for cycle time calculation
       #ifdef DEBUG_METER_READER_MEMORY
       size_t arena_used_bytes;
       #endif
