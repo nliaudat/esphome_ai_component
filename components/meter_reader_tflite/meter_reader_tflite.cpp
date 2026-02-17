@@ -483,7 +483,8 @@ void MeterReaderTFLite::loop() {
                      res_ptr->inference_time, millis() - res_ptr->total_start_time);
             
             // Reconstruct combined reading
-            float final_val = this->combine_readings(res_ptr->readings);
+            std::string digit_str;
+            float final_val = this->combine_readings(res_ptr->readings, digit_str);
             
             #ifdef DEBUG_METER_READER_MEMORY
             if (this->debug_memory_enabled_ && this->tensor_arena_used_sensor_) {
@@ -515,8 +516,8 @@ void MeterReaderTFLite::loop() {
                      // Publish to inference logs text sensor
                      char inference_log[150];
                      snprintf(inference_log, sizeof(inference_log),
-                              "Reading: %.1f -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%%)",
-                              final_val, validated_val, valid ? "yes" : "no",
+                              "Reading: %s -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%%)",
+                              digit_str.c_str(), validated_val, valid ? "yes" : "no",
                               avg_conf * 100.0f, this->confidence_threshold_ * 100.0f);
                      this->inference_logs_->publish_state(inference_log);
                 }
@@ -538,15 +539,15 @@ void MeterReaderTFLite::loop() {
 
                 // Publish (matches process_full_image logic)
                 if (valid && (this->validation_coord_.has_validator() || avg_conf >= this->confidence_threshold_)) {
-                     ESP_LOGI(TAG, "Result: VALID (Raw: %.0f, Conf: %.3f, %s)", 
-                              final_val, avg_conf, conf_list.c_str());
+                     ESP_LOGI(TAG, "Result: VALID (Raw: %s, Conf: %.3f, %s)", 
+                              digit_str.c_str(), avg_conf, conf_list.c_str());
                      this->value_sensor_->publish_state(validated_val);
                      if (this->confidence_sensor_) {
                          this->confidence_sensor_->publish_state(avg_conf * 100.0f);
                      }
                 } else {
-                     ESP_LOGI(TAG, "Result: INVALID (Raw: %.0f, Conf: %.3f, %s)", 
-                              final_val, avg_conf, conf_list.c_str());
+                     ESP_LOGI(TAG, "Result: INVALID (Raw: %s, Conf: %.3f, %s)", 
+                              digit_str.c_str(), avg_conf, conf_list.c_str());
 
                      #ifdef USE_DATA_COLLECTOR
                      // Detect suspicious patterns (e.g. all 0s or all 1s) using logic in ValueValidator
@@ -562,7 +563,7 @@ void MeterReaderTFLite::loop() {
                      if (true) { // Logic simplified: If we are in this block, it IS invalid.
                          ESP_LOGW(TAG, "Data Collection Triggered: Reading Invalid (Conf: %.1f%%, Suspicious: %s)", 
                                   avg_conf * 100.0f, suspicious ? "YES" : "NO");
-                         this->trigger_low_confidence_collection(final_val, avg_conf);
+                         this->trigger_low_confidence_collection(digit_str, avg_conf);
                      }
                      #endif
                 }
@@ -635,7 +636,7 @@ void MeterReaderTFLite::loop() {
 }
 
 #ifdef USE_DATA_COLLECTOR
-void MeterReaderTFLite::trigger_low_confidence_collection(float value, float confidence) {
+void MeterReaderTFLite::trigger_low_confidence_collection(const std::string &value, float confidence) {
     if (!this->collect_low_confidence_ || !this->data_collector_) return;
     // User requested 0% to Threshold range.
     // if (confidence < low_confidence_trigger_threshold_) return; 
@@ -895,7 +896,8 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     
     if (!readings.empty()) {
         // Use helper to combine readings and log details (matches legacy behavior)
-        float final_val = this->combine_readings(readings);
+        std::string digit_str;
+        float final_val = this->combine_readings(readings, digit_str);
 
         float avg_conf = std::accumulate(confidences.begin(), confidences.end(), 0.0f) / confidences.size();
         
@@ -906,16 +908,16 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
              // Publish to inference logs text sensor
              char inference_log[150];
              snprintf(inference_log, sizeof(inference_log),
-                      "Reading: %.1f -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%% (high: %.1f%%))",
-                      final_val, validated_val, valid ? "yes" : "no",
+                      "Reading: %s -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%% (high: %.1f%%))",
+                      digit_str.c_str(), validated_val, valid ? "yes" : "no",
                       avg_conf * 100.0f, this->confidence_threshold_ * 100.0f, this->high_confidence_threshold_ * 100.0f);
              this->inference_logs_->publish_state(inference_log);
         }
 
         if (valid && (this->validation_coord_.has_validator() || avg_conf >= this->confidence_threshold_)) {
              // Removed checking of inference_log char buffer availability to match legacy cleanly
-             ESP_LOGI(TAG, "Reading: %.1f -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%% (high: %.1f%%))", 
-                final_val, validated_val, valid ? "yes" : "no", 
+             ESP_LOGI(TAG, "Reading: %s -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%% (high: %.1f%%))", 
+                digit_str.c_str(), validated_val, valid ? "yes" : "no", 
                 avg_conf * 100.0f, this->confidence_threshold_ * 100.0f, this->high_confidence_threshold_ * 100.0f);
              
              if (this->value_sensor_) this->value_sensor_->publish_state(validated_val);
@@ -923,8 +925,8 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
              
              ESP_LOGI(TAG, "Reading published - valid and confidence threshold met");
         } else {
-             ESP_LOGI(TAG, "Reading: %.1f -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%% (high: %.1f%%))", 
-                final_val, validated_val, valid ? "yes" : "no", 
+             ESP_LOGI(TAG, "Reading: %s -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%% (high: %.1f%%))", 
+                digit_str.c_str(), validated_val, valid ? "yes" : "no", 
                 avg_conf * 100.0f, this->confidence_threshold_ * 100.0f, this->high_confidence_threshold_ * 100.0f);
              ESP_LOGW(TAG, "Reading NOT published - %s", 
                      !valid ? "validation failed" : "confidence below threshold");
@@ -942,7 +944,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
              if (true) {
                  ESP_LOGW(TAG, "Data Collection Triggered: Reading Invalid (Conf: %.1f%%, Suspicious: %s)", 
                           avg_conf * 100.0f, suspicious ? "YES" : "NO");
-                 this->trigger_low_confidence_collection(final_val, avg_conf);
+                 this->trigger_low_confidence_collection(digit_str, avg_conf);
              }
              #endif
         }
@@ -1064,7 +1066,7 @@ void MeterReaderTFLite::set_web_server(web_server_base::WebServerBase *web_serve
 #endif
 
 // Logic Helpers
-float MeterReaderTFLite::combine_readings(const esphome::StaticVector<float, 16>& readings) {
+float MeterReaderTFLite::combine_readings(const esphome::StaticVector<float, 16>& readings, std::string &out_str) {
     std::string digit_string;
     
     ESP_LOGI(TAG, "Processing %d readings:", readings.size());
@@ -1088,6 +1090,9 @@ float MeterReaderTFLite::combine_readings(const esphome::StaticVector<float, 16>
     
     ESP_LOGI(TAG, "Concatenated digit string: %s", digit_string.c_str());
     
+    // Output the string
+    out_str = digit_string;
+    
     std::string readings_str;
     for (const auto& reading : readings) {
       if (!readings_str.empty()) {
@@ -1101,7 +1106,9 @@ float MeterReaderTFLite::combine_readings(const esphome::StaticVector<float, 16>
     
     float combined_value = 0.0f;
     // Guaranteed to be numeric string from logic above
-    combined_value = std::stof(digit_string);
+    if (!digit_string.empty()) {
+        combined_value = std::stof(digit_string);
+    }
     
     ESP_LOGI(TAG, "Final combined value: %.0f", combined_value);
     return combined_value;

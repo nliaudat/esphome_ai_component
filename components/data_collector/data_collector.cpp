@@ -31,7 +31,7 @@ void DataCollector::dump_config() {
   }
 }
 
-void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, int width, int height, const std::string& format, float raw_value, float confidence) {
+void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, int width, int height, const std::string& format, const std::string &raw_value, float confidence) {
   if (!frame) {
     ESP_LOGW(TAG, "No frame provided for collection");
     return;
@@ -49,8 +49,8 @@ void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, in
   }
 
   uint32_t start_time = millis();
-  ESP_LOGI(TAG, "Starting data collection (Value: %.2f, Confidence: %.2f%%, Size: %dx%d, Fmt: %s)", 
-           raw_value, confidence * 100.0f, width, height, format.c_str());
+  ESP_LOGI(TAG, "Starting data collection (Value: %s, Confidence: %.2f%%, Size: %dx%d, Fmt: %s)", 
+           raw_value.c_str(), confidence * 100.0f, width, height, format.c_str());
 
   // Determine format
   pixformat_t pix_fmt = PIXFORMAT_GRAYSCALE;
@@ -90,7 +90,7 @@ void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, in
 }
 
 // Async wrapper
-bool DataCollector::upload_image(const uint8_t *data, size_t len, float raw_value, float confidence) {
+bool DataCollector::upload_image(const uint8_t *data, size_t len, const std::string &raw_value, float confidence) {
     if (!this->upload_queue_) {
         ESP_LOGE(TAG, "Upload queue not initialized");
         return false;
@@ -112,7 +112,11 @@ bool DataCollector::upload_image(const uint8_t *data, size_t len, float raw_valu
     UploadJob job;
     job.data = copy;
     job.len = len;
-    job.value = raw_value;
+    
+    // Copy string safely
+    strncpy(job.value, raw_value.c_str(), sizeof(job.value) - 1);
+    job.value[sizeof(job.value) - 1] = '\0'; // Ensure null-termination
+    
     job.confidence = confidence;
 
     // Send to queue (non-blocking or small timeout)
@@ -146,7 +150,7 @@ void DataCollector::upload_task(void *arg) {
         // Use a timeout so we periodically check task_running_
         if (xQueueReceive(collector->upload_queue_, &job, 1000 / portTICK_PERIOD_MS) == pdTRUE) {
             // Process upload
-            collector->process_upload_sync(job.data, job.len, job.value, job.confidence);
+            collector->process_upload_sync(job.data, job.len, std::string(job.value), job.confidence);
             
             // Free the memory we allocated in upload_image
             free(job.data);
@@ -181,7 +185,7 @@ DataCollector::~DataCollector() {
     }
 }
 
-bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, float raw_value, float confidence) {
+bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, const std::string &raw_value, float confidence) {
   if (this->upload_url_.empty()) return false;
 
   ESP_LOGI(TAG, "Uploading image to %s...", this->upload_url_.c_str());
@@ -217,10 +221,10 @@ bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, float r
   }
   
   // Add metadata headers
-  char buf[32];
-  snprintf(buf, sizeof(buf), "%.2f", raw_value);
-  esp_http_client_set_header(client, "X-Meter-Value", buf);
+  // Pass raw value as string directly
+  esp_http_client_set_header(client, "X-Meter-Value", raw_value.c_str());
   
+  char buf[32];
   snprintf(buf, sizeof(buf), "%.4f", confidence);
   esp_http_client_set_header(client, "X-Meter-Confidence", buf);
 
@@ -237,7 +241,7 @@ bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, float r
         // Log response body if small? Or just detailed info
         // esp_http_client_read handling requires event loop or full read.
         // For now, log that we finished.
-        ESP_LOGD(TAG, "Full upload metrics: Value=%.2f, Conf=%.4f, Size=%zu", raw_value, confidence, len);
+        ESP_LOGD(TAG, "Full upload metrics: Value=%s, Conf=%.4f, Size=%zu", raw_value.c_str(), confidence, len);
         ESP_LOGD(TAG, "Headers sent: X-Meter-Value, X-Meter-Confidence, Content-Type, Authorization");
     }
     success = (status_code >= 200 && status_code < 300);

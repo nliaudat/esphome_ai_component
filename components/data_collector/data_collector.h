@@ -25,7 +25,7 @@ class DataCollector : public Component {
 
   // Main entry point
   // raw_value and confidence are passed for metadata/logging
-  void collect_image(std::shared_ptr<camera::CameraImage> frame, int width, int height, const std::string& format, float raw_value, float confidence);
+  void collect_image(std::shared_ptr<camera::CameraImage> frame, int width, int height, const std::string& format, const std::string &raw_value, float confidence);
 
  protected:
   std::string upload_url_;
@@ -36,14 +36,14 @@ class DataCollector : public Component {
   switch_::Switch *web_submit_switch_{nullptr};
 
   // Helper to upload
-  bool upload_image(const uint8_t *data, size_t len, float raw_value, float confidence);
+  bool upload_image(const uint8_t *data, size_t len, const std::string &raw_value, float confidence);
   // Internal synchronous upload
-  bool process_upload_sync(const uint8_t *data, size_t len, float raw_value, float confidence);
+  bool process_upload_sync(const uint8_t *data, size_t len, const std::string &raw_value, float confidence);
 
   struct UploadJob {
       uint8_t *data;
       size_t len;
-      float value;
+      char value[32]; // Fixed size string buffer
       float confidence;
   };
 

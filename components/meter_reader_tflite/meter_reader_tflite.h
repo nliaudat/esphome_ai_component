@@ -262,11 +262,11 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   
   // Storage for pending collection
   struct PendingCollection {
-      float value;
+      std::string value; // Changed from float to string
       float confidence;
   } pending_collection_;
   
-  void trigger_low_confidence_collection(float value, float confidence);
+  void trigger_low_confidence_collection(const std::string &value, float confidence); // Updated signature
   #endif
 
   // bool strict_confidence_check_{false}; // Moved
@@ -324,7 +324,8 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   // Helper
   void process_available_frame();
   void process_full_image(std::shared_ptr<camera::CameraImage> frame);
-  float combine_readings(const esphome::StaticVector<float, 16>& readings);
+  // Updated signature to return string as out-parameter or return
+  float combine_readings(const esphome::StaticVector<float, 16>& readings, std::string &out_str);
   bool validate_and_update_reading(float raw, float conf, float& val);
   bool validate_and_update_reading(const esphome::StaticVector<float, 16>& digits, const esphome::StaticVector<float, 16>& confidences, float& val);
 
