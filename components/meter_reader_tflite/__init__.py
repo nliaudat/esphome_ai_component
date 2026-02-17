@@ -52,6 +52,8 @@ CONF_START_FLASH_CALIBRATION_BUTTON = 'start_flash_calibration_button'
 CONF_FLASH_LIGHT_CONTROLLER = 'flash_light_controller'
 CONF_DATA_COLLECTOR = 'data_collector'
 CONF_COLLECT_LOW_CONFIDENCE = 'collect_low_confidence'
+CONF_COLLECT_MIN_GLOBAL_CONFIDENCE = 'collect_min_global_confidence'
+CONF_COLLECT_MIN_DIGIT_CONFIDENCE = 'collect_min_digit_confidence'
 
 CONF_CROP_ZONES = 'crop_zones_global'
 
@@ -111,6 +113,8 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_FLASH_LIGHT_CONTROLLER): cv.use_id(flash_light_controller.FlashLightController) if flash_light_controller else cv.string,
     cv.Optional(CONF_DATA_COLLECTOR): cv.use_id(data_collector.DataCollector) if data_collector else cv.string,
     cv.Optional(CONF_COLLECT_LOW_CONFIDENCE, default=True): cv.boolean,
+    cv.Optional(CONF_COLLECT_MIN_GLOBAL_CONFIDENCE, default=0.90): cv.float_range(min=0.0, max=1.0),
+    cv.Optional(CONF_COLLECT_MIN_DIGIT_CONFIDENCE, default=0.90): cv.float_range(min=0.0, max=1.0),
 
     cv.Optional(CONF_CROP_ZONES): cv.use_id(globals.GlobalsComponent),
     # cv.Optional(CONF_CAMERA_WINDOW): cv.Any(
@@ -374,6 +378,10 @@ async def to_code(config):
         dc = await cg.get_variable(config[CONF_DATA_COLLECTOR])
         cg.add(var.set_data_collector(dc))
         cg.add(var.set_collect_low_confidence(config[CONF_COLLECT_LOW_CONFIDENCE]))
+        if CONF_COLLECT_MIN_GLOBAL_CONFIDENCE in config:
+            cg.add(var.set_collect_min_global_confidence(config[CONF_COLLECT_MIN_GLOBAL_CONFIDENCE]))
+        if CONF_COLLECT_MIN_DIGIT_CONFIDENCE in config:
+            cg.add(var.set_collect_min_digit_confidence(config[CONF_COLLECT_MIN_DIGIT_CONFIDENCE]))
         cg.add_define("USE_DATA_COLLECTOR")
     
     # Handle optional camera window configuration

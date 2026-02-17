@@ -170,6 +170,8 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   #ifdef USE_DATA_COLLECTOR
   void set_data_collector(data_collector::DataCollector *collector) { data_collector_ = collector; }
   void set_collect_low_confidence(bool collect) { collect_low_confidence_ = collect; }
+  void set_collect_min_global_confidence(float min_conf) { collect_min_global_confidence_ = min_conf; }
+  void set_collect_min_digit_confidence(float min_conf) { collect_min_digit_confidence_ = min_conf; }
   #endif
 
   // Dynamic Resource Management
@@ -252,6 +254,8 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   #ifdef USE_DATA_COLLECTOR
   bool collect_low_confidence_{true};
   float low_confidence_trigger_threshold_{0.0f}; 
+  float collect_min_global_confidence_{0.90f};
+  float collect_min_digit_confidence_{0.90f};
   
   enum CollectionState {
       COLLECTION_IDLE,

@@ -550,24 +550,39 @@ void MeterReaderTFLite::loop() {
                               digit_str.c_str(), avg_conf, conf_list.c_str());
 
                      #ifdef USE_DATA_COLLECTOR
-                     // Detect suspicious patterns (e.g. all 0s or all 1s) using logic in ValueValidator
+                     // Data Collection Trigger Logic
+                     // We are in the 'else' block of 'if (valid && ...)'
+                     // So we know it is effectively invalid for publishing purposes.
+                     bool trigger_collection = true; // Default to true for invalid readings (legacy behavior)
+
+                     // Detect suspicious patterns
                      bool suspicious = false;
                      if (this->validation_coord_.has_validator()) {
                          suspicious = this->validation_coord_.get_validator()->is_hallucination_pattern(res_ptr->readings);
                      }
-
-                     // Only collect if confidence is actually low OR if specific suspicious pattern detected OR if VALIDATION FAILED
-                     // "Result: INVALID" implies !valid OR low confidence.
-                     // We want to collect ALL invalid readings to catch High Confidence errors.
                      
-                     if (true) { // Logic simplified: If we are in this block, it IS invalid.
+                     // Check thresholds if it wasn't already going to trigger
+                     if (!trigger_collection && this->collect_min_global_confidence_ > 0 && avg_conf < this->collect_min_global_confidence_) {
+                         trigger_collection = true;
+                         ESP_LOGW(TAG, "Data Collection Triggered: Global Confidence %.2f < %.2f", avg_conf, this->collect_min_global_confidence_);
+                     }
+
+                     if (!trigger_collection && this->collect_min_digit_confidence_ > 0) {
+                         for (float c : res_ptr->probabilities) {
+                             if (c < this->collect_min_digit_confidence_) {
+                                 trigger_collection = true;
+                                 ESP_LOGW(TAG, "Data Collection Triggered: A digit confidence %.2f < %.2f", c, this->collect_min_digit_confidence_);
+                                 break;
+                             }
+                         }
+                     }
+
+                     if (trigger_collection) {
                          std::string metadata = "";
-                         #ifdef USE_DATA_COLLECTOR
                          metadata = this->serialize_inference_metadata(digit_str, avg_conf, res_ptr->readings, res_ptr->probabilities,
                                                                      this->camera_coord_.get_width(), this->camera_coord_.get_height());
-                         #endif
-
-                         ESP_LOGW(TAG, "Data Collection Triggered: Reading Invalid (Conf: %.1f%%, Suspicious: %s)", 
+ 
+                         ESP_LOGW(TAG, "Data Collection Triggered: Reading Invalid/LowConf (Conf: %.1f%%, Suspicious: %s)", 
                                   avg_conf * 100.0f, suspicious ? "YES" : "NO");
                          this->trigger_low_confidence_collection(digit_str, avg_conf, metadata);
                      }
@@ -939,23 +954,37 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
                      !valid ? "validation failed" : "confidence below threshold");
              
              #ifdef USE_DATA_COLLECTOR
-             // Detect suspicious patterns (e.g. all 0s or all 1s) using logic in ValueValidator
+             // Data Collection Trigger Logic
+             bool trigger_collection = true; // Default to true since we are in the invalid/rejected block
+
+             // Detect suspicious patterns
              bool suspicious = false;
              if (this->validation_coord_.has_validator()) {
                  suspicious = this->validation_coord_.get_validator()->is_hallucination_pattern(readings);
              }
 
-             // Only collect if confidence is actually low OR if specific suspicious pattern detected OR if VALIDATION FAILED
-             // We are in the 'else' block of 'if (valid ...)', so we know it's invalid.
+             // Check thresholds
+             if (!trigger_collection && this->collect_min_global_confidence_ > 0 && avg_conf < this->collect_min_global_confidence_) {
+                 trigger_collection = true;
+                 ESP_LOGW(TAG, "Data Collection Triggered: Global Confidence %.2f < %.2f", avg_conf, this->collect_min_global_confidence_);
+             }
+
+             if (!trigger_collection && this->collect_min_digit_confidence_ > 0) {
+                 for (float c : confidences) {
+                     if (c < this->collect_min_digit_confidence_) {
+                         trigger_collection = true;
+                         ESP_LOGW(TAG, "Data Collection Triggered: A digit confidence %.2f < %.2f", c, this->collect_min_digit_confidence_);
+                         break;
+                     }
+                 }
+             }
              
-             if (true) {
+             if (trigger_collection) {
                  std::string metadata = "";
-                 #ifdef USE_DATA_COLLECTOR
                  metadata = this->serialize_inference_metadata(digit_str, avg_conf, readings, confidences,
                                                              this->camera_coord_.get_width(), this->camera_coord_.get_height());
-                 #endif
-
-                 ESP_LOGW(TAG, "Data Collection Triggered: Reading Invalid (Conf: %.1f%%, Suspicious: %s)", 
+                 
+                 ESP_LOGW(TAG, "Data Collection Triggered: Reading Invalid/LowConf (Conf: %.1f%%, Suspicious: %s)", 
                           avg_conf * 100.0f, suspicious ? "YES" : "NO");
                  this->trigger_low_confidence_collection(digit_str, avg_conf, metadata);
              }
@@ -1611,7 +1640,11 @@ void MeterReaderTFLite::reload_resources() {
               }
               */
               // Fix: Pass raw rotation
-              config.rotation = this->rotation_;
+              if (this->esp32_camera_utils_) {
+                  config.rotation = this->esp32_camera_utils_->get_rotation();
+              } else {
+                  config.rotation = this->rotation_;
+              }
               
               config.input_type = static_cast<esp32_camera_utils::ImageProcessorInputType>(processor_input_type);
               config.normalize = spec.normalize;
@@ -1639,9 +1672,17 @@ std::string MeterReaderTFLite::serialize_inference_metadata(const std::string &v
     json.reserve(512); 
     
     char buffer[128];
-    snprintf(buffer, sizeof(buffer), "{\"val\":\"%s\",\"conf\":%.3f,\"w\":%d,\"h\":%d,\"digits\":[", 
+    snprintf(buffer, sizeof(buffer), "{\"val\":\"%s\",\"conf\":%.3f,\"w\":%d,\"h\":%d", 
              value.c_str(), confidence, width, height);
     json += buffer;
+
+    #ifdef DEV_ENABLE_ROTATION
+    float rot = (this->esp32_camera_utils_) ? this->esp32_camera_utils_->get_rotation() : this->rotation_;
+    snprintf(buffer, sizeof(buffer), ",\"rot\":%.1f", rot);
+    json += buffer;
+    #endif
+
+    json += ",\"digits\":[";
 
     // Get zones
     std::vector<esp32_camera_utils::CropZone> zones;

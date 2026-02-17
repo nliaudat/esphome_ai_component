@@ -99,6 +99,10 @@ meter_reader_tflite:
   
   # Image Rotation (Dev)
   rotation: "90" # Options: "0", "90", "180", "270"
+  
+  # Data Collection Thresholds
+  collect_min_global_confidence: 0.90
+  collect_min_digit_confidence: 0.90
 ```
 
 #### Option B: Seven-Segment OCR Reader (No AI)
@@ -151,7 +155,11 @@ data_collector:
 meter_reader_tflite:
   # ... existing config ...
   data_collector: my_data_collector
-  collect_low_confidence: true # Trigger upload on low confidence
+  collect_low_confidence: true # Trigger upload on low confidence (uses min_global/digit_confidence)
+  
+  # Optional: Customize collection thresholds (defaults to 0.90)
+  collect_min_global_confidence: 0.80 
+  collect_min_digit_confidence: 0.80
 ```
 
 ```
