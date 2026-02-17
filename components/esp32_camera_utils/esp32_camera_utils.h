@@ -8,6 +8,10 @@
 
 #include <string>
 
+#include "esphome/core/defines.h"
+
+#ifdef USE_ESP32_CAMERA_UTILS
+
 namespace esphome {
 namespace esp32_camera_utils {
 
@@ -118,3 +122,5 @@ class Esp32CameraUtils : public Component {
 
 }  // namespace esp32_camera_utils
 }  // namespace esphome
+
+#endif  // USE_ESP32_CAMERA_UTILS

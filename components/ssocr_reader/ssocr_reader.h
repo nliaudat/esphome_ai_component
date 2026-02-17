@@ -11,6 +11,10 @@
 #include <mutex>
 #include <atomic>
 
+#include "esphome/core/defines.h"
+
+#ifdef USE_SSOCR_READER
+
 namespace esphome {
 namespace ssocr_reader {
 
@@ -74,3 +78,5 @@ class SSOCRReader : public PollingComponent, public esphome::camera::CameraListe
 
 }  // namespace ssocr_reader
 }  // namespace esphome
+
+#endif  // USE_SSOCR_READER

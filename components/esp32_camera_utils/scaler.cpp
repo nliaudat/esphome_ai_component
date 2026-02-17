@@ -130,5 +130,4 @@ bool Scaler::scale_bilinear(const uint8_t* src, int src_w, int src_h, int src_ch
 
 }  // namespace esp32_camera_utils
 }  // namespace esphome
-
 #endif // USE_CAMERA_SCALER

@@ -53,6 +53,10 @@
 #include "esphome/components/web_server_base/web_server_base.h"
 #endif
 
+#include "esphome/core/defines.h"
+
+#ifdef USE_METER_READER_TFLITE
+
 namespace esphome {
 namespace meter_reader_tflite {
 
@@ -381,3 +385,5 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
 }  // namespace meter_reader_tflite
 }  // namespace esphome
+
+#endif  // USE_METER_READER_TFLITE

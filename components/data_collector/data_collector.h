@@ -8,6 +8,10 @@
 #include <string>
 #include <atomic>
 
+#include "esphome/core/defines.h"
+
+#ifdef USE_DATA_COLLECTOR
+
 namespace esphome {
 namespace data_collector {
 
@@ -58,3 +62,5 @@ class DataCollector : public Component {
 
 }  // namespace data_collector
 }  // namespace esphome
+
+#endif  // USE_DATA_COLLECTOR

@@ -11,6 +11,10 @@
 #include <mutex>
 #include <atomic>
 
+#include "esphome/core/defines.h"
+
+#ifdef USE_ANALOG_READER
+
 namespace esphome {
 namespace analog_reader {
 
@@ -193,3 +197,5 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
 
 }  // namespace analog_reader
 }  // namespace esphome
+
+#endif  // USE_ANALOG_READER

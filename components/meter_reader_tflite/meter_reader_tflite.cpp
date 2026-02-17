@@ -1285,7 +1285,6 @@ void MeterReaderTFLite::dump_config() {
 
 } // namespace meter_reader_tflite
 } // namespace esphome
-
 #ifdef SUPPORT_DOUBLE_BUFFERING
 using namespace esphome::meter_reader_tflite;
 

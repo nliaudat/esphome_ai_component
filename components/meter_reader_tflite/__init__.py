@@ -177,6 +177,8 @@ async def to_code(config):
     cg.add_global(cg.RawStatement('using namespace esphome::meter_reader_tflite;'))
     await cg.register_component(var, config)
     
+    cg.add_define("USE_METER_READER_TFLITE")
+    
     # Register validator
     if CONF_VALIDATOR in config:
         v = await cg.get_variable(config[CONF_VALIDATOR])

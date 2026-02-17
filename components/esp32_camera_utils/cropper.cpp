@@ -68,5 +68,4 @@ bool Cropper::validate_zone(const CropZone& zone, int img_w, int img_h) {
 
 }  // namespace esp32_camera_utils
 }  // namespace esphome
-
 #endif // USE_CAMERA_CROPPER

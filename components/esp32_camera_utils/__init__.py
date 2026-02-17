@@ -62,6 +62,8 @@ CONFIG_SCHEMA = cv.Schema({
 }).extend(cv.COMPONENT_SCHEMA)
 
 async def to_code(config):
+    cg.add_define("USE_ESP32_CAMERA_UTILS")
+    
     esp32.add_idf_component(
         name="espressif/esp_new_jpeg",
         ref="1.0.0"

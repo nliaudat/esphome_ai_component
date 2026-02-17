@@ -4,6 +4,10 @@
 #include "esphome/components/light/light_state.h"
 #include <functional>
 
+#include "esphome/core/defines.h"
+
+#ifdef USE_FLASH_LIGHT_CONTROLLER
+
 namespace esphome {
 namespace flash_light_controller {
 
@@ -49,3 +53,5 @@ class FlashLightController : public Component {
 
 }  // namespace flash_light_controller
 }  // namespace esphome
+
+#endif  // USE_FLASH_LIGHT_CONTROLLER
