@@ -31,7 +31,7 @@ void DataCollector::dump_config() {
   }
 }
 
-void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, int width, int height, const std::string& format, const std::string &raw_value, float confidence) {
+void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, int width, int height, const std::string& format, const std::string &raw_value, float confidence, const std::string &metadata) {
   if (!frame) {
     ESP_LOGW(TAG, "No frame provided for collection");
     return;
@@ -70,7 +70,7 @@ void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, in
       
       // We don't own this buffer, so we shouldn't free it unless we copied it.
       // But upload_image takes raw pointer.
-      this->upload_image(jpeg_buf, jpeg_len, raw_value, confidence);
+      this->upload_image(jpeg_buf, jpeg_len, raw_value, confidence, metadata.c_str());
       // No free needed for frame buffer
       return; 
   }
@@ -83,14 +83,14 @@ void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, in
     return;
   }
   
-  this->upload_image(jpeg_buf, jpeg_len, raw_value, confidence);
+  this->upload_image(jpeg_buf, jpeg_len, raw_value, confidence, metadata.c_str());
   
   // fmt2jpg allocates jpeg_buf on success — free it
   free(jpeg_buf);
 }
 
 // Async wrapper
-bool DataCollector::upload_image(const uint8_t *data, size_t len, const std::string &raw_value, float confidence) {
+bool DataCollector::upload_image(const uint8_t *data, size_t len, const std::string &raw_value, float confidence, const char *metadata) {
     if (!this->upload_queue_) {
         ESP_LOGE(TAG, "Upload queue not initialized");
         return false;
@@ -119,10 +119,27 @@ bool DataCollector::upload_image(const uint8_t *data, size_t len, const std::str
     
     job.confidence = confidence;
 
+    // Handle Metadata
+    if (metadata && strlen(metadata) > 0) {
+        job.metadata_len = strlen(metadata) + 1;
+        job.metadata = (char*)heap_caps_malloc(job.metadata_len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (job.metadata) {
+            strncpy(job.metadata, metadata, job.metadata_len);
+        } else {
+             ESP_LOGW(TAG, "Failed to allocate memory for metadata (%u bytes)", job.metadata_len);
+             job.metadata = nullptr;
+             job.metadata_len = 0;
+        }
+    } else {
+        job.metadata = nullptr;
+        job.metadata_len = 0;
+    }
+
     // Send to queue (non-blocking or small timeout)
     if (xQueueSend(this->upload_queue_, &job, 10 / portTICK_PERIOD_MS) != pdTRUE) {
         ESP_LOGE(TAG, "Upload queue full! Dropping image.");
         free(copy);
+        if (job.metadata) free(job.metadata);
         return false;
     }
     
@@ -150,10 +167,11 @@ void DataCollector::upload_task(void *arg) {
         // Use a timeout so we periodically check task_running_
         if (xQueueReceive(collector->upload_queue_, &job, 1000 / portTICK_PERIOD_MS) == pdTRUE) {
             // Process upload
-            collector->process_upload_sync(job.data, job.len, std::string(job.value), job.confidence);
+            collector->process_upload_sync(job.data, job.len, std::string(job.value), job.confidence, job.metadata);
             
             // Free the memory we allocated in upload_image
             free(job.data);
+            if (job.metadata) free(job.metadata);
         }
     }
     vTaskDelete(nullptr);
@@ -185,7 +203,7 @@ DataCollector::~DataCollector() {
     }
 }
 
-bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, const std::string &raw_value, float confidence) {
+bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, const std::string &raw_value, float confidence, const char *metadata) {
   if (this->upload_url_.empty()) return false;
 
   ESP_LOGI(TAG, "Uploading image to %s...", this->upload_url_.c_str());
@@ -227,6 +245,10 @@ bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, const s
   char buf[32];
   snprintf(buf, sizeof(buf), "%.4f", confidence);
   esp_http_client_set_header(client, "X-Meter-Confidence", buf);
+
+  if (metadata) {
+       esp_http_client_set_header(client, "X-Meter-Json", metadata);
+  }
 
   esp_http_client_set_post_field(client, (const char *)data, len);
 

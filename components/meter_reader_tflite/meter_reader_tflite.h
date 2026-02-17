@@ -264,9 +264,14 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   struct PendingCollection {
       std::string value; // Changed from float to string
       float confidence;
+      std::string extra_metadata;
   } pending_collection_;
   
-  void trigger_low_confidence_collection(const std::string &value, float confidence); // Updated signature
+  void trigger_low_confidence_collection(const std::string &value, float confidence, const std::string &metadata = "");
+  std::string serialize_inference_metadata(const std::string &value, float confidence, 
+                                          const esphome::StaticVector<float, 16> &readings, 
+                                          const esphome::StaticVector<float, 16> &confidences, 
+                                          int width, int height); 
   #endif
 
   // bool strict_confidence_check_{false}; // Moved

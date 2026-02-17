@@ -561,9 +561,15 @@ void MeterReaderTFLite::loop() {
                      // We want to collect ALL invalid readings to catch High Confidence errors.
                      
                      if (true) { // Logic simplified: If we are in this block, it IS invalid.
+                         std::string metadata = "";
+                         #ifdef USE_DATA_COLLECTOR
+                         metadata = this->serialize_inference_metadata(digit_str, avg_conf, res_ptr->readings, res_ptr->probabilities,
+                                                                     this->camera_coord_.get_width(), this->camera_coord_.get_height());
+                         #endif
+
                          ESP_LOGW(TAG, "Data Collection Triggered: Reading Invalid (Conf: %.1f%%, Suspicious: %s)", 
                                   avg_conf * 100.0f, suspicious ? "YES" : "NO");
-                         this->trigger_low_confidence_collection(digit_str, avg_conf);
+                         this->trigger_low_confidence_collection(digit_str, avg_conf, metadata);
                      }
                      #endif
                 }
@@ -636,7 +642,7 @@ void MeterReaderTFLite::loop() {
 }
 
 #ifdef USE_DATA_COLLECTOR
-void MeterReaderTFLite::trigger_low_confidence_collection(const std::string &value, float confidence) {
+void MeterReaderTFLite::trigger_low_confidence_collection(const std::string &value, float confidence, const std::string &metadata) {
     if (!this->collect_low_confidence_ || !this->data_collector_) return;
     // User requested 0% to Threshold range.
     // if (confidence < low_confidence_trigger_threshold_) return; 
@@ -650,7 +656,7 @@ void MeterReaderTFLite::trigger_low_confidence_collection(const std::string &val
 
     ESP_LOGI(TAG, "Low confidence (%.2f%%) detected. Retaking with flash for data collection...", confidence * 100.0f);
 
-    this->pending_collection_ = {value, confidence};
+    this->pending_collection_ = {value, confidence, metadata};
     this->collection_state_ = COLLECTION_WAITING_FOR_FLASH;
     
     // Force Flash via Coordinator
@@ -686,7 +692,8 @@ void MeterReaderTFLite::process_available_frame() {
     #ifdef USE_DATA_COLLECTOR
     if (this->collection_state_ == COLLECTION_WAITING_FOR_FRAME) {
          if (this->data_collector_) {
-             this->data_collector_->collect_image(frame, this->camera_coord_.get_width(), this->camera_coord_.get_height(), this->camera_coord_.get_format(), this->pending_collection_.value, this->pending_collection_.confidence);
+             this->data_collector_->collect_image(frame, this->camera_coord_.get_width(), this->camera_coord_.get_height(), this->camera_coord_.get_format(), 
+                                                 this->pending_collection_.value, this->pending_collection_.confidence, this->pending_collection_.extra_metadata);
          }
          this->collection_state_ = COLLECTION_IDLE;
          this->flashlight_coord_.disable_flash();
@@ -942,9 +949,15 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
              // We are in the 'else' block of 'if (valid ...)', so we know it's invalid.
              
              if (true) {
+                 std::string metadata = "";
+                 #ifdef USE_DATA_COLLECTOR
+                 metadata = this->serialize_inference_metadata(digit_str, avg_conf, readings, confidences,
+                                                             this->camera_coord_.get_width(), this->camera_coord_.get_height());
+                 #endif
+
                  ESP_LOGW(TAG, "Data Collection Triggered: Reading Invalid (Conf: %.1f%%, Suspicious: %s)", 
                           avg_conf * 100.0f, suspicious ? "YES" : "NO");
-                 this->trigger_low_confidence_collection(digit_str, avg_conf);
+                 this->trigger_low_confidence_collection(digit_str, avg_conf, metadata);
              }
              #endif
         }
@@ -1612,3 +1625,54 @@ void MeterReaderTFLite::reload_resources() {
          ESP_LOGI(TAG, "Resources reloaded and processing resumed.");
     });
 }
+
+#ifdef USE_DATA_COLLECTOR
+// Data Collection Helper to serialize inference results to JSON
+std::string MeterReaderTFLite::serialize_inference_metadata(const std::string &value, float confidence, 
+                                                           const esphome::StaticVector<float, 16> &readings, 
+                                                           const esphome::StaticVector<float, 16> &confidences, 
+                                                           int width, int height) {
+    // Simple JSON construction
+    // Format: {"val":"VALUE","conf":0.95,"w":WIDTH,"h":HEIGHT,"digits":[{"val":1,"conf":0.99,"box":[x,y,w,h]},...]}
+    
+    std::string json;
+    json.reserve(512); 
+    
+    char buffer[128];
+    snprintf(buffer, sizeof(buffer), "{\"val\":\"%s\",\"conf\":%.3f,\"w\":%d,\"h\":%d,\"digits\":[", 
+             value.c_str(), confidence, width, height);
+    json += buffer;
+
+    // Get zones
+    std::vector<esp32_camera_utils::CropZone> zones;
+    if (this->crop_zone_handler_.get_zones().size() > 0) {
+         zones = this->crop_zone_handler_.get_zones();
+    }
+    
+    for (size_t i = 0; i < readings.size(); i++) {
+        if (i > 0) json += ",";
+        
+        // Find crop zone for this index
+        int x = 0, y = 0, w = 0, h = 0;
+        if (i < zones.size()) {
+             x = zones[i].x1; 
+             y = zones[i].y1; 
+             w = zones[i].x2 - zones[i].x1; 
+             h = zones[i].y2 - zones[i].y1;
+        }
+        
+        int digit_val = static_cast<int>(round(readings[i]));
+        if (digit_val == 10) digit_val = 0; 
+        
+        float conf = 0.0f;
+        if (i < confidences.size()) conf = confidences[i];
+        
+        snprintf(buffer, sizeof(buffer), "{\"val\":%d,\"conf\":%.3f,\"box\":[%d,%d,%d,%d]}",
+                 digit_val, conf, x, y, w, h);
+        json += buffer;
+    }
+    
+    json += "]}";
+    return json;
+}
+#endif
