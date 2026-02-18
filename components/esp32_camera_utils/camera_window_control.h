@@ -1,5 +1,9 @@
 #pragma once
 
+#include "esphome/core/defines.h"
+
+#ifdef USE_ESP32_CAMERA_UTILS
+
 #include "esphome/components/esp32_camera/esp32_camera.h"
 #include "esp_camera.h"
 #include "esphome/core/log.h"
@@ -157,3 +161,5 @@ class CameraWindowControl {
 
 }  // namespace esp32_camera_utils
 }  // namespace esphome
+
+#endif // USE_ESP32_CAMERA_UTILS

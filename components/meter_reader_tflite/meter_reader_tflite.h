@@ -89,7 +89,9 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_confidence_sensor(sensor::Sensor *sensor) { confidence_sensor_ = sensor; }
   
   // Set Validator (External)
+#ifdef USE_VALUE_VALIDATOR
   void set_validator(value_validator::ValueValidator *v) { validation_coord_.set_validator(v); }
+#endif
 
   void set_crop_zones(const std::string &zones_json);
   void set_crop_zones_global(globals::GlobalsComponent<std::string> *global_var) {
@@ -144,7 +146,9 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
   // Flashlight
   void set_flash_light(light::LightState* flash_light);
+#ifdef USE_FLASH_LIGHT_CONTROLLER
   void set_flash_controller(flash_light_controller::FlashLightController* controller);
+#endif
   void set_flash_pre_time(uint32_t ms);
   void set_flash_post_time(uint32_t ms);
   void force_flash_inference(); // Service

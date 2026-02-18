@@ -1,5 +1,9 @@
 #pragma once
 
+#include "esphome/core/defines.h"
+
+#ifdef USE_SSOCR_READER
+
 #include "esphome/core/component.h"
 #include "esphome/components/esp32_camera/esp32_camera.h"
 #include "esphome/components/esp32_camera_utils/camera_window_control.h"
@@ -80,3 +84,5 @@ class CameraCoordinator {
 
 }  // namespace ssocr_reader
 }  // namespace esphome
+
+#endif // USE_SSOCR_READER

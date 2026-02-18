@@ -1,11 +1,15 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import sensor, esp32_camera, esp32, value_validator
+from esphome.components import sensor, esp32_camera, esp32
+try:
+    from esphome.components import value_validator
+except ImportError:
+    value_validator = None
 
 from esphome.const import CONF_ID, CONF_NAME
 from esphome.core import CORE
 
-DEPENDENCIES = ["esp32_camera", "value_validator"]
+DEPENDENCIES = ["esp32_camera"]
 AUTO_LOAD = ["esp32_camera_utils"]
 
 analog_reader_ns = cg.esphome_ns.namespace("analog_reader")
@@ -100,7 +104,7 @@ DIAL_SCHEMA = cv.Schema({
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(AnalogReader),
-    cv.Optional(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator),
+    cv.Optional(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator) if value_validator else cv.string,
     cv.Required(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera),
     cv.Optional(CONF_VALUE_SENSOR): sensor.sensor_schema(),
     cv.Required(CONF_DIALS): cv.ensure_list(DIAL_SCHEMA),

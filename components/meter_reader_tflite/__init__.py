@@ -6,7 +6,10 @@ import zlib
 from esphome.const import CONF_ID, CONF_MODEL, CONF_ROTATION, CONF_NAME, CONF_DISABLED_BY_DEFAULT, CONF_INTERNAL, CONF_ICON, CONF_FORCE_UPDATE, CONF_ENTITY_CATEGORY
 from esphome.core import CORE, HexInt
 from esphome.components import esp32, sensor, text_sensor, button
-from esphome.components import value_validator
+try:
+    from esphome.components import value_validator
+except ImportError:
+    value_validator = None
 
 import esphome.components.esp32_camera as esp32_camera
 from esphome.cpp_generator import RawExpression
@@ -23,14 +26,15 @@ except ImportError:
 
 CODEOWNERS = ["@nl"]
 if CORE.target_platform == "esp32":
-    DEPENDENCIES = ['esp32', 'tflite_micro_helper', 'esp32_camera_utils', 'value_validator']
+    DEPENDENCIES = ['esp32', 'tflite_micro_helper', 'esp32_camera_utils']
     if flash_light_controller:
         DEPENDENCIES.append('flash_light_controller')
     if data_collector:
-        DEPENDENCIES.append('data_collector')
+        # data_collector is now optional, not forced in DEPENDENCIES
+        pass
 else:
     # On host, we mock utils and remove esp32 check
-    DEPENDENCIES = ['tflite_micro_helper', 'value_validator']
+    DEPENDENCIES = ['tflite_micro_helper']
 
 AUTO_LOAD = ['sensor']
 
@@ -85,7 +89,7 @@ def datasize_to_bytes(value):
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(MeterReaderTFLite),
     cv.Required(CONF_MODEL): cv.file_,
-    cv.Optional(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator),
+    cv.Optional(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator) if value_validator else cv.string,
     cv.Optional(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera) if CORE.target_platform == "esp32" else cv.string,
     # cv.Optional(CONF_MODEL_TYPE, default="class100-0180"): cv.string,  # Add model type selection
     cv.Optional(CONF_CONFIDENCE_THRESHOLD, default=0.85): cv.float_range(

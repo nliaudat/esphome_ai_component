@@ -28,7 +28,9 @@ class SSOCRReader : public PollingComponent, public esphome::camera::CameraListe
 
   void set_value_sensor(sensor::Sensor *s) { value_sensor_ = s; }
   void set_confidence_sensor(sensor::Sensor *s) { confidence_sensor_ = s; } 
+#ifdef USE_VALUE_VALIDATOR
   void set_validator(value_validator::ValueValidator *v) { validation_coord_.set_validator(v); }
+#endif
   
   void set_threshold_config(int level) { threshold_level_ = level; }
   void set_crop_config(int x, int y, int w, int h) {

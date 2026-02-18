@@ -13,6 +13,11 @@
 #include <vector>
 #include <span>
 #include <mutex>
+
+#include "esphome/core/defines.h"
+
+#ifdef USE_ESP32_CAMERA_UTILS
+
 #include "esphome/components/esp32_camera/esp32_camera.h"
 #include "crop_zone_handler.h"
 #include "esp_jpeg_dec.h"
@@ -380,3 +385,5 @@ class RotatedPreviewImage : public camera::CameraImage {
 
 }  // namespace esp32_camera_utils
 }  // namespace esphome
+
+#endif // USE_ESP32_CAMERA_UTILS

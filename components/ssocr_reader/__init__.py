@@ -1,6 +1,11 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import sensor, text_sensor, esp32_camera, value_validator
+from esphome.components import sensor, text_sensor, esp32_camera
+try:
+    from esphome.components import value_validator
+except ImportError:
+    value_validator = None
+
 from esphome.core import CORE
 from esphome.const import (
     CONF_ID,
@@ -9,7 +14,7 @@ from esphome.const import (
 
 CONF_CAMERA_ID = "camera_id"
 
-DEPENDENCIES = ["esp32_camera", "value_validator"]
+DEPENDENCIES = ["esp32_camera"]
 AUTO_LOAD = ["esp32_camera_utils"]
 
 ssocr_reader_ns = cg.esphome_ns.namespace("ssocr_reader")
@@ -30,7 +35,7 @@ CONF_VALIDATOR = "validator"
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(SSOCRReader),
-        cv.Optional(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator),
+        cv.Optional(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator) if value_validator else cv.string,
         cv.Optional(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera),
         cv.Optional(CONF_VALUE): sensor.sensor_schema(),
         cv.Optional("debug", default=False): cv.boolean,
