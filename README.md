@@ -269,6 +269,24 @@ New optimized models are available for digit recognition that significantly impr
 
 These models are recommended for faster response times and lower power consumption.
 
+## 🆘 Call for Contributors
+
+**This project needs your help!**
+
+This component has grown to **over 20,000 lines of C++ code**, implementing complex features like Neural Network inference (`tflite-micro`), Image Processing, and native ESPHome integration. 
+
+> [!NOTE]
+> **AI-Assisted Development**: While the legacy version was manually written, this new modular version (v2.0) leverages AI assistance to achieve advanced features like **dual-core optimizations**, **complex memory management**, and **leak prevention** that were beyond my initial ESPHome knowledge. While the results are excellent and performance is high, this approach has introduced complexity that needs human review.
+
+It was a significant effort to develop, and maintaining it alone is becoming increasingly difficult. I cannot respond to every discussion, issue, or feature request on my own.
+
+**We are looking for:**
+*   **C++ Developers**: optimization, bug fixes, and new features. To **review the code** and refine the AI-generated portions.
+*   **Power Users**: to help answer questions in discussions and test new releases.
+*   **Documentation Writers**: to help keep the wiki and guides up to date.
+
+If you love this project and want to see it thrive, please consider contributing!
+
 ## 📄 License
 
 * Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC-BY-NC-SA)
