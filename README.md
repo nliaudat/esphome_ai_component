@@ -10,6 +10,21 @@ This project provides a robust, modular framework for running TensorFlow Lite Mi
 
 **New in v2.0:** The project has been refactored into modular components for better maintainability and reusability.
 
+### 🎯 Core Value Proposition
+**"Turn any ESP32 Camera into a privacy-first, offline AI Meter Reader for ESPHome."**
+Unlike other solutions that are standalone firmwares, this is a **native ESPHome component**, meaning you get all the power of the ESPHome ecosystem combined with edge AI:
+
+*   **Broad Hardware Support**: Compatible with [many microcontrollers](https://esphome.io/components/) and camera boards (ESP32-CAM, ESP32-S3, Xiao, etc.).
+*   **Infinite Extensibility**: Easily integrate with thousands of other [ESPHome components](https://esphome.io/) like **MQTT**, Displays, Time, or simple sensors. 
+*   **Native Control**: Native API, OTA updates, and simple YAML configuration come standard.
+
+### 🚀 Reusable AI Core & Technical Excellence
+Beyond just a meter reader, this project provides a robust foundation for **any** ESP32 AI project:
+
+*   **`tflite_micro_helper`**: A standalone, reusable component that makes running **any** TFLite model easy. No more boilerplate!
+*   **Memory Safe & Optimized**: Written in modern **Safe C++**. We use `std::span`, zero-copy buffers, and `esp-nn` hardware acceleration to squeeze every drop of performance while preventing crashes and memory leaks.
+*   **Production Ready**: Designed for 24/7 operation with robust error handling and watchdog protections.
+
 ## 📦 Components
 
 The repository allows you to use specific components based on your needs:
