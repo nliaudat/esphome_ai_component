@@ -284,6 +284,7 @@ It was a significant effort to develop, and maintaining it alone is becoming inc
 *   **C++ Developers**: optimization, bug fixes, and new features. To **review the code** and refine the AI-generated portions.
 *   **Power Users**: to help answer questions in discussions and test new releases.
 *   **Documentation Writers**: to help keep the wiki and guides up to date.
+*   **Promoters**: I don't use social media (personal choice to keep my life quiet), so I rely on you to talk about this project!
 
 If you love this project and want to see it thrive, please consider contributing!
 
