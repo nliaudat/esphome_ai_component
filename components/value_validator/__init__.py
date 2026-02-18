@@ -55,6 +55,8 @@ CONFIG_SCHEMA = cv.All(cv.ensure_list(cv.Schema({
 }).extend(cv.COMPONENT_SCHEMA)))
 
 async def to_code(config):
+    cg.add_define("USE_VALUE_VALIDATOR")
+    
     for conf in config:
         var = cg.new_Pvariable(conf[CONF_ID])
         await cg.register_component(var, conf)

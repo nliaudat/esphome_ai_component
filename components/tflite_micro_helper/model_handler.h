@@ -1,5 +1,9 @@
 #pragma once
 
+#include "esphome/core/defines.h"
+
+#ifdef USE_TFLITE_MICRO_HELPER
+
 #include <memory>
 #include <string>
 #include <vector>
@@ -149,3 +153,5 @@ class ModelHandler {
 
 }  // namespace tflite_micro_helper
 }  // namespace esphome
+
+#endif // USE_TFLITE_MICRO_HELPER

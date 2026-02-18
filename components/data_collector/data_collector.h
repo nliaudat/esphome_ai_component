@@ -8,6 +8,10 @@
 #include <string>
 #include <atomic>
 
+#include "esphome/core/defines.h"
+
+#ifdef USE_DATA_COLLECTOR
+
 namespace esphome {
 namespace data_collector {
 
@@ -25,7 +29,7 @@ class DataCollector : public Component {
 
   // Main entry point
   // raw_value and confidence are passed for metadata/logging
-  void collect_image(std::shared_ptr<camera::CameraImage> frame, int width, int height, const std::string& format, float raw_value, float confidence);
+  void collect_image(std::shared_ptr<camera::CameraImage> frame, int width, int height, const std::string& format, const std::string &raw_value, float confidence, const std::string &metadata = "");
 
  protected:
   std::string upload_url_;
@@ -36,15 +40,17 @@ class DataCollector : public Component {
   switch_::Switch *web_submit_switch_{nullptr};
 
   // Helper to upload
-  bool upload_image(const uint8_t *data, size_t len, float raw_value, float confidence);
+  bool upload_image(const uint8_t *data, size_t len, const std::string &raw_value, float confidence, const char *metadata = nullptr);
   // Internal synchronous upload
-  bool process_upload_sync(const uint8_t *data, size_t len, float raw_value, float confidence);
+  bool process_upload_sync(const uint8_t *data, size_t len, const std::string &raw_value, float confidence, const char *metadata = nullptr);
 
   struct UploadJob {
       uint8_t *data;
       size_t len;
-      float value;
+      char value[32]; // Fixed size string buffer
       float confidence;
+      char *metadata;
+      size_t metadata_len;
   };
 
   QueueHandle_t upload_queue_{nullptr};
@@ -56,3 +62,5 @@ class DataCollector : public Component {
 
 }  // namespace data_collector
 }  // namespace esphome
+
+#endif  // USE_DATA_COLLECTOR

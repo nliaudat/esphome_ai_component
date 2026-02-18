@@ -1,8 +1,15 @@
 #pragma once
 
+#include "esphome/core/defines.h"
+
+#ifdef USE_METER_READER_TFLITE
+
 #include "esphome/core/component.h"
 #include "esphome/components/light/light_state.h"
+
+#ifdef USE_FLASH_LIGHT_CONTROLLER
 #include "esphome/components/flash_light_controller/flash_light_controller.h"
+#endif
 
 #include <atomic>
 #include <functional>
@@ -12,6 +19,7 @@ namespace meter_reader_tflite {
 
 class FlashlightCoordinator {
  public:
+#ifdef USE_FLASH_LIGHT_CONTROLLER
   void setup(Component* parent, light::LightState* legacy_light, 
              flash_light_controller::FlashLightController* controller);
 
@@ -21,7 +29,6 @@ class FlashlightCoordinator {
   uint32_t get_pre_time() const { return pre_time_; }
   
   // Logic
-  // Returns TRUE if flash logic is active/waiting (i.e. don't update normally)
   bool update_scheduling(); 
   
   // Actions
@@ -53,13 +60,26 @@ class FlashlightCoordinator {
   
   std::function<void()> request_frame_callback_;
   
-  // Helper to schedule delayed tasks
-  // Note: Coordinators aren't components, so they can't use set_timeout directly easily 
-  // unless we pass the parent component or use App.scheduler.
-  // We will assume parent passes a scheduler or we use Application directly.
   template<typename F>
   void schedule_timeout(uint32_t ms, F&& f);
+#else
+  // Dummy implementation
+  void setup(Component* parent, light::LightState* legacy_light, void* controller) {}
+  void set_timing(uint32_t pre_time, uint32_t post_time) {}
+  void set_update_interval(uint32_t interval_ms) {}
+  uint32_t get_pre_time() const { return 0; }
+  bool update_scheduling() { return false; }
+  void enable_flash() {}
+  void disable_flash() {}
+  void force_inference(std::function<void()> frame_request_callback) {}
+  void capture_preview_sequence(std::function<void()> frame_request_callback) {}
+  bool is_active() const { return false; }
+  void set_request_frame_callback(std::function<void()> cb) {}
+  void set_debug(bool debug) {}
+#endif
 };
 
 }  // namespace meter_reader_tflite
 }  // namespace esphome
+
+#endif // USE_METER_READER_TFLITE

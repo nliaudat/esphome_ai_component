@@ -11,6 +11,10 @@
 #include <mutex>
 #include <atomic>
 
+#include "esphome/core/defines.h"
+
+#ifdef USE_ANALOG_READER
+
 namespace esphome {
 namespace analog_reader {
 
@@ -74,7 +78,9 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   void dump_config() override;
 
   void set_value_sensor(sensor::Sensor *s) { value_sensor_ = s; }
+#ifdef USE_VALUE_VALIDATOR
   void set_validator(value_validator::ValueValidator *v) { validation_coord_.set_validator(v); }
+#endif
   
   void set_camera(esphome::camera::Camera *camera) { camera_ = camera; }
   void set_camera_image_format(int width, int height, const std::string &format) {
@@ -193,3 +199,5 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
 
 }  // namespace analog_reader
 }  // namespace esphome
+
+#endif  // USE_ANALOG_READER

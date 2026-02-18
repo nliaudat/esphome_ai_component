@@ -53,6 +53,10 @@
 #include "esphome/components/web_server_base/web_server_base.h"
 #endif
 
+#include "esphome/core/defines.h"
+
+#ifdef USE_METER_READER_TFLITE
+
 namespace esphome {
 namespace meter_reader_tflite {
 
@@ -85,7 +89,9 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_confidence_sensor(sensor::Sensor *sensor) { confidence_sensor_ = sensor; }
   
   // Set Validator (External)
+#ifdef USE_VALUE_VALIDATOR
   void set_validator(value_validator::ValueValidator *v) { validation_coord_.set_validator(v); }
+#endif
 
   void set_crop_zones(const std::string &zones_json);
   void set_crop_zones_global(globals::GlobalsComponent<std::string> *global_var) {
@@ -140,7 +146,9 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
   // Flashlight
   void set_flash_light(light::LightState* flash_light);
+#ifdef USE_FLASH_LIGHT_CONTROLLER
   void set_flash_controller(flash_light_controller::FlashLightController* controller);
+#endif
   void set_flash_pre_time(uint32_t ms);
   void set_flash_post_time(uint32_t ms);
   void force_flash_inference(); // Service
@@ -170,6 +178,8 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   #ifdef USE_DATA_COLLECTOR
   void set_data_collector(data_collector::DataCollector *collector) { data_collector_ = collector; }
   void set_collect_low_confidence(bool collect) { collect_low_confidence_ = collect; }
+  void set_collect_min_global_confidence(float min_conf) { collect_min_global_confidence_ = min_conf; }
+  void set_collect_min_digit_confidence(float min_conf) { collect_min_digit_confidence_ = min_conf; }
   #endif
 
   // Dynamic Resource Management
@@ -252,6 +262,8 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   #ifdef USE_DATA_COLLECTOR
   bool collect_low_confidence_{true};
   float low_confidence_trigger_threshold_{0.0f}; 
+  float collect_min_global_confidence_{0.90f};
+  float collect_min_digit_confidence_{0.90f};
   
   enum CollectionState {
       COLLECTION_IDLE,
@@ -262,11 +274,16 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   
   // Storage for pending collection
   struct PendingCollection {
-      float value;
+      std::string value; // Changed from float to string
       float confidence;
+      std::string extra_metadata;
   } pending_collection_;
   
-  void trigger_low_confidence_collection(float value, float confidence);
+  void trigger_low_confidence_collection(const std::string &value, float confidence, const std::string &metadata = "");
+  std::string serialize_inference_metadata(const std::string &value, float confidence, 
+                                          const esphome::StaticVector<float, 16> &readings, 
+                                          const esphome::StaticVector<float, 16> &confidences, 
+                                          int width, int height); 
   #endif
 
   // bool strict_confidence_check_{false}; // Moved
@@ -324,7 +341,8 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   // Helper
   void process_available_frame();
   void process_full_image(std::shared_ptr<camera::CameraImage> frame);
-  float combine_readings(const esphome::StaticVector<float, 16>& readings);
+  // Updated signature to return string as out-parameter or return
+  float combine_readings(const esphome::StaticVector<float, 16>& readings, std::string &out_str);
   bool validate_and_update_reading(float raw, float conf, float& val);
   bool validate_and_update_reading(const esphome::StaticVector<float, 16>& digits, const esphome::StaticVector<float, 16>& confidences, float& val);
 
@@ -371,3 +389,5 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
 }  // namespace meter_reader_tflite
 }  // namespace esphome
+
+#endif  // USE_METER_READER_TFLITE

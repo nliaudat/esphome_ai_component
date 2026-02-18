@@ -6,7 +6,10 @@ import zlib
 from esphome.const import CONF_ID, CONF_MODEL, CONF_ROTATION, CONF_NAME, CONF_DISABLED_BY_DEFAULT, CONF_INTERNAL, CONF_ICON, CONF_FORCE_UPDATE, CONF_ENTITY_CATEGORY
 from esphome.core import CORE, HexInt
 from esphome.components import esp32, sensor, text_sensor, button
-from esphome.components import value_validator
+try:
+    from esphome.components import value_validator
+except ImportError:
+    value_validator = None
 
 import esphome.components.esp32_camera as esp32_camera
 from esphome.cpp_generator import RawExpression
@@ -23,14 +26,15 @@ except ImportError:
 
 CODEOWNERS = ["@nl"]
 if CORE.target_platform == "esp32":
-    DEPENDENCIES = ['esp32', 'tflite_micro_helper', 'esp32_camera_utils', 'value_validator']
+    DEPENDENCIES = ['esp32', 'tflite_micro_helper', 'esp32_camera_utils']
     if flash_light_controller:
         DEPENDENCIES.append('flash_light_controller')
     if data_collector:
-        DEPENDENCIES.append('data_collector')
+        # data_collector is now optional, not forced in DEPENDENCIES
+        pass
 else:
     # On host, we mock utils and remove esp32 check
-    DEPENDENCIES = ['tflite_micro_helper', 'value_validator']
+    DEPENDENCIES = ['tflite_micro_helper']
 
 AUTO_LOAD = ['sensor']
 
@@ -52,6 +56,8 @@ CONF_START_FLASH_CALIBRATION_BUTTON = 'start_flash_calibration_button'
 CONF_FLASH_LIGHT_CONTROLLER = 'flash_light_controller'
 CONF_DATA_COLLECTOR = 'data_collector'
 CONF_COLLECT_LOW_CONFIDENCE = 'collect_low_confidence'
+CONF_COLLECT_MIN_GLOBAL_CONFIDENCE = 'collect_min_global_confidence'
+CONF_COLLECT_MIN_DIGIT_CONFIDENCE = 'collect_min_digit_confidence'
 
 CONF_CROP_ZONES = 'crop_zones_global'
 
@@ -83,7 +89,7 @@ def datasize_to_bytes(value):
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(MeterReaderTFLite),
     cv.Required(CONF_MODEL): cv.file_,
-    cv.Optional(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator),
+    cv.Optional(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator) if value_validator else cv.string,
     cv.Optional(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera) if CORE.target_platform == "esp32" else cv.string,
     # cv.Optional(CONF_MODEL_TYPE, default="class100-0180"): cv.string,  # Add model type selection
     cv.Optional(CONF_CONFIDENCE_THRESHOLD, default=0.85): cv.float_range(
@@ -111,6 +117,8 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_FLASH_LIGHT_CONTROLLER): cv.use_id(flash_light_controller.FlashLightController) if flash_light_controller else cv.string,
     cv.Optional(CONF_DATA_COLLECTOR): cv.use_id(data_collector.DataCollector) if data_collector else cv.string,
     cv.Optional(CONF_COLLECT_LOW_CONFIDENCE, default=True): cv.boolean,
+    cv.Optional(CONF_COLLECT_MIN_GLOBAL_CONFIDENCE, default=0.90): cv.float_range(min=0.0, max=1.0),
+    cv.Optional(CONF_COLLECT_MIN_DIGIT_CONFIDENCE, default=0.90): cv.float_range(min=0.0, max=1.0),
 
     cv.Optional(CONF_CROP_ZONES): cv.use_id(globals.GlobalsComponent),
     # cv.Optional(CONF_CAMERA_WINDOW): cv.Any(
@@ -172,6 +180,8 @@ async def to_code(config):
     cg.add_global(cg.RawStatement('#include "esphome/components/meter_reader_tflite/meter_reader_tflite.h"'))
     cg.add_global(cg.RawStatement('using namespace esphome::meter_reader_tflite;'))
     await cg.register_component(var, config)
+    
+    cg.add_define("USE_METER_READER_TFLITE")
     
     # Register validator
     if CONF_VALIDATOR in config:
@@ -374,6 +384,10 @@ async def to_code(config):
         dc = await cg.get_variable(config[CONF_DATA_COLLECTOR])
         cg.add(var.set_data_collector(dc))
         cg.add(var.set_collect_low_confidence(config[CONF_COLLECT_LOW_CONFIDENCE]))
+        if CONF_COLLECT_MIN_GLOBAL_CONFIDENCE in config:
+            cg.add(var.set_collect_min_global_confidence(config[CONF_COLLECT_MIN_GLOBAL_CONFIDENCE]))
+        if CONF_COLLECT_MIN_DIGIT_CONFIDENCE in config:
+            cg.add(var.set_collect_min_digit_confidence(config[CONF_COLLECT_MIN_DIGIT_CONFIDENCE]))
         cg.add_define("USE_DATA_COLLECTOR")
     
     # Handle optional camera window configuration

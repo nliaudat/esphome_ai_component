@@ -1,5 +1,9 @@
 #pragma once
 
+#include "esphome/core/defines.h"
+
+#ifdef USE_METER_READER_TFLITE
+
 #include "esphome/components/tflite_micro_helper/model_handler.h"
 #include <unordered_map>
 #include <string>
@@ -148,3 +152,5 @@ static const std::unordered_map<std::string, ModelConfig> MODEL_CONFIGS = {
 
 }  // namespace meter_reader_tflite
 }  // namespace esphome
+
+#endif // USE_METER_READER_TFLITE

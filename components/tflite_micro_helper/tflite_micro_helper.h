@@ -4,6 +4,10 @@
 #include "memory_manager.h"
 #include "esphome/core/log.h"
 
+#include "esphome/core/defines.h"
+
+#ifdef USE_TFLITE_MICRO_HELPER
+
 namespace esphome {
 namespace tflite_micro_helper {
 
@@ -93,3 +97,5 @@ class TFLiteMicroHelper {
 
 }  // namespace tflite_micro_helper
 }  // namespace esphome
+
+#endif  // USE_TFLITE_MICRO_HELPER

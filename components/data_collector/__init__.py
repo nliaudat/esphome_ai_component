@@ -34,6 +34,8 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
     
+    cg.add_define("USE_DATA_COLLECTOR")
+    
     if config.get("debug", False):
         cg.add(var.set_debug(True))
 

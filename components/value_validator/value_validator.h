@@ -13,6 +13,10 @@
 #include <vector>
 #include <span>
 
+#include "esphome/core/defines.h"
+
+#ifdef USE_VALUE_VALIDATOR
+
 namespace esphome {
 namespace value_validator {
 
@@ -179,3 +183,5 @@ class ValueValidator : public Component {
 
 }  // namespace value_validator
 }  // namespace esphome
+
+#endif  // USE_VALUE_VALIDATOR

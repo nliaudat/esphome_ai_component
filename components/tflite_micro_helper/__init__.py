@@ -15,6 +15,8 @@ CONFIG_SCHEMA = cv.Schema({
 })
 
 def to_code(config):
+    cg.add_define("USE_TFLITE_MICRO_HELPER")
+    
     if CORE.target_platform == "esp32":
         esp32.add_idf_component(
             name="espressif/esp-tflite-micro",

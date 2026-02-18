@@ -122,5 +122,4 @@ void DrawingUtils::draw_filled_circle(uint8_t* buffer, int center_x, int center_
 
 }  // namespace esp32_camera_utils
 }  // namespace esphome
-
 #endif // USE_CAMERA_DRAWING

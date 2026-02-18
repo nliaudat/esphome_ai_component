@@ -1,6 +1,9 @@
 from flask import Flask, request
 import os
 import time
+import json
+import piexif
+import piexif.helper
 from werkzeug.utils import secure_filename
 from markupsafe import escape
 
@@ -80,6 +83,25 @@ def upload(device_id):
             f.write(request.data)
             
         print(f"Saved {filepath} (Value: {value}, Conf: {conf})")
+        
+        # Inject Metadata if present
+        metadata_json = request.headers.get('X-Meter-Json')
+        if metadata_json:
+            try:
+                # Prepare EXIF data
+                exif_dict = {"0th": {}, "Exif": {}, "GPS": {}, "1st": {}, "thumbnail": None}
+                
+                # UserComment expects specific encoding. piexif helper handles it.
+                # Ensure the string is proper JSON or at least a string
+                user_comment = piexif.helper.UserComment.dump(metadata_json)
+                exif_dict["Exif"][piexif.ExifIFD.UserComment] = user_comment
+                
+                exif_bytes = piexif.dump(exif_dict)
+                piexif.insert(exif_bytes, filepath)
+                print(f"Injected EXIF metadata into {filename}")
+            except Exception as e:
+                print(f"Failed to inject EXIF: {e}")
+
         return "OK", 200
         
     except Exception as e:

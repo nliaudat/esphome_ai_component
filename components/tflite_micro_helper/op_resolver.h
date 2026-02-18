@@ -1,5 +1,9 @@
 #pragma once
 
+#include "esphome/core/defines.h"
+
+#ifdef USE_TFLITE_MICRO_HELPER
+
 #include <set>
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/schema/schema_generated.h"
@@ -258,3 +262,5 @@ class OpResolverManager {
 
 }  // namespace tflite_micro_helper
 }  // namespace esphome
+
+#endif // USE_TFLITE_MICRO_HELPER

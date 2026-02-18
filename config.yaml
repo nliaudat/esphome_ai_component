@@ -172,7 +172,9 @@ meter_reader_tflite:
 
   update_interval: 60s
 
-  # collect_low_confidence: true #default true / needed for datacollector
+  # collect_low_confidence: true # [Optional] Default: true. Required for data collector. Defines what is considered "low confidence" (uses confidence_threshold).
+  # collect_min_global_confidence: 0.90 # [Optional] Default: 0.90. Low confidence override for data collection (Average < Value). Prerequisite: data_collector.
+  # collect_min_digit_confidence: 0.90 # [Optional] Default: 0.90. Low confidence override for data collection (Any Digit < Value). Prerequisite: data_collector.
 
   debug: false
   debug_image: false # static embedded image (debug.jpg)

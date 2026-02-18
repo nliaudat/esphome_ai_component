@@ -1,5 +1,9 @@
 #pragma once
 
+#include "esphome/core/defines.h"
+
+#ifdef USE_METER_READER_TFLITE
+
 #include "esphome/core/component.h"
 #include "esphome/components/esp32_camera/esp32_camera.h"
 #include "esphome/components/esp32_camera_utils/camera_window_control.h"
@@ -94,3 +98,5 @@ class CameraCoordinator {
 
 }  // namespace meter_reader_tflite
 }  // namespace esphome
+
+#endif // USE_METER_READER_TFLITE
