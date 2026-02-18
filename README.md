@@ -10,6 +10,21 @@ This project provides a robust, modular framework for running TensorFlow Lite Mi
 
 **New in v2.0:** The project has been refactored into modular components for better maintainability and reusability.
 
+### 🎯 Core Value Proposition
+**"Turn any ESP32 Camera into a privacy-first, offline AI Meter Reader for ESPHome."**
+Unlike other solutions that are standalone firmwares, this is a **native ESPHome component**, meaning you get all the power of the ESPHome ecosystem combined with edge AI:
+
+*   **Broad Hardware Support**: Compatible with [many microcontrollers](https://esphome.io/components/) and camera boards (ESP32-CAM, ESP32-S3, Xiao, etc.).
+*   **Infinite Extensibility**: Easily integrate with thousands of other [ESPHome components](https://esphome.io/) like **MQTT**, Displays, Time, or simple sensors. 
+*   **Native Control**: Native API, OTA updates, and simple YAML configuration come standard.
+
+### 🚀 Reusable AI Core & Technical Excellence
+Beyond just a meter reader, this project provides a robust foundation for **any** ESP32 AI project:
+
+*   **`tflite_micro_helper`**: A standalone, reusable component that makes running **any** TFLite model easy. No more boilerplate!
+*   **Memory Safe & Optimized**: Written in modern **Safe C++**. We use `std::span`, zero-copy buffers, and `esp-nn` hardware acceleration to squeeze every drop of performance while preventing crashes and memory leaks.
+*   **Production Ready**: Designed for 24/7 operation with robust error handling and watchdog protections.
+
 ## 📦 Components
 
 The repository allows you to use specific components based on your needs:
@@ -253,6 +268,25 @@ New optimized models are available for digit recognition that significantly impr
 *   **Performance**: Capable of full image processing and 8-digit inference in **less than 270 ms** [esp32-S3] (2700 ms for legacy esp32).
 
 These models are recommended for faster response times and lower power consumption.
+
+## 🆘 Call for Contributors
+
+**This project needs your help!**
+
+This component has grown to **over 20,000 lines of C++ code**, implementing complex features like Neural Network inference (`tflite-micro`), Image Processing, and native ESPHome integration. 
+
+> [!NOTE]
+> **AI-Assisted Development**: While the legacy version was manually written, this new modular version (v2.0) leverages AI assistance to achieve advanced features like **dual-core optimizations**, **complex memory management**, and **leak prevention** that were beyond my initial ESPHome knowledge. While the results are excellent and performance is high, this approach has introduced complexity that needs human review.
+
+It was a significant effort to develop, and maintaining it alone is becoming increasingly difficult. I cannot respond to every discussion, issue, or feature request on my own.
+
+**We are looking for:**
+*   **C++ Developers**: optimization, bug fixes, and new features. To **review the code** and refine the AI-generated portions.
+*   **Power Users**: to help answer questions in discussions and test new releases.
+*   **Documentation Writers**: to help keep the wiki and guides up to date.
+*   **Promoters**: I don't use social media (personal choice to keep my life quiet), so I rely on you to talk about this project!
+
+If you love this project and want to see it thrive, please consider contributing!
 
 ## 📄 License
 
