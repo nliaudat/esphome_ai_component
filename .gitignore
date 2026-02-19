@@ -38,3 +38,4 @@ analyze_heap.py
 
 # Specific large files / models
 dig-class100-0180-s2-q.tflite
+global_coordinator_implementation.md
