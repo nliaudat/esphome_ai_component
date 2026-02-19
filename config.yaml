@@ -167,8 +167,8 @@ meter_reader_tflite:
   validator: ${id_prefix}_validator
   # confidence_threshold: 0.85 # Only if validator is disabled
   camera_id: ${id_prefix}_espcam
-  model: "digit_recognizer_v4_10cls_RGB.tflite"
-  # model: "digit_recognizer_v4_10cls_GRAY.tflite"
+  model: "models/digit_recognizer_v4_10cls_RGB.tflite"
+  # model: "models/digit_recognizer_v4_10cls_GRAY.tflite"
 
   update_interval: 60s
 
@@ -271,23 +271,22 @@ meter_reader_tflite:
 
 packages:
   # Board Configuration (Mutually Exclusive)
-  # - !include board_freenove_esp32-s3-n8r8.yaml
-  # - !include board_Seeed_Studio_XIAO_ESP32-S3_sense.yaml
-  # - !include board_generic_esp32-s3-n16r8.yaml
-  # - !include board_wrover_kit.yaml
-  # - !include board_m5stack_psram.yaml
-  # - !include board_esp32cam_aithinker.yaml #esp32_camera.yaml > power_down_pin must be enabled
-  - !include board_AI-On-The-Edge-Cam_Esp32-S3.yaml
+  # - !include boards/board_freenove_esp32-s3-n8r8.yaml
+  # - !include boards/board_Seeed_Studio_XIAO_ESP32-S3_sense.yaml
+  # - !include boards/board_generic_esp32-s3-n16r8.yaml
+  # - !include boards/board_wrover_kit.yaml
+  # - !include boards/board_m5stack_psram.yaml
+  # - !include boards/board_esp32cam_aithinker.yaml #esp32_camera.yaml > power_down_pin must be enabled
+  - !include boards/board_AI-On-The-Edge-Cam_Esp32-S3.yaml
 
   # - !include debug_board.yaml
   
   # Component-specific controls (comment to disable individual controls)
-  - !include meter_reader_tflite_controls.yaml
-  - !include value_validator_controls.yaml
-  - !include flash_light_controller_controls.yaml
-  - !include esp32_camera_utils_controls.yaml
-  # - !include data_collector_controls.yaml
-  # - !include analog_reader_controls.yaml
+  - !include components/meter_reader_tflite/meter_reader_tflite_controls.yaml
+  - !include components/value_validator/value_validator_controls.yaml
+  - !include components/flash_light_controller/flash_light_controller_controls.yaml
+  - !include components/esp32_camera_utils/esp32_camera_utils_controls.yaml
+  # - !include components/analog_reader/analog_reader_controls.yaml
 
   
   # camera configs
