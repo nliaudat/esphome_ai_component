@@ -261,13 +261,13 @@ analog_reader: # DEV !
 
 packages:
   # Board Configuration (Mutually Exclusive)
-  # - !include board_freenove_esp32-s3-n8r8.yaml
-  # - !include board_Seeed_Studio_XIAO_ESP32-S3_sense.yaml
-  # - !include board_generic_esp32-s3-n16r8.yaml
-  # - !include board_wrover_kit.yaml
-  # - !include board_m5stack_psram.yaml
-  - !include board_esp32cam_aithinker.yaml # esp32_camera.yaml > power_down_pin must be enabled
-  # - !include board_AI-On-The-Edge-Cam_Esp32-S3.yaml
+  # - !include boards/board_freenove_esp32-s3-n8r8.yaml
+  # - !include boards/board_Seeed_Studio_XIAO_ESP32-S3_sense.yaml
+  # - !include boards/board_generic_esp32-s3-n16r8.yaml
+  # - !include boards/board_wrover_kit.yaml
+  # - !include boards/board_m5stack_psram.yaml
+  - !include boards/board_esp32cam_aithinker.yaml # esp32_camera.yaml > power_down_pin must be enabled
+  # - !include boards/board_AI-On-The-Edge-Cam_Esp32-S3.yaml
 
   # - !include debug_board.yaml
   
