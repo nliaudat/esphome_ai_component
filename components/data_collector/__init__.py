@@ -1,7 +1,9 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import switch
+from esphome.components import esp32
 from esphome.const import CONF_ID
+from esphome.core import CORE
 
 DEPENDENCIES = ["esp32_camera"]
 
@@ -35,6 +37,12 @@ async def to_code(config):
     await cg.register_component(var, config)
     
     cg.add_define("USE_DATA_COLLECTOR")
+    
+    if CORE.is_esp32:
+        # ESPHome 2026.2.0+: IDF components are excluded by default.
+        # Re-enable esp_http_client which is used by data_collector.
+        esp32.include_builtin_idf_component("esp_http_client")
+
     
     if config.get("debug", False):
         cg.add(var.set_debug(True))
