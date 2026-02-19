@@ -252,12 +252,11 @@ packages:
   # - !include debug_board.yaml
   
   # Component-specific controls (uncomment to disable individual controls)
-  # - !include meter_reader_tflite_controls.yaml # Not used for SSOCR
-  - !include value_validator_controls.yaml
-  - !include flash_light_controller_controls.yaml
-  - !include esp32_camera_utils_controls.yaml
-  
-  # camera configs
+  # - !include components/meter_reader_tflite/meter_reader_tflite_controls.yaml
+  - !include components/value_validator/value_validator_controls.yaml
+  - !include components/flash_light_controller/flash_light_controller_controls.yaml
+  - !include components/esp32_camera_utils/esp32_camera_utils_controls.yaml
+  # - !include components/analog_reader/analog_reader_controls.yaml
   - !include camera_options.yaml
   - !include esp32_camera.yaml
   # - !include camera_webserver.yaml
