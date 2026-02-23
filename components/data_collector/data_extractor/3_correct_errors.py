@@ -19,6 +19,7 @@ import csv
 from typing import List, Tuple, Optional, Dict, Any, Union
 from pathlib import Path
 from dataclasses import dataclass
+from tqdm import tqdm
 
 # Set up logging
 logging.basicConfig(
@@ -542,7 +543,7 @@ def load_image(image_source: Union[str, Path], input_channels: int = 1) -> Optio
         if image.nbytes > 50 * 1024 * 1024:  # 50MB
             logger.warning("Large image detected, consider resizing")
             
-        logger.info(f"Loaded image: {image_source_str}, shape: {image.shape}, channels: {1 if len(image.shape) == 2 else image.shape[2]}")
+        # logger.info(f"Loaded image: {image_source_str}, shape: {image.shape}, channels: {1 if len(image.shape) == 2 else image.shape[2]}")
         return image
         
     except requests.exceptions.RequestException as e:
@@ -723,10 +724,10 @@ def process_single_image(
                 if save_output:
                     # Copy the original image
                     shutil.copy2(image_path, result["output_filename"])
-                    logger.info(f"Prediction mismatch (orig: {orig_val}, new: {final_reading}), copied to training: {result['output_filename']}")
+                    # logger.info(f"Prediction mismatch (orig: {orig_val}, new: {final_reading}), copied to training: {result['output_filename']}")
             else:
                 result["output_filename"] = None # Don't save if it matches
-                logger.info(f"Match (val: {final_reading}, conf: {confidence:.3f}). No action needed.")
+                # logger.info(f"Match (val: {final_reading}, conf: {confidence:.3f}). No action needed.")
 
         return result
 
@@ -837,10 +838,7 @@ def process_folder(
     
     logger.info(f"Starting batch processing of {len(images)} images...")
     
-    for i, image_path in enumerate(images, 1):
-        if i % 100 == 0:
-            logger.info(f"Processing image {i}/{len(images)}: {image_path.name}")
-            
+    for image_path in tqdm(images, desc="Processing images", unit="img"):
         try:
             result = process_single_image(
                 meter_reader=meter_reader,
@@ -852,17 +850,17 @@ def process_folder(
             
             if "error" not in result:
                 successful += 1
-                logger.info(f"SUCCESS: {image_path.name} -> {result['final_reading']}")
+                # logger.info(f"SUCCESS: {image_path.name} -> {result['final_reading']}")
             else:
                 failed += 1
-                logger.error(f"FAILED: {image_path.name} -> Error: {result['error']}")
+                # logger.error(f"FAILED: {image_path.name} -> Error: {result['error']}")
             
             result["image_path"] = str(image_path)
             results.append(result)
             
         except Exception as e:
             failed += 1
-            logger.error(f"FAILED: {image_path.name} -> Unexpected error: {str(e)}")
+            # logger.error(f"FAILED: {image_path.name} -> Unexpected error: {str(e)}")
             results.append({
                 "image_path": str(image_path),
                 "error": str(e)
