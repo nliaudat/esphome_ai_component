@@ -784,9 +784,20 @@ def process_image(
 
     try:
         if len(results["raw_readings"]) == 1:
-            results["final_reading"] = float(results["raw_readings"][0])
+            raw_val = results["raw_readings"][0]
+            digit = int(round(raw_val))
+            # Match C++ wraparound behavior for 9.5-9.9
+            if meter_reader.model_type != "mnist" and digit == 10:
+                digit = 0
+            results["final_reading"] = float(digit)
         else:
-            results["final_reading"] = float(''.join(str(int(round(x))) for x in results["raw_readings"]))
+            final_str = ""
+            for raw_val in results["raw_readings"]:
+                digit = int(round(raw_val))
+                if meter_reader.model_type != "mnist" and digit == 10:
+                    digit = 0
+                final_str += str(digit)
+            results["final_reading"] = float(final_str)
     except Exception as e:
         logger.error(f"Error calculating final reading: {str(e)}")
         results["final_reading"] = -1.0
