@@ -1701,13 +1701,19 @@ std::string MeterReaderTFLite::serialize_inference_metadata(const std::string &v
              h = zones[i].y2 - zones[i].y1;
         }
         
-        int digit_val = static_cast<int>(round(readings[i]));
-        if (digit_val == 10) digit_val = 0; 
+        float digit_val = 0.0f;
+        if (i < readings.size()) {
+            digit_val = readings[i];
+            // Preserve the NaN/10 wraparound logic but allow decimals
+            if (digit_val >= 9.99f && digit_val <= 10.01f) {
+                digit_val = 0.0f; 
+            }
+        }
         
         float conf = 0.0f;
         if (i < confidences.size()) conf = confidences[i];
         
-        snprintf(buffer, sizeof(buffer), "{\"val\":%d,\"conf\":%.3f,\"box\":[%d,%d,%d,%d]}",
+        snprintf(buffer, sizeof(buffer), "{\"val\":%g,\"conf\":%.3f,\"box\":[%d,%d,%d,%d]}",
                  digit_val, conf, x, y, w, h);
         json += buffer;
     }

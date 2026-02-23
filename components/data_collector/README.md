@@ -128,3 +128,17 @@ data_collector:
 
 The server will automatically create a subfolder named after the prefix (e.g., `uploads/${id_prefix}/`) to store the images.
 
+## 🛠️ Data Extractor Processing Pipeline
+
+Once you have accumulated a substantial amount of raw images on your server, you can use the tooling inside the `components/data_collector/data_extractor` folder to process, deduplicate, and validate these images for training.
+
+The workflow consists of six main stages:
+1. **Extraction** (`1_extractor.py`): Parses the injected EXIF metadata to crop out and isolate individual digit zones.
+2. **Deduplication** (`2_deduplicate.py`): Cleans the dataset of exact and perceptual duplicates to prevent bias and reduce bloat.
+3. **Error Correction** (`3_correct_errors.py`): Runs the cropped dataset through a larger/newer TFLite model to identify cases where the on-device inference was incorrect, exporting them to a `training/` folder.
+4. **Training Deduplication** (`4_clean_duplicates_training.py`): Runs a final deduplication pass specifically on the mismatched images in the `training/` folder.
+5. **Visual Validation** (Important): Manually review the images within the `training/` folder to ensure the new AI model's "corrected" guesses are actually accurate. Delete or manually rename any files where the larger model also guessed incorrectly.
+6. **Retraining**: Upload the visually validated dataset as a zip file to the [digit_recognizer repository](https://github.com/nliaudat/digit_recognizer) (via issues or pull requests) to contribute to the global model, or use the tooling there to retrain your own custom model locally.
+
+For full instructions, view the [Data Extractor README](data_extractor/README.md).
+
