@@ -718,16 +718,29 @@ def process_single_image(
         if final_reading != -1.0:
             orig_val, orig_conf = parse_filename(image_path)
             
-            # If the new inference is different from the original prediction
-            if orig_val is not None and abs(orig_val - final_reading) > 0.01:
-                result["output_filename"] = get_output_filename(final_reading, confidence, image_path)
-                if save_output:
-                    # Copy the original image
-                    shutil.copy2(image_path, result["output_filename"])
-                    # logger.info(f"Prediction mismatch (orig: {orig_val}, new: {final_reading}), copied to training: {result['output_filename']}")
-            else:
-                result["output_filename"] = None # Don't save if it matches
-                # logger.info(f"Match (val: {final_reading}, conf: {confidence:.3f}). No action needed.")
+            # If the new inference represents a different integer than the original prediction
+            if orig_val is not None:
+                def get_cpp_integer(val: float) -> int:
+                    import math
+                    decimal_part = val - math.floor(val)
+                    if decimal_part >= 0.7:
+                        digit = math.ceil(val)
+                    else:
+                        digit = math.floor(val)
+                    
+                    if meter_reader.model_type != "mnist" and digit >= 10:
+                        digit = 0
+                    return digit
+                
+                if get_cpp_integer(final_reading) != get_cpp_integer(orig_val):
+                    result["output_filename"] = get_output_filename(final_reading, confidence, image_path)
+                    if save_output:
+                        # Copy the original image
+                        shutil.copy2(image_path, result["output_filename"])
+                        # logger.info(f"Prediction mismatch (orig: {orig_val}, new: {final_reading}), copied to training: {result['output_filename']}")
+                else:
+                    result["output_filename"] = None # Don't save if it matches the same integer
+                    # logger.info(f"Match (val: {final_reading}, conf: {confidence:.3f}). No action needed.")
 
         return result
 
@@ -786,11 +799,12 @@ def process_image(
     try:
         if len(results["raw_readings"]) == 1:
             raw_val = results["raw_readings"][0]
-            digit = int(round(raw_val))
             # Match C++ wraparound behavior for 9.5-9.9
-            if meter_reader.model_type != "mnist" and digit == 10:
-                digit = 0
-            results["final_reading"] = float(digit)
+            if meter_reader.model_type != "mnist" and raw_val >= 9.5:
+                raw_val -= 10.0
+                if raw_val < 0:
+                    raw_val = 0.0
+            results["final_reading"] = round(float(raw_val), 1)
         else:
             final_str = ""
             for raw_val in results["raw_readings"]:
