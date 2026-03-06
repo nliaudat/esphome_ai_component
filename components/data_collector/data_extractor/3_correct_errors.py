@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 # Configuration Constants
 MODELS_DIR = Path("models").resolve()
 DEFAULT_REGIONS_FILE = Path("regions.json")
-DEFAULT_MODEL = "digit_recognizer_v12_100cls_RGB" 
+DEFAULT_MODEL = "super_high_accuracy_validator_100cls_RGB" 
 DEFAULT_RESULT_IMAGE = Path("result.jpg")
 MAX_IMAGE_SIZE = (1920, 1080)  # For memory safety
 

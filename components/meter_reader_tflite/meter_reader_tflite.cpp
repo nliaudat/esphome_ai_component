@@ -1113,17 +1113,25 @@ float MeterReaderTFLite::combine_readings(const esphome::StaticVector<float, 16>
     
     ESP_LOGI(TAG, "Processing %d readings:", readings.size());
     
-    // Convert each reading to integer digit and handle wrap-around
+    // Convert each reading to integer digit and handle wrap-around based on Ground Truth labeling
     for (size_t i = 0; i < readings.size(); i++) {
-        int digit = static_cast<int>(round(readings[i]));
+        float reading = readings[i];
+        float decimal_part = reading - std::floor(reading);
+        int digit;
+        
+        if (decimal_part >= 0.7f) {
+            digit = static_cast<int>(std::ceil(reading));
+        } else {
+            digit = static_cast<int>(std::floor(reading));
+        }
         
         // Handle wrap-around for original models (like Python script)
-        if (digit == 10) {
+        if (digit >= 10) {
             digit = 0;
-            ESP_LOGD(TAG, "Zone %d: Raw=%.1f -> Rounded=10 -> Wrapped to 0", 
+            ESP_LOGD(TAG, "Zone %d: Raw=%.1f -> Wrapped to 0", 
                     i + 1, readings[i]);
         } else {
-            ESP_LOGD(TAG, "Zone %d: Raw=%.1f -> Rounded=%d", 
+            ESP_LOGD(TAG, "Zone %d: Raw=%.1f -> Computed=%d", 
                     i + 1, readings[i], digit);
         }
         
