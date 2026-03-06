@@ -132,6 +132,18 @@ MODELS: Dict[str, ModelConfig] = {
         normalize=True,
         invert=False
     ),
+    "super_high_accuracy_validator_100cls_RGB": ModelConfig(
+        path=MODELS_DIR / "super_high_accuracy_validator_100cls_RGB.tflite",
+        description="super_high_accuracy_validator Digit Classifier 100 classes RGB",
+        output_processing="softmax_scale10",
+        scale_factor=10.0,
+        input_type="uint8",
+        input_channels=3,
+        input_size=(32, 20),
+        normalize=True,
+        invert=False
+    ),
+
 }
 
 class MeterReader:
