@@ -152,7 +152,18 @@ class MeterReader:
     def __init__(self, model_type: str = DEFAULT_MODEL) -> None:
         """Initialize the MeterReader with a specific model type."""
         # NEW: Check if default model.tflite exists when no specific model is specified
-        if model_type not in MODELS:
+        if Path(model_type).is_file():
+            # Support loading arbitrary model paths directly
+            logger.info(f"Using explicitly resolved model path: {model_type}")
+            self.model_config = ModelConfig(
+                path=Path(model_type),
+                description=f"Custom loaded from {model_type}",
+                output_processing="softmax_scale10" if "100cls" in model_type else "softmax",
+                scale_factor=10.0 if "100cls" in model_type else 1.0,
+                input_type="float32" # Unused with our robust parsing now
+            )
+            self.model_type = Path(model_type).stem
+        elif model_type not in MODELS:
             # Check if model.tflite exists as default
             default_model_path = MODELS_DIR / "model.tflite"
             if default_model_path.exists():
@@ -322,33 +333,24 @@ class MeterReader:
         if self.model_config.invert:
             image = cv2.bitwise_not(image)
         
-        # Handle quantization and normalization - SIMPLIFIED LOGIC
-        if self.model_config.quantized:
-            # Always normalize to [0, 1] first for consistency
-            image = image.astype('float32') / 255.0
-            
-            # Apply quantization based on model requirements
+        # Handle quantization and normalization - ROBUST DYNAMIC SCALING
+        # Always normalize to [0, 1] first as a consistent starting point
+        image = image.astype(np.float32) / 255.0
+        
+        if input_dtype == np.uint8:
+            image = (image * 255.0).astype(np.uint8)
+        elif input_dtype == np.int8:
+            # Check if it's ESP-DL ([-128, 127]) or standard TFLite mapping
             input_scale, input_zero_point = self.input_quantization
-            
-            if input_dtype == np.uint8:
-                # Standard uint8 quantization [0, 255]
+            if input_zero_point == -128 and abs(input_scale - 1/255.0) < 1e-6:
+                # uint8 encoded within int8
                 image = (image * 255.0).astype(np.uint8)
-            elif input_dtype == np.int8:
-                # int8 quantization - handle both ESP-DL and uint8-in-int8 cases
-                if input_zero_point == -128 and abs(input_scale - 1/255.0) < 1e-6:
-                    # uint8 in int8 container
-                    image = (image * 255.0).astype(np.uint8)
-                    image = image.astype(np.float32)
-                    image = (image / input_scale + input_zero_point).astype(np.int8)
-                else:
-                    # True ESP-DL quantization
-                    image = (image * 255.0 - 128.0).astype(np.int8)
-        else:
-            # For non-quantized models
-            if self.model_config.normalize:
-                image = image.astype('float32') / 255.0
+                image = (image.astype(np.float32) / input_scale + input_zero_point).astype(np.int8)
             else:
-                image = image.astype('float32')
+                image = (image * 255.0 - 128.0).astype(np.int8)
+        else:
+            # Keep as float32 [0.0, 1.0]
+            pass
         
         # Add batch dimension
         if len(input_shape) == 4:
@@ -429,37 +431,24 @@ class MeterReader:
             logger.debug(f"Raw output: {output[0]}")
             logger.debug(f"Raw output dtype: {output.dtype}")
             
-            if self.model_config.quantized:
+            # Determine if output is quantized based on tensor details, not just config
+            output_dtype = self.output_details[0]['dtype']
+            
+            if output_dtype in [np.uint8, np.int8]:
                 # Dequantize output
                 output_scale, output_zero_point = self.output_quantization
-                output_dequantized = (output.astype(np.float32) - output_zero_point) * output_scale
-
-                # Directly use dequantized values (no softmax)
-                output_values = output_dequantized[0]
-                predicted_class = int(np.argmax(output_values))
-                raw_confidence = float(np.max(output_values))
-
-                # Better normalization: scale to [0,1] based on expected output range
-                # For your quantized model, outputs are typically in [0, 1] after dequantization
-                # So we can just clamp to [0,1] or use min-max scaling
-                confidence = max(0.0, min(1.0, raw_confidence))
-                
-                # Alternative: min-max normalization if outputs can be negative
-                # if output_values.max() > output_values.min():
-                #     confidence = (raw_confidence - output_values.min()) / (output_values.max() - output_values.min())
-                # else:
-                #     confidence = 1.0
-
-                logger.debug(f"Quantized output values: {output_values}")
-                logger.debug(f"Predicted class: {predicted_class}, raw_confidence: {raw_confidence:.4f}, normalized: {confidence:.4f}")
-                
+                output_values = (output[0].astype(np.float32) - output_zero_point) * output_scale
             else:
-                # For non-quantized models, use original softmax approach
-                output_dequantized = self._dequantize_output(output)
-                probabilities = tf.nn.softmax(output_dequantized[0]).numpy()
-                predicted_class = np.argmax(probabilities)
-                confidence = float(np.max(probabilities))
-                logger.debug(f"Softmax confidence: {confidence:.4f}")
+                # Float model, already float32 probabilities
+                output_values = output[0]
+                
+            predicted_class = int(np.argmax(output_values))
+            raw_confidence = float(np.max(output_values))
+
+            # Clamp confidence
+            confidence = max(0.0, min(1.0, raw_confidence))
+
+            logger.debug(f"Predicted class: {predicted_class}, raw_confidence: {raw_confidence:.4f}, normalized: {confidence:.4f}")
             
             # Apply scaling based on model type
             if self.model_config.output_processing == "direct_class":
@@ -568,7 +557,7 @@ def load_image(image_source: Union[str, Path], input_channels: int = 1) -> Optio
 def validate_arguments(args: argparse.Namespace) -> bool:
     """Validate command line arguments."""
     # NEW: Allow default model.tflite if no specific model is specified
-    if args.model not in MODELS:
+    if args.model not in MODELS and not Path(args.model).is_file():
         default_model_path = MODELS_DIR / "model.tflite"
         if not default_model_path.exists():
             logger.error(f"Invalid model type: {args.model}. Available models: {list(MODELS.keys())}")
@@ -928,17 +917,6 @@ def main() -> int:
         if not regions:
             logger.info(f"No valid regions found in {args.regions}, will process entire images as single regions")
 
-        # Handle folder processing
-        if args.folder:
-            logger.info(f"Processing folder: {args.folder}")
-            results = process_folder(
-                folder_path=args.folder,
-                meter_reader=meter_reader,
-                regions=regions,
-                save_output=not args.no_output_image
-            )
-            return 0
-
         # Handle single image processing (original functionality)
         if args.image_source:
             # Load image
@@ -984,7 +962,18 @@ def main() -> int:
                 cv2.waitKey(0)
                 cv2.destroyAllWindows()
 
-        return 0
+            return 0
+            
+        # Handle folder processing
+        if args.folder:
+            logger.info(f"Processing folder: {args.folder}")
+            results = process_folder(
+                folder_path=args.folder,
+                meter_reader=meter_reader,
+                regions=regions,
+                save_output=not args.no_output_image
+            )
+            return 0
 
     except KeyboardInterrupt:
         logger.info("Execution interrupted by user")
