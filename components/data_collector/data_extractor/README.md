@@ -59,7 +59,7 @@ python 1_extractor.py --input ../server/uploads --output extracted
 python 2_deduplicate.py --folder extracted --delete
 
 # 3. Find inference mismatches and export them to training/
-python 3_correct_errors.py --folder extracted --model digit_recognizer_v12_100cls_RGB
+python 3_correct_errors.py --folder extracted --model super_high_accuracy_validator_100cls_RGB
 
 # 4. Clean duplicates inside the training/ directory
 python 4_clean_duplicates_training.py
