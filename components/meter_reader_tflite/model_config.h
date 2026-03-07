@@ -136,7 +136,20 @@ static const std::unordered_map<std::string, ModelConfig> MODEL_CONFIGS = {
         ModelConfig{
             .description = "digit_recognizer_v3_10cls_RGB",
             .tensor_arena_size = "75KB", //check_tflite_model.py reports : Total Arena Size: 70.3 KB
-            .output_processing = "softmax", //qat_quantized, auto_detect
+            .output_processing = "direct_class", //qat_quantized, auto_detect
+            .scale_factor = 1.0f,
+            .input_type = "uint8",  
+            .input_channels = 3,
+            .input_order = "RGB",
+            .input_size = {32, 20}, 
+            .normalize = false 
+        }
+    },
+    {"digit_recognizer_v17_10cls_RGB", 
+        ModelConfig{
+            .description = "digit_recognizer_v17_10cls_RGB",
+            .tensor_arena_size = "175KB", //check_tflite_model.py reports : Total Arena Size: 174.11 KB
+            .output_processing = "direct_class", //qat_quantized, auto_detect
             .scale_factor = 1.0f,
             .input_type = "uint8",  
             .input_channels = 3,
