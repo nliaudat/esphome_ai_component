@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 # Configuration Constants
 MODELS_DIR = Path("models").resolve()
 DEFAULT_REGIONS_FILE = Path("regions.json")
-DEFAULT_MODEL = "super_high_accuracy_validator_100cls_RGB" 
+DEFAULT_MODEL = "digit_recognizer_v16_100cls_RGB" 
 DEFAULT_RESULT_IMAGE = Path("result.jpg")
 MAX_IMAGE_SIZE = (1920, 1080)  # For memory safety
 
@@ -143,7 +143,17 @@ MODELS: Dict[str, ModelConfig] = {
         normalize=True,
         invert=False
     ),
-
+    "digit_recognizer_v16_100cls_RGB": ModelConfig(
+        path=MODELS_DIR / "digit_recognizer_v16_100cls_RGB.tflite",
+        description="digit_recognizer_v16_100cls_RGB Digit Classifier 100 classes RGB",
+        output_processing="softmax_scale10",
+        scale_factor=10.0,
+        input_type="uint8",
+        input_channels=3,
+        input_size=(32, 20),
+        normalize=True,
+        invert=False
+    ),
 }
 
 class MeterReader:
@@ -905,7 +915,8 @@ def main() -> int:
         # Handle single image processing (original functionality)
         if args.image_source:
             # Load image
-            image = load_image(args.image_source, input_channels=1)
+            #image = load_image(args.image_source, input_channels=1)
+            image = load_image(args.image_source, input_channels=meter_reader.model_config.input_channels)
             if image is None:
                 logger.error("Failed to load image")
                 return 1
