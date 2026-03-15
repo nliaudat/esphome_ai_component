@@ -557,9 +557,11 @@ void MeterReaderTFLite::loop() {
 
                      // Detect suspicious patterns
                      bool suspicious = false;
+                     #ifdef USE_VALUE_VALIDATOR
                      if (this->validation_coord_.has_validator()) {
                          suspicious = this->validation_coord_.get_validator()->is_hallucination_pattern(res_ptr->readings);
                      }
+                     #endif
                      
                      // Check thresholds if it wasn't already going to trigger
                      if (!trigger_collection && this->collect_min_global_confidence_ > 0 && avg_conf < this->collect_min_global_confidence_) {
@@ -959,9 +961,11 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
 
              // Detect suspicious patterns
              bool suspicious = false;
+             #ifdef USE_VALUE_VALIDATOR
              if (this->validation_coord_.has_validator()) {
                  suspicious = this->validation_coord_.get_validator()->is_hallucination_pattern(readings);
              }
+             #endif
 
              // Check thresholds
              if (!trigger_collection && this->collect_min_global_confidence_ > 0 && avg_conf < this->collect_min_global_confidence_) {
@@ -1048,9 +1052,11 @@ void MeterReaderTFLite::set_last_valid_value(const std::string &value) {
 void MeterReaderTFLite::set_flash_light(light::LightState* light) {
     this->flashlight_coord_.setup(this, light, nullptr);
 }
+#ifdef USE_FLASH_LIGHT_CONTROLLER
 void MeterReaderTFLite::set_flash_controller(flash_light_controller::FlashLightController* c) {
     this->flashlight_coord_.setup(this, nullptr, c);
 }
+#endif
 void MeterReaderTFLite::set_generate_preview(bool generate) { 
     this->generate_preview_ = generate; 
     

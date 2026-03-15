@@ -2,6 +2,8 @@
 #include "esphome/core/log.h"
 #include "esphome/core/application.h"
 
+#ifdef USE_FLASH_LIGHT_CONTROLLER
+
 namespace esphome {
 namespace meter_reader_tflite {
 
@@ -133,3 +135,5 @@ void FlashlightCoordinator::capture_preview_sequence(std::function<void()> frame
 
 } // namespace meter_reader_tflite
 } // namespace esphome
+
+#endif // USE_FLASH_LIGHT_CONTROLLER
