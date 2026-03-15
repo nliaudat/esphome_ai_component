@@ -27,11 +27,7 @@ except ImportError:
 CODEOWNERS = ["@nl"]
 if CORE.target_platform == "esp32":
     DEPENDENCIES = ['esp32', 'tflite_micro_helper', 'esp32_camera_utils']
-    if flash_light_controller:
-        DEPENDENCIES.append('flash_light_controller')
-    if data_collector:
-        # data_collector is now optional, not forced in DEPENDENCIES
-        pass
+    # flash_light_controller and data_collector are optional; not added to DEPENDENCIES here
 else:
     # On host, we mock utils and remove esp32 check
     DEPENDENCIES = ['tflite_micro_helper']
@@ -185,6 +181,7 @@ async def to_code(config):
     
     # Register validator
     if CONF_VALIDATOR in config:
+        cg.add_define("USE_VALUE_VALIDATOR")
         v = await cg.get_variable(config[CONF_VALIDATOR])
         cg.add(var.set_validator(v))
 
@@ -374,8 +371,9 @@ async def to_code(config):
         crop_global = await cg.get_variable(config[CONF_CROP_ZONES])
         cg.add(var.set_crop_zones_global(crop_global))    
 
-    # Set flash light controller if configured
+    # Set flash light controller if configured (optional)
     if CONF_FLASH_LIGHT_CONTROLLER in config:
+        cg.add_define("USE_FLASH_LIGHT_CONTROLLER")
         flash_controller = await cg.get_variable(config[CONF_FLASH_LIGHT_CONTROLLER])
         cg.add(var.set_flash_controller(flash_controller))
 
