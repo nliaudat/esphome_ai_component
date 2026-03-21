@@ -1,10 +1,9 @@
 #include "meter_reader_tflite.h"
 #include "esphome/core/application.h"
 
-
 #include <esp_heap_caps.h>
-
 #include <numeric>
+#include <deque>
 
 #ifdef USE_WEB_SERVER
 #include "esphome/components/esp32_camera_utils/preview_web_handler.h"
@@ -488,8 +487,6 @@ bool MeterReaderTFLite::capture(FlashMode flash_mode) {
     this->pending_flash_mode_ = flash_mode;
     
     if (flash_mode == FlashMode::ON) {
-        this->frames_to_discard_ = 2;
-        ESP_LOGI(TAG, "Flash frame requested, discarding %d buffered frames", this->frames_to_discard_);
         this->flashlight_coord_.enable_flash();
         this->transition_to(CaptureState::FLASH_WARMUP);
     } else {
@@ -588,11 +585,30 @@ void MeterReaderTFLite::loop() {
 
                 // Publish (matches process_full_image logic)
                 if (valid && (this->validation_coord_.has_validator() || avg_conf >= this->confidence_threshold_)) {
-                     ESP_LOGI(TAG, "Result: VALID (Raw: %s, Conf: %.3f, %s)", 
-                              digit_str.c_str(), avg_conf, conf_list.c_str());
-                     this->value_sensor_->publish_state(validated_val);
+                     this->reading_history_.push_back(validated_val);
+                     if (this->reading_history_.size() > HYSTERESIS_COUNT) {
+                         this->reading_history_.pop_front();
+                     }
+                     
+                     bool should_publish = false;
+                     if (this->reading_history_.size() >= HYSTERESIS_COUNT) {
+                         float min_val = *std::min_element(this->reading_history_.begin(), this->reading_history_.end());
+                         float max_val = *std::max_element(this->reading_history_.begin(), this->reading_history_.end());
+                         float variance = max_val - min_val;
+                         should_publish = (variance < 0.01f);
+                     }
+                     
+                     float smart_conf = this->calculate_smart_confidence(validated_val, avg_conf, digit_str);
+                     
+                     ESP_LOGI(TAG, "Result: VALID (Raw: %s, Conf: %.3f, Smart: %.3f, Publish: %s)", 
+                              digit_str.c_str(), avg_conf, smart_conf, should_publish ? "YES" : "NO");
+                     
+                     if (should_publish) {
+                         this->value_sensor_->publish_state(validated_val);
+                         this->last_published_value_ = validated_val;
+                     }
                      if (this->confidence_sensor_) {
-                         this->confidence_sensor_->publish_state(avg_conf * 100.0f);
+                         this->confidence_sensor_->publish_state(smart_conf * 100.0f);
                      }
                 } else {
                      ESP_LOGI(TAG, "Result: INVALID (Raw: %s, Conf: %.3f, %s)", 
@@ -606,11 +622,9 @@ void MeterReaderTFLite::loop() {
 
                      // Detect suspicious patterns
                      bool suspicious = false;
-                     #ifdef USE_VALUE_VALIDATOR
                      if (this->validation_coord_.has_validator()) {
                          suspicious = this->validation_coord_.get_validator()->is_hallucination_pattern(res_ptr->readings);
                      }
-                     #endif
                      
                      // Check thresholds if it wasn't already going to trigger
                      if (!trigger_collection && this->collect_min_global_confidence_ > 0 && avg_conf < this->collect_min_global_confidence_) {
@@ -815,7 +829,8 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     // Check for debug image (last processed master)
     if (this->generate_preview_ || this->request_preview_) {
         auto preview = this->camera_coord_.get_debug_image();
-        ESP_LOGD(TAG, "Checking for preview image. Ptr: %p", preview ? preview.get() : nullptr);
+        ESP_LOGI(TAG, "Preview check - Ptr: %p, generate: %d, request: %d", 
+                 preview ? preview.get() : nullptr, this->generate_preview_, this->request_preview_);
         
         if (preview) {
              // Draw crop zones on the preview image for debugging visualization.
@@ -834,17 +849,17 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
                          std::swap(w, h);
                      }
                      
-                     uint16_t color = 0x07E0; // Light Green
-                     
-                     auto spec = this->tflite_coord_.get_model_spec();
-                     int channels = spec.input_channels;
-                     // RGB565 is 2 bytes but DrawingUtils usually works with pixels.
-                     
-                     // Simply skip drawing for now to avoid complexity or potential bugs, 
-                     // OR rely on user verification that image is correct.
-                     // Safe to modify 'preview' here because inference buffers were already copied/extracted
-                     // in the `camera_coord_.process_frame` call above.
-                     // The next frame will allocate a new buffer, so this modification does not affect future inference.
+                      uint16_t color = 0x07E0;
+                      int channels = 3;
+                      auto zones = this->crop_zone_handler_.get_zones();
+                      for (const auto& zone : zones) {
+                          int z_w = zone.x2 - zone.x1;
+                          int z_h = zone.y2 - zone.y1;
+                          esp32_camera_utils::DrawingUtils::draw_rectangle(
+                              buf, zone.x1, zone.y1, z_w, z_h,
+                              w, h, channels, color
+                          );
+                      }
                  }
                  #endif
                  #endif
@@ -1010,11 +1025,9 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
 
              // Detect suspicious patterns
              bool suspicious = false;
-             #ifdef USE_VALUE_VALIDATOR
              if (this->validation_coord_.has_validator()) {
                  suspicious = this->validation_coord_.get_validator()->is_hallucination_pattern(readings);
              }
-             #endif
 
              // Check thresholds
              if (!trigger_collection && this->collect_min_global_confidence_ > 0 && avg_conf < this->collect_min_global_confidence_) {
@@ -1101,11 +1114,12 @@ void MeterReaderTFLite::set_last_valid_value(const std::string &value) {
 void MeterReaderTFLite::set_flash_light(light::LightState* light) {
     this->flashlight_coord_.setup(this, light, nullptr);
 }
-#ifdef USE_FLASH_LIGHT_CONTROLLER
 void MeterReaderTFLite::set_flash_controller(flash_light_controller::FlashLightController* c) {
     this->flashlight_coord_.setup(this, nullptr, c);
+    this->flashlight_coord_.set_timing(c->get_flash_pre_time(), c->get_flash_post_time());
+    ESP_LOGI(TAG, "Flash controller configured: Pre=%u ms, Post=%u ms", 
+             c->get_flash_pre_time(), c->get_flash_post_time());
 }
-#endif
 void MeterReaderTFLite::set_generate_preview(bool generate) { 
     this->generate_preview_ = generate; 
     
@@ -1195,6 +1209,12 @@ float MeterReaderTFLite::combine_readings(const esphome::StaticVector<float, 16>
     
     ESP_LOGI(TAG, "Concatenated digit string: %s", digit_string.c_str());
     
+    // Apply decimal point for 8-digit format (5 integer + 3 decimal)
+    if (digit_string.length() == 8) {
+        digit_string = digit_string.substr(0, 5) + "." + digit_string.substr(5, 3);
+        ESP_LOGI(TAG, "Formatted with decimal: %s", digit_string.c_str());
+    }
+    
     // Output the string
     out_str = digit_string;
     
@@ -1215,23 +1235,60 @@ float MeterReaderTFLite::combine_readings(const esphome::StaticVector<float, 16>
         combined_value = std::stof(digit_string);
     }
     
-    ESP_LOGI(TAG, "Final combined value: %.0f", combined_value);
+    ESP_LOGI(TAG, "Final combined value: %.3f", combined_value);
     return combined_value;
 }
 
 bool MeterReaderTFLite::validate_and_update_reading(float raw, float conf, float& val) {
-    int ival = static_cast<int>(raw);
+    // Preserve 3 decimal places for water meter readings
+    int ival = static_cast<int>(raw * 1000.0f);
     int oval = ival;
     bool valid = this->validation_coord_.validate_reading(ival, conf, oval);
-    val = static_cast<float>(oval);
+    val = static_cast<float>(oval) / 1000.0f;
     return valid;
 }
 
 bool MeterReaderTFLite::validate_and_update_reading(const esphome::StaticVector<float, 16>& digits, const esphome::StaticVector<float, 16>& confidences, float& val) {
     int oval = 0;
     bool valid = this->validation_coord_.validate_reading(digits, confidences, oval);
-    val = static_cast<float>(oval);
+    val = static_cast<float>(oval) / 1000.0f;
     return valid;
+}
+
+float MeterReaderTFLite::calculate_smart_confidence(float raw_value, float base_confidence, const std::string& digit_str) {
+    float smart_conf = base_confidence;
+    
+    // Reduce confidence for impossible values
+    if (raw_value < 0) {
+        smart_conf *= 0.5f;
+    }
+    
+    // Check for sudden large jumps from last published value
+    if (this->last_published_value_ > 0) {
+        float jump = std::abs(raw_value - this->last_published_value_);
+        if (jump > 10.0f) {
+            smart_conf *= 0.7f;
+        } else if (jump > 1.0f) {
+            smart_conf *= 0.85f;
+        }
+    }
+    
+    // Check digit string for suspicious patterns
+    if (digit_str.length() == 8) {
+        // Check for all same digits (e.g., 11111111)
+        bool all_same = true;
+        for (size_t i = 1; i < digit_str.length(); i++) {
+            if (digit_str[i] != digit_str[0]) {
+                all_same = false;
+                break;
+            }
+        }
+        if (all_same) {
+            smart_conf *= 0.6f;
+        }
+    }
+    
+    return smart_conf;
 }
 
 // Window Control
@@ -1300,7 +1357,13 @@ void MeterReaderTFLite::set_update_interval(uint32_t ms) {
 }
 
 void MeterReaderTFLite::force_flash_inference() {
-    this->capture(FlashMode::ON);
+    this->flashlight_coord_.force_inference([this](){ 
+        // Discard 2 buffered frames to ensure flash-lit capture
+        this->frames_to_discard_ = 2;
+        this->frame_requested_ = true; 
+        this->last_request_time_ = millis();
+        ESP_LOGI(TAG, "Flash frame requested, discarding %d buffered frames", this->frames_to_discard_);
+    });
 }
 
 // Debug Handlers
@@ -1328,6 +1391,8 @@ void MeterReaderTFLite::dump_config() {
   ESP_LOGCONFIG(TAG, "Meter Reader TFLite:");
   ESP_LOGCONFIG(TAG, "  Confidence Threshold: %.2f", this->confidence_threshold_);
   ESP_LOGCONFIG(TAG, "  Update Interval: %u ms", this->get_update_interval());
+  ESP_LOGCONFIG(TAG, "  Flash Pre-Time: %u ms", this->flashlight_coord_.get_pre_time());
+  ESP_LOGCONFIG(TAG, "  Flash Post-Time: %u ms", this->flashlight_coord_.get_post_time());
   
   #ifdef SUPPORT_DOUBLE_BUFFERING
   ESP_LOGCONFIG(TAG, "  Pipeline: Double Buffering (Dual Core) ENABLED");

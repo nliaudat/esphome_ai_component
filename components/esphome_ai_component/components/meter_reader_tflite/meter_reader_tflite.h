@@ -169,15 +169,13 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 #endif
   void set_flash_pre_time(uint32_t ms);
   void set_flash_post_time(uint32_t ms);
-  void force_flash_inference(); // Service
+  void force_flash_inference(); // Service - deprecated, use capture() instead
   
-  // New capture state machine methods
   bool capture(FlashMode flash_mode);
   bool is_capturing() const { return capture_state_ != CaptureState::IDLE; }
   void handle_capture_state();
   void transition_to(CaptureState new_state);
   const char* state_to_string(CaptureState state);
-  
   void set_enable_flash_calibration(bool enable) { enable_flash_calibration_ = enable; }
 
   // Calibration
@@ -260,7 +258,13 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   // ValueValidator output_validator_; 
   ValueValidatorCoordinator validation_coord_;
 
-  // State
+  // State - NEW: Unified state machine
+  CaptureState capture_state_{CaptureState::IDLE};
+  uint32_t state_entered_time_{0};
+  bool has_pending_capture_{false};
+  FlashMode pending_flash_mode_{FlashMode::OFF};
+  
+  // Legacy state (to be removed after migration)
   std::atomic<bool> pause_processing_{false};
   std::atomic<bool> frame_requested_{false};
   std::atomic<bool> frame_available_{false};
@@ -269,14 +273,6 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   std::mutex frame_mutex_;
   uint32_t last_request_time_{0};
   uint32_t pending_frame_acquisition_time_{0};
-  
-  // NEW: Capture state machine for flash synchronization
-  CaptureState capture_state_{CaptureState::IDLE};
-  uint32_t state_entered_time_{0};
-  FlashMode pending_flash_mode_{FlashMode::OFF};
-  
-  // Buffer flush for flash sync (discard stale unlit frames)
-  int frames_to_discard_{0};
 
   // Config
   float confidence_threshold_{0.85f};
@@ -291,6 +287,9 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   bool debug_memory_enabled_{false}; // Runtime flag
   bool window_active_{false};
   bool enable_flash_calibration_{false};
+
+  // Buffer flush for flash sync (discard stale unlit frames)
+  int frames_to_discard_{0};
 
   // Data Collection
   #ifdef USE_DATA_COLLECTOR
@@ -367,6 +366,11 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   sensor::Sensor *total_inference_time_sensor_{nullptr};
   sensor::Sensor *capture_to_publish_time_sensor_{nullptr};
   bool debug_timing_{false};
+
+  std::deque<float> reading_history_;
+  static constexpr size_t HYSTERESIS_COUNT = 3;
+  float last_published_value_{0.0f};
+  float calculate_smart_confidence(float raw_value, float base_confidence, const std::string& digit_str);
 
   button::Button *unload_button_{nullptr};
   button::Button *reload_button_{nullptr};
