@@ -54,14 +54,14 @@ class Rotator {
                                      int& out_w, int& out_h);
 
  private:
-  static constexpr float PI = 3.14159265359f;
-  static constexpr float DEG_TO_RAD = PI / 180.0f;
+  static constexpr float ROTATOR_PI = 3.14159265359f;
+  static constexpr float ROTATOR_DEG_TO_RAD = ROTATOR_PI / 180.0f;
 };
 
 // Implementation moved to header to resolve linker issues
 inline void Rotator::get_rotated_dimensions(int src_w, int src_h, float angle_deg, 
                                      int& out_w, int& out_h) {
-    float angle_rad = angle_deg * DEG_TO_RAD;
+    float angle_rad = angle_deg * ROTATOR_DEG_TO_RAD;
     float cos_a = std::abs(std::cos(angle_rad));
     float sin_a = std::abs(std::sin(angle_rad));
 
@@ -180,7 +180,7 @@ inline bool Rotator::perform_rotation(const uint8_t* input, uint8_t* output,
     }
 
     // Arbitrary rotation (Nearest Neighbor)
-    float angle_rad = rot * DEG_TO_RAD;
+    float angle_rad = rot * ROTATOR_DEG_TO_RAD;
     float cos_a = std::cos(angle_rad);
     float sin_a = std::sin(angle_rad);
 
