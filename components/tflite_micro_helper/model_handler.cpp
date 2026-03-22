@@ -448,18 +448,9 @@ ProcessedOutput ModelHandler::process_output(const float *output_data) const {
   } else if (this->config_.output_processing == "logits") {
     result.value = static_cast<float>(max_idx);
 
-    if (min_val >= 0.0f && max_val <= 1.0f) {
-      result.confidence = max_val_output;
-    } else {
-      float confidence_range = max_val - min_val;
-      if (confidence_range > 0.001f) {
-        result.confidence = (max_val_output - min_val) / confidence_range;
-      } else {
-        result.confidence = 1.0f;
-      }
-      result.confidence = std::max(0.0f,
-                                   std::min(1.0f, result.confidence));
-    }
+    result.confidence = max_val_output;
+    result.confidence = std::max(0.0f,
+                                 std::min(1.0f, result.confidence));
 
     if (this->config_.scale_factor != 1.0f) {
       result.value = result.value / this->config_.scale_factor;
@@ -472,11 +463,7 @@ ProcessedOutput ModelHandler::process_output(const float *output_data) const {
   } else if (this->config_.output_processing == "qat_quantized") {
     result.value = static_cast<float>(max_idx);
 
-    if (max_val > min_val) {
-      result.confidence = (max_val_output - min_val) / (max_val - min_val);
-    } else {
-      result.confidence = 1.0f;
-    }
+    result.confidence = max_val_output;
     result.confidence = std::max(0.0f,
                                  std::min(1.0f, result.confidence));
 

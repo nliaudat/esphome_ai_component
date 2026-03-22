@@ -27,6 +27,7 @@ class FlashlightCoordinator {
   void set_timing(uint32_t pre_time, uint32_t post_time);
   void set_update_interval(uint32_t interval_ms);
   uint32_t get_pre_time() const { return pre_time_; }
+  uint32_t get_post_time() const { return post_time_; }
   
   // Logic
   bool update_scheduling(); 
@@ -35,6 +36,9 @@ class FlashlightCoordinator {
   void enable_flash();
   void disable_flash();
   void force_inference(std::function<void()> frame_request_callback);
+  
+  // Cancel pending flash off timer (call when frame captured to extend flash)
+  void cancel_flash_off_timer();
   
   // Helpers
   void capture_preview_sequence(std::function<void()> frame_request_callback);

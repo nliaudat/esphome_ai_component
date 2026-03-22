@@ -823,6 +823,9 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
           
           #ifdef DEBUG_ESP32_CAMERA_UTILS
           DEBUG_ZONE_INFO(zone, (zone.x2 - zone.x1), (zone.y2 - zone.y1), this->config_.model_width, this->config_.model_height);
+          char zone_name[32];
+          snprintf(zone_name, sizeof(zone_name), "zone_%zu", results.size() - 1);
+          debug_output_zone_preview(result.data->get(), this->config_.model_width, this->config_.model_height, this->config_.model_channels, zone_name);
           #endif
       } else {
           all_zones_successful = false;

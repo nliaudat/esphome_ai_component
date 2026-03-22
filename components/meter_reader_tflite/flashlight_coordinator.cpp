@@ -2,8 +2,6 @@
 #include "esphome/core/log.h"
 #include "esphome/core/application.h"
 
-#ifdef USE_FLASH_LIGHT_CONTROLLER
-
 namespace esphome {
 namespace meter_reader_tflite {
 
@@ -14,6 +12,8 @@ void FlashlightCoordinator::setup(Component* parent, light::LightState* legacy_l
     parent_ = parent;
     legacy_light_ = legacy_light;
     controller_ = controller;
+    ESP_LOGI(TAG, "FlashlightCoordinator setup: controller=%p, legacy_light=%p", 
+             (void*)controller, (void*)legacy_light);
 }
 
 void FlashlightCoordinator::set_timing(uint32_t pre_time, uint32_t post_time) {
@@ -26,13 +26,19 @@ void FlashlightCoordinator::set_update_interval(uint32_t interval_ms) {
 }
 
 void FlashlightCoordinator::enable_flash() {
+    ESP_LOGI(TAG, "enable_flash called: controller=%p, legacy_light=%p", 
+             (void*)controller_, (void*)legacy_light_);
     if (controller_) {
+        ESP_LOGI(TAG, "Using controller to enable flash");
         controller_->enable_flash();
     } else if (legacy_light_) {
+        ESP_LOGI(TAG, "Using legacy light to enable flash");
         auto_controlled_.store(true);
         auto call = legacy_light_->turn_on();
         call.set_transition_length(0);
         call.perform();
+    } else {
+        ESP_LOGW(TAG, "No flash mechanism available!");
     }
 }
 
@@ -99,16 +105,22 @@ bool FlashlightCoordinator::update_scheduling() {
 void FlashlightCoordinator::force_inference(std::function<void()> frame_request_callback) {
     if (!legacy_light_ && !controller_) return;
     
-    ESP_LOGI(TAG, "Forcing flash inference");
+    ESP_LOGI(TAG, "Forcing flash inference (Pre: %u ms, Post: %u ms)", pre_time_, post_time_);
     enable_flash();
     
+    uint32_t warmup = (pre_time_ > 500) ? pre_time_ : 500;
+    uint32_t post = (post_time_ > 500) ? post_time_ : 500;
+    
     if (parent_) {
-        // Warmup 3s
-        App.scheduler.set_timeout(parent_, "force_flash_warmup", 3000, [this, frame_request_callback]() {
+        App.scheduler.set_timeout(parent_, "force_flash_warmup", warmup, [this, frame_request_callback, post]() {
              frame_request_callback();
              
-             // Off after 500ms safety
-             App.scheduler.set_timeout(parent_, "force_flash_off", 500, [this]() {
+              // Keep flash on for post_time after frame request
+              uint32_t extended_post = post;
+             ESP_LOGI(TAG, "Flash staying on for %u ms after frame request", extended_post);
+             
+             App.scheduler.set_timeout(parent_, "force_flash_off", extended_post, [this]() {
+                 ESP_LOGI(TAG, "Flash timeout complete - disabling flash");
                  disable_flash();
              });
         });
@@ -135,5 +147,3 @@ void FlashlightCoordinator::capture_preview_sequence(std::function<void()> frame
 
 } // namespace meter_reader_tflite
 } // namespace esphome
-
-#endif // USE_FLASH_LIGHT_CONTROLLER
