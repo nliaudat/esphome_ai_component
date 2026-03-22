@@ -86,16 +86,18 @@ globals:
     initial_value: '"[[151,186,191,253],[188,186,230,252],[228,186,270,252],[266,186,308,252],[305,185,345,252],[347,188,367,223],[366,188,388,223],[385,188,410,223]]"'
 
 output:
-  - platform: gpio
+  - platform: ledc
     pin: GPIO4
     id: flash_output
+    frequency: 1000Hz
 
 light:
-  - platform: binary
+  - platform: monochromatic
     output: flash_output
     name: "Flash LED"
     id: flash_led
     restore_mode: ALWAYS_OFF
+    default_transition_length: 0s
 
 i2c:
   sda: GPIO26
@@ -137,6 +139,26 @@ button:
           id(ai_meter_reader).set_show_crop_areas(show);
           ESP_LOGI("main", "Crop overlay: %s", show ? "ON" : "OFF");
 
+number:
+  - platform: template
+    name: "Flash Brightness"
+    id: flash_brightness
+    min_value: 0
+    max_value: 100
+    step: 5
+    initial_value: 100
+    unit_of_measurement: "%"
+    optimistic: true
+    restore_value: true
+    set_action:
+      - light.control:
+          id: flash_led
+          brightness: !lambda "return x / 100.0;"
+    on_value:
+      - logger.log:
+          format: "Flash brightness set to %.0f%%"
+          args: [x]
+
 text_sensor:
 
 sensor:
@@ -161,6 +183,8 @@ interval:
             ESP_LOGW("main", "Skipping early interval trigger");
             return;
           }
+          // Set flash brightness before triggering inference
+          id(flash_led).turn_on().set_brightness(id(flash_brightness).state / 100.0f).perform();
           id(ai_meter_reader).force_flash_inference();
 
 meter_reader_tflite:
