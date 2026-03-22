@@ -28,6 +28,7 @@
 
 #ifdef USE_WEB_SERVER
 #include "esphome/components/web_server_base/web_server_base.h"
+#include "crop_web_handler.h"
 #endif
 
 #include <memory>
@@ -386,6 +387,25 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
 #ifdef USE_WEB_SERVER
   web_server_base::WebServerBase *web_server_{nullptr};
+  
+  // Crop storage for web viewing
+  std::vector<std::shared_ptr<camera::CameraImage>> last_crops_;
+  std::mutex crops_mutex_;
+ public:
+  std::vector<std::shared_ptr<camera::CameraImage>> get_last_crops() {
+    std::lock_guard<std::mutex> lock(crops_mutex_);
+    return last_crops_;
+  }
+ protected:
+  void set_last_crops(const std::vector<esp32_camera_utils::ImageProcessor::ProcessResult>& results) {
+    std::lock_guard<std::mutex> lock(crops_mutex_);
+    last_crops_.clear();
+    for (const auto& result : results) {
+      if (result.data) {
+        last_crops_.push_back(result.data);
+      }
+    }
+  }
 #endif
 
 #ifdef SUPPORT_DOUBLE_BUFFERING

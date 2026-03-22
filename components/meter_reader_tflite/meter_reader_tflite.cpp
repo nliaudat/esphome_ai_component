@@ -296,6 +296,12 @@ void MeterReaderTFLite::setup() {
               }));
           }
           #endif
+          // Setup Crop Zone Handler
+          if (this->web_server_) {
+              this->web_server_->add_handler(new CropWebHandler([this]() {
+                  return this->get_last_crops();
+              }));
+          }
           #endif
 
           // Print debug info on success (legacy behavior)
@@ -825,6 +831,11 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
         ESP_LOGD(TAG, "Processing full image: Requesting frame processing from CameraCoordinator");
     }
     auto processed_buffers = this->camera_coord_.process_frame(frame, zones);
+    
+    // Store crops for web viewing
+    #ifdef USE_WEB_SERVER
+    this->set_last_crops(processed_buffers);
+    #endif
     
     // Check for debug image (last processed master)
     if (this->generate_preview_ || this->request_preview_) {
