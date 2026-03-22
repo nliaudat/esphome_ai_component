@@ -127,7 +127,7 @@ void CropWebHandler::handleRequest(web_server_idf::AsyncWebServerRequest *reques
   
   for (size_t i = 0; i < crops.size(); i++) {
     html += "<div class='crop-container'>"
-            "<img src='/crops/" + std::to_string(i) + "' width='64' height='40' alt='Crop " + std::to_string(i) + "'>"
+            "<img src='/crops/" + std::to_string(i) + "' width='256' height='160' alt='Crop " + std::to_string(i) + "'>"
             "<div class='crop-label'>Zone " + std::to_string(i) + "</div>"
             "</div>";
   }
