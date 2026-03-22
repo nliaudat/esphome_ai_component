@@ -387,24 +387,14 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
 #ifdef USE_WEB_SERVER
   web_server_base::WebServerBase *web_server_{nullptr};
-  
-  // Crop storage for web viewing
-  std::vector<std::shared_ptr<camera::CameraImage>> last_crops_;
-  std::mutex crops_mutex_;
+  CropRingBuffer crop_ring_buffer_;
  public:
-  std::vector<std::shared_ptr<camera::CameraImage>> get_last_crops() {
-    std::lock_guard<std::mutex> lock(crops_mutex_);
-    return last_crops_;
+  std::vector<CropEntry> get_last_crops() {
+    return crop_ring_buffer_.get_crops();
   }
  protected:
-  void set_last_crops(const std::vector<esp32_camera_utils::ImageProcessor::ProcessResult>& results) {
-    std::lock_guard<std::mutex> lock(crops_mutex_);
-    last_crops_.clear();
-    for (const auto& result : results) {
-      if (result.data) {
-        last_crops_.push_back(result.data);
-      }
-    }
+  void set_last_crops(std::vector<esp32_camera_utils::ImageProcessor::ProcessResult>& results) {
+    crop_ring_buffer_.update(results);
   }
 #endif
 

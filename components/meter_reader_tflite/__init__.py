@@ -195,6 +195,9 @@ CONFIG_SCHEMA = cv.Schema(
 async def to_code(config):
     """Code generation for the component."""
 
+    # Register additional source files
+    cg.add_build_flag("-I components/meter_reader_tflite")
+
     # esp32.add_idf_component(
     #     name="espressif/esp-tflite-micro",
     #     # ref="~1.3.4" #https://github.com/espressif/esp-tflite-micro/issues/120
