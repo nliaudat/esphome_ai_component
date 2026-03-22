@@ -14,6 +14,19 @@ namespace meter_reader_tflite {
 using tflite_micro_helper::ModelConfig;
 
 static const std::unordered_map<std::string, ModelConfig> MODEL_CONFIGS = {
+    {"dig-class100-0168_s2_q", 
+        ModelConfig{
+            .description = "dig-class100-0168",
+            .tensor_arena_size = "512KB",
+            .output_processing = "softmax_jomjol",
+            .scale_factor = 10.0f,
+            .input_type = "float32",  
+            .input_channels = 3,
+            .input_order = "RGB",
+            .input_size = {32, 20}, 
+            .normalize = false
+        }
+    },
     {"dig-class100-0180-s2-q", 
         ModelConfig{
             .description = "dig-class100-0180",

@@ -52,7 +52,9 @@ wifi:
   power_save_mode: LIGHT
 
 external_components:
-  - source: github://nliaudat/esphome_ai_component@mikaabra
+  - source:
+      type: local
+      path: components
     components:
       - tflite_micro_helper
       - esp32_camera_utils
