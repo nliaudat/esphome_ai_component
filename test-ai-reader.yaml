@@ -52,8 +52,8 @@ wifi:
   power_save_mode: LIGHT
 
 external_components:
-  - source: github://nliaudat/esphome_ai_component@main
-    components: 
+  - source: github://nliaudat/esphome_ai_component@mikaabra
+    components:
       - tflite_micro_helper
       - esp32_camera_utils
       - flash_light_controller
@@ -165,7 +165,7 @@ meter_reader_tflite:
   id: ai_meter_reader
   camera_id: meter_cam
   model: "dig-class100-0168_s2_q.tflite"
-  tensor_arena_size: 128KB
+  tensor_arena_size: 512KB
   confidence_threshold: 0.85
   crop_zones_global: crop_zones
   value_sensor: ai_meter_value
