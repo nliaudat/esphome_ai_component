@@ -83,6 +83,8 @@ CONF_COLLECT_LOW_CONFIDENCE = "collect_low_confidence"
 CONF_COLLECT_MIN_GLOBAL_CONFIDENCE = "collect_min_global_confidence"
 CONF_COLLECT_MIN_DIGIT_CONFIDENCE = "collect_min_digit_confidence"
 
+CONF_LOW_CONFIDENCE_CROP_THRESHOLD = "low_confidence_crop_threshold"
+
 CONF_CROP_ZONES = "crop_zones_global"
 
 CONF_CAMERA_WINDOW = "camera_window"
@@ -159,6 +161,9 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_COLLECT_MIN_DIGIT_CONFIDENCE, default=0.90): cv.float_range(
             min=0.0, max=1.0
         ),
+        cv.Optional(CONF_LOW_CONFIDENCE_CROP_THRESHOLD, default=0.90): cv.float_range(
+            min=0.0, max=1.0
+        ),
         cv.Optional(CONF_CROP_ZONES): cv.use_id(globals.GlobalsComponent),
         # cv.Optional(CONF_CAMERA_WINDOW): cv.Any(
         # cv.Schema({  # Or detailed configuration
@@ -194,6 +199,9 @@ CONFIG_SCHEMA = cv.Schema(
 
 async def to_code(config):
     """Code generation for the component."""
+
+    # Register additional source files
+    cg.add_build_flag("-I components/meter_reader_tflite")
 
     # esp32.add_idf_component(
     #     name="espressif/esp-tflite-micro",
@@ -447,6 +455,12 @@ async def to_code(config):
             cg.add(
                 var.set_collect_min_digit_confidence(
                     config[CONF_COLLECT_MIN_DIGIT_CONFIDENCE]
+                )
+            )
+        if CONF_LOW_CONFIDENCE_CROP_THRESHOLD in config:
+            cg.add(
+                var.set_low_confidence_threshold(
+                    config[CONF_LOW_CONFIDENCE_CROP_THRESHOLD]
                 )
             )
         cg.add_define("USE_DATA_COLLECTOR")

@@ -28,6 +28,7 @@
 
 #ifdef USE_WEB_SERVER
 #include "esphome/components/web_server_base/web_server_base.h"
+#include "crop_web_handler.h"
 #endif
 
 #include <memory>
@@ -386,6 +387,32 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
 #ifdef USE_WEB_SERVER
   web_server_base::WebServerBase *web_server_{nullptr};
+  CropRingBuffer crop_ring_buffer_;
+  LowConfidenceCropBuffer low_conf_crop_buffer_;
+ public:
+  std::vector<CropEntry> get_last_crops() {
+    return crop_ring_buffer_.get_crops();
+  }
+  LowConfidenceCropBuffer* get_low_conf_crop_buffer() {
+    return &low_conf_crop_buffer_;
+  }
+  void set_low_confidence_threshold(float threshold) {
+    low_conf_crop_buffer_.set_threshold(threshold);
+  }
+ protected:
+  void set_last_crops(std::vector<esp32_camera_utils::ImageProcessor::ProcessResult>& results) {
+    crop_ring_buffer_.update(results);
+  }
+  void save_low_confidence_crops(float confidence, const std::string& reading, const std::vector<float>& digit_confidences = {}) {
+    ESP_LOGD("meter_reader_tflite", "save_low_confidence_crops called: confidence=%.2f", confidence);
+    auto crops = crop_ring_buffer_.get_crops();
+    ESP_LOGD("meter_reader_tflite", "Got %zu crops from ring buffer", crops.size());
+    if (!crops.empty()) {
+      low_conf_crop_buffer_.save_low_confidence_set(crops, confidence, reading, digit_confidences);
+    } else {
+      ESP_LOGD("meter_reader_tflite", "No crops to save - ring buffer empty or expired");
+    }
+  }
 #endif
 
 #ifdef SUPPORT_DOUBLE_BUFFERING

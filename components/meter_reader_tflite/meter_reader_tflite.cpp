@@ -196,6 +196,15 @@ static constexpr uint32_t CALIBRATION_STEP_POST_MS = 100;
 void MeterReaderTFLite::setup() {
     ESP_LOGI(TAG, "Setting up Meter Reader TFLite (Refactored)...");
     
+    #ifdef USE_WEB_SERVER
+    ESP_LOGI(TAG, "Low confidence crop buffer threshold: %.2f", low_conf_crop_buffer_.get_threshold());
+    if (low_conf_crop_buffer_.is_allocated()) {
+        ESP_LOGI(TAG, "Low confidence crop buffer allocated: %zu bytes in PSRAM", low_conf_crop_buffer_.get_buffer_size());
+    } else {
+        ESP_LOGE(TAG, "Low confidence crop buffer FAILED to allocate in PSRAM");
+    }
+    #endif
+    
     // 1. Initial Config
     if (this->camera_coord_.get_width() == 0) {
         ESP_LOGE(TAG, "Camera dimensions not set!");
@@ -296,6 +305,12 @@ void MeterReaderTFLite::setup() {
               }));
           }
           #endif
+          // Setup Crop Zone Handler
+          if (this->web_server_) {
+              this->web_server_->add_handler(new CropWebHandler([this]() {
+                  return this->get_last_crops();
+              }, this->get_low_conf_crop_buffer()));
+          }
           #endif
 
           // Print debug info on success (legacy behavior)
@@ -642,18 +657,27 @@ void MeterReaderTFLite::loop() {
                          }
                      }
 
-                     if (trigger_collection) {
-                         std::string metadata = "";
-                         metadata = this->serialize_inference_metadata(digit_str, avg_conf, res_ptr->readings, res_ptr->probabilities,
-                                                                     this->camera_coord_.get_width(), this->camera_coord_.get_height());
- 
-                         ESP_LOGW(TAG, "Data Collection Triggered: Reading Invalid/LowConf (Conf: %.1f%%, Suspicious: %s)", 
-                                  avg_conf * 100.0f, suspicious ? "YES" : "NO");
-                         this->trigger_low_confidence_collection(digit_str, avg_conf, metadata);
-                     }
-                     #endif
-                }
-            }
+                      if (trigger_collection) {
+                          std::string metadata = "";
+                          metadata = this->serialize_inference_metadata(digit_str, avg_conf, res_ptr->readings, res_ptr->probabilities,
+                                                                      this->camera_coord_.get_width(), this->camera_coord_.get_height());
+  
+                          ESP_LOGW(TAG, "Data Collection Triggered: Reading Invalid/LowConf (Conf: %.1f%%, Suspicious: %s)", 
+                                   avg_conf * 100.0f, suspicious ? "YES" : "NO");
+                          this->trigger_low_confidence_collection(digit_str, avg_conf, metadata);
+                      }
+                       #endif
+                  }
+              }
+              
+              #ifdef USE_WEB_SERVER
+              // Pass per-digit confidences for display
+              std::vector<float> digit_confs;
+              for (float c : res_ptr->probabilities) {
+                digit_confs.push_back(c);
+              }
+              this->save_low_confidence_crops(avg_conf, digit_str, digit_confs);
+              #endif
             
             // Publish pool efficiency statistics
             #ifdef DEBUG_METER_READER_MEMORY
@@ -825,6 +849,11 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
         ESP_LOGD(TAG, "Processing full image: Requesting frame processing from CameraCoordinator");
     }
     auto processed_buffers = this->camera_coord_.process_frame(frame, zones);
+    
+    // Store crops for web viewing
+    #ifdef USE_WEB_SERVER
+    this->set_last_crops(processed_buffers);
+    #endif
     
     // Check for debug image (last processed master)
     if (this->generate_preview_ || this->request_preview_) {

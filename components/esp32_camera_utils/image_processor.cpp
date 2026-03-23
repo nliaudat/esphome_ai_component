@@ -787,20 +787,20 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
                                       zone.x1, zone.y1, zone.x2, zone.y2);
                         }
                    }
-              } else {
-                  // RGB
-                   if (this->config_.input_type == kInputTypeFloat32) {
-                        crop_success = this->process_rgb888_crop_and_scale_to_float32(
-                            processing_source_ptr, zone, crop_w, crop_h,
-                            out_buf->get(), this->config_.model_width, this->config_.model_height,
-                            this->config_.model_channels, this->config_.normalize, stride);
-                   } else {
-                        crop_success = this->process_rgb888_crop_and_scale_to_uint8(
-                            processing_source_ptr, zone, crop_w, crop_h,
-                            out_buf->get(), this->config_.model_width, this->config_.model_height,
-                            this->config_.model_channels, stride);
-                   }
-              }
+               } else {
+                   // RGB
+                    if (this->config_.input_type == kInputTypeFloat32) {
+                         crop_success = this->process_rgb888_crop_and_scale_to_float32_area(
+                             processing_source_ptr, zone, crop_w, crop_h,
+                             out_buf->get(), this->config_.model_width, this->config_.model_height,
+                             this->config_.model_channels, this->config_.normalize, stride);
+                    } else {
+                         crop_success = this->process_rgb888_crop_and_scale_to_uint8(
+                             processing_source_ptr, zone, crop_w, crop_h,
+                             out_buf->get(), this->config_.model_width, this->config_.model_height,
+                             this->config_.model_channels, stride);
+                    }
+               }
           } else {
               ESP_LOGE(TAG, "Zone bounds error vs Master: [%d,%d->%d,%d] in %dx%d", 
                   zone.x1, zone.y1, zone.x2, zone.y2, master_width, master_height);
@@ -1498,6 +1498,54 @@ bool ImageProcessor::process_rgb888_crop_and_scale_to_uint8(
     // Manual logging can be added here if needed
     #endif
 
+    return true;
+}
+
+bool ImageProcessor::process_rgb888_crop_and_scale_to_float32_area(
+    const uint8_t* input_data, const CropZone& zone, int crop_width, int crop_height,
+    uint8_t* output_buffer, int model_width, int model_height, int channels, bool normalize, int src_stride_width) {
+    
+    float* float_output = reinterpret_cast<float*>(output_buffer);
+    
+    float x_scale = static_cast<float>(crop_width) / model_width;
+    float y_scale = static_cast<float>(crop_height) / model_height;
+    
+    for (int y = 0; y < model_height; y++) {
+        float src_y_start = y * y_scale;
+        float src_y_end = (y + 1) * y_scale;
+        int y_start = static_cast<int>(src_y_start);
+        int y_end = static_cast<int>(src_y_end);
+        if (y_end >= crop_height) y_end = crop_height - 1;
+        
+        for (int x = 0; x < model_width; x++) {
+            float src_x_start = x * x_scale;
+            float src_x_end = (x + 1) * x_scale;
+            int x_start = static_cast<int>(src_x_start);
+            int x_end = static_cast<int>(src_x_end);
+            if (x_end >= crop_width) x_end = crop_width - 1;
+            
+            uint32_t r_sum = 0, g_sum = 0, b_sum = 0;
+            uint32_t count = 0;
+            
+            for (int sy = y_start; sy <= y_end; sy++) {
+                for (int sx = x_start; sx <= x_end; sx++) {
+                    int src_pos = ((zone.y1 + sy) * src_stride_width + (zone.x1 + sx)) * 3;
+                    r_sum += input_data[src_pos];
+                    g_sum += input_data[src_pos + 1];
+                    b_sum += input_data[src_pos + 2];
+                    count++;
+                }
+            }
+            
+            uint8_t r = static_cast<uint8_t>(r_sum / count);
+            uint8_t g = static_cast<uint8_t>(g_sum / count);
+            uint8_t b = static_cast<uint8_t>(b_sum / count);
+            
+            int dst_pos = (y * model_width + x) * channels;
+            arrange_channels(&float_output[dst_pos], r, g, b, channels, normalize);
+        }
+    }
+    
     return true;
 }
 
