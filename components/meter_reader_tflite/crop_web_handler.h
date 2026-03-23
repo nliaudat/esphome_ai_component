@@ -54,6 +54,13 @@ struct CropImageSpec {
   static constexpr size_t CHANNELS = 3;
   static constexpr size_t UINT8_SIZE = WIDTH * HEIGHT * CHANNELS;
   static constexpr size_t FLOAT_SIZE = UINT8_SIZE * sizeof(float);
+  
+  static void convert_float_to_uint8(const float* src, uint8_t* dst, size_t count = UINT8_SIZE) {
+    for (size_t i = 0; i < count; ++i) {
+      int val = static_cast<int>(src[i]);
+      dst[i] = static_cast<uint8_t>(std::max(0, std::min(255, val)));
+    }
+  }
 };
 
 struct LowConfidenceCropSet {
@@ -83,6 +90,7 @@ class LowConfidenceCropBuffer {
   void save_low_confidence_set(const std::vector<CropEntry>& crops, float confidence, const std::string& reading, const std::vector<float>& digit_confidences = {});
   std::vector<const LowConfidenceCropSet*> get_low_confidence_sets() const;
   const LowConfidenceCropSet* get_set(size_t index) const;
+  bool get_crop_data(size_t set_index, size_t crop_index, std::vector<uint8_t>& out_data, size_t& out_crop_size) const;
   void set_threshold(float threshold) { threshold_ = threshold; }
   float get_threshold() const { return threshold_; }
   bool is_allocated() const { return sets_ != nullptr; }
