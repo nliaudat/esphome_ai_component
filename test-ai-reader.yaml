@@ -36,7 +36,7 @@ psram:
   speed: 40MHz
 
 logger:
-  level: INFO
+  level: DEBUG
 
 api:
   encryption:
@@ -89,7 +89,7 @@ output:
   - platform: ledc
     pin: GPIO4
     id: flash_output
-    frequency: 1000Hz
+    frequency: 20000Hz
 
 light:
   - platform: monochromatic
@@ -158,6 +158,25 @@ number:
       - logger.log:
           format: "Flash brightness set to %.0f%%"
           args: [x]
+
+  - platform: template
+    name: "Low Confidence Threshold"
+    id: low_confidence_threshold
+    min_value: 0
+    max_value: 100
+    step: 5
+    initial_value: 90
+    unit_of_measurement: "%"
+    optimistic: true
+    restore_value: true
+    set_action:
+      - logger.log:
+          format: "Low confidence threshold set to %.0f%%"
+          args: [x]
+    on_value:
+      - lambda: |-
+          id(ai_meter_reader)->set_low_confidence_threshold(x / 100.0f);
+          ESP_LOGI("low_conf_thresh", "Threshold set to %.0f%%", x);
 
 text_sensor:
 
