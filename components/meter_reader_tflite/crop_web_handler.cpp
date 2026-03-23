@@ -7,6 +7,8 @@
 #include <esp_heap_caps.h>
 #include <cstring>
 #include <algorithm>
+#include <cctype>
+#include <climits>
 
 static const char* TAG = "low_conf_crop";
 
@@ -26,12 +28,11 @@ void CropRingBuffer::update(std::vector<esp32_camera_utils::ImageProcessor::Proc
       entry.raw_size = result.size;
       entry.timestamp = now;
       
-      entry.raw_data = std::shared_ptr<uint8_t>(
-        result.data->get(),
-        [](uint8_t*) {}
-      );
-      
-      crops_.push_back(std::move(entry));
+      entry.raw_data = CropEntry::allocate_crop_buffer(result.size);
+      if (entry.raw_data) {
+        std::memcpy(entry.raw_data.get(), result.data->get(), result.size);
+        crops_.push_back(std::move(entry));
+      }
     }
   }
   
@@ -81,7 +82,7 @@ void LowConfidenceCropBuffer::allocate_in_psram() {
   ESP_LOGI(TAG, "Low confidence crop buffer allocated in PSRAM: %zu bytes (%zu sets)", alloc_size, MAX_SETS);
 }
 
-void LowConfidenceCropBuffer::save_low_confidence_set(const std::vector<CropEntry>& crops, float confidence, const std::string& reading) {
+void LowConfidenceCropBuffer::save_low_confidence_set(const std::vector<CropEntry>& crops, float confidence, const std::string& reading, const std::vector<float>& digit_confidences) {
   ESP_LOGD(TAG, "save_low_confidence_set called: confidence=%.2f, threshold=%.2f, crops=%zu", 
            confidence, threshold_, crops.size());
   
@@ -113,30 +114,34 @@ void LowConfidenceCropBuffer::save_low_confidence_set(const std::vector<CropEntr
   set.confidence = confidence;
   std::strncpy(set.reading, reading.c_str(), LowConfidenceCropSet::MAX_READING_LEN - 1);
   set.reading[LowConfidenceCropSet::MAX_READING_LEN - 1] = '\0';
-  set.timestamp = millis();
+  set.uptime_ms = millis();
   set.valid = true;
   set.num_crops = std::min(crops.size(), LowConfidenceCropSet::MAX_CROPS_PER_SET);
   
-  const size_t expected_uint8_size = 20 * 32 * 3;
-  const size_t expected_float_size = expected_uint8_size * sizeof(float);
+  // Store per-digit confidences
+  for (size_t i = 0; i < LowConfidenceCropSet::MAX_CROPS_PER_SET; ++i) {
+    if (i < digit_confidences.size()) {
+      set.digit_confidences[i] = digit_confidences[i];
+    } else {
+      set.digit_confidences[i] = 0.0f;
+    }
+  }
   
   for (size_t i = 0; i < set.num_crops; ++i) {
     if (crops[i].raw_data && crops[i].raw_size > 0) {
       const uint8_t* source_data = crops[i].raw_data.get();
       size_t source_size = crops[i].raw_size;
       
-      if (source_size == expected_float_size) {
-        // Convert float32 to uint8 before storing
+      if (source_size == CropImageSpec::FLOAT_SIZE) {
         const float* float_data = reinterpret_cast<const float*>(source_data);
-        for (size_t j = 0; j < expected_uint8_size; ++j) {
+        for (size_t j = 0; j < CropImageSpec::UINT8_SIZE; ++j) {
           int val = static_cast<int>(float_data[j]);
           set.crop_data[i][j] = static_cast<uint8_t>(std::max(0, std::min(255, val)));
         }
-        set.crop_sizes[i] = expected_uint8_size;
-      } else if (source_size == expected_uint8_size) {
-        // Already uint8, copy directly
-        std::memcpy(set.crop_data[i].data(), source_data, expected_uint8_size);
-        set.crop_sizes[i] = expected_uint8_size;
+        set.crop_sizes[i] = CropImageSpec::UINT8_SIZE;
+      } else if (source_size == CropImageSpec::UINT8_SIZE) {
+        std::memcpy(set.crop_data[i].data(), source_data, CropImageSpec::UINT8_SIZE);
+        set.crop_sizes[i] = CropImageSpec::UINT8_SIZE;
       } else {
         ESP_LOGW(TAG, "Unexpected crop size %zu for crop %zu", source_size, i);
         set.crop_sizes[i] = 0;
@@ -198,13 +203,126 @@ void LowConfidenceCropBuffer::clear() {
   current_index_ = 0;
 }
 
+static int parse_index_safe(const std::string& s) {
+  if (s.empty()) return -1;
+  for (char c : s) {
+    if (!std::isdigit(static_cast<unsigned char>(c))) return -1;
+  }
+  char* end;
+  long val = std::strtol(s.c_str(), &end, 10);
+  if (end != s.c_str() + s.length() || val < 0 || val > INT_MAX) return -1;
+  return static_cast<int>(val);
+}
+
+static std::string escape_html(const char* input) {
+  std::string output;
+  for (const char* p = input; *p; ++p) {
+    switch (*p) {
+      case '&': output += "&amp;"; break;
+      case '<': output += "&lt;"; break;
+      case '>': output += "&gt;"; break;
+      case '"': output += "&quot;"; break;
+      case '\'': output += "&#x27;"; break;
+      default: output += *p; break;
+    }
+  }
+  return output;
+}
+
+static std::string format_age(uint32_t timestamp_ms) {
+  uint32_t now = millis();
+  uint32_t age_ms;
+  if (now >= timestamp_ms) {
+    age_ms = now - timestamp_ms;
+  } else {
+    age_ms = (0xFFFFFFFF - timestamp_ms) + now + 1;
+  }
+  
+  if (age_ms < 60000) {
+    return std::to_string(age_ms / 1000) + "s ago";
+  } else if (age_ms < 3600000) {
+    return std::to_string(age_ms / 60000) + "m " + std::to_string((age_ms % 60000) / 1000) + "s ago";
+  } else {
+    return std::to_string(age_ms / 3600000) + "h " + std::to_string((age_ms % 3600000) / 60000) + "m ago";
+  }
+}
+
+std::string LowConfidenceCropBuffer::generate_html_page() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  
+  if (!sets_) {
+    return "<html><body><h1>Buffer not allocated</h1><p>PSRAM allocation failed.</p></body></html>";
+  }
+  
+  bool any_valid = false;
+  for (size_t i = 0; i < MAX_SETS; ++i) {
+    if (sets_[i].valid) {
+      any_valid = true;
+      break;
+    }
+  }
+  
+  if (!any_valid) {
+    std::string html = "<html><body><h1>No low-confidence readings captured yet</h1><p>Readings below " + 
+                       std::to_string(static_cast<int>(threshold_ * 100)) + 
+                       "% confidence will appear here.</p></body></html>";
+    return html;
+  }
+  
+  std::string html = "<!DOCTYPE html><html><head>"
+                "<title>Low Confidence Readings</title>"
+                "<style>"
+                "body { font-family: Arial, sans-serif; background: #222; color: white; padding: 20px; }"
+                ".reading-set { border: 2px solid #444; margin: 20px 0; padding: 15px; background: #333; }"
+                ".reading-header { font-size: 18px; margin-bottom: 10px; color: #ff6b6b; }"
+                ".crop-container { display: inline-block; margin: 5px; text-align: center; }"
+                ".crop-container img { border: 2px solid #555; background: #444; }"
+                ".crop-label { margin-top: 3px; font-size: 12px; }"
+                "</style></head><body>"
+                "<h1>Low Confidence Readings</h1>"
+                "<p>Threshold: " + std::to_string(static_cast<int>(threshold_ * 100)) + "%</p>";
+  
+  for (size_t i = 0; i < MAX_SETS; ++i) {
+    size_t idx = (current_index_ + MAX_SETS - 1 - i) % MAX_SETS;
+    const auto& set = sets_[idx];
+    if (!set.valid) continue;
+    
+    std::string time_str = format_age(set.uptime_ms);
+    
+    html += "<div class='reading-set'>"
+            "<div class='reading-header'>Reading: " + escape_html(set.reading) + 
+            " | Avg: " + std::to_string(static_cast<int>(set.confidence * 100)) + "%"
+            " | " + time_str +
+            " | Set #" + std::to_string(i) + "</div>"
+            "<div style='display: flex; flex-wrap: wrap;'>";
+    
+    for (size_t crop_idx = 0; crop_idx < set.num_crops; ++crop_idx) {
+      int digit_conf = static_cast<int>(set.digit_confidences[crop_idx] * 100);
+      html += "<div class='crop-container'>"
+              "<img src='/low-confidence-crops/" + std::to_string(i) + "/" + std::to_string(crop_idx) + 
+              "' width='128' height='80' alt='Crop " + std::to_string(crop_idx) + "'>"
+              "<div class='crop-label'>" + std::to_string(digit_conf) + "%</div>"
+              "</div>";
+    }
+    
+    html += "</div></div>";
+  }
+  
+  html += "<p><a href='/crops'>View current crops</a></p>"
+          "</body></html>";
+  
+  return html;
+}
+
 bool CropWebHandler::canHandle(web_server_idf::AsyncWebServerRequest *request) const {
-  std::string url = request->url().c_str();
+  char url_buf[web_server_idf::AsyncWebServerRequest::URL_BUF_SIZE];
+  std::string url = std::string(request->url_to(url_buf));
   return url.find("/crops") == 0 || url.find("/low-confidence-crops") == 0;
 }
 
 void CropWebHandler::handleRequest(web_server_idf::AsyncWebServerRequest *request) {
-  std::string url = request->url().c_str();
+  char url_buf[web_server_idf::AsyncWebServerRequest::URL_BUF_SIZE];
+  std::string url = std::string(request->url_to(url_buf));
   
   if (url.find("/low-confidence-crops") == 0) {
     handleLowConfidenceRequest(request);
@@ -221,7 +339,7 @@ void CropWebHandler::handleRequest(web_server_idf::AsyncWebServerRequest *reques
   int crop_index = -1;
   if (url.length() > 7) {
     std::string index_str = url.substr(7);
-    crop_index = std::stoi(index_str);
+    crop_index = parse_index_safe(index_str);
   }
   
   if (crop_index >= 0 && crop_index < (int)crops.size()) {
@@ -231,22 +349,19 @@ void CropWebHandler::handleRequest(web_server_idf::AsyncWebServerRequest *reques
       return;
     }
     
-    const size_t expected_uint8_size = 20 * 32 * 3;
-    const size_t expected_float_size = expected_uint8_size * sizeof(float);
-    
     std::vector<uint8_t> rgb_buffer;
     uint8_t* source_data = crop.raw_data.get();
     size_t source_size = crop.raw_size;
     
-    if (source_size == expected_float_size) {
-      rgb_buffer.resize(expected_uint8_size);
+    if (source_size == CropImageSpec::FLOAT_SIZE) {
+      rgb_buffer.resize(CropImageSpec::UINT8_SIZE);
       float* float_data = reinterpret_cast<float*>(source_data);
-      for (size_t i = 0; i < expected_uint8_size; ++i) {
+      for (size_t i = 0; i < CropImageSpec::UINT8_SIZE; ++i) {
         int val = static_cast<int>(float_data[i]);
         rgb_buffer[i] = static_cast<uint8_t>(std::max(0, std::min(255, val)));
       }
       source_data = rgb_buffer.data();
-    } else if (source_size != expected_uint8_size) {
+    } else if (source_size != CropImageSpec::UINT8_SIZE) {
       request->send(500, "text/plain", ("Unexpected crop size: " + std::to_string(source_size)).c_str());
       return;
     }
@@ -254,7 +369,8 @@ void CropWebHandler::handleRequest(web_server_idf::AsyncWebServerRequest *reques
     uint8_t* jpeg_buf = nullptr;
     size_t jpeg_len = 0;
     
-  bool converted = fmt2jpg(const_cast<uint8_t*>(source_data), expected_uint8_size, 20, 32, PIXFORMAT_RGB888, 80, &jpeg_buf, &jpeg_len);
+  bool converted = fmt2jpg(const_cast<uint8_t*>(source_data), CropImageSpec::UINT8_SIZE, 
+                           CropImageSpec::WIDTH, CropImageSpec::HEIGHT, PIXFORMAT_RGB888, 80, &jpeg_buf, &jpeg_len);
     
     if (!converted || !jpeg_buf) {
       request->send(500, "text/plain", "JPEG conversion failed");
@@ -288,6 +404,7 @@ void CropWebHandler::handleRequest(web_server_idf::AsyncWebServerRequest *reques
   }
   
   html += "</div><p><a href='/preview'>View full preview</a></p>"
+          "<p><a href='/low-confidence-crops'>View low confidence captures</a></p>"
           "</body></html>";
   
   request->send(200, "text/html", html.c_str());
@@ -299,64 +416,40 @@ void CropWebHandler::handleLowConfidenceRequest(web_server_idf::AsyncWebServerRe
     return;
   }
   
-  std::string url = request->url().c_str();
+  char url_buf[web_server_idf::AsyncWebServerRequest::URL_BUF_SIZE];
+  std::string url = std::string(request->url_to(url_buf));
   
   if (url.length() > 22) {
     std::string path = url.substr(22);
     size_t slash1 = path.find('/');
     if (slash1 != std::string::npos) {
-      int set_index = std::stoi(path.substr(0, slash1));
-      int crop_index = std::stoi(path.substr(slash1 + 1));
+      // Parse indices manually to avoid exceptions (disabled in ESP-IDF)
+      auto parse_index = [](const std::string& s) -> int {
+        if (s.empty()) return -1;
+        // Check all characters are digits
+        for (char c : s) {
+          if (!std::isdigit(static_cast<unsigned char>(c))) return -1;
+        }
+        // Use strtol which doesn't throw
+        char* end;
+        long val = std::strtol(s.c_str(), &end, 10);
+        if (end != s.c_str() + s.length() || val < 0 || val > INT_MAX) return -1;
+        return static_cast<int>(val);
+      };
+      
+      int set_index = parse_index(path.substr(0, slash1));
+      int crop_index = parse_index(path.substr(slash1 + 1));
+      
+      if (set_index < 0 || crop_index < 0) {
+        request->send(400, "text/plain", "Invalid index format");
+        return;
+      }
       handleLowConfidenceCropRequest(request, set_index, crop_index);
       return;
     }
   }
   
-  auto sets = low_conf_buffer_->get_low_confidence_sets();
-  
-  if (sets.empty()) {
-    std::string html = "<html><body><h1>No low-confidence readings captured yet</h1><p>Readings below " + 
-                       std::to_string(static_cast<int>(low_conf_buffer_->get_threshold() * 100)) + 
-                       "% confidence will appear here.</p></body></html>";
-    request->send(200, "text/html", html.c_str());
-    return;
-  }
-  
-  std::string html = "<!DOCTYPE html><html><head>"
-                "<title>Low Confidence Readings</title>"
-                "<style>"
-                "body { font-family: Arial, sans-serif; background: #222; color: white; padding: 20px; }"
-                ".reading-set { border: 2px solid #444; margin: 20px 0; padding: 15px; background: #333; }"
-                ".reading-header { font-size: 18px; margin-bottom: 10px; color: #ff6b6b; }"
-                ".crop-container { display: inline-block; margin: 5px; text-align: center; }"
-                ".crop-container img { border: 2px solid #555; background: #444; }"
-                ".crop-label { margin-top: 3px; font-size: 12px; }"
-                "</style></head><body>"
-                "<h1>Low Confidence Readings (Last 10)</h1>"
-                "<p>Threshold: " + std::to_string(static_cast<int>(low_conf_buffer_->get_threshold() * 100)) + "%</p>";
-  
-  for (size_t set_idx = 0; set_idx < sets.size(); ++set_idx) {
-    const auto* set = sets[set_idx];
-    html += "<div class='reading-set'>"
-            "<div class='reading-header'>Reading: " + std::string(set->reading) + 
-            " | Confidence: " + std::to_string(static_cast<int>(set->confidence * 100)) + "%"
-            " | Set #" + std::to_string(set_idx) + "</div>"
-            "<div>";
-    
-    for (size_t crop_idx = 0; crop_idx < set->num_crops; ++crop_idx) {
-      html += "<div class='crop-container'>"
-              "<img src='/low-confidence-crops/" + std::to_string(set_idx) + "/" + std::to_string(crop_idx) + 
-              "' width='128' height='80' alt='Crop " + std::to_string(crop_idx) + "'>"
-              "<div class='crop-label'>Zone " + std::to_string(crop_idx) + "</div>"
-              "</div>";
-    }
-    
-    html += "</div></div>";
-  }
-  
-  html += "<p><a href='/crops'>View current crops</a></p>"
-          "</body></html>";
-  
+  std::string html = low_conf_buffer_->generate_html_page();
   request->send(200, "text/html", html.c_str());
 }
 
@@ -373,22 +466,19 @@ void CropWebHandler::handleLowConfidenceCropRequest(web_server_idf::AsyncWebServ
     return;
   }
   
-  const size_t expected_uint8_size = 20 * 32 * 3;
-  const size_t expected_float_size = expected_uint8_size * sizeof(float);
-  
   std::vector<uint8_t> rgb_buffer;
   const uint8_t* source_data = set->crop_data[crop_index].data();
   size_t source_size = set->crop_sizes[crop_index];
   
-  if (source_size == expected_float_size) {
-    rgb_buffer.resize(expected_uint8_size);
+  if (source_size == CropImageSpec::FLOAT_SIZE) {
+    rgb_buffer.resize(CropImageSpec::UINT8_SIZE);
     const float* float_data = reinterpret_cast<const float*>(source_data);
-    for (size_t i = 0; i < expected_uint8_size; ++i) {
+    for (size_t i = 0; i < CropImageSpec::UINT8_SIZE; ++i) {
       int val = static_cast<int>(float_data[i]);
       rgb_buffer[i] = static_cast<uint8_t>(std::max(0, std::min(255, val)));
     }
     source_data = rgb_buffer.data();
-  } else if (source_size != expected_uint8_size) {
+  } else if (source_size != CropImageSpec::UINT8_SIZE) {
     request->send(500, "text/plain", "Unexpected crop size");
     return;
   }
@@ -396,7 +486,8 @@ void CropWebHandler::handleLowConfidenceCropRequest(web_server_idf::AsyncWebServ
   uint8_t* jpeg_buf = nullptr;
   size_t jpeg_len = 0;
   
-  bool converted = fmt2jpg(const_cast<uint8_t*>(source_data), expected_uint8_size, 20, 32, PIXFORMAT_RGB888, 80, &jpeg_buf, &jpeg_len);
+  bool converted = fmt2jpg(const_cast<uint8_t*>(source_data), CropImageSpec::UINT8_SIZE,
+                           CropImageSpec::WIDTH, CropImageSpec::HEIGHT, PIXFORMAT_RGB888, 80, &jpeg_buf, &jpeg_len);
   
   if (!converted || !jpeg_buf) {
     request->send(500, "text/plain", "JPEG conversion failed");

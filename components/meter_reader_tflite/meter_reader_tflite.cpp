@@ -671,7 +671,12 @@ void MeterReaderTFLite::loop() {
               }
               
               #ifdef USE_WEB_SERVER
-              this->save_low_confidence_crops(avg_conf, digit_str);
+              // Pass per-digit confidences for display
+              std::vector<float> digit_confs;
+              for (float c : res_ptr->probabilities) {
+                digit_confs.push_back(c);
+              }
+              this->save_low_confidence_crops(avg_conf, digit_str, digit_confs);
               #endif
             
             // Publish pool efficiency statistics
