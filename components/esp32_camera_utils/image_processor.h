@@ -275,6 +275,8 @@ private:
   bool process_rgb888_crop_and_scale_to_float32(const uint8_t* input_data, const CropZone& zone, int crop_width, int crop_height, uint8_t* output_buffer, int model_width, int model_height, int channels, bool normalize, int src_stride_width);
   bool process_rgb888_crop_and_scale_to_uint8(const uint8_t* input_data, const CropZone& zone, int crop_width, int crop_height, uint8_t* output_buffer, int model_width, int model_height, int channels, int src_stride_width);
   
+  bool process_rgb888_crop_and_scale_to_float32_area(const uint8_t* input_data, const CropZone& zone, int crop_width, int crop_height, uint8_t* output_buffer, int model_width, int model_height, int channels, bool normalize, int src_stride_width);
+  
   bool process_rgb565_crop_and_scale_to_float32(const uint8_t* input_data, const CropZone &zone, int crop_width, int crop_height, uint8_t* output_buffer, int model_width, int model_height, int model_channels, bool normalize, int src_stride_width);
   bool process_rgb565_crop_and_scale_to_uint8(const uint8_t* input_data, const CropZone &zone, int crop_width, int crop_height, uint8_t* output_buffer, int model_width, int model_height, int model_channels, int src_stride_width);
   
