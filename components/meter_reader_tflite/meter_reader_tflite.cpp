@@ -1074,17 +1074,26 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
                  }
              }
              
-             if (trigger_collection) {
-                 std::string metadata = "";
-                 metadata = this->serialize_inference_metadata(digit_str, avg_conf, readings, confidences,
-                                                             this->camera_coord_.get_width(), this->camera_coord_.get_height());
-                 
-                 ESP_LOGW(TAG, "Data Collection Triggered: Reading Invalid/LowConf (Conf: %.1f%%, Suspicious: %s)", 
-                          avg_conf * 100.0f, suspicious ? "YES" : "NO");
-                 this->trigger_low_confidence_collection(digit_str, avg_conf, metadata);
-             }
-             #endif
-        }
+              if (trigger_collection) {
+                  std::string metadata = "";
+                  metadata = this->serialize_inference_metadata(digit_str, avg_conf, readings, confidences,
+                                                              this->camera_coord_.get_width(), this->camera_coord_.get_height());
+                  
+                  ESP_LOGW(TAG, "Data Collection Triggered: Reading Invalid/LowConf (Conf: %.1f%%, Suspicious: %s)", 
+                           avg_conf * 100.0f, suspicious ? "YES" : "NO");
+                  this->trigger_low_confidence_collection(digit_str, avg_conf, metadata);
+              }
+              #endif
+              
+              #ifdef USE_WEB_SERVER
+              // Pass per-digit confidences for display (sync path)
+              std::vector<float> digit_confs;
+              for (float c : confidences) {
+                digit_confs.push_back(c);
+              }
+              this->save_low_confidence_crops(avg_conf, digit_str, digit_confs);
+              #endif
+         }
 
         // Calibration Logic Hook
         // Calibration Logic Hook

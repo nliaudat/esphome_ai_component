@@ -134,10 +134,7 @@ void LowConfidenceCropBuffer::save_low_confidence_set(const std::vector<CropEntr
       
       if (source_size == CropImageSpec::FLOAT_SIZE) {
         const float* float_data = reinterpret_cast<const float*>(source_data);
-        for (size_t j = 0; j < CropImageSpec::UINT8_SIZE; ++j) {
-          int val = static_cast<int>(float_data[j]);
-          set.crop_data[i][j] = static_cast<uint8_t>(std::max(0, std::min(255, val)));
-        }
+        CropImageSpec::convert_float_to_uint8(float_data, set.crop_data[i].data());
         set.crop_sizes[i] = CropImageSpec::UINT8_SIZE;
       } else if (source_size == CropImageSpec::UINT8_SIZE) {
         std::memcpy(set.crop_data[i].data(), source_data, CropImageSpec::UINT8_SIZE);
@@ -187,6 +184,30 @@ const LowConfidenceCropSet* LowConfidenceCropBuffer::get_set(size_t index) const
   }
   
   return nullptr;
+}
+
+bool LowConfidenceCropBuffer::get_crop_data(size_t set_index, size_t crop_index, std::vector<uint8_t>& out_data, size_t& out_crop_size) const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  
+  if (!sets_ || set_index >= MAX_SETS) {
+    return false;
+  }
+  
+  size_t idx = (current_index_ + MAX_SETS - 1 - set_index) % MAX_SETS;
+  const auto& set = sets_[idx];
+  
+  if (!set.valid || crop_index >= set.num_crops) {
+    return false;
+  }
+  
+  out_crop_size = set.crop_sizes[crop_index];
+  if (out_crop_size == 0 || out_crop_size > CropImageSpec::UINT8_SIZE) {
+    return false;
+  }
+  
+  out_data.resize(out_crop_size);
+  std::memcpy(out_data.data(), set.crop_data[crop_index].data(), out_crop_size);
+  return true;
 }
 
 void LowConfidenceCropBuffer::clear() {
@@ -337,8 +358,8 @@ void CropWebHandler::handleRequest(web_server_idf::AsyncWebServerRequest *reques
   }
   
   int crop_index = -1;
-  if (url.length() > 7) {
-    std::string index_str = url.substr(7);
+  if (url.length() > (sizeof("/crops/") - 1)) {
+    std::string index_str = url.substr(sizeof("/crops/") - 1);
     crop_index = parse_index_safe(index_str);
   }
   
@@ -356,10 +377,7 @@ void CropWebHandler::handleRequest(web_server_idf::AsyncWebServerRequest *reques
     if (source_size == CropImageSpec::FLOAT_SIZE) {
       rgb_buffer.resize(CropImageSpec::UINT8_SIZE);
       float* float_data = reinterpret_cast<float*>(source_data);
-      for (size_t i = 0; i < CropImageSpec::UINT8_SIZE; ++i) {
-        int val = static_cast<int>(float_data[i]);
-        rgb_buffer[i] = static_cast<uint8_t>(std::max(0, std::min(255, val)));
-      }
+      CropImageSpec::convert_float_to_uint8(float_data, rgb_buffer.data());
       source_data = rgb_buffer.data();
     } else if (source_size != CropImageSpec::UINT8_SIZE) {
       request->send(500, "text/plain", ("Unexpected crop size: " + std::to_string(source_size)).c_str());
@@ -454,29 +472,22 @@ void CropWebHandler::handleLowConfidenceRequest(web_server_idf::AsyncWebServerRe
 }
 
 void CropWebHandler::handleLowConfidenceCropRequest(web_server_idf::AsyncWebServerRequest *request, int set_index, int crop_index) const {
-  const auto* set = low_conf_buffer_->get_set(set_index);
+  std::vector<uint8_t> crop_data;
+  size_t crop_size = 0;
   
-  if (!set || !set->valid || crop_index < 0 || crop_index >= static_cast<int>(set->num_crops)) {
+  if (!low_conf_buffer_->get_crop_data(set_index, crop_index, crop_data, crop_size)) {
     request->send(404, "text/plain", "Crop not found");
     return;
   }
   
-  if (set->crop_sizes[crop_index] == 0) {
-    request->send(404, "text/plain", "Crop data empty");
-    return;
-  }
-  
   std::vector<uint8_t> rgb_buffer;
-  const uint8_t* source_data = set->crop_data[crop_index].data();
-  size_t source_size = set->crop_sizes[crop_index];
+  const uint8_t* source_data = crop_data.data();
+  size_t source_size = crop_size;
   
   if (source_size == CropImageSpec::FLOAT_SIZE) {
     rgb_buffer.resize(CropImageSpec::UINT8_SIZE);
     const float* float_data = reinterpret_cast<const float*>(source_data);
-    for (size_t i = 0; i < CropImageSpec::UINT8_SIZE; ++i) {
-      int val = static_cast<int>(float_data[i]);
-      rgb_buffer[i] = static_cast<uint8_t>(std::max(0, std::min(255, val)));
-    }
+    CropImageSpec::convert_float_to_uint8(float_data, rgb_buffer.data());
     source_data = rgb_buffer.data();
   } else if (source_size != CropImageSpec::UINT8_SIZE) {
     request->send(500, "text/plain", "Unexpected crop size");
