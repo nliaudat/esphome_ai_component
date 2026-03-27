@@ -167,12 +167,12 @@ meter_reader_tflite:
   validator: ${id_prefix}_validator
   # confidence_threshold: 0.85 # Only if validator is disabled
   camera_id: ${id_prefix}_espcam
-  model: "models/digit_recognizer_v4_10cls_RGB.tflite" 
-
+  model: "models/digit_recognizer_v23_10cls_RGB.tflite" #v17 works great
   # model: "models/digit_recognizer_v3_10cls_RGB.tflite" # 38.41 KB in flash | 0.9729 accuracy | 5172 inf/s | 70.11 KB memory footprint
   # model: "models/digit_recognizer_v4_10cls_RGB.tflite" # 78.33 KB in flash | 0.9876 accuracy | 6380 inf/s | 103.02 KB memory footprint
   # model: "models/digit_recognizer_v16_10cls_RGB.tflite" # 128.84 KB in flash | 0.9918 accuracy | 3907 inf/s | 246.28 KB memory footprint
-  # model: "models/digit_recognizer_v17_10cls_RGB.tflite" # 71.02 KB in flash | 0.9867 accuracy | 4810 inf/s | 174.11 KB memory footprint
+  # model: "models/digit_recognizer_v17_10cls_RGB.tflite" # 71 Kb in flash | 0.9867 accuracy | 4810 inf/s | 174.11 KB memory footprint
+  # model: "models/digit_recognizer_v23_10cls_RGB.tflite" # 62 Kb in flash | 0.9874 accuracy | 7585 inf/s | 81.61 KB memory footprint
 
 
   update_interval: 60s
