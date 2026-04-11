@@ -194,8 +194,8 @@ async def to_code(config):
         # On host, we don't set a real camera object.
         pass
     
-    model_path = config[CONF_MODEL]
-    model_filename = os.path.basename(model_path)
+    model_path = CORE.relative_config_path(config[CONF_MODEL])
+    model_filename = os.path.basename(str(model_path).replace("\\", "/"))
     model_type = os.path.splitext(model_filename)[0]  # Remove .tflite extension
        
     # Set model type from extracted filename
