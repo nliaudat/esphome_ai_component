@@ -22,12 +22,22 @@ def to_code(config):
             name="espressif/esp-tflite-micro",
             # ref="~1.3.4" #https://github.com/espressif/esp-tflite-micro/issues/120
             ref="1.3.4" # fix to 1.3.4 cause 1.3.5 has bug
+            # ref="1.3.5"
         )
         
         esp32.add_idf_component(
             name="espressif/esp-nn",
-            ref="~1.1.2"
+            # ref="~1.1.2"
+            ref="1.2.1"
         )
+
+        # Force remove default -std flags and apply correct ones
+        # cg.add_platformio_option("build_unflags", ["-std=gnu++11", "-std=gnu99"])
+        # cg.add_build_flag("-std=gnu++14")
+        # cg.add_build_flag("-std=gnu11")  # For C files
+        
+        # Alternative: Just disable -Werror for this component
+        # cg.add_build_flag("-Wno-error")
             
         cg.add_build_flag("-DTF_LITE_STATIC_MEMORY")
         cg.add_build_flag("-DTF_LITE_DISABLE_X86_NEON")
