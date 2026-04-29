@@ -197,6 +197,7 @@ DataCollector::~DataCollector() {
         UploadJob job;
         while (xQueueReceive(this->upload_queue_, &job, 0) == pdTRUE) {
             free(job.data);
+            if (job.metadata) free(job.metadata);
         }
         vQueueDelete(this->upload_queue_);
         this->upload_queue_ = nullptr;
@@ -260,9 +261,6 @@ bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, const s
     ESP_LOGI(TAG, "HTTP POST Status = %d, content_length = %lld", 
              status_code, esp_http_client_get_content_length(client));
     if (this->debug_) {
-        // Log response body if small? Or just detailed info
-        // esp_http_client_read handling requires event loop or full read.
-        // For now, log that we finished.
         ESP_LOGD(TAG, "Full upload metrics: Value=%s, Conf=%.4f, Size=%zu", raw_value.c_str(), confidence, len);
         ESP_LOGD(TAG, "Headers sent: X-Meter-Value, X-Meter-Confidence, Content-Type, Authorization");
     }
