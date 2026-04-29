@@ -12,6 +12,7 @@
 #include <cmath>
 #include <cstring>
 #include <numeric>
+#include <limits>
 
 namespace esphome {
 namespace value_validator {
@@ -29,13 +30,6 @@ void ReadingHistory::setup() {
   ensure_capacity();
 }
 
-ReadingHistory::~ReadingHistory() {
-  if (buffer_) {
-    free(buffer_);
-    buffer_ = nullptr;
-  }
-}
-
 void ReadingHistory::ensure_capacity() {
   if (capacity_ > 0) return;
   
@@ -47,9 +41,10 @@ void ReadingHistory::ensure_capacity() {
   static constexpr size_t MIN_HISTORY_ENTRIES = 10;
   if (target < MIN_HISTORY_ENTRIES) target = MIN_HISTORY_ENTRIES;
   
-  buffer_ = static_cast<HistoricalReading *>(psram_alloc(target * sizeof(HistoricalReading)));
-  
-  if (buffer_) {
+  // RAII: unique_ptr with custom deleter (free for psram_alloc compatibility)
+  void* raw = psram_alloc(target * sizeof(HistoricalReading));
+  if (raw) {
+      buffer_.reset(static_cast<HistoricalReading*>(raw));
       capacity_ = target;
       head_ = 0;
       count_ = 0;
@@ -782,9 +777,14 @@ void ValueValidator::set_last_valid_reading(const std::string &value) {
 
   int int_val = 0;
   char* end = nullptr;
+  errno = 0;
   long val = strtol(value.c_str(), &end, 10);
   if (end != value.c_str() + value.length()) {
       ESP_LOGE(TAG, "Failed to parse complete manual value string: %s", value.c_str());
+      return;
+  }
+  if (errno == ERANGE || val > std::numeric_limits<int>::max() || val < std::numeric_limits<int>::min()) {
+      ESP_LOGE(TAG, "Manual value out of int range: %s", value.c_str());
       return;
   }
   int_val = static_cast<int>(val);

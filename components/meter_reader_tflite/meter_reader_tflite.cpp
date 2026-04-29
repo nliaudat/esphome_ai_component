@@ -365,7 +365,7 @@ void MeterReaderTFLite::setup() {
 }
 
 void MeterReaderTFLite::set_camera(camera::Camera *camera) { // -> CameraCoord callback
-    this->camera_coord_.set_camera((esp32_camera::ESP32Camera*)camera);
+    this->camera_coord_.set_camera(static_cast<esp32_camera::ESP32Camera *>(camera));
     // Register listener
     ESP_LOGD(TAG, "Registering CameraListener for MeterReaderTFLite");
     camera->add_listener(this); 
@@ -510,7 +510,7 @@ void MeterReaderTFLite::loop() {
             
             if (this->value_sensor_) {
                 float validated_val = 0.0f;
-                bool valid = this->validate_and_update_reading(final_val, avg_conf, validated_val);
+                bool valid = this->validate_and_update_reading(res_ptr->readings, res_ptr->probabilities, validated_val);
                 
                 if (this->inference_logs_) {
                      // Publish to inference logs text sensor
@@ -1145,7 +1145,6 @@ float MeterReaderTFLite::combine_readings(const esphome::StaticVector<float, 16>
     }
     
     ESP_LOGI(TAG, "Concatenated digit string: %s", digit_string.c_str());
-    
     // Output the string
     out_str = digit_string;
     
@@ -1165,7 +1164,6 @@ float MeterReaderTFLite::combine_readings(const esphome::StaticVector<float, 16>
     if (!digit_string.empty()) {
         combined_value = std::stof(digit_string);
     }
-    
     ESP_LOGI(TAG, "Final combined value: %.0f", combined_value);
     return combined_value;
 }
@@ -1303,7 +1301,7 @@ void MeterReaderTFLite::dump_config() {
 using namespace esphome::meter_reader_tflite;
 
 void MeterReaderTFLite::inference_task(void *arg) {
-    MeterReaderTFLite* self = (MeterReaderTFLite*)arg;
+    auto *self = static_cast<MeterReaderTFLite *>(arg);
     InferenceJob* job = nullptr;
     
     while (self->task_running_.load()) {
@@ -1346,8 +1344,9 @@ void MeterReaderTFLite::inference_task(void *arg) {
             InferenceResult* res_ptr = res.get();
             if (xQueueSend(self->output_queue_, &res_ptr, 100 / portTICK_PERIOD_MS) != pdTRUE) {
                 // Queue push failed, likely due to main loop backpressure. Drop result to prevent blocking.
+                // res unique_ptr will auto-cleanup via free_inference_result when it goes out of scope
             } else {
-                res.release(); // Ownership transferred
+                res.release(); // Ownership transferred to queue consumer
             }
             job = nullptr;
         } else {
@@ -1355,7 +1354,7 @@ void MeterReaderTFLite::inference_task(void *arg) {
         }
     }
     ESP_LOGI(TAG, "Inference task stopping...");
-    vTaskDelete(NULL);
+    vTaskDelete(nullptr);
 }
 
 void MeterReaderTFLite::start_inference_pipeline() {

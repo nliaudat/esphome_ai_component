@@ -2,7 +2,7 @@
 
 #include "esphome/core/component.h"
 #include "esphome/components/camera/camera.h"
-#include "esphome/components/esp32_camera/esp32_camera.h"
+//#include "esphome/components/esp32_camera/esp32_camera.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/button/button.h"
@@ -47,12 +47,6 @@
 #include "freertos/queue.h"
 #endif
 
-  #include "esphome/components/esp32_camera/esp32_camera.h"
-
-#ifdef USE_WEB_SERVER
-#include "esphome/components/web_server_base/web_server_base.h"
-#endif
-
 #include "esphome/core/defines.h"
 
 #ifdef USE_METER_READER_TFLITE
@@ -81,21 +75,21 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void return_image() override {};
 
   // Config Setters (Delegated)
-  void set_confidence_threshold(float threshold) { confidence_threshold_ = threshold; }
+  void set_confidence_threshold(float threshold) { this->confidence_threshold_ = threshold; }
   void set_tensor_arena_size(size_t size_bytes); // -> TFLite
   void set_model(const uint8_t *model, size_t length); // -> TFLite
 
-  void set_value_sensor(sensor::Sensor *sensor) { value_sensor_ = sensor; }
-  void set_confidence_sensor(sensor::Sensor *sensor) { confidence_sensor_ = sensor; }
+  void set_value_sensor(sensor::Sensor *sensor) { this->value_sensor_ = sensor; }
+  void set_confidence_sensor(sensor::Sensor *sensor) { this->confidence_sensor_ = sensor; }
   
   // Set Validator (External)
 #ifdef USE_VALUE_VALIDATOR
-  void set_validator(value_validator::ValueValidator *v) { validation_coord_.set_validator(v); }
+  void set_validator(value_validator::ValueValidator *v) { this->validation_coord_.set_validator(v); }
 #endif
 
   void set_crop_zones(const std::string &zones_json);
   void set_crop_zones_global(globals::GlobalsComponent<std::string> *global_var) {
-      crop_zone_handler_.set_crop_zones_global(global_var);
+      this->crop_zone_handler_.set_crop_zones_global(global_var);
   }
 
   void set_camera_image_format(int width, int height, const std::string &pixel_format); // -> CameraCoord & TFLite
@@ -114,14 +108,17 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void take_preview_image();
   void capture_preview();
   std::shared_ptr<camera::CameraImage> get_preview_image();
+#endif
 
- private:
+ protected:
+  #ifdef DEV_ENABLE_ROTATION
   void update_preview_image(std::shared_ptr<camera::CameraImage> image);
   std::shared_ptr<camera::CameraImage> last_preview_image_{nullptr};
   std::mutex preview_mutex_;
   bool request_preview_{false};
+  #endif
+
  public:
-#endif
 
   // Debug/Reporting
   static void register_service(MeterReaderTFLite *comp) { comp->print_debug_info(); }

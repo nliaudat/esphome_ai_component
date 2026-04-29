@@ -28,13 +28,17 @@ void PreviewWebHandler::handleRequest(web_server_idf::AsyncWebServerRequest *req
   }
 
   std::shared_ptr<camera::CameraImage> img_ptr = this->image_provider_();
-  // Safe downcast functionality should be provided by image_processor.h or static_pointer_cast
-  // We use the std::static_pointer_cast approach as defined in the plan
-  auto image = std::static_pointer_cast<RotatedPreviewImage>(img_ptr);
-
-  if (!image) {
+  if (!img_ptr) {
       ESP_LOGW(TAG, "HTTP Preview requested but no image available");
       request->send(503, "text/plain", "Preview not available yet. Please try again.");
+      return;
+  }
+
+  // Use dynamic_pointer_cast for safe runtime type checking
+  auto image = std::dynamic_pointer_cast<RotatedPreviewImage>(img_ptr);
+  if (!image) {
+      ESP_LOGE(TAG, "Image provider returned incompatible image type (expected RotatedPreviewImage)");
+      request->send(500, "text/plain", "Internal error: incompatible image type");
       return;
   }
 
