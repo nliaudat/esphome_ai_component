@@ -156,7 +156,18 @@ bool TFLiteCoordinator::process_model_result(const esp32_camera_utils::ImageProc
          return false;
     }
     
-    memcpy(input->data.uint8, result.data->get(), result.size);
+    // Validate result data pointer before memcpy
+    if (!result.data) {
+         ESP_LOGE(TAG, "Null result data pointer");
+         return false;
+    }
+    const uint8_t* src_data = result.data->get();
+    if (!src_data) {
+         ESP_LOGE(TAG, "Null result data buffer (shared_ptr is empty)");
+         return false;
+    }
+    
+    memcpy(input->data.uint8, src_data, result.size);
     
     if (model_handler_.invoke() != kTfLiteOk) {
         ESP_LOGE(TAG, "Model invocation failed");
@@ -200,7 +211,8 @@ TFLiteCoordinator::ModelSpec TFLiteCoordinator::get_model_spec() const {
     
     // Determine input type by checking tensor size
     // Float32 = W*H*C*4, Uint8 = W*H*C*1
-    TfLiteTensor* input = ((tflite_micro_helper::ModelHandler&)model_handler_).input_tensor(); 
+    // Use const_cast explicitly (documented) since input_tensor() lacks a const overload
+    TfLiteTensor* input = const_cast<tflite_micro_helper::ModelHandler&>(model_handler_).input_tensor();
     
     size_t num_elements = spec.input_width * spec.input_height * spec.input_channels;
     

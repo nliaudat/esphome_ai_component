@@ -1344,8 +1344,9 @@ void MeterReaderTFLite::inference_task(void *arg) {
             InferenceResult* res_ptr = res.get();
             if (xQueueSend(self->output_queue_, &res_ptr, 100 / portTICK_PERIOD_MS) != pdTRUE) {
                 // Queue push failed, likely due to main loop backpressure. Drop result to prevent blocking.
+                // res unique_ptr will auto-cleanup via free_inference_result when it goes out of scope
             } else {
-                res.release(); // Ownership transferred
+                res.release(); // Ownership transferred to queue consumer
             }
             job = nullptr;
         } else {
@@ -1353,7 +1354,7 @@ void MeterReaderTFLite::inference_task(void *arg) {
         }
     }
     ESP_LOGI(TAG, "Inference task stopping...");
-    vTaskDelete(NULL);
+    vTaskDelete(nullptr);
 }
 
 void MeterReaderTFLite::start_inference_pipeline() {

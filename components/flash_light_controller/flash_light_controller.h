@@ -3,6 +3,7 @@
 #include "esphome/core/component.h"
 #include "esphome/components/light/light_state.h"
 #include <functional>
+#include <atomic>
 
 #include "esphome/core/defines.h"
 
@@ -47,7 +48,7 @@ class FlashLightController : public Component {
   light::LightState *flash_light_{nullptr};
   uint32_t flash_pre_time_{5000};
   uint32_t flash_post_time_{2000};
-  bool is_active_{false};
+  std::atomic<bool> is_active_{false};
   bool debug_{false};
 };
 

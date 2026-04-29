@@ -60,8 +60,10 @@ bool CameraCoordinator::set_window(int offset_x, int offset_y, int width, int he
         this->current_width_ = new_dims.first;
         this->current_height_ = new_dims.second;
         
-        // Blocking delay required: camera must stabilize before returning success
-        // Cannot use set_timeout() as caller expects immediate result
+        // NOTE: Blocking delay required - camera sensor needs stabilization time
+        // before the next frame capture. This runs during setup/reconfiguration,
+        // not in the hot loop() path. Caller expects synchronous completion.
+        // TODO: Consider state machine approach if this causes issues in async contexts
         delay(WINDOW_SET_STABILIZATION_MS);
         return true;
     }

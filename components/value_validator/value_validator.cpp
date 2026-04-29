@@ -30,13 +30,6 @@ void ReadingHistory::setup() {
   ensure_capacity();
 }
 
-ReadingHistory::~ReadingHistory() {
-  if (buffer_) {
-    free(buffer_);
-    buffer_ = nullptr;
-  }
-}
-
 void ReadingHistory::ensure_capacity() {
   if (capacity_ > 0) return;
   
@@ -48,9 +41,10 @@ void ReadingHistory::ensure_capacity() {
   static constexpr size_t MIN_HISTORY_ENTRIES = 10;
   if (target < MIN_HISTORY_ENTRIES) target = MIN_HISTORY_ENTRIES;
   
-  buffer_ = static_cast<HistoricalReading *>(psram_alloc(target * sizeof(HistoricalReading)));
-  
-  if (buffer_) {
+  // RAII: unique_ptr with custom deleter (free for psram_alloc compatibility)
+  void* raw = psram_alloc(target * sizeof(HistoricalReading));
+  if (raw) {
+      buffer_.reset(static_cast<HistoricalReading*>(raw));
       capacity_ = target;
       head_ = 0;
       count_ = 0;

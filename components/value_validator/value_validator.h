@@ -47,10 +47,13 @@ class ReadingHistory {
   size_t get_day_count() const { return count_; }
   
   void clear();
-  ~ReadingHistory();
 
  private:
-  HistoricalReading* buffer_{nullptr};
+  // RAII-managed buffer using unique_ptr with custom deleter (free for psram_alloc)
+  struct FreeDeleter {
+    void operator()(HistoricalReading* p) const { free(p); }
+  };
+  std::unique_ptr<HistoricalReading[], FreeDeleter> buffer_;
   size_t capacity_{0};
   size_t head_{0}; // Write index (points to next free slot)
   size_t count_{0}; // Current number of elements

@@ -71,20 +71,25 @@ bool FlashlightCoordinator::update_scheduling() {
         if (schedule_time > 0 && parent_) {
             ESP_LOGI(TAG, "Scheduling flash for next cycle in %u ms", schedule_time);
             
-            App.scheduler.set_timeout(parent_, "flash_on", schedule_time, [this]() {
+            // Use unique timeout names to avoid collisions with multiple instances
+            std::string timeout_on = "flash_on_" + std::to_string(reinterpret_cast<uintptr_t>(this));
+            std::string timeout_capture = "flash_capture_" + std::to_string(reinterpret_cast<uintptr_t>(this));
+            std::string timeout_off = "flash_off_" + std::to_string(reinterpret_cast<uintptr_t>(this));
+            
+            App.scheduler.set_timeout(parent_, timeout_on.c_str(), schedule_time, [this, timeout_capture, timeout_off]() {
                 enable_flash();
                 scheduled_ = true;
                 
                 // Then wait for pre-time to capture
                 uint32_t capture_delay = (pre_time_ > 500) ? pre_time_ - 500 : 0;
                 
-                App.scheduler.set_timeout(parent_, "flash_capture", capture_delay, [this]() {
+                App.scheduler.set_timeout(parent_, timeout_capture.c_str(), capture_delay, [this]() {
                     if (request_frame_callback_) request_frame_callback_();
                 });
                 
                 // Then off
                 uint32_t off_delay = pre_time_ + post_time_;
-                App.scheduler.set_timeout(parent_, "flash_off", off_delay, [this]() {
+                App.scheduler.set_timeout(parent_, timeout_off.c_str(), off_delay, [this]() {
                     disable_flash();
                     scheduled_ = false;
                 });

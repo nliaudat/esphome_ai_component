@@ -2,7 +2,7 @@
 
 #include "esphome/core/component.h"
 #include "esphome/components/camera/camera.h"
-#include "esphome/components/esp32_camera/esp32_camera.h"
+//#include "esphome/components/esp32_camera/esp32_camera.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/button/button.h"
@@ -45,12 +45,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
-#endif
-
-  #include "esphome/components/esp32_camera/esp32_camera.h"
-
-#ifdef USE_WEB_SERVER
-#include "esphome/components/web_server_base/web_server_base.h"
 #endif
 
 #include "esphome/core/defines.h"
@@ -114,14 +108,17 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void take_preview_image();
   void capture_preview();
   std::shared_ptr<camera::CameraImage> get_preview_image();
+#endif
 
- private:
+ protected:
+  #ifdef DEV_ENABLE_ROTATION
   void update_preview_image(std::shared_ptr<camera::CameraImage> image);
   std::shared_ptr<camera::CameraImage> last_preview_image_{nullptr};
   std::mutex preview_mutex_;
   bool request_preview_{false};
+  #endif
+
  public:
-#endif
 
   // Debug/Reporting
   static void register_service(MeterReaderTFLite *comp) { comp->print_debug_info(); }
