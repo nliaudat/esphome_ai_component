@@ -12,6 +12,7 @@
 #include <cmath>
 #include <cstring>
 #include <numeric>
+#include <limits>
 
 namespace esphome {
 namespace value_validator {
@@ -782,9 +783,14 @@ void ValueValidator::set_last_valid_reading(const std::string &value) {
 
   int int_val = 0;
   char* end = nullptr;
+  errno = 0;
   long val = strtol(value.c_str(), &end, 10);
   if (end != value.c_str() + value.length()) {
       ESP_LOGE(TAG, "Failed to parse complete manual value string: %s", value.c_str());
+      return;
+  }
+  if (errno == ERANGE || val > std::numeric_limits<int>::max() || val < std::numeric_limits<int>::min()) {
+      ESP_LOGE(TAG, "Manual value out of int range: %s", value.c_str());
       return;
   }
   int_val = static_cast<int>(val);
