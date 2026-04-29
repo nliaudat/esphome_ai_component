@@ -913,7 +913,13 @@ std::array<uint8_t, JPEG_BUFFER_SIZE> buffer;
 2.  **ASK** the user to confirm before proceeding
 3.  **REFERENCE** the section number from this document
 
-### 12.10 Communication Style Directive
+### 12.10 No Unauthorized Commits
+
+- **NEVER** commit, push, or create any files in the repository without explicit human acknowledgment and approval.
+- Present changes as proposals first. Wait for the user to confirm before writing any files or making commits.
+- This rule applies to ALL files including documentation, proposals, and code changes.
+
+### 12.11 Communication Style Directive
 
 - **DO NOT** add "open questions" sections in code comments.
 - Keep review output focused on findings, fixes, and actionable recommendations only.
