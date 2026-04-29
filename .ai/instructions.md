@@ -40,6 +40,15 @@ This project provides a modular framework for running **TensorFlow Lite Micro mo
 **This file is the SINGLE SOURCE OF TRUTH for all code reviews.**  
 Generic C++ advice is OVERRIDDEN by the rules below.
 
+### 🚨 ESP-IDF & Classic ESP32 Compatibility (Added 2026-04)
+
+**All code changes MUST:**
+1. **Compile and run on ESP-IDF** (the sole framework for ESP32-S3, standard for all ESP32)
+2. **Fall back gracefully on classic ESP32** — dual-target awareness (§12.5)
+3. **Never assume PSRAM** is available (always check `psramFound()`)
+4. **Guard ESP-NN features** with `#ifdef ESP_NN` + ESP-IDF platform checks
+5. **Never use Arduino-only APIs** in shared code paths (`digitalWrite`, `delay`, `Serial`)
+
 ---
 
 ## 2. COMPONENT ARCHITECTURE
@@ -117,16 +126,22 @@ esphome_ai_component/
 - Camera windowing MUST work with OV2640/OV3660 sensors
 - Rotation setting MUST apply to inference preprocessing
 - MUST expose confidence scores to Home Assistant
+- **Grayscale pipeline optimizations** (bypass JPEG decode + RGB→Gray conversion) MUST only activate when the model has 1-channel input detected at runtime via `TfLiteTensor::dims->data[3] == 1`. RGB models MUST be unaffected.
+- **Inference result processing** MUST NOT be duplicated across sync and async paths. Extract common logic into a single `publish_inference_result()` method called by both.
 
 **⚠️ WARNING:**
 - Rotation ONLY affects inference, not web stream (documented limitation)
 - Default tensor arena size: 512KB (ESP32), 768KB (ESP32-S3)
 - Large models (>1MB) may fail on classic ESP32
+- **Calibration timing constants** MUST NOT be duplicated in header and .cpp with different values. Define defaults in ONE place (prefer header struct defaults).
+- **Preview web handler** MUST NOT be guarded by `DEV_ENABLE_ROTATION` — it should be available whenever `USE_WEB_SERVER` is defined.
+- **Camera recovery** SHOULD implement automatic camera re-initialization after N consecutive frame timeouts (N ≥ 3), with `esp_restart()` as last resort after 5+ timeouts.
 
 **❌ BLOCKER:**
 - No hardcoded model input dimensions - MUST derive from model
 - No synchronous HTTP in inference path
 - No memory allocation during loop() after setup
+- NO TOCTOU (CWE-367) with multiple atomic flags for frame state — MUST use a single atomic state machine (e.g. `std::atomic<FrameState>`) instead of three separate `std::atomic<bool>` flags.
 
 ### 3.2 `esp32_camera_utils` - Image Processing Core
 
@@ -946,5 +961,5 @@ std::array<uint8_t, JPEG_BUFFER_SIZE> buffer;
 **END OF AI COLLABORATION GUIDE**
 
 *This document is the authoritative standard for the esphome_ai_component repository.*
-*Last updated: February 2026*
+*Last updated: April 2026*
 ```

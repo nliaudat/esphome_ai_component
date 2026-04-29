@@ -231,11 +231,16 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   // ValueValidator output_validator_; 
   ValueValidatorCoordinator validation_coord_;
 
-  // State
+  // State — Single atomic state machine (replaces 3 separate bool flags, eliminates TOCTOU CWE-367)
+  enum class FrameState : uint8_t {
+    IDLE,
+    REQUESTED,
+    AVAILABLE,
+    PROCESSING,
+    TIMEOUT
+  };
+  std::atomic<FrameState> frame_state_{FrameState::IDLE};
   std::atomic<bool> pause_processing_{false};
-  std::atomic<bool> frame_requested_{false};
-  std::atomic<bool> frame_available_{false};
-  std::atomic<bool> processing_frame_{false};
   std::shared_ptr<camera::CameraImage> pending_frame_{nullptr};
   std::mutex frame_mutex_;
   uint32_t last_request_time_{0};
@@ -342,6 +347,11 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   float combine_readings(const esphome::StaticVector<float, 16>& readings, std::string &out_str);
   bool validate_and_update_reading(float raw, float conf, float& val);
   bool validate_and_update_reading(const esphome::StaticVector<float, 16>& digits, const esphome::StaticVector<float, 16>& confidences, float& val);
+
+  // Inference result publishing — extracted to eliminate duplication between sync and async paths
+  void publish_inference_result(const std::string& digit_str, float avg_conf, float validated_val, bool valid,
+                                const esphome::StaticVector<float, 16>& readings,
+                                const esphome::StaticVector<float, 16>& confidences);
 
 #ifdef USE_WEB_SERVER
   web_server_base::WebServerBase *web_server_{nullptr};

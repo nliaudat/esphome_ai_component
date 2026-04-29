@@ -322,7 +322,7 @@ void MeterReaderTFLite::setup() {
     
     // 5. Setup Flashlight Coordinator Callback
     this->flashlight_coord_.set_request_frame_callback([this](){
-        this->frame_requested_ = true;
+        this->frame_state_.store(FrameState::REQUESTED);
         this->last_request_time_ = millis();
         ESP_LOGD(TAG, "Frame requested via coordinator callback");
     });
@@ -385,11 +385,10 @@ void MeterReaderTFLite::set_debug(bool debug) {
 
 void MeterReaderTFLite::on_camera_image(const std::shared_ptr<camera::CameraImage> &image) {
     std::lock_guard<std::mutex> lock(this->frame_mutex_);
-    if (this->frame_requested_.load() && !this->processing_frame_.load()) {
+    FrameState expected = FrameState::REQUESTED;
+    if (this->frame_state_.compare_exchange_strong(expected, FrameState::AVAILABLE)) {
         this->pending_frame_ = image;
         this->pending_frame_acquisition_time_ = millis(); 
-        this->frame_available_.store(true);
-        this->frame_requested_.store(false);
     }
 }
 
@@ -427,10 +426,11 @@ void MeterReaderTFLite::update() {
         
         // Trigger frame request for preview update 
         // (Similar to continuous mode but specifically for preview)
-        if (!this->frame_available_ && !this->frame_requested_) {
-             this->frame_requested_ = true;
+        FrameState state = this->frame_state_.load();
+        if (state == FrameState::IDLE) {
+             this->frame_state_.store(FrameState::REQUESTED);
              this->last_request_time_ = millis();
-        } else if (this->frame_available_) {
+        } else if (state == FrameState::AVAILABLE) {
              this->process_available_frame();
         }
         return; // Skip standard scheduling
@@ -442,13 +442,14 @@ void MeterReaderTFLite::update() {
     
     if (!busy) {
         // Normal cycle
-         if (!this->frame_available_ && !this->frame_requested_) {
-             this->frame_requested_ = true;
+        FrameState state = this->frame_state_.load();
+        if (state == FrameState::IDLE) {
+             this->frame_state_.store(FrameState::REQUESTED);
              this->last_request_time_ = millis();
              ESP_LOGD(TAG, "Requesting frame (Continuous/No-Flash)");
-         } else if (this->frame_available_) {
+        } else if (state == FrameState::AVAILABLE) {
              this->process_available_frame();
-         }
+        }
     }
 }
 
@@ -458,18 +459,20 @@ void MeterReaderTFLite::loop() {
     if (this->is_failed()) return;
 
     // Watchdog: If frame requested but not arrived, reset state
-    if (this->frame_requested_ && (millis() - this->last_request_time_ > this->frame_request_timeout_ms_)) {
+    FrameState state = this->frame_state_.load();
+    if (state == FrameState::REQUESTED && (millis() - this->last_request_time_ > this->frame_request_timeout_ms_)) {
         ESP_LOGE(TAG, "Frame request timed out (%u ms)! Camera Frame Failure.", this->frame_request_timeout_ms_);
         if (this->main_logs_) {
              char msg[100];
              snprintf(msg, sizeof(msg), "CRITICAL: Camera Frame Failure (Timeout %ums)", this->frame_request_timeout_ms_);
              this->main_logs_->publish_state(msg);
         }
-        this->frame_requested_ = false;
+        this->frame_state_.store(FrameState::TIMEOUT);
         // Check if we need to force reset camera or just continue
     }
 
-    if (this->frame_available_ && !this->processing_frame_) {
+    state = this->frame_state_.load();
+    if (state == FrameState::AVAILABLE) {
         this->process_available_frame();
     }
     
@@ -478,7 +481,6 @@ void MeterReaderTFLite::loop() {
     InferenceResult* res_ptr = nullptr;
     if (this->output_queue_ && xQueueReceive(this->output_queue_, &res_ptr, 0) == pdTRUE) {
         if (res_ptr) {
-            // Reconstruct logic from process_full_image's tail
             ESP_LOGD(TAG, "Async inference finished in %lu ms (Total: %lu ms)", 
                      res_ptr->inference_time, millis() - res_ptr->total_start_time);
             
@@ -500,7 +502,6 @@ void MeterReaderTFLite::loop() {
             }
 
             // Validate
-            // Use Average Confidence to match Single Core logic
             float avg_conf = 0.0f;
             if (!res_ptr->probabilities.empty()) {
                  float sum = 0.0f;
@@ -511,85 +512,8 @@ void MeterReaderTFLite::loop() {
             if (this->value_sensor_) {
                 float validated_val = 0.0f;
                 bool valid = this->validate_and_update_reading(res_ptr->readings, res_ptr->probabilities, validated_val);
-                
-                if (this->inference_logs_) {
-                     // Publish to inference logs text sensor
-                     char inference_log[150];
-                     snprintf(inference_log, sizeof(inference_log),
-                              "Reading: %s -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%%)",
-                              digit_str.c_str(), validated_val, valid ? "yes" : "no",
-                              avg_conf * 100.0f, this->confidence_threshold_ * 100.0f);
-                     this->inference_logs_->publish_state(inference_log);
-                }
-
-                // Build confidence list string
-                std::string conf_list = "[";
-                // C++20: Range-based for loop with init-statement
-                for (int i = 0; const auto &score : res_ptr->probabilities) {
-                    if (i < 5) { // Limit logging to top 5 categories
-                         ESP_LOGD(TAG, "  Class %d: %.3f", i, score);
-                    }
-                    if (i > 0) conf_list += ", ";
-                    char buf[8];
-                    snprintf(buf, sizeof(buf), "%.3f", score);
-                    conf_list += buf;
-                    i++;
-                }
-                conf_list += "]";
-
-                // Publish (matches process_full_image logic)
-                if (valid && (this->validation_coord_.has_validator() || avg_conf >= this->confidence_threshold_)) {
-                     ESP_LOGI(TAG, "Result: VALID (Raw: %s, Conf: %.3f, %s)", 
-                              digit_str.c_str(), avg_conf, conf_list.c_str());
-                     this->value_sensor_->publish_state(validated_val);
-                     if (this->confidence_sensor_) {
-                         this->confidence_sensor_->publish_state(avg_conf * 100.0f);
-                     }
-                } else {
-                     ESP_LOGI(TAG, "Result: INVALID (Raw: %s, Conf: %.3f, %s)", 
-                              digit_str.c_str(), avg_conf, conf_list.c_str());
-
-                     #ifdef USE_DATA_COLLECTOR
-                     // Data Collection Trigger Logic
-                     // We are in the 'else' block of 'if (valid && ...)'
-                     // So we know it is effectively invalid for publishing purposes.
-                     bool trigger_collection = true; // Default to true for invalid readings (legacy behavior)
-
-                     // Detect suspicious patterns
-                     bool suspicious = false;
-                     #ifdef USE_VALUE_VALIDATOR
-                     if (this->validation_coord_.has_validator()) {
-                         suspicious = this->validation_coord_.get_validator()->is_hallucination_pattern(res_ptr->readings);
-                     }
-                     #endif
-                     
-                     // Check thresholds if it wasn't already going to trigger
-                     if (!trigger_collection && this->collect_min_global_confidence_ > 0 && avg_conf < this->collect_min_global_confidence_) {
-                         trigger_collection = true;
-                         ESP_LOGW(TAG, "Data Collection Triggered: Global Confidence %.2f < %.2f", avg_conf, this->collect_min_global_confidence_);
-                     }
-
-                     if (!trigger_collection && this->collect_min_digit_confidence_ > 0) {
-                         for (float c : res_ptr->probabilities) {
-                             if (c < this->collect_min_digit_confidence_) {
-                                 trigger_collection = true;
-                                 ESP_LOGW(TAG, "Data Collection Triggered: A digit confidence %.2f < %.2f", c, this->collect_min_digit_confidence_);
-                                 break;
-                             }
-                         }
-                     }
-
-                     if (trigger_collection) {
-                         std::string metadata = "";
-                         metadata = this->serialize_inference_metadata(digit_str, avg_conf, res_ptr->readings, res_ptr->probabilities,
-                                                                     this->camera_coord_.get_width(), this->camera_coord_.get_height());
- 
-                         ESP_LOGW(TAG, "Data Collection Triggered: Reading Invalid/LowConf (Conf: %.1f%%, Suspicious: %s)", 
-                                  avg_conf * 100.0f, suspicious ? "YES" : "NO");
-                         this->trigger_low_confidence_collection(digit_str, avg_conf, metadata);
-                     }
-                     #endif
-                }
+                this->publish_inference_result(digit_str, avg_conf, validated_val, valid,
+                                               res_ptr->readings, res_ptr->probabilities);
             }
             
             // Publish pool efficiency statistics
@@ -653,7 +577,7 @@ void MeterReaderTFLite::loop() {
             // Request next frame if configured.
             // Note: 'update()' triggers 'take_picture', so this maintains the loop if continuous mode is enabled.
         }
-        this->processing_frame_ = false; // Release lock
+        this->frame_state_.store(FrameState::IDLE); // Release lock
     }
     #endif
 }
@@ -680,29 +604,28 @@ void MeterReaderTFLite::trigger_low_confidence_collection(const std::string &val
     this->flashlight_coord_.enable_flash();
     
     // Wait for stabilization
-    uint32_t delay = this->flashlight_coord_.get_pre_time();
+    uint32_t stabilization_delay = this->flashlight_coord_.get_pre_time();
     // Safety clamp
-    if (delay < 500) delay = 500;
-    if (delay > 5000) delay = 5000;
+    if (stabilization_delay < 500) stabilization_delay = 500;
+    if (stabilization_delay > 5000) stabilization_delay = 5000;
 
-    this->set_timeout(delay, [this]() {
+    this->set_timeout(stabilization_delay, [this]() {
         ESP_LOGD(TAG, "Flash stabilized. Requesting data collection frame.");
         this->collection_state_ = COLLECTION_WAITING_FOR_FRAME;
-        this->frame_requested_ = true;
+        this->frame_state_.store(FrameState::REQUESTED);
         this->last_request_time_ = millis();
     });
 }
 #endif
 
 void MeterReaderTFLite::process_available_frame() {
-    this->processing_frame_ = true;
+    this->frame_state_.store(FrameState::PROCESSING);
     
     std::shared_ptr<camera::CameraImage> frame;
     {
         std::lock_guard<std::mutex> lock(this->frame_mutex_);
         frame = this->pending_frame_;
         this->pending_frame_.reset();
-        this->frame_available_ = false;
     }
     
     // Data Collection Interception
@@ -714,7 +637,7 @@ void MeterReaderTFLite::process_available_frame() {
          }
          this->collection_state_ = COLLECTION_IDLE;
          this->flashlight_coord_.disable_flash();
-         this->processing_frame_ = false;
+         this->frame_state_.store(FrameState::IDLE);
          return; 
     }
     #endif
@@ -722,7 +645,7 @@ void MeterReaderTFLite::process_available_frame() {
     if (frame) {
         this->process_full_image(frame);
     }
-    this->processing_frame_ = false;
+    this->frame_state_.store(FrameState::IDLE);
 }
 
 void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> frame) {
@@ -821,13 +744,11 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     // Async Path
     if (processed_buffers.empty()) {
         ESP_LOGW(TAG, "Processed buffers empty. Skipping inference (Async).");
-        this->processing_frame_ = false;
         return;
     }
 
     // If we are paused (Setup Mode/Preview Only), we stop here.
     if (this->pause_processing_) {
-        this->processing_frame_ = false;
         return;
     }
     
@@ -846,7 +767,6 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     if (xQueueSend(this->input_queue_, &job_ptr, 0) != pdTRUE) {
         ESP_LOGW(TAG, "Inference Queue Full - Dropping Frame");
         // job destructor will cleanup automatically (calls free_inference_job)
-        this->processing_frame_ = false;
     } else {
         ESP_LOGI(TAG, "Job successfully enqueued.");
         job.release(); // Ownership transferred to queue
@@ -875,7 +795,6 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     if (processed_buffers.empty()) {
         ESP_LOGE(TAG, "No processed buffers generated (JPEG decode failed?). Skipping inference.");
         if (this->main_logs_) this->main_logs_->publish_state("ERROR: JPEG Decode Failed / No Buffers");
-        this->processing_frame_ = false;
         return;
     }
 
@@ -928,79 +847,91 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
         float validated_val = final_val;
         bool valid = this->validate_and_update_reading(readings, confidences, validated_val);
 
-        if (this->inference_logs_) {
-             // Publish to inference logs text sensor
-             char inference_log[150];
-             snprintf(inference_log, sizeof(inference_log),
-                      "Reading: %s -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%% (high: %.1f%%))",
-                      digit_str.c_str(), validated_val, valid ? "yes" : "no",
-                      avg_conf * 100.0f, this->confidence_threshold_ * 100.0f, this->high_confidence_threshold_ * 100.0f);
-             this->inference_logs_->publish_state(inference_log);
-        }
+        // Use shared publishing method (eliminates duplication with async path)
+        this->publish_inference_result(digit_str, avg_conf, validated_val, valid, readings, confidences);
 
-        if (valid && (this->validation_coord_.has_validator() || avg_conf >= this->confidence_threshold_)) {
-             // Removed checking of inference_log char buffer availability to match legacy cleanly
-             ESP_LOGI(TAG, "Reading: %s -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%% (high: %.1f%%))", 
-                digit_str.c_str(), validated_val, valid ? "yes" : "no", 
-                avg_conf * 100.0f, this->confidence_threshold_ * 100.0f, this->high_confidence_threshold_ * 100.0f);
-             
-             if (this->value_sensor_) this->value_sensor_->publish_state(validated_val);
-             if (this->confidence_sensor_) this->confidence_sensor_->publish_state(avg_conf * 100.0f);
-             
-             ESP_LOGI(TAG, "Reading published - valid and confidence threshold met");
-        } else {
-             ESP_LOGI(TAG, "Reading: %s -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%% (high: %.1f%%))", 
-                digit_str.c_str(), validated_val, valid ? "yes" : "no", 
-                avg_conf * 100.0f, this->confidence_threshold_ * 100.0f, this->high_confidence_threshold_ * 100.0f);
-             ESP_LOGW(TAG, "Reading NOT published - %s", 
-                     !valid ? "validation failed" : "confidence below threshold");
-             
-             #ifdef USE_DATA_COLLECTOR
-             // Data Collection Trigger Logic
-             bool trigger_collection = true; // Default to true since we are in the invalid/rejected block
-
-             // Detect suspicious patterns
-             bool suspicious = false;
-             #ifdef USE_VALUE_VALIDATOR
-             if (this->validation_coord_.has_validator()) {
-                 suspicious = this->validation_coord_.get_validator()->is_hallucination_pattern(readings);
-             }
-             #endif
-
-             // Check thresholds
-             if (!trigger_collection && this->collect_min_global_confidence_ > 0 && avg_conf < this->collect_min_global_confidence_) {
-                 trigger_collection = true;
-                 ESP_LOGW(TAG, "Data Collection Triggered: Global Confidence %.2f < %.2f", avg_conf, this->collect_min_global_confidence_);
-             }
-
-             if (!trigger_collection && this->collect_min_digit_confidence_ > 0) {
-                 for (float c : confidences) {
-                     if (c < this->collect_min_digit_confidence_) {
-                         trigger_collection = true;
-                         ESP_LOGW(TAG, "Data Collection Triggered: A digit confidence %.2f < %.2f", c, this->collect_min_digit_confidence_);
-                         break;
-                     }
-                 }
-             }
-             
-             if (trigger_collection) {
-                 std::string metadata = "";
-                 metadata = this->serialize_inference_metadata(digit_str, avg_conf, readings, confidences,
-                                                             this->camera_coord_.get_width(), this->camera_coord_.get_height());
-                 
-                 ESP_LOGW(TAG, "Data Collection Triggered: Reading Invalid/LowConf (Conf: %.1f%%, Suspicious: %s)", 
-                          avg_conf * 100.0f, suspicious ? "YES" : "NO");
-                 this->trigger_low_confidence_collection(digit_str, avg_conf, metadata);
-             }
-             #endif
-        }
-
-        // Calibration Logic Hook
         // Calibration Logic Hook
         this->update_calibration(avg_conf);
     }
     
     METER_DURATION_END("Total Processing");
+}
+
+void MeterReaderTFLite::publish_inference_result(const std::string& digit_str, float avg_conf, float validated_val, bool valid,
+                                                  const esphome::StaticVector<float, 16>& readings,
+                                                  const esphome::StaticVector<float, 16>& confidences) {
+    // Publish to inference logs text sensor
+    if (this->inference_logs_) {
+        char inference_log[150];
+        snprintf(inference_log, sizeof(inference_log),
+                 "Reading: %s -> %.1f (valid: %s, confidence: %.1f%%, threshold: %.1f%%)",
+                 digit_str.c_str(), validated_val, valid ? "yes" : "no",
+                 avg_conf * 100.0f, this->confidence_threshold_ * 100.0f);
+        this->inference_logs_->publish_state(inference_log);
+    }
+
+    // Build confidence list string for logging
+    std::string conf_list = "[";
+    for (int i = 0; const auto &score : confidences) {
+        if (i < 5) { // Limit logging to top 5 categories
+            ESP_LOGD(TAG, "  Class %d: %.3f", i, score);
+        }
+        if (i > 0) conf_list += ", ";
+        char buf[8];
+        snprintf(buf, sizeof(buf), "%.3f", score);
+        conf_list += buf;
+        i++;
+    }
+    conf_list += "]";
+
+    if (valid && (this->validation_coord_.has_validator() || avg_conf >= this->confidence_threshold_)) {
+        ESP_LOGI(TAG, "Result: VALID (Raw: %s, Conf: %.3f, %s)", 
+                 digit_str.c_str(), avg_conf, conf_list.c_str());
+        if (this->value_sensor_) this->value_sensor_->publish_state(validated_val);
+        if (this->confidence_sensor_) this->confidence_sensor_->publish_state(avg_conf * 100.0f);
+    } else {
+        ESP_LOGI(TAG, "Result: INVALID (Raw: %s, Conf: %.3f, %s)", 
+                 digit_str.c_str(), avg_conf, conf_list.c_str());
+
+        #ifdef USE_DATA_COLLECTOR
+        // Data Collection Trigger Logic
+        bool trigger_collection = true; // Default to true for invalid readings
+
+        // Detect suspicious patterns
+        bool suspicious = false;
+        #ifdef USE_VALUE_VALIDATOR
+        if (this->validation_coord_.has_validator()) {
+            suspicious = this->validation_coord_.get_validator()->is_hallucination_pattern(readings);
+        }
+        #endif
+
+        // Check thresholds
+        if (!trigger_collection && this->collect_min_global_confidence_ > 0 && avg_conf < this->collect_min_global_confidence_) {
+            trigger_collection = true;
+            ESP_LOGW(TAG, "Data Collection Triggered: Global Confidence %.2f < %.2f", avg_conf, this->collect_min_global_confidence_);
+        }
+
+        if (!trigger_collection && this->collect_min_digit_confidence_ > 0) {
+            for (float c : confidences) {
+                if (c < this->collect_min_digit_confidence_) {
+                    trigger_collection = true;
+                    ESP_LOGW(TAG, "Data Collection Triggered: A digit confidence %.2f < %.2f", c, this->collect_min_digit_confidence_);
+                    break;
+                }
+            }
+        }
+
+        if (trigger_collection) {
+            std::string metadata = "";
+            metadata = this->serialize_inference_metadata(digit_str, avg_conf, readings, confidences,
+                                                        this->camera_coord_.get_width(), this->camera_coord_.get_height());
+
+            ESP_LOGW(TAG, "Data Collection Triggered: Reading Invalid/LowConf (Conf: %.1f%%, Suspicious: %s)", 
+                     avg_conf * 100.0f, suspicious ? "YES" : "NO");
+            this->trigger_low_confidence_collection(digit_str, avg_conf, metadata);
+        }
+        #endif
+    }
 }
 
 void MeterReaderTFLite::set_crop_zones(const std::string &zones_json) {
@@ -1093,7 +1024,7 @@ void MeterReaderTFLite::take_preview_image() { this->capture_preview(); }
 void MeterReaderTFLite::capture_preview() {
     this->request_preview_ = true;
     this->flashlight_coord_.capture_preview_sequence([this](){
-        this->frame_requested_ = true;
+        this->frame_state_.store(FrameState::REQUESTED);
         this->last_request_time_ = millis();
     });
 }
@@ -1250,7 +1181,7 @@ void MeterReaderTFLite::set_update_interval(uint32_t ms) {
 
 void MeterReaderTFLite::force_flash_inference() {
     this->flashlight_coord_.force_inference([this](){ 
-        this->frame_requested_ = true; 
+        this->frame_state_.store(FrameState::REQUESTED);
         this->last_request_time_ = millis();
     });
 }
@@ -1405,7 +1336,7 @@ void MeterReaderTFLite::stop_inference_pipeline() {
              vTaskDelete(this->inference_task_handle_);
              break;
         }
-        delay(10);
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
     this->inference_task_handle_ = nullptr;
     

@@ -1,7 +1,8 @@
 #include "camera_coordinator.h"
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
-#include "esphome/core/application.h" // For delay() if needed
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 namespace esphome {
 namespace meter_reader_tflite {
@@ -60,11 +61,10 @@ bool CameraCoordinator::set_window(int offset_x, int offset_y, int width, int he
         this->current_width_ = new_dims.first;
         this->current_height_ = new_dims.second;
         
-        // NOTE: Blocking delay required - camera sensor needs stabilization time
-        // before the next frame capture. This runs during setup/reconfiguration,
-        // not in the hot loop() path. Caller expects synchronous completion.
-        // TODO: Consider state machine approach if this causes issues in async contexts
-        delay(WINDOW_SET_STABILIZATION_MS);
+        // NOTE: Camera sensor needs stabilization time before the next frame capture.
+        // This runs during setup/reconfiguration, not in the hot loop() path.
+        // Using vTaskDelay to yield to other tasks during the wait.
+        vTaskDelay(pdMS_TO_TICKS(WINDOW_SET_STABILIZATION_MS));
         return true;
     }
     ESP_LOGE(TAG, "Failed to set camera window");
@@ -87,7 +87,9 @@ bool CameraCoordinator::reset_window() {
          
          if (success) {
              this->current_format_ = this->orig_format_;
-             delay(WINDOW_RESET_STABILIZATION_MS); // Blocking: camera must stabilize
+             // Camera sensor needs stabilization time before the next frame capture.
+             // Using vTaskDelay to yield to other tasks during the wait.
+             vTaskDelay(pdMS_TO_TICKS(WINDOW_RESET_STABILIZATION_MS));
          }
     }
     
@@ -114,7 +116,7 @@ bool CameraCoordinator::test_camera_after_reset(std::atomic<bool>& frame_availab
              frame_requested.store(false);
              return true;
          }
-         delay(100);
+         vTaskDelay(pdMS_TO_TICKS(100));
      }
      frame_requested.store(false);
      return false;
