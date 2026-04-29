@@ -872,7 +872,7 @@ std::array<uint8_t, JPEG_BUFFER_SIZE> buffer;
 - `meter_reader_tflite/` → Apply AI inference rules
 - `esp32_camera_utils/` → Apply memory management rules
 - `data_collector/` → Apply non-blocking network rules
-- `legacy_*/` → Apply frozen component rules (NO changes)
+- `legacy_meter_reader_tflite/` → **EXCLUDED** from AI review. Do not read, analyze, or suggest changes to this component. It is frozen and deprecated.
 
 ### 12.5 Performance Dual-Target Awareness
 
