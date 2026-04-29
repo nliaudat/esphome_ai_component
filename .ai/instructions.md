@@ -913,6 +913,11 @@ std::array<uint8_t, JPEG_BUFFER_SIZE> buffer;
 2.  **ASK** the user to confirm before proceeding
 3.  **REFERENCE** the section number from this document
 
+### 12.10 Communication Style Directive
+
+- **DO NOT** add "open questions" sections in code comments.
+- Keep review output focused on findings, fixes, and actionable recommendations only.
+
 ---
 
 ## 📌 SUMMARY: NON-NEGOTIABLE RULES (Cheat Sheet)
