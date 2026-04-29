@@ -81,21 +81,21 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void return_image() override {};
 
   // Config Setters (Delegated)
-  void set_confidence_threshold(float threshold) { confidence_threshold_ = threshold; }
+  void set_confidence_threshold(float threshold) { this->confidence_threshold_ = threshold; }
   void set_tensor_arena_size(size_t size_bytes); // -> TFLite
   void set_model(const uint8_t *model, size_t length); // -> TFLite
 
-  void set_value_sensor(sensor::Sensor *sensor) { value_sensor_ = sensor; }
-  void set_confidence_sensor(sensor::Sensor *sensor) { confidence_sensor_ = sensor; }
+  void set_value_sensor(sensor::Sensor *sensor) { this->value_sensor_ = sensor; }
+  void set_confidence_sensor(sensor::Sensor *sensor) { this->confidence_sensor_ = sensor; }
   
   // Set Validator (External)
 #ifdef USE_VALUE_VALIDATOR
-  void set_validator(value_validator::ValueValidator *v) { validation_coord_.set_validator(v); }
+  void set_validator(value_validator::ValueValidator *v) { this->validation_coord_.set_validator(v); }
 #endif
 
   void set_crop_zones(const std::string &zones_json);
   void set_crop_zones_global(globals::GlobalsComponent<std::string> *global_var) {
-      crop_zone_handler_.set_crop_zones_global(global_var);
+      this->crop_zone_handler_.set_crop_zones_global(global_var);
   }
 
   void set_camera_image_format(int width, int height, const std::string &pixel_format); // -> CameraCoord & TFLite
