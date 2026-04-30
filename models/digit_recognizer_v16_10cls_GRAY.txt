@@ -1,0 +1,25 @@
+Model: ../models/digit_recognizer_v16_10cls_GRAY.tflite
+Timestamp: 2026-04-29 22:09:37
+TensorFlow Version: 2.20.0
+File Size: 129.55 KB
+
+================================================================================
+INPUT/OUTPUT SUMMARY
+================================================================================
+Input 0:  [ 1 32 20  1]   <class 'numpy.uint8'>
+Output 0: [ 1 10]         <class 'numpy.uint8'>
+
+================================================================================
+MEMORY USAGE ANALYSIS
+================================================================================
+Total Memory Usage: 243.63 KB
+Number of Tensors: 69
+
+================================================================================
+NOTES
+================================================================================
+- Grayscale version of digit_recognizer_v16_10cls_RGB
+- 1 input channel (GRAY) instead of 3 (RGB)
+- Same architecture as v16_RGB but with single channel input
+- Output processing: SOFTMAX -> QUANTIZE to uint8
+- Tensor Arena Size: ~250KB recommended
