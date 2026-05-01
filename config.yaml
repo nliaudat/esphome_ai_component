@@ -42,8 +42,12 @@ substitutions:
   
     
   # camera
+  # NOTE: OV2640 + ESP32 camera driver cannot reliably do grayscale AND windowing at the same time.
+  # Using JPEG pixel format with the camera; grayscale conversion is done in software by the ImageProcessor
+  # when a grayscale model (model_channels == 1) is loaded.
   camera_pixel_format: JPEG # (cropping implementation is faster with RGB888 format) | Displays: RGB565, RGB888 | Cameras: YUV422, YUV420, RAW | Efficiency: Grayscale, YUV420, JPEG
-  # camera_pixel_format: GRAYSCALE 
+  ### windowing not available nativelyin grayscale mode (OV2640) due to driver limitations. The image is forced JPEG and then converted to grayscale in software by the ImageProcessor
+# camera_pixel_format: GRAYSCALE 
   camera_resolution: 640x480 #800x600 #640x480 #https://esphome.io/components/esp32_camera.html
   # camera_jpeg_quality: 10 # From 10 (best) to 63 (worst). | Must be 0 if non JPEG
   camera_jpeg_quality: 10
@@ -93,6 +97,7 @@ esp32_camera_utils:
   camera_id: ${id_prefix}_espcam
   debug: false
   ### zoom availale for OV2640, OV3660, OV5640, SC101IOT, SC030IOT from crop zones (explicit)
+  ### windowing not available nativelyin grayscale mode (OV2640) due to driver limitations. The image is forced JPEG and then converted to grayscale in software by the ImageProcessor 
   # camera_window:  # can be set in http://[hassio]/developer-tools/action > esphome.[s3cam_tflite]_set_camera_window
   #   offset_x: 928 # multiple of 4
   #   offset_y: 480 # multiple of 4
@@ -154,8 +159,8 @@ value_validator:
   smart_validation_window: 5           # Window size for pattern analysis (default: 5)
     
   # Confidence Thresholds
-  high_confidence_threshold: 0.95      # Threshold for high confidence (default: 90%)
-  per_digit_confidence_threshold: 0.95 # Min confidence per digit (default: 85%)
+  high_confidence_threshold: 0.90     # Threshold for high confidence (default: 90%)
+  per_digit_confidence_threshold: 0.85 # Min confidence per digit (default: 85%)
   strict_confidence_check: true       # Require all digits meet threshold (default: false)
     
   # Memory Management
@@ -167,7 +172,7 @@ meter_reader_tflite:
   validator: ${id_prefix}_validator
   # confidence_threshold: 0.85 # Only if validator is disabled
   camera_id: ${id_prefix}_espcam
-  model: "models/digit_recognizer_v23_10cls_RGB.tflite" 
+  model: "models/digit_recognizer_v23_10cls_RGB.tflite"  #v17 works also great
   # model: "models/digit_recognizer_v3_10cls_RGB.tflite" # 38.41 KB in flash | 0.9788 accuracy | 5172 inf/s | 70.11 KB memory footprint
   # model: "models/digit_recognizer_v4_10cls_RGB.tflite" # 78.33 KB in flash | 0.9924 accuracy | 6380 inf/s | 103.02 KB memory footprint
   # model: "models/digit_recognizer_v16_10cls_RGB.tflite" # 128.84 KB in flash | 0.9918 accuracy | 3907 inf/s | 246.28 KB memory footprint
