@@ -601,21 +601,30 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
       }
   }
   
+  // Auto-detect JPEG data even if config doesn't say "JPEG"
+  // This handles cases where camera outputs JPEG but pixel_format is set to GRAYSCALE/RGB888
+  bool is_actually_jpeg = (this->config_.pixel_format == "JPEG");
+  if (!is_actually_jpeg && image_data.size() >= 2 && 
+      image_data[0] == 0xFF && image_data[1] == 0xD8) {
+    ESP_LOGW(TAG, "JPEG data detected but pixel_format is '%s'. Auto-decoding as JPEG.",
+             this->config_.pixel_format.c_str());
+    is_actually_jpeg = true;
+  }
+  
   // Decide if we should decode once
   // Use master buffer for JPEG if memory is available, otherwise process zone-by-zone
-  if (this->config_.pixel_format == "JPEG" && !low_memory) {
+  if (is_actually_jpeg && !low_memory) {
       use_master_buffer = true;
       
       const uint8_t *jpeg_data = image_data.data();
       size_t jpeg_size = image_data.size();
 
       // 1. Determine format and rotation optimization
+      // NOTE: ESP32 JPEG decoder does NOT support JPEG_PIXEL_FORMAT_GRAY (grayscale) output.
+      // Always decode to RGB888, then convert to grayscale in software.
+      // See: ESP-IDF JPEG_DEC error "Unsupported output pixel format(GREY)"
       jpeg_pixel_format_t decode_format = JPEG_PIXEL_FORMAT_RGB888;
       int decode_channels = 3;
-      if (this->config_.pixel_format == "GRAYSCALE") {
-          decode_format = JPEG_PIXEL_FORMAT_GRAY;
-          decode_channels = 1;
-      }
       
       // Check for standard angles to use decoder rotation (Hardware/Optimized)
       jpeg_rotate_t hw_rotation = JPEG_ROTATE_0D;
@@ -697,11 +706,12 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
 
   // PREVIEW CACHING LOGIC
   const uint8_t* processing_source_ptr = nullptr;
+  
   if (use_master_buffer && master_decoded_buffer) {
-        // Fix BGR -> RGB unconditionally for 3-channel
-        // Since we disabled the internal fix in decode_jpeg, we know we have specific BGR output to correct.
-        if (master_channels == 3) {
-            // ESP_LOGD(TAG, "ImageProcessor: Executing BGR->RGB Swap on %dx%d image", master_width, master_height);
+        // Fix BGR -> RGB for 3-channel (needed for RGB models where channel order matters)
+        // Skip for grayscale models (model_channels == 1) since arrange_channels()
+        // computes luminance from R,G,B which is order-independent.
+        if (master_channels == 3 && this->config_.model_channels >= 3) {
             uint8_t* raw_buf = master_decoded_buffer.get();
             size_t pixel_count = master_width * master_height;
             for (size_t i = 0; i < pixel_count; i++) {
@@ -710,36 +720,58 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
                 raw_buf[idx] = raw_buf[idx + 2];
                 raw_buf[idx + 2] = temp;
             }
-        } else {
-             // ESP_LOGW(TAG, "ImageProcessor: Skipping BGR->RGB Swap. Channels=%d", master_channels);
+        }
+
+        // Convert master buffer to grayscale when model expects 1 channel
+        // This handles the case where pixel_format is GRAYSCALE but the camera
+        // outputs JPEG data (ESPHome converts GRAYSCALE to JPEG when jpeg_quality != 0).
+        // The JPEG has JPEG_SUBSAMPLE_GRAY (no chrominance data), so R=G=B and
+        // conversion is a simple byte copy of every 3rd byte.
+        // This saves 2/3rds of buffer memory and uses the correct grayscale
+        // processing path for zone extraction.
+        JpegBufferPtr gray_master_buffer;
+        if (master_channels == 3 && this->config_.model_channels == 1) {
+            size_t pixel_count = master_width * master_height;
+            size_t gray_size = pixel_count;
+            gray_master_buffer = allocate_jpeg_buffer(gray_size);
+            if (gray_master_buffer) {
+                uint8_t* src = master_decoded_buffer.get();
+                uint8_t* dst = gray_master_buffer.get();
+                for (size_t i = 0; i < pixel_count; i++) {
+                    dst[i] = src[i * 3];
+                }
+                // Replace master buffer with grayscale version
+                master_decoded_buffer = std::move(gray_master_buffer);
+                master_channels = 1;
+                ESP_LOGI(TAG, "Converted master buffer to grayscale: %dx%d (%zu bytes)",
+                         master_width, master_height, gray_size);
+            } else {
+                ESP_LOGW(TAG, "Failed to allocate grayscale master buffer, using RGB888");
+            }
         }
 
         if (this->config_.cache_preview_image) {
-            uint8_t* raw = master_decoded_buffer.release();
-            // Wrap in TrackedBuffer (jpeg aligned)
-            // Constructor: ptr, spiram, jpeg_aligned, pooled, size
-            // Note: size=0 is safe for free (jpeg_free_align doesn't need it), but checking track usage might be off.
-            // Using 0 for now as we don't easily know alloc size unless we track it from decode/alloc.
-            // Actually decode_jpeg allocates size = w*h*c roughly.
-            TrackedBuffer* tb = new TrackedBuffer(raw, false, true, false, 0);
-            UniqueBufferPtr uptr(tb);
-            
+            // Copy the master buffer for preview (don't release - we still need it for zone processing)
             size_t buf_len = master_width * master_height * master_channels;
-            
-            // Create preview image
-             std::shared_ptr<RotatedPreviewImage> cached_img = std::make_shared<RotatedPreviewImage>(
-                std::move(uptr), 
-                buf_len,
-                master_width, master_height,
-                (master_channels == 1) ? PIXFORMAT_GRAYSCALE : PIXFORMAT_RGB888 
-            );
-            this->last_processed_image_ = cached_img;
-            processing_source_ptr = raw; // Still valid, owned by cached_img
-            // ESP_LOGD(TAG, "ImageProcessor: Cached preview image. Ptr: %p", (void*)cached_img.get());
-        } else {
-             ESP_LOGD(TAG, "ImageProcessor: Preview caching DISABLED. Releasing buffer.");
-             processing_source_ptr = master_decoded_buffer.get();
+            auto preview_buf = allocate_image_buffer(buf_len);
+            if (preview_buf) {
+                memcpy(preview_buf->get(), master_decoded_buffer.get(), buf_len);
+                
+                std::shared_ptr<RotatedPreviewImage> cached_img(
+                    new RotatedPreviewImage(
+                        std::move(preview_buf), buf_len,
+                        master_width, master_height,
+                        (master_channels == 1) ? PIXFORMAT_GRAYSCALE : PIXFORMAT_RGB888
+                    )
+                );
+                this->last_processed_image_ = cached_img;
+            }
         }
+        
+        // Process zones directly from the master buffer.
+        // If grayscale conversion was done above, master_channels == 1 and
+        // the grayscale processing path will be used for zone extraction.
+        processing_source_ptr = master_decoded_buffer.get();
   }
 
   // Process Zones from Master Buffer (or Source if not JPEG/Mastered)
@@ -881,9 +913,20 @@ bool ImageProcessor::process_zone_to_buffer(
         return false;
     }
 
+    // Auto-detect JPEG data even if config doesn't say "JPEG"
+    bool is_actually_jpeg = (this->config_.pixel_format == "JPEG");
+    if (!is_actually_jpeg && image->get_data_length() >= 2) {
+        const uint8_t* data = image->get_data_buffer();
+        if (data[0] == 0xFF && data[1] == 0xD8) {
+            ESP_LOGW(TAG, "JPEG data detected in process_zone_to_buffer but pixel_format is '%s'. Auto-decoding as JPEG.",
+                     this->config_.pixel_format.c_str());
+            is_actually_jpeg = true;
+        }
+    }
+    
     bool success = false;
     
-    if (this->config_.pixel_format == "JPEG") {
+    if (is_actually_jpeg) {
         CropZone adjusted_zone = adjust_zone_for_jpeg(zone, this->config_.camera_width, this->config_.camera_height);
         success = this->process_jpeg_zone_to_buffer(image, adjusted_zone, output_buffer, output_buffer_size);
     } else {
@@ -957,15 +1000,16 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
     }
 
     // Determine decode format based on model needs
-    // If model needs 1 channel, we decode directly to GRAY to save memory/time
+    // NOTE: ESP32 JPEG decoder does NOT support JPEG_PIXEL_FORMAT_GRAY (grayscale) output.
+    // Always decode to RGB888, then convert to grayscale in software.
+    // See: ESP-IDF JPEG_DEC error "Unsupported output pixel format(GREY)"
     jpeg_pixel_format_t decode_format = JPEG_PIXEL_FORMAT_RGB888;
     int decode_channels = 3;
     
-    // Explicit grayscale request
-    if (this->config_.pixel_format == "GRAYSCALE") {
-        decode_format = JPEG_PIXEL_FORMAT_GRAY;
-        decode_channels = 1;
-    }
+    // Determine if we need to convert decoded RGB888 to grayscale
+    // When camera outputs pixel_format: GRAYSCALE, the JPEG has JPEG_SUBSAMPLE_GRAY
+    // (no chrominance data), so R=G=B and conversion is a simple byte copy.
+    bool needs_grayscale_conversion = (this->config_.model_channels == 1);
 
     int dec_w = 0, dec_h = 0;
     
@@ -1015,11 +1059,50 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
         return false;
     }
 
-    // 2. Handle Rotation (Software - Arbitrary)
-    uint8_t* processing_buf = full_image_buf.get();
+    // 2. Convert decoded RGB888 to grayscale if model needs 1 channel
+    // This saves 2/3rds of buffer memory and avoids redundant per-pixel grayscale
+    // conversion in arrange_channels(). When camera outputs pixel_format: GRAYSCALE,
+    // the JPEG has JPEG_SUBSAMPLE_GRAY (no chrominance data), so R=G=B and conversion
+    // is a simple byte copy.
+    UniqueBufferPtr gray_buffer_storage;
+    if (needs_grayscale_conversion && decode_channels == 3) {
+        uint8_t* rgb_buf = full_image_buf.get();
+        size_t pixel_count = jpeg_width * jpeg_height;
+        
+        // Allocate 1-channel buffer for grayscale
+        size_t gray_size = pixel_count;
+        gray_buffer_storage = allocate_image_buffer(gray_size);
+        
+        if (gray_buffer_storage) {
+            uint8_t* gray_buf = gray_buffer_storage->get();
+            // Convert RGB888 → grayscale: since JPEG is subsampled grayscale, R=G=B
+            // Just copy every 3rd byte (first channel)
+            for (size_t i = 0; i < pixel_count; i++) {
+                gray_buf[i] = rgb_buf[i * 3];
+            }
+            
+            // Free the 3-channel buffer
+            full_image_buf.reset();
+            decode_channels = 1;
+            
+            ESP_LOGI(TAG, "Converted zone buffer to grayscale: %dx%d (%zu bytes)", 
+                     jpeg_width, jpeg_height, gray_size);
+        } else {
+            ESP_LOGW(TAG, "Failed to allocate grayscale buffer, using RGB888");
+        }
+    }
+
+    // 3. Handle Rotation (Software - Arbitrary)
+    uint8_t* processing_buf = nullptr;
     int proc_width = jpeg_width;
     int proc_height = jpeg_height;
     UniqueBufferPtr rotated_buffer_storage;
+    
+    if (gray_buffer_storage) {
+        processing_buf = gray_buffer_storage->get();
+    } else {
+        processing_buf = full_image_buf.get();
+    }
 
     #ifdef USE_CAMERA_ROTATOR
     if (software_rotation_needed && std::abs(this->config_.rotation) > 0.01f) {
@@ -1045,7 +1128,7 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
         uint8_t* rotated_buf = rotated_buffer_storage->get();
 
         // Use helper to Rotate: Full -> Rotated
-        bool rot_success = Rotator::perform_rotation(full_image_buf.get(), rotated_buf, 
+        bool rot_success = Rotator::perform_rotation(processing_buf, rotated_buf, 
                                                  jpeg_width, jpeg_height, 
                                                  decode_channels, this->config_.rotation, out_w, out_h); 
         
@@ -1056,15 +1139,18 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
             
             // Clean up original decode buffer early to save memory
             full_image_buf.reset();
+            gray_buffer_storage.reset();
             
             // Wrap in RotatedPreviewImage to keep it alive and accessible for preview ONLY if requested
             if (this->config_.cache_preview_image) {
                 // We transfer ownership of the UniqueBufferPtr to the shared_ptr<RotatedPreviewImage>
-                std::shared_ptr<RotatedPreviewImage> cached_img = std::make_shared<RotatedPreviewImage>(
-                    std::move(rotated_buffer_storage), 
-                    rotated_size,
-                    out_w, out_h,
-                    (decode_channels == 1) ? PIXFORMAT_GRAYSCALE : PIXFORMAT_RGB888 
+                std::shared_ptr<RotatedPreviewImage> cached_img(
+                    new RotatedPreviewImage(
+                        std::move(rotated_buffer_storage), 
+                        rotated_size,
+                        out_w, out_h,
+                        (decode_channels == 1) ? PIXFORMAT_GRAYSCALE : PIXFORMAT_RGB888 
+                    )
                 );
                 
                 this->last_processed_image_ = cached_img;
@@ -1087,7 +1173,7 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
     }
     #endif
 
-    // 3. Scale / Crop from Processing Buffer (Rotated if needed)
+    // 4. Scale / Crop from Processing Buffer (Rotated if needed)
     int stride = proc_width;
     
     // Note: 'zone' is already validated against 'proc_width/proc_height'
@@ -1151,9 +1237,20 @@ ImageProcessor::ProcessResult ImageProcessor::process_zone(
         return result; 
     }
     
+    // Auto-detect JPEG data even if config doesn't say "JPEG"
+    bool is_actually_jpeg = (this->config_.pixel_format == "JPEG");
+    if (!is_actually_jpeg && image->get_data_length() >= 2) {
+        const uint8_t* data = image->get_data_buffer();
+        if (data[0] == 0xFF && data[1] == 0xD8) {
+            ESP_LOGW(TAG, "JPEG data detected in process_zone but pixel_format is '%s'. Auto-decoding as JPEG.",
+                     this->config_.pixel_format.c_str());
+            is_actually_jpeg = true;
+        }
+    }
+    
     bool success = false;
     
-    if (this->config_.pixel_format == "JPEG") {
+    if (is_actually_jpeg) {
         CropZone adjusted_zone = adjust_zone_for_jpeg(zone, this->config_.camera_width, this->config_.camera_height);
         success = this->process_jpeg_zone_to_buffer(image, adjusted_zone, buffer->get(), required_size);
     } else {
@@ -1231,6 +1328,15 @@ bool ImageProcessor::process_raw_zone_pointer(
     const CropZone &zone, 
     uint8_t *output_buffer, 
     size_t output_buffer_size) {
+
+    // Safety check: detect JPEG data that might have slipped through
+    if (input_len >= 2 && input_data[0] == 0xFF && input_data[1] == 0xD8) {
+        ESP_LOGE(TAG, "JPEG data detected in raw processing path! pixel_format='%s'. "
+                 "This will produce garbage output. Check camera pixel_format config.",
+                 this->config_.pixel_format.c_str());
+        // Return false to prevent feeding garbage to the model
+        return false;
+    }
 
     // Validate buffer size against requirements
     size_t required_size = this->get_required_buffer_size();

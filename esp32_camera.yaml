@@ -46,7 +46,10 @@ esp32_camera:
   frame_buffer_location: PSRAM # DRAM # available in the release 2025.8.0
   
   ## new with https://github.com/esphome/esphome/pull/9496
-  # pixel_format: ${camera_pixel_format} # only if new camera component
+  # NOTE: OV2640 + ESP32 camera driver cannot reliably do grayscale AND windowing at the same time.
+  # When using camera_window in esp32_camera_utils, keep pixel_format as JPEG and let the
+  # ImageProcessor handle grayscale conversion in software for grayscale models.
+  pixel_format: JPEG #pixel_format: ${camera_pixel_format} 
   # frame_buffer_location: PSRAM # only if new camera component
   
   # task_stack_size: 8192

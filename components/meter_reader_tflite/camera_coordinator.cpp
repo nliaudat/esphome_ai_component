@@ -134,6 +134,13 @@ void CameraCoordinator::update_image_processor_config(int model_width, int model
     esp32_camera_utils::ImageProcessorConfig config;
     config.camera_width = this->current_width_;
     config.camera_height = this->current_height_;
+    
+    // Always pass the actual camera pixel format to ImageProcessor.
+    // The ImageProcessor has JPEG auto-detection that handles JPEG data regardless
+    // of the configured pixel_format. For grayscale models, the zone processing
+    // functions (process_rgb888_crop_and_scale_to_*) call arrange_channels() which
+    // handles model_channels == 1 by computing luminance from R,G,B per-pixel.
+    // This avoids expensive full-frame BGR→RGB swap and grayscale conversion.
     config.pixel_format = this->current_format_;
     config.model_width = model_width;
     config.model_height = model_height;
