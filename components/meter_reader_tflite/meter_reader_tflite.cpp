@@ -461,14 +461,16 @@ void MeterReaderTFLite::loop() {
     // Watchdog: If frame requested but not arrived, reset state
     FrameState state = this->frame_state_.load();
     if (state == FrameState::REQUESTED && (millis() - this->last_request_time_ > this->frame_request_timeout_ms_)) {
-        ESP_LOGE(TAG, "Frame request timed out (%u ms)! Camera Frame Failure.", this->frame_request_timeout_ms_);
-        if (this->main_logs_) {
-             char msg[100];
-             snprintf(msg, sizeof(msg), "CRITICAL: Camera Frame Failure (Timeout %ums)", this->frame_request_timeout_ms_);
-             this->main_logs_->publish_state(msg);
+        FrameState expected = FrameState::REQUESTED;
+        if (this->frame_state_.compare_exchange_strong(expected, FrameState::IDLE)) {
+            ESP_LOGE(TAG, "Frame request timed out (%u ms)! Camera Frame Failure.", this->frame_request_timeout_ms_);
+            if (this->main_logs_) {
+                 char msg[100];
+                 snprintf(msg, sizeof(msg), "CRITICAL: Camera Frame Failure (Timeout %ums)", this->frame_request_timeout_ms_);
+                 this->main_logs_->publish_state(msg);
+            }
+            // Check if we need to force reset camera or just continue
         }
-        this->frame_state_.store(FrameState::TIMEOUT);
-        // Check if we need to force reset camera or just continue
     }
 
     state = this->frame_state_.load();
@@ -514,6 +516,7 @@ void MeterReaderTFLite::loop() {
                 bool valid = this->validate_and_update_reading(res_ptr->readings, res_ptr->probabilities, validated_val);
                 this->publish_inference_result(digit_str, avg_conf, validated_val, valid,
                                                res_ptr->readings, res_ptr->probabilities);
+                this->update_calibration(avg_conf);
             }
             
             // Publish pool efficiency statistics
