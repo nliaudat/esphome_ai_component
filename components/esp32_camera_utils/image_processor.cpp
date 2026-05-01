@@ -738,7 +738,13 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
                 uint8_t* src = master_decoded_buffer.get();
                 uint8_t* dst = gray_master_buffer.get();
                 for (size_t i = 0; i < pixel_count; i++) {
-                    dst[i] = src[i * 3];
+                    size_t idx = i * 3;
+                    // ESP32 JPEG decoder outputs BGR888 by default
+                    uint8_t b = src[idx];
+                    uint8_t g = src[idx + 1];
+                    uint8_t r = src[idx + 2];
+                    // Fast integer luminance: Y = (R*77 + G*150 + B*29) >> 8
+                    dst[i] = (r * 77 + g * 150 + b * 29) >> 8;
                 }
                 // Replace master buffer with grayscale version
                 master_decoded_buffer = std::move(gray_master_buffer);
@@ -1075,10 +1081,15 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
         
         if (gray_buffer_storage) {
             uint8_t* gray_buf = gray_buffer_storage->get();
-            // Convert RGB888 → grayscale: since JPEG is subsampled grayscale, R=G=B
-            // Just copy every 3rd byte (first channel)
+            // Convert BGR888 → grayscale
             for (size_t i = 0; i < pixel_count; i++) {
-                gray_buf[i] = rgb_buf[i * 3];
+                size_t idx = i * 3;
+                // ESP32 JPEG decoder outputs BGR888 by default
+                uint8_t b = rgb_buf[idx];
+                uint8_t g = rgb_buf[idx + 1];
+                uint8_t r = rgb_buf[idx + 2];
+                // Fast integer luminance: Y = (R*77 + G*150 + B*29) >> 8
+                gray_buf[i] = (r * 77 + g * 150 + b * 29) >> 8;
             }
             
             // Free the 3-channel buffer
