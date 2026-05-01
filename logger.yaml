@@ -11,7 +11,8 @@ logger:
     ModelHandler: DEBUG
     ImageProcessor: DEBUG
     tflite_coordinator: DEBUG
-    internal_temperature: ERROR 
+    internal_temperature: ERROR
+    internal_temperature.esp32: ERROR
     
     
 # text_sensor:  
