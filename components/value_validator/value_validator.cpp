@@ -387,27 +387,13 @@ bool ValueValidator::validate_reading(std::span<const float> digits, std::span<c
       if (debug_ && !modified) {
           ESP_LOGD(TAG, "Per-digit filter: No changes needed. (Raw: %d)", raw_val);
       }
-  } else {
-       // First reading or no history 
-       
-       if (config_.strict_confidence_check) {
-             ESP_LOGD(TAG, "First reading (Strict Mode): Checking %d digits against %.2f", 
-                      static_cast<int>(current_digits.size()), config_.per_digit_confidence_threshold);
-            
-            for (size_t i = 0; i < current_digits.size(); i++) {
-                float conf = (i < confidences.size()) ? confidences[i] : 0.0f;
-                // ... same logic ...
-                if (conf < config_.per_digit_confidence_threshold) {
-                     ESP_LOGW(TAG, "Initial reading digit %d low confidence (Conf: %.2f < %.2f) - Rejecting", 
-                              static_cast<int>(i), conf, config_.per_digit_confidence_threshold);
-                     final_valid_check = false;
-                }
-            }
-       } else {
-           // Strict check disabled: Accept first reading provided digits are valid (checked above)
-           ESP_LOGD(TAG, "First reading: Strict check disabled, accepting.");
-       }
-  }
+   } else {
+        // First reading or no history
+        // The first reading is handled by the 3-consistent-readings mechanism in validate_reading().
+        // We do NOT apply per-digit strict checks here, as that would prevent the first reading
+        // from ever being established (every reading would be rejected before reaching validate_reading).
+        ESP_LOGD(TAG, "First reading: Skipping per-digit strict check (handled by 3-consistent mechanism).");
+   }
   
   if (!final_valid_check) {
       // Strict per-digit check failed. Return false immediately to prevent invalid state.
