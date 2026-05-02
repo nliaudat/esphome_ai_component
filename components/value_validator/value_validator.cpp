@@ -388,11 +388,28 @@ bool ValueValidator::validate_reading(std::span<const float> digits, std::span<c
           ESP_LOGD(TAG, "Per-digit filter: No changes needed. (Raw: %d)", raw_val);
       }
    } else {
-        // First reading or no history
-        // The first reading is handled by the 3-consistent-readings mechanism in validate_reading().
-        // We do NOT apply per-digit strict checks here, as that would prevent the first reading
-        // from ever being established (every reading would be rejected before reaching validate_reading).
-        ESP_LOGD(TAG, "First reading: Skipping per-digit strict check (handled by 3-consistent mechanism).");
+      // First reading or no history
+      // Apply a relaxed per-digit check: use a lower threshold (70%) to catch truly bad digits
+      // while still allowing the 3-consistent-readings mechanism to work.
+      // Using the full per_digit_confidence_threshold (e.g. 90%) here would prevent the first
+      // reading from ever being established if initial readings have slightly low confidence
+      // on some digits, even when the overall confidence is good (e.g. 94%).
+      if (config_.strict_confidence_check) {
+        constexpr float FIRST_READING_DIGIT_THRESHOLD = 0.70f;
+        for (size_t i = 0; i < current_digits.size(); i++) {
+          float conf = (i < confidences.size()) ? confidences[i] : 0.0f;
+          if (conf < FIRST_READING_DIGIT_THRESHOLD) {
+            ESP_LOGW(TAG, "Initial reading digit %d very low confidence (Conf: %.2f < %.2f) - Rejecting",
+                     static_cast<int>(i), conf, FIRST_READING_DIGIT_THRESHOLD);
+            final_valid_check = false;
+          }
+        }
+        if (final_valid_check) {
+          ESP_LOGD(TAG, "First reading: All digits above relaxed threshold (%.2f).", FIRST_READING_DIGIT_THRESHOLD);
+        }
+      } else {
+        ESP_LOGD(TAG, "First reading: Strict check disabled, accepting.");
+      }
    }
   
   if (!final_valid_check) {
