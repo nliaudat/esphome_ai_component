@@ -395,17 +395,17 @@ bool ValueValidator::validate_reading(std::span<const float> digits, std::span<c
       // reading from ever being established if initial readings have slightly low confidence
       // on some digits, even when the overall confidence is good (e.g. 94%).
       if (config_.strict_confidence_check) {
-        constexpr float FIRST_READING_DIGIT_THRESHOLD = 0.70f;
+        float threshold = config_.first_reading_digit_threshold;
         for (size_t i = 0; i < current_digits.size(); i++) {
           float conf = (i < confidences.size()) ? confidences[i] : 0.0f;
-          if (conf < FIRST_READING_DIGIT_THRESHOLD) {
+          if (conf < threshold) {
             ESP_LOGW(TAG, "Initial reading digit %d very low confidence (Conf: %.2f < %.2f) - Rejecting",
-                     static_cast<int>(i), conf, FIRST_READING_DIGIT_THRESHOLD);
+                     static_cast<int>(i), conf, threshold);
             final_valid_check = false;
           }
         }
         if (final_valid_check) {
-          ESP_LOGD(TAG, "First reading: All digits above relaxed threshold (%.2f).", FIRST_READING_DIGIT_THRESHOLD);
+          ESP_LOGD(TAG, "First reading: All digits above relaxed threshold (%.2f).", threshold);
         }
       } else {
         ESP_LOGD(TAG, "First reading: Strict check disabled, accepting.");

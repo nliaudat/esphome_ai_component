@@ -79,6 +79,7 @@ class ValueValidator : public Component {
     size_t max_history_size_bytes{51200}; // 50KB limit for history buffer
     float per_digit_confidence_threshold{0.85f}; // Minimum confidence to accept a changed digit
     bool strict_confidence_check{false}; // If true, requires all digits to be above threshold
+    float first_reading_digit_threshold{0.70f}; // Relaxed per-digit threshold for first reading (default 70%)
     int max_consecutive_rejections{10}; // Self-correct after N consecutive high-confidence rejections
     int small_negative_tolerance{5}; // Allow negative changes up to this many units
     bool persist_state{false}; // Persist last_valid_reading_ across reboots
@@ -107,6 +108,7 @@ class ValueValidator : public Component {
   void set_max_history_size_bytes(size_t v) { config_.max_history_size_bytes = v; }
   void set_per_digit_confidence_threshold(float v) { config_.per_digit_confidence_threshold = v; }
   void set_strict_confidence_check(bool v) { config_.strict_confidence_check = v; }
+  void set_first_reading_digit_threshold(float v) { config_.first_reading_digit_threshold = v; }
   void set_max_consecutive_rejections(int v) { config_.max_consecutive_rejections = v; }
   void set_small_negative_tolerance(int v) { config_.small_negative_tolerance = v; }
   void set_persist_state(bool v) { config_.persist_state = v; }
