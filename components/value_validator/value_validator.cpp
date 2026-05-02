@@ -360,14 +360,14 @@ bool ValueValidator::validate_reading(std::span<const float> digits, std::span<c
               if (debug_) {
                  ESP_LOGD(TAG, "Digit %d unchanged (%d). Conf: %.2f", static_cast<int>(i), new_d, conf);
               }
-              // Strict check: if high_confidence_threshold is configured (per_digit_confidence_threshold),
-              // we require even unchanged digits to meet it IF strict mode is enabled.
-              // User request: "I want all digit to be upper".
+              // Strict check: only apply to digits that have CHANGED.
+              // Unchanged digits with low confidence are acceptable (they're stable/correct).
+              // This prevents false rejections when the model is slightly uncertain
+              // about digits that haven't actually changed value.
               if (config_.strict_confidence_check && conf < config_.per_digit_confidence_threshold) {
-                  ESP_LOGW(TAG, "Digit %d unchanged but low confidence (Conf: %.2f < %.2f) - Rejecting reading in strict mode", 
+                  ESP_LOGW(TAG, "Digit %d unchanged but low confidence (Conf: %.2f < %.2f) - NOT rejecting (unchanged digit)", 
                            static_cast<int>(i), conf, config_.per_digit_confidence_threshold);
-                  // Mark invalid, but continue constructing string to maintain state if needed
-                  final_valid_check = false;
+                  // Do NOT mark invalid for unchanged digits - they're stable and correct
               }
               filtered_digit_string += std::to_string(new_d);
           }
