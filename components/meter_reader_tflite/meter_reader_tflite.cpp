@@ -511,13 +511,11 @@ void MeterReaderTFLite::loop() {
                  avg_conf = sum / res_ptr->probabilities.size();
             }
             
-            if (this->value_sensor_) {
-                float validated_val = 0.0f;
-                bool valid = this->validate_and_update_reading(res_ptr->readings, res_ptr->probabilities, validated_val);
-                this->publish_inference_result(digit_str, avg_conf, validated_val, valid,
-                                               res_ptr->readings, res_ptr->probabilities);
-                this->update_calibration(avg_conf);
-            }
+            float validated_val = 0.0f;
+            bool valid = this->validate_and_update_reading(res_ptr->readings, res_ptr->probabilities, validated_val);
+            this->publish_inference_result(digit_str, avg_conf, validated_val, valid,
+                                           res_ptr->readings, res_ptr->probabilities);
+            this->update_calibration(avg_conf);
             
             // Publish pool efficiency statistics
             #ifdef DEBUG_METER_READER_MEMORY
