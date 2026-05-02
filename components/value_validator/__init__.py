@@ -19,6 +19,7 @@ CONF_HIGH_CONFIDENCE_THRESHOLD = "high_confidence_threshold"
 CONF_MAX_HISTORY_SIZE = "max_history_size"
 CONF_PER_DIGIT_CONFIDENCE_THRESHOLD = "per_digit_confidence_threshold"
 CONF_STRICT_CONFIDENCE_CHECK = "strict_confidence_check"
+CONF_FIRST_READING_DIGIT_THRESHOLD = "first_reading_digit_threshold"
 CONF_MAX_CONSECUTIVE_REJECTIONS = "max_consecutive_rejections"
 CONF_SMALL_NEGATIVE_TOLERANCE = "small_negative_tolerance"
 CONF_PERSIST_STATE = "persist_state"
@@ -37,6 +38,7 @@ CONFIG_SCHEMA = cv.All(cv.ensure_list(cv.Schema({
     cv.Optional(CONF_MAX_HISTORY_SIZE, default="50kB"): cv.validate_bytes,
     cv.Optional(CONF_PER_DIGIT_CONFIDENCE_THRESHOLD, default=0.85): cv.percentage,
     cv.Optional(CONF_STRICT_CONFIDENCE_CHECK, default=False): cv.boolean,
+    cv.Optional(CONF_FIRST_READING_DIGIT_THRESHOLD, default=0.70): cv.percentage,
     cv.Optional(CONF_MAX_CONSECUTIVE_REJECTIONS, default=10): cv.positive_int,
     cv.Optional(CONF_SMALL_NEGATIVE_TOLERANCE, default=5): cv.positive_int,
     cv.Optional(CONF_PERSIST_STATE, default=False): cv.boolean,
@@ -71,6 +73,7 @@ async def to_code(config):
         cg.add(var.set_max_history_size_bytes(conf[CONF_MAX_HISTORY_SIZE]))
         cg.add(var.set_per_digit_confidence_threshold(conf[CONF_PER_DIGIT_CONFIDENCE_THRESHOLD]))
         cg.add(var.set_strict_confidence_check(conf[CONF_STRICT_CONFIDENCE_CHECK]))
+        cg.add(var.set_first_reading_digit_threshold(conf[CONF_FIRST_READING_DIGIT_THRESHOLD]))
         cg.add(var.set_max_consecutive_rejections(conf[CONF_MAX_CONSECUTIVE_REJECTIONS]))
         cg.add(var.set_small_negative_tolerance(conf[CONF_SMALL_NEGATIVE_TOLERANCE]))
         cg.add(var.set_persist_state(conf[CONF_PERSIST_STATE]))

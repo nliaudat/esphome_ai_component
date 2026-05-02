@@ -162,6 +162,7 @@ value_validator:
   high_confidence_threshold: 0.90     # Threshold for high confidence (default: 90%)
   per_digit_confidence_threshold: 0.85 # Min confidence per digit (default: 85%)
   strict_confidence_check: true       # Require all digits meet threshold (default: false)
+  #first_reading_digit_threshold: 0.70
     
   # Memory Management
   max_history_size: 50kB               # Max history memory usage (default: 50kB)
