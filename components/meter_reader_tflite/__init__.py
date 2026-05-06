@@ -2,6 +2,7 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 import os
+import re
 import zlib
 from esphome.const import CONF_ID, CONF_MODEL, CONF_ROTATION, CONF_NAME, CONF_DISABLED_BY_DEFAULT, CONF_INTERNAL, CONF_ICON, CONF_FORCE_UPDATE, CONF_ENTITY_CATEGORY
 from esphome.core import CORE, HexInt
@@ -63,6 +64,17 @@ CONF_FRAME_REQUEST_TIMEOUT = 'frame_request_timeout'
 CONF_UNLOAD_BUTTON = 'unload_button'
 CONF_RELOAD_BUTTON = 'reload_button'
 
+# Dynamic model config overrides (optional - auto-detected from .txt file)
+CONF_INPUT_TYPE = 'input_type'
+CONF_INPUT_CHANNELS = 'input_channels'
+CONF_INPUT_WIDTH = 'input_width'
+CONF_INPUT_HEIGHT = 'input_height'
+CONF_OUTPUT_PROCESSING = 'output_processing'
+CONF_SCALE_FACTOR = 'scale_factor'
+CONF_INPUT_ORDER = 'input_order'
+CONF_NORMALIZE = 'normalize'
+CONF_INVERT = 'invert'
+
 meter_reader_tflite_ns = cg.esphome_ns.namespace('meter_reader_tflite')
 MeterReaderTFLite = meter_reader_tflite_ns.class_('MeterReaderTFLite', cg.PollingComponent)
 
@@ -81,6 +93,102 @@ def datasize_to_bytes(value):
     except ValueError as e:
         raise cv.Invalid(f"Invalid data size: {e}") from e
 
+
+def parse_model_txt_file(model_path):
+    """Parse a model .txt file to extract configuration parameters.
+    
+    Returns a dict with auto-detected config values, or None if file not found.
+    """
+    txt_path = os.path.splitext(model_path)[0] + '.txt'
+    if not os.path.exists(txt_path):
+        return None
+    
+    with open(txt_path, 'r') as f:
+        content = f.read()
+    
+    config = {}
+    
+    # Parse input type and shape from INPUT/OUTPUT SUMMARY section
+    # Example: "Input 0:  [ 1 32 20  3]   <class 'numpy.float32'>"
+    input_match = re.search(r'Input\s+0:\s+\[\s*\d+\s+(\d+)\s+(\d+)\s+(\d+)\].*?numpy\.(\w+)', content)
+    if input_match:
+        config['input_height'] = int(input_match.group(1))
+        config['input_width'] = int(input_match.group(2))
+        config['input_channels'] = int(input_match.group(3))
+        dtype = input_match.group(4)
+        config['input_type'] = 'float32' if dtype == 'float32' else 'uint8'
+    
+    # Parse output shape to determine class count
+    # Example: "Output 0: [ 1 10]         <class 'numpy.float32'>"
+    output_match = re.search(r'Output\s+0:\s+\[\s*\d+\s+(\d+)\]', content)
+    if output_match:
+        num_classes = int(output_match.group(1))
+        # 10 classes → scale_factor=1.0, 100 classes → scale_factor=10.0
+        if num_classes == 10:
+            config['scale_factor'] = 1.0
+        elif num_classes == 100:
+            config['scale_factor'] = 10.0
+        else:
+            config['scale_factor'] = 1.0
+    
+    # Parse peak memory from peak analysis (if available)
+    # Example: "Peak active memory: 70.96 KB"
+    peak_match = re.search(r'Peak active memory:\s+([\d.]+)\s+KB', content)
+    if peak_match:
+        peak_kb = float(peak_match.group(1))
+        # Use 1.5x safety margin, minimum 100KB
+        arena_kb = max(100, int(peak_kb * 1.5))
+        config['tensor_arena_size'] = arena_kb * 1024
+    
+    # Parse total operations count for MAX_OPERATORS
+    # Example: "Total operations: 37"
+    ops_match = re.search(r'Total operations:\s+(\d+)', content)
+    if ops_match:
+        total_ops = int(ops_match.group(1))
+        # Add safety margin of 5 for the resolver
+        config['max_operators'] = total_ops + 5
+        print(f"  Auto-detected MAX_OPERATORS: {config['max_operators']} (from {total_ops} operations + 5 margin)")
+    
+    # Detect DELEGATE ops (incompatible with TFLite Micro) - informational only
+    if re.search(r'\bDELEGATE\b', content):
+        print(f"  Note: Model '{os.path.basename(txt_path)}' contains DELEGATE ops.")
+        print(f"    DELEGATE ops are NOT compatible with TFLite Micro.")
+        print(f"    Re-export the model with delegates disabled:")
+        print(f"      converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS]")
+    
+    return config
+
+
+def infer_model_config_from_filename(model_filename):
+    """Infer model config from filename heuristics when no .txt file exists."""
+    config = {}
+    name = os.path.splitext(model_filename)[0]
+    
+    # Detect channels from filename
+    if '_GRAY' in name or '_GRAYSCALE' in name:
+        config['input_channels'] = 1
+        config['input_order'] = 'GRAY'
+    elif '_RGB' in name:
+        config['input_channels'] = 3
+        config['input_order'] = 'RGB'
+    elif '_BGR' in name:
+        config['input_channels'] = 3
+        config['input_order'] = 'BGR'
+    else:
+        config['input_channels'] = 3
+        config['input_order'] = 'RGB'
+    
+    # Detect class count from filename
+    if '_10cls_' in name or name.endswith('_10cls'):
+        config['scale_factor'] = 1.0
+    elif '_100cls_' in name or name.endswith('_100cls'):
+        config['scale_factor'] = 10.0
+    else:
+        config['scale_factor'] = 1.0
+    
+    return config
+
+
 # Use the standard ESPHome sensor configuration pattern
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(MeterReaderTFLite),
@@ -91,10 +199,13 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_CONFIDENCE_THRESHOLD, default=0.85): cv.float_range(
         min=0.0, max=1.0
     ),
-    # Make tensor_arena_size optional since it's now in model_config.h
-    cv.Optional(CONF_TENSOR_ARENA_SIZE): cv.All( 
-        datasize_to_bytes,
-        cv.Range(min=50 * 1024, max=1000 * 1024)
+    # Make tensor_arena_size optional since it's auto-detected from .txt file
+    cv.Optional(CONF_TENSOR_ARENA_SIZE): cv.Any(
+        cv.All(
+            datasize_to_bytes,
+            cv.Range(min=50 * 1024, max=1000 * 1024)
+        ),
+        cv.string,  # Allow string like "110KB" for auto-detection override
     ),
     cv.GenerateID(CONF_RAW_DATA_ID): cv.declare_id(cg.uint8),
     cv.Optional(CONF_DEBUG, default=False): cv.boolean, 
@@ -127,6 +238,17 @@ CONFIG_SCHEMA = cv.Schema({
     # ),
     # cv.Optional(CONF_AUTO_CAMERA_WINDOW, default=False): cv.boolean,
     cv.Optional(CONF_FRAME_REQUEST_TIMEOUT, default=15000): cv.int_range(min=1000, max=60000),
+    
+    # Dynamic model config overrides (optional - auto-detected from .txt file)
+    cv.Optional(CONF_INPUT_TYPE): cv.enum({'uint8': 'uint8', 'float32': 'float32'}, lower=True),
+    cv.Optional(CONF_INPUT_CHANNELS): cv.int_range(min=1, max=4),
+    cv.Optional(CONF_INPUT_WIDTH): cv.int_range(min=8, max=512),
+    cv.Optional(CONF_INPUT_HEIGHT): cv.int_range(min=8, max=512),
+    cv.Optional(CONF_OUTPUT_PROCESSING): cv.enum({'direct_class': 'direct_class', 'softmax': 'softmax', 'argmax': 'argmax'}, lower=True),
+    cv.Optional(CONF_SCALE_FACTOR): cv.float_range(min=0.1, max=100.0),
+    cv.Optional(CONF_INPUT_ORDER): cv.enum({'RGB': 'RGB', 'BGR': 'BGR', 'GRAY': 'GRAY'}, upper=True),
+    cv.Optional(CONF_NORMALIZE): cv.boolean,
+    cv.Optional(CONF_INVERT): cv.boolean,
     
     cv.Optional("value_sensor"): cv.use_id(sensor.Sensor),
     cv.Optional("confidence_sensor"): cv.use_id(sensor.Sensor),
@@ -216,15 +338,87 @@ async def to_code(config):
     cg.add(var.set_model(prog_arr, len(model_data)))
     cg.add(var.set_confidence_threshold(config[CONF_CONFIDENCE_THRESHOLD]))
     
-    # Set tensor arena size - use config value if provided, otherwise use default
-    # The actual size will be determined from model_config.h in the C++ code
+    # ============================================================
+    # Dynamic Model Configuration (auto-detect from .txt, override from YAML)
+    # ============================================================
+    # Priority: YAML overrides > .txt auto-detection > filename heuristics > defaults
+    
+    # Step 1: Try to parse .txt file for auto-detected config
+    auto_config = parse_model_txt_file(model_path)
+    if auto_config:
+        print(f"  Auto-detected model config from '{model_filename}.txt':")
+        for k, v in auto_config.items():
+            print(f"    {k}: {v}")
+    else:
+        # Step 2: Fallback to filename heuristics
+        auto_config = infer_model_config_from_filename(model_filename)
+        print(f"  No .txt file found for '{model_filename}', using filename heuristics:")
+        for k, v in auto_config.items():
+            print(f"    {k}: {v}")
+    
+    # Step 3: Apply YAML overrides (user-provided values override auto-detected)
+    yaml_overrides = {}
+    if CONF_INPUT_TYPE in config:
+        yaml_overrides['input_type'] = config[CONF_INPUT_TYPE]
+    if CONF_INPUT_CHANNELS in config:
+        yaml_overrides['input_channels'] = config[CONF_INPUT_CHANNELS]
+    if CONF_INPUT_WIDTH in config:
+        yaml_overrides['input_width'] = config[CONF_INPUT_WIDTH]
+    if CONF_INPUT_HEIGHT in config:
+        yaml_overrides['input_height'] = config[CONF_INPUT_HEIGHT]
+    if CONF_OUTPUT_PROCESSING in config:
+        yaml_overrides['output_processing'] = config[CONF_OUTPUT_PROCESSING]
+    if CONF_SCALE_FACTOR in config:
+        yaml_overrides['scale_factor'] = config[CONF_SCALE_FACTOR]
+    if CONF_INPUT_ORDER in config:
+        yaml_overrides['input_order'] = config[CONF_INPUT_ORDER]
+    if CONF_NORMALIZE in config:
+        yaml_overrides['normalize'] = config[CONF_NORMALIZE]
+    if CONF_INVERT in config:
+        yaml_overrides['invert'] = config[CONF_INVERT]
+    
+    if yaml_overrides:
+        print(f"  YAML overrides applied:")
+        for k, v in yaml_overrides.items():
+            print(f"    {k}: {v}")
+        auto_config.update(yaml_overrides)
+    
+    # Step 4: Set all config values on the C++ component
+    # Use auto-detected values with sensible defaults for anything missing
+    cg.add(var.set_input_type(auto_config.get('input_type', 'uint8')))
+    cg.add(var.set_input_channels(auto_config.get('input_channels', 3)))
+    cg.add(var.set_input_width(auto_config.get('input_width', 32)))
+    cg.add(var.set_input_height(auto_config.get('input_height', 20)))
+    cg.add(var.set_output_processing(auto_config.get('output_processing', 'direct_class')))
+    cg.add(var.set_scale_factor(auto_config.get('scale_factor', 1.0)))
+    cg.add(var.set_input_order(auto_config.get('input_order', 'RGB')))
+    cg.add(var.set_normalize(auto_config.get('normalize', False)))
+    cg.add(var.set_invert(auto_config.get('invert', False)))
+    
+    # Step 5: Set tensor arena size
+    # Priority: YAML config > .txt peak analysis > default 100KB
     if CONF_TENSOR_ARENA_SIZE in config:
-        cg.add(var.set_tensor_arena_size(config[CONF_TENSOR_ARENA_SIZE]))
+        arena_size = config[CONF_TENSOR_ARENA_SIZE]
+        # If it's a string (like "110KB"), parse it
+        if isinstance(arena_size, str):
+            arena_size = datasize_to_bytes(arena_size)
+        cg.add(var.set_tensor_arena_size(arena_size))
+        print(f"  Tensor arena size: {arena_size} bytes (from YAML config)")
+    elif 'tensor_arena_size' in auto_config:
+        cg.add(var.set_tensor_arena_size(auto_config['tensor_arena_size']))
+        print(f"  Tensor arena size: {auto_config['tensor_arena_size']} bytes (from .txt peak analysis)")
+    else:
+        # Default fallback
+        cg.add(var.set_tensor_arena_size(100 * 1024))
+        print(f"  Tensor arena size: {100 * 1024} bytes (default)")
+    
+    # Step 6: Set MAX_OPERATORS from .txt file analysis (with fallback)
+    max_ops = auto_config.get('max_operators', 30)
+    cg.add_build_flag(f"-DMAX_OPERATORS={max_ops}")
+    print(f"  MAX_OPERATORS: {max_ops} (build flag)")
+    
     if "show_crop_areas" in config:
         cg.add(var.set_show_crop_areas(config["show_crop_areas"]))
-    # else:
-        # # Default will be handled in the C++ code based on model type from model_config.h
-        # cg.add(var.set_tensor_arena_size(512 * 1024))  # 512KB default fallback
     
     # Get camera resolution from substitutions
     width, height = 640, 480  # Defaults

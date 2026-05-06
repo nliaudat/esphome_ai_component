@@ -199,6 +199,35 @@ bool ModelHandler::load_model_with_arena(const uint8_t *model_data, size_t model
 
   if (this->interpreter_->AllocateTensors() != kTfLiteOk) {
     ESP_LOGE(TAG, "Failed to allocate tensors");
+    ESP_LOGE(TAG, "  Tensor arena: %zu bytes (requested: %zu)", tensor_arena_size, this->tensor_arena_size_requested_);
+    ESP_LOGE(TAG, "  Model size: %zu bytes", this->model_length_);
+    ESP_LOGE(TAG, "  Model operators: %zu", this->tflite_model_->subgraphs()->Get(0)->operators()->size());
+    ESP_LOGE(TAG, "  Model operator codes: %zu", this->tflite_model_->operator_codes()->size());
+    
+    // Log all operator codes in the model for debugging
+    for (size_t i = 0; i < this->tflite_model_->operator_codes()->size(); ++i) {
+        const auto *op_code = this->tflite_model_->operator_codes()->Get(i);
+        ESP_LOGE(TAG, "  Op code [%zu]: builtin_code=%d (%s)", i, op_code->builtin_code(),
+                 tflite::EnumNameBuiltinOperator(op_code->builtin_code()));
+    }
+    
+    // Check for DELEGATE op which is not supported by TFLite Micro
+    for (size_t i = 0; i < this->tflite_model_->operator_codes()->size(); ++i) {
+        const auto *op_code = this->tflite_model_->operator_codes()->Get(i);
+        if (op_code->builtin_code() == tflite::BuiltinOperator_DELEGATE) {
+            ESP_LOGE(TAG, "  *** WARNING: Model contains DELEGATE operator (index %zu)! ***", i);
+            ESP_LOGE(TAG, "  *** TFLite Micro does NOT support delegates. ***");
+            ESP_LOGE(TAG, "  *** The model was likely exported with XNNPACK delegate enabled. ***");
+            ESP_LOGE(TAG, "  *** Re-export the model with --no-xnnpack or disable delegates. ***");
+        }
+    }
+    
+    // Log arena usage info if available
+    #ifdef DEBUG_TFLITE_MICRO_HELPER
+    size_t arena_used = this->interpreter_->arena_used_bytes();
+    ESP_LOGE(TAG, "  Arena used before failure: %zu bytes", arena_used);
+    #endif
+    
     return false;
   }
   

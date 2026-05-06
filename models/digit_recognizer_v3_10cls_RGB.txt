@@ -2,8 +2,8 @@
 ================================================================================
 TFLITE MODEL COMPREHENSIVE INSPECTION REPORT
 ================================================================================
-Model: ../models/digit_recognizer_v3_10cls_RGB.tflite
-Timestamp: 2026-03-13 16:19:38
+Model: C:\Users\nl\Dropbox\home_automation\esphome_ai_component\models\digit_recognizer_v3_10cls_RGB.tflite
+Timestamp: 2026-05-06 20:03:01
 TensorFlow Version: 2.20.0
 File Size: 38.41 KB
 
@@ -75,6 +75,76 @@ tfl.pseudo_qconst4             [48]                 <class 'numpy.int32'> 48    
 --------------------------------------------------------------------------------
 Total Memory Usage: 70.11 KB
 Number of Tensors: 34
+
+================================================================================
+PEAK MEMORY ANALYSIS (TFLite Micro Arena Estimate)
+================================================================================
+
+Total memory (sum of all tensors): 70.11 KB
+Peak active memory (lifetime analysis): 62.88 KB at op index 17
+TFLite Micro arena estimate (1.5x peak): 94.32 KB
+
+Recommended tensor_arena_size: 95KB
+
+Top tensors by memory:
+  [  7]    13.50 KB  [48  3  3 32]             <class 'numpy.int8'> tfl.pseudo_qconst5
+  [ 18]    10.00 KB  [ 1 32 20 16]             <class 'numpy.int8'> digit_recognizer_v3_rgb_1/sep_conv1_16f_1/Relu;dig
+  [ 19]    10.00 KB  [ 1 32 20 16]             <class 'numpy.int8'> digit_recognizer_v3_rgb_1/relu6_1_1/Relu6
+  [  9]     6.75 KB  [32  3  3 24]             <class 'numpy.int8'> tfl.pseudo_qconst7
+  [ 21]     3.75 KB  [ 1 16 10 24]             <class 'numpy.int8'> digit_recognizer_v3_rgb_1/conv2_24f_1/Relu;digit_r
+  [ 22]     3.75 KB  [ 1 16 10 24]             <class 'numpy.int8'> digit_recognizer_v3_rgb_1/relu6_2_1/Relu6
+  [ 11]     3.38 KB  [24  3  3 16]             <class 'numpy.int8'> tfl.pseudo_qconst9
+  [ 20]     2.50 KB  [ 1 16 10 16]             <class 'numpy.int8'> digit_recognizer_v3_rgb_1/pool1_1/MaxPool2d
+  [  5]     2.25 KB  [48 48]                   <class 'numpy.int8'> tfl.pseudo_qconst3
+  [  0]     1.88 KB  [ 1 32 20  3]             <class 'numpy.uint8'> serving_default_input:0
+
+================================================================================
+TFLITE MICRO COMPATIBILITY CHECK
+================================================================================
+
+[WARN] Found 6 DELEGATE operation(s)!
+   TFLite Micro does NOT support delegate operations.
+   This model will FAIL to load on microcontrollers.
+   The model was likely exported with XNNPACK delegate enabled.
+   Re-export with: converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS]
+   Or disable delegates during conversion.
+
+   DELEGATE op index 18:
+     Inputs: [12 13 14 15 16]
+     Outputs: [18]
+
+   DELEGATE op index 19:
+     Inputs: [10 11 19]
+     Outputs: [21]
+
+   DELEGATE op index 20:
+     Inputs: [ 8  9 22]
+     Outputs: [24]
+
+   DELEGATE op index 21:
+     Inputs: [ 6  7 25]
+     Outputs: [26]
+
+   DELEGATE op index 22:
+     Inputs: [ 1  4  5 27]
+     Outputs: [29]
+
+   DELEGATE op index 23:
+     Inputs: [ 2  3 30]
+     Outputs: [31]
+
+[OK] Total operations (24) within MAX_OPERATORS (30) limit
+
+Unique operator types: 9
+  CONV_2D: 4
+  DELEGATE: 6
+  DEPTHWISE_CONV_2D: 1
+  FULLY_CONNECTED: 2
+  MAX_POOL_2D: 2
+  MEAN: 1
+  QUANTIZE: 2
+  RELU6: 5
+  SOFTMAX: 1
 
 ================================================================================
 DETAILED OPERATIONS BREAKDOWN

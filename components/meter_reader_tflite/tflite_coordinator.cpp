@@ -51,35 +51,26 @@ bool TFLiteCoordinator::load_model() {
     std::lock_guard<std::mutex> lock(model_mutex_);
     ESP_LOGI(TAG, "Loading TFLite model...");
 
-    // Get model configuration from model_config.h FIRST
+    // Build ModelConfig from dynamically-set member variables
+    // (set from __init__.py at build time via individual setters)
     tflite_micro_helper::ModelConfig config;
-    auto it = MODEL_CONFIGS.find(model_type_);
-    if (it != MODEL_CONFIGS.end()) {
-        config = it->second;
-        ESP_LOGI(TAG, "Using model config: %s", config.description.c_str());
+    config.description = model_type_;
+    config.input_type = input_type_;
+    config.input_channels = input_channels_;
+    config.input_size = {input_width_, input_height_};
+    config.output_processing = output_processing_;
+    config.scale_factor = scale_factor_;
+    config.input_order = input_order_;
+    config.normalize = normalize_;
+    config.invert = invert_;
+    // tensor_arena_size is handled directly via tensor_arena_size_requested_
+    config.tensor_arena_size = "";  // Not used - arena size is set directly
 
-        // Parse arena size string logic from original code...
-        std::string arena_size_str = config.tensor_arena_size;
-        size_t multiplier = 1;
-        if (arena_size_str.find("KB") != std::string::npos) {
-            multiplier = 1024;
-            arena_size_str = arena_size_str.substr(0, arena_size_str.length() - 2);
-        } else if (arena_size_str.find("MB") != std::string::npos) {
-            multiplier = 1024 * 1024;
-            arena_size_str = arena_size_str.substr(0, arena_size_str.length() - 2);
-        }
-        
-        char* end_ptr;
-        long size_value = strtol(arena_size_str.c_str(), &end_ptr, 10);
-        if (size_value > 0) {
-            // Override with config-specific size if valid
-            tensor_arena_size_requested_ = size_value * multiplier;
-            ESP_LOGI(TAG, "Using model-specific tensor arena size: %zu", tensor_arena_size_requested_);
-        }
-    } else {
-        ESP_LOGE(TAG, "Model type '%s' not found", model_type_.c_str());
-        // Fallback: Proceed, but correct model loading may fail if config is critical.
-    }
+    ESP_LOGI(TAG, "Using model config: %s", config.description.c_str());
+    ESP_LOGI(TAG, "  Input: %s %dx%dx%d", input_type_.c_str(), input_width_, input_height_, input_channels_);
+    ESP_LOGI(TAG, "  Output: %s (scale=%.1f)", output_processing_.c_str(), scale_factor_);
+    ESP_LOGI(TAG, "  Order: %s, normalize=%d, invert=%d", input_order_.c_str(), normalize_, invert_);
+    ESP_LOGI(TAG, "  Tensor arena: %zu bytes", tensor_arena_size_requested_);
 
     if (!allocate_tensor_arena()) {
         return false;
@@ -90,6 +81,16 @@ bool TFLiteCoordinator::load_model() {
                                  tensor_arena_allocation_.actual_size,
                                  config)) {
         ESP_LOGE(TAG, "Failed to load model into interpreter");
+        ESP_LOGE(TAG, "  Model type: %s", model_type_.c_str());
+        ESP_LOGE(TAG, "  Model config: %s", config.description.c_str());
+        ESP_LOGE(TAG, "  Model size: %zu bytes", model_length_);
+        ESP_LOGE(TAG, "  Tensor arena: %zu bytes (requested: %zu)", 
+                 tensor_arena_allocation_.actual_size, tensor_arena_size_requested_);
+        ESP_LOGE(TAG, "  Input type from config: %s", config.input_type.c_str());
+        ESP_LOGE(TAG, "  Input channels: %d", config.input_channels);
+        ESP_LOGE(TAG, "  Input size: %dx%d", 
+                 config.input_size.size() >= 1 ? config.input_size[0] : 0,
+                 config.input_size.size() >= 2 ? config.input_size[1] : 0);
         return false;
     }
 

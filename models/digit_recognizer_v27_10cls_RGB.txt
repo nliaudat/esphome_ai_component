@@ -1,0 +1,473 @@
+
+================================================================================
+TFLITE MODEL COMPREHENSIVE INSPECTION REPORT
+================================================================================
+Model: C:\Users\nl\Dropbox\home_automation\esphome_ai_component\models\digit_recognizer_v27_10cls_RGB.tflite
+Timestamp: 2026-05-06 20:06:01
+TensorFlow Version: 2.20.0
+File Size: 65.62 KB
+
+================================================================================
+MODEL SUMMARY: TFLite Model
+================================================================================
+Layer (type)              Output Shape         Param #         Size (KB) 
+--------------------------------------------------------------------------------
+STRIDED_SLICE_0           [ 1 32 20  1]        0               10.00     
+MUL_1                     [ 1 32 20  1]        0               0.04      
+STRIDED_SLICE_2           [ 1 32 20  1]        0               16.25     
+MUL_3                     [ 1 32 20  1]        0               0.00      
+ADD_4                     [ 1 32 20  1]        0               0.00      
+STRIDED_SLICE_5           [ 1 32 20  1]        0               7.72      
+MUL_6                     [ 1 32 20  1]        0               2.50      
+ADD_7                     [ 1 32 20  1]        0               0.00      
+MEAN_8                    [1 1 1 1]            0               2.50      
+SUB_9                     [ 1 32 20  1]        0               0.00      
+TRANSPOSE_10              [ 1  1 32 20]        0               22.50     
+RESHAPE_11                [ 1 32 20  1]        0               2.50      
+MUL_12                    [ 1 32 20  1]        0               0.00      
+MEAN_13                   [1 1 1 1]            0               2.50      
+SQRT_14                   [1 1 1 1]            0               0.00      
+ADD_15                    [1 1 1 1]            0               8.75      
+DIV_16                    [ 1 32 20  1]        0               0.00      
+MINIMUM_17                [ 1 32 20  1]        0               8.75      
+MAXIMUM_18                [ 1 32 20  1]        0               0.22      
+LOGISTIC_19               [ 1 32 20  1]        0               0.00      
+SUB_20                    [ 1 32 20  1]        0               12.50     
+MUL_21                    [ 1 32 20  1]        0               8.75      
+LOGISTIC_22               [ 1 32 20  1]        0               0.00      
+RESHAPE_23                [ 1  1 32 20]        0               22.50     
+TRANSPOSE_24              [ 1 32 20  1]        0               0.00      
+CONV_2D_25                [ 1 32 20 20]        0               0.00      
+MAX_POOL_2D_26            [ 1 16 10 20]        0               0.00      
+CONV_2D_27                [ 1 16 10 36]        0               0.00      
+MAX_POOL_2D_28            [ 1  8  5 36]        0               0.00      
+CONV_2D_29                [ 1  8  5 48]        0               0.00      
+CONV_2D_30                [ 1  8  5 56]        0               0.00      
+MEAN_31                   [ 1  1  1 56]        0               0.00      
+RESHAPE_32                [ 1 56]              0               0.00      
+FULLY_CONNECTED_33        [ 1 64]              0               0.00      
+FULLY_CONNECTED_34        [ 1 10]              0               0.00      
+SOFTMAX_35                [ 1 10]              0               0.00      
+DELEGATE_36               [ 1 10]              0               0.04      
+--------------------------------------------------------------------------------
+Total params: 0
+Total memory: 128.02 KB
+Total operations: 37
+
+================================================================================
+INPUT/OUTPUT SUMMARY
+================================================================================
+Input 0:  [ 1 32 20  3]   <class 'numpy.float32'>
+Output 0: [ 1 10]         <class 'numpy.float32'>
+
+================================================================================
+MEMORY USAGE ANALYSIS
+================================================================================
+Tensor Name                    Shape                Dtype      Elements     Memory (KB) 
+--------------------------------------------------------------------------------
+model_26/tf.nn.relu6_10/Relu   [ 1 32 20 20]        <class 'numpy.float32'> 12,800       50.00       
+tfl.pseudo_qconst              [56  3  3 48]        <class 'numpy.int8'> 24,192       23.62       
+model_26/tf.nn.relu6_11/Relu   [ 1 16 10 36]        <class 'numpy.float32'> 5,760        22.50       
+tfl.pseudo_qconst1             [48  3  3 36]        <class 'numpy.int8'> 15,552       15.19       
+model_26/tf.nn.max_pool2d_4/   [ 1 16 10 20]        <class 'numpy.float32'> 3,200        12.50       
+model_26/tf.nn.relu6_13/Relu   [ 1  8  5 56]        <class 'numpy.float32'> 2,240        8.75        
+input                          [ 1 32 20  3]        <class 'numpy.float32'> 1,920        7.50        
+model_26/tf.nn.relu6_12/Relu   [ 1  8  5 48]        <class 'numpy.float32'> 1,920        7.50        
+tfl.pseudo_qconst2             [36  3  3 20]        <class 'numpy.int8'> 6,480        6.33        
+model_26/tf.nn.max_pool2d_5/   [ 1  8  5 36]        <class 'numpy.float32'> 1,440        5.62        
+tfl.pseudo_qconst3             [64 56]              <class 'numpy.int8'> 3,584        3.50        
+arith.constant17               [10 64]              <class 'numpy.float32'> 640          2.50        
+model_26/tf.strided_slice_6/   [ 1 32 20  1]        <class 'numpy.float32'> 640          2.50        
+model_26/tf.math.multiply_20   [ 1 32 20  1]        <class 'numpy.float32'> 640          2.50        
+model_26/tf.strided_slice_7/   [ 1 32 20  1]        <class 'numpy.float32'> 640          2.50        
+model_26/tf.math.multiply_21   [ 1 32 20  1]        <class 'numpy.float32'> 640          2.50        
+model_26/tf.math.add_18/Add    [ 1 32 20  1]        <class 'numpy.float32'> 640          2.50        
+model_26/tf.strided_slice_8/   [ 1 32 20  1]        <class 'numpy.float32'> 640          2.50        
+model_26/tf.math.multiply_22   [ 1 32 20  1]        <class 'numpy.float32'> 640          2.50        
+model_26/tf.math.add_19/Add    [ 1 32 20  1]        <class 'numpy.float32'> 640          2.50        
+--------------------------------------------------------------------------------
+Total Memory Usage: 220.61 KB
+Number of Tensors: 69
+
+================================================================================
+PEAK MEMORY ANALYSIS (TFLite Micro Arena Estimate)
+================================================================================
+
+Total memory (sum of all tensors): 220.61 KB
+Peak active memory (lifetime analysis): 70.96 KB at op index 26
+TFLite Micro arena estimate (1.5x peak): 106.45 KB
+
+Recommended tensor_arena_size: 107KB
+
+Top tensors by memory:
+  [ 58]    50.00 KB  [ 1 32 20 20]             <class 'numpy.float32'> model_26/tf.nn.relu6_10/Relu6;model_26/tf.math.add
+  [ 29]    23.62 KB  [56  3  3 48]             <class 'numpy.int8'> tfl.pseudo_qconst
+  [ 60]    22.50 KB  [ 1 16 10 36]             <class 'numpy.float32'> model_26/tf.nn.relu6_11/Relu6;model_26/tf.math.add
+  [ 30]    15.19 KB  [48  3  3 36]             <class 'numpy.int8'> tfl.pseudo_qconst1
+  [ 59]    12.50 KB  [ 1 16 10 20]             <class 'numpy.float32'> model_26/tf.nn.max_pool2d_4/MaxPool2d
+  [ 63]     8.75 KB  [ 1  8  5 56]             <class 'numpy.float32'> model_26/tf.nn.relu6_13/Relu6;model_26/tf.math.add
+  [  0]     7.50 KB  [ 1 32 20  3]             <class 'numpy.float32'> input
+  [ 62]     7.50 KB  [ 1  8  5 48]             <class 'numpy.float32'> model_26/tf.nn.relu6_12/Relu6;model_26/tf.math.add
+  [ 31]     6.33 KB  [36  3  3 20]             <class 'numpy.int8'> tfl.pseudo_qconst2
+  [ 61]     5.62 KB  [ 1  8  5 36]             <class 'numpy.float32'> model_26/tf.nn.max_pool2d_5/MaxPool2d
+
+================================================================================
+TFLITE MICRO COMPATIBILITY CHECK
+================================================================================
+
+[WARN] Found 1 DELEGATE operation(s)!
+   TFLite Micro does NOT support delegate operations.
+   This model will FAIL to load on microcontrollers.
+   The model was likely exported with XNNPACK delegate enabled.
+   Re-export with: converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS]
+   Or disable delegates during conversion.
+
+   DELEGATE op index 36:
+     Inputs: [ 0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23
+ 24 25 26 27 28 29 30 31 32]
+     Outputs: [68]
+
+[WARN] Model has 37 operations, but MAX_OPERATORS=30
+   7 operation(s) exceed the limit!
+   Increase MAX_OPERATORS in model_handler.h
+
+Unique operator types: 17
+  ADD: 3
+  CONV_2D: 4
+  DELEGATE: 1
+  DIV: 1
+  FULLY_CONNECTED: 2
+  LOGISTIC: 2
+  MAXIMUM: 1
+  MAX_POOL_2D: 2
+  MEAN: 3
+  MINIMUM: 1
+  MUL: 5
+  RESHAPE: 3
+  SOFTMAX: 1
+  SQRT: 1
+  STRIDED_SLICE: 3
+  SUB: 2
+  TRANSPOSE: 2
+
+================================================================================
+DETAILED OPERATIONS BREAKDOWN
+================================================================================
+
+OPERATION COUNTS:
+  ADD: 3
+  CONV_2D: 4
+  DELEGATE: 1
+  DIV: 1
+  FULLY_CONNECTED: 2
+  LOGISTIC: 2
+  MAXIMUM: 1
+  MAX_POOL_2D: 2
+  MEAN: 3
+  MINIMUM: 1
+  MUL: 5
+  RESHAPE: 3
+  SOFTMAX: 1
+  SQRT: 1
+  STRIDED_SLICE: 3
+  SUB: 2
+  TRANSPOSE: 2
+
+DETAILED OPERATION INFO:
+
+STRIDED_SLICE (index: 0):
+  Input tensors: [0 3 2 1]
+  Output tensors: [33]
+    Input 0: shape=[ 1 32 20  3], dtype=<class 'numpy.float32'>
+    Input 3: shape=[4], dtype=<class 'numpy.int32'>
+    Input 2: shape=[4], dtype=<class 'numpy.int32'>
+    Input 1: shape=[4], dtype=<class 'numpy.int32'>
+    Output 33: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+
+MUL (index: 1):
+  Input tensors: [33 12]
+  Output tensors: [34]
+    Input 33: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+    Input 12: shape=[], dtype=<class 'numpy.float32'>
+    Output 34: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+
+STRIDED_SLICE (index: 2):
+  Input tensors: [ 0 28  3  1]
+  Output tensors: [35]
+    Input 0: shape=[ 1 32 20  3], dtype=<class 'numpy.float32'>
+    Input 28: shape=[4], dtype=<class 'numpy.int32'>
+    Input 3: shape=[4], dtype=<class 'numpy.int32'>
+    Input 1: shape=[4], dtype=<class 'numpy.int32'>
+    Output 35: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+
+MUL (index: 3):
+  Input tensors: [35 11]
+  Output tensors: [36]
+    Input 35: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+    Input 11: shape=[], dtype=<class 'numpy.float32'>
+    Output 36: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+
+ADD (index: 4):
+  Input tensors: [36 34]
+  Output tensors: [37]
+    Input 36: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+    Input 34: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+    Output 37: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+
+STRIDED_SLICE (index: 5):
+  Input tensors: [ 0  2 27  1]
+  Output tensors: [38]
+    Input 0: shape=[ 1 32 20  3], dtype=<class 'numpy.float32'>
+    Input 2: shape=[4], dtype=<class 'numpy.int32'>
+    Input 27: shape=[4], dtype=<class 'numpy.int32'>
+    Input 1: shape=[4], dtype=<class 'numpy.int32'>
+    Output 38: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+
+MUL (index: 6):
+  Input tensors: [38 10]
+  Output tensors: [39]
+    Input 38: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+    Input 10: shape=[], dtype=<class 'numpy.float32'>
+    Output 39: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+
+ADD (index: 7):
+  Input tensors: [37 39]
+  Output tensors: [40]
+    Input 37: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+    Input 39: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+    Output 40: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+
+MEAN (index: 8):
+  Input tensors: [40  8]
+  Output tensors: [41]
+    Input 40: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+    Input 8: shape=[3], dtype=<class 'numpy.int32'>
+    Output 41: shape=[1 1 1 1], dtype=<class 'numpy.float32'>
+
+SUB (index: 9):
+  Input tensors: [40 41]
+  Output tensors: [42]
+    Input 40: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+    Input 41: shape=[1 1 1 1], dtype=<class 'numpy.float32'>
+    Output 42: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+
+TRANSPOSE (index: 10):
+  Input tensors: [42 17]
+  Output tensors: [43]
+    Input 42: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+    Input 17: shape=[4], dtype=<class 'numpy.int32'>
+    Output 43: shape=[ 1  1 32 20], dtype=<class 'numpy.float32'>
+
+RESHAPE (index: 11):
+  Input tensors: [43  5]
+  Output tensors: [44]
+    Input 43: shape=[ 1  1 32 20], dtype=<class 'numpy.float32'>
+    Input 5: shape=[4], dtype=<class 'numpy.int32'>
+    Output 44: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+
+MUL (index: 12):
+  Input tensors: [42 42]
+  Output tensors: [45]
+    Input 42: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+    Input 42: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+    Output 45: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+
+MEAN (index: 13):
+  Input tensors: [45  8]
+  Output tensors: [46]
+    Input 45: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+    Input 8: shape=[3], dtype=<class 'numpy.int32'>
+    Output 46: shape=[1 1 1 1], dtype=<class 'numpy.float32'>
+
+SQRT (index: 14):
+  Input tensors: [46]
+  Output tensors: [47]
+    Input 46: shape=[1 1 1 1], dtype=<class 'numpy.float32'>
+    Output 47: shape=[1 1 1 1], dtype=<class 'numpy.float32'>
+
+ADD (index: 15):
+  Input tensors: [47 15]
+  Output tensors: [48]
+    Input 47: shape=[1 1 1 1], dtype=<class 'numpy.float32'>
+    Input 15: shape=[1 1 1 1], dtype=<class 'numpy.float32'>
+    Output 48: shape=[1 1 1 1], dtype=<class 'numpy.float32'>
+
+DIV (index: 16):
+  Input tensors: [44 48]
+  Output tensors: [49]
+    Input 44: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+    Input 48: shape=[1 1 1 1], dtype=<class 'numpy.float32'>
+    Output 49: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+
+MINIMUM (index: 17):
+  Input tensors: [49 13]
+  Output tensors: [50]
+    Input 49: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+    Input 13: shape=[], dtype=<class 'numpy.float32'>
+    Output 50: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+
+MAXIMUM (index: 18):
+  Input tensors: [50 14]
+  Output tensors: [51]
+    Input 50: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+    Input 14: shape=[], dtype=<class 'numpy.float32'>
+    Output 51: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+
+LOGISTIC (index: 19):
+  Input tensors: [51]
+  Output tensors: [52]
+    Input 51: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+    Output 52: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+
+SUB (index: 20):
+  Input tensors: [52  6]
+  Output tensors: [53]
+    Input 52: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+    Input 6: shape=[], dtype=<class 'numpy.float32'>
+    Output 53: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+
+MUL (index: 21):
+  Input tensors: [53  9]
+  Output tensors: [54]
+    Input 53: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+    Input 9: shape=[], dtype=<class 'numpy.float32'>
+    Output 54: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+
+LOGISTIC (index: 22):
+  Input tensors: [54]
+  Output tensors: [55]
+    Input 54: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+    Output 55: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+
+RESHAPE (index: 23):
+  Input tensors: [55  4]
+  Output tensors: [56]
+    Input 55: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+    Input 4: shape=[4], dtype=<class 'numpy.int32'>
+    Output 56: shape=[ 1  1 32 20], dtype=<class 'numpy.float32'>
+
+TRANSPOSE (index: 24):
+  Input tensors: [56 16]
+  Output tensors: [57]
+    Input 56: shape=[ 1  1 32 20], dtype=<class 'numpy.float32'>
+    Input 16: shape=[4], dtype=<class 'numpy.int32'>
+    Output 57: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 25):
+  Input tensors: [57 19 24]
+  Output tensors: [58]
+    Input 57: shape=[ 1 32 20  1], dtype=<class 'numpy.float32'>
+    Input 19: shape=[20  3  3  1], dtype=<class 'numpy.float32'>
+    Input 24: shape=[20], dtype=<class 'numpy.float32'>
+    Output 58: shape=[ 1 32 20 20], dtype=<class 'numpy.float32'>
+
+MAX_POOL_2D (index: 26):
+  Input tensors: [58]
+  Output tensors: [59]
+    Input 58: shape=[ 1 32 20 20], dtype=<class 'numpy.float32'>
+    Output 59: shape=[ 1 16 10 20], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 27):
+  Input tensors: [59 31 23]
+  Output tensors: [60]
+    Input 59: shape=[ 1 16 10 20], dtype=<class 'numpy.float32'>
+    Input 31: shape=[36  3  3 20], dtype=<class 'numpy.int8'>
+    Input 23: shape=[36], dtype=<class 'numpy.float32'>
+    Output 60: shape=[ 1 16 10 36], dtype=<class 'numpy.float32'>
+
+MAX_POOL_2D (index: 28):
+  Input tensors: [60]
+  Output tensors: [61]
+    Input 60: shape=[ 1 16 10 36], dtype=<class 'numpy.float32'>
+    Output 61: shape=[ 1  8  5 36], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 29):
+  Input tensors: [61 30 22]
+  Output tensors: [62]
+    Input 61: shape=[ 1  8  5 36], dtype=<class 'numpy.float32'>
+    Input 30: shape=[48  3  3 36], dtype=<class 'numpy.int8'>
+    Input 22: shape=[48], dtype=<class 'numpy.float32'>
+    Output 62: shape=[ 1  8  5 48], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 30):
+  Input tensors: [62 29 21]
+  Output tensors: [63]
+    Input 62: shape=[ 1  8  5 48], dtype=<class 'numpy.float32'>
+    Input 29: shape=[56  3  3 48], dtype=<class 'numpy.int8'>
+    Input 21: shape=[56], dtype=<class 'numpy.float32'>
+    Output 63: shape=[ 1  8  5 56], dtype=<class 'numpy.float32'>
+
+MEAN (index: 31):
+  Input tensors: [63  7]
+  Output tensors: [64]
+    Input 63: shape=[ 1  8  5 56], dtype=<class 'numpy.float32'>
+    Input 7: shape=[2], dtype=<class 'numpy.int32'>
+    Output 64: shape=[ 1  1  1 56], dtype=<class 'numpy.float32'>
+
+RESHAPE (index: 32):
+  Input tensors: [64 26]
+  Output tensors: [65]
+    Input 64: shape=[ 1  1  1 56], dtype=<class 'numpy.float32'>
+    Input 26: shape=[2], dtype=<class 'numpy.int32'>
+    Output 65: shape=[ 1 56], dtype=<class 'numpy.float32'>
+
+FULLY_CONNECTED (index: 33):
+  Input tensors: [65 32 20]
+  Output tensors: [66]
+    Input 65: shape=[ 1 56], dtype=<class 'numpy.float32'>
+    Input 32: shape=[64 56], dtype=<class 'numpy.int8'>
+    Input 20: shape=[64], dtype=<class 'numpy.float32'>
+    Output 66: shape=[ 1 64], dtype=<class 'numpy.float32'>
+
+FULLY_CONNECTED (index: 34):
+  Input tensors: [66 18 25]
+  Output tensors: [67]
+    Input 66: shape=[ 1 64], dtype=<class 'numpy.float32'>
+    Input 18: shape=[10 64], dtype=<class 'numpy.float32'>
+    Input 25: shape=[10], dtype=<class 'numpy.float32'>
+    Output 67: shape=[ 1 10], dtype=<class 'numpy.float32'>
+
+SOFTMAX (index: 35):
+  Input tensors: [67]
+  Output tensors: [68]
+    Input 67: shape=[ 1 10], dtype=<class 'numpy.float32'>
+    Output 68: shape=[ 1 10], dtype=<class 'numpy.float32'>
+
+DELEGATE (index: 36):
+  Input tensors: [ 0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23
+ 24 25 26 27 28 29 30 31 32]
+  Output tensors: [68]
+    Input 0: shape=[ 1 32 20  3], dtype=<class 'numpy.float32'>
+    Input 1: shape=[4], dtype=<class 'numpy.int32'>
+    Input 2: shape=[4], dtype=<class 'numpy.int32'>
+    Input 3: shape=[4], dtype=<class 'numpy.int32'>
+    Input 4: shape=[4], dtype=<class 'numpy.int32'>
+    Input 5: shape=[4], dtype=<class 'numpy.int32'>
+    Input 6: shape=[], dtype=<class 'numpy.float32'>
+    Input 7: shape=[2], dtype=<class 'numpy.int32'>
+    Input 8: shape=[3], dtype=<class 'numpy.int32'>
+    Input 9: shape=[], dtype=<class 'numpy.float32'>
+    Input 10: shape=[], dtype=<class 'numpy.float32'>
+    Input 11: shape=[], dtype=<class 'numpy.float32'>
+    Input 12: shape=[], dtype=<class 'numpy.float32'>
+    Input 13: shape=[], dtype=<class 'numpy.float32'>
+    Input 14: shape=[], dtype=<class 'numpy.float32'>
+    Input 15: shape=[1 1 1 1], dtype=<class 'numpy.float32'>
+    Input 16: shape=[4], dtype=<class 'numpy.int32'>
+    Input 17: shape=[4], dtype=<class 'numpy.int32'>
+    Input 18: shape=[10 64], dtype=<class 'numpy.float32'>
+    Input 19: shape=[20  3  3  1], dtype=<class 'numpy.float32'>
+    Input 20: shape=[64], dtype=<class 'numpy.float32'>
+    Input 21: shape=[56], dtype=<class 'numpy.float32'>
+    Input 22: shape=[48], dtype=<class 'numpy.float32'>
+    Input 23: shape=[36], dtype=<class 'numpy.float32'>
+    Input 24: shape=[20], dtype=<class 'numpy.float32'>
+    Input 25: shape=[10], dtype=<class 'numpy.float32'>
+    Input 26: shape=[2], dtype=<class 'numpy.int32'>
+    Input 27: shape=[4], dtype=<class 'numpy.int32'>
+    Input 28: shape=[4], dtype=<class 'numpy.int32'>
+    Input 29: shape=[56  3  3 48], dtype=<class 'numpy.int8'>
+    Input 30: shape=[48  3  3 36], dtype=<class 'numpy.int8'>
+    Input 31: shape=[36  3  3 20], dtype=<class 'numpy.int8'>
+    Input 32: shape=[64 56], dtype=<class 'numpy.int8'>
+    Output 68: shape=[ 1 10], dtype=<class 'numpy.float32'>
