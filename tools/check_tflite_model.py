@@ -592,8 +592,14 @@ def inspect_tflite_model(model_path, verbose=False, output_file=None,
                         summary_type="basic"):
     """Enhanced TFLite model inspection with comprehensive analysis"""
     try:
-        # Load model
-        interpreter = tf.lite.Interpreter(model_path=model_path)
+        # Load model WITHOUT default delegates (XNNPACK) to avoid false positives
+        # in delegate detection. Using default delegates wraps builtin ops in
+        # DELEGATE at runtime, making _get_ops_details() report DELEGATE even
+        # when the flatbuffer is clean.
+        interpreter = tf.lite.Interpreter(
+            model_path=model_path,
+            experimental_op_resolver_type=tf.lite.experimental.OpResolverType.BUILTIN_WITHOUT_DEFAULT_DELEGATES
+        )
         interpreter.allocate_tensors()
         
         # Initialize output content

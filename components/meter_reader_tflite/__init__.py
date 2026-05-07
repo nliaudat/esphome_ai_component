@@ -131,13 +131,11 @@ def parse_model_txt_file(model_path):
         else:
             config['scale_factor'] = 1.0
     
-    # Parse peak memory from peak analysis (if available)
-    # Example: "Peak active memory: 70.96 KB"
-    peak_match = re.search(r'Peak active memory:\s+([\d.]+)\s+KB', content)
-    if peak_match:
-        peak_kb = float(peak_match.group(1))
-        # Use 1.5x safety margin, minimum 100KB
-        arena_kb = max(100, int(peak_kb * 1.5))
+    # Parse recommended tensor_arena_size from peak analysis (if available)
+    # Example: "Recommended tensor_arena_size: 42KB"
+    arena_match = re.search(r'Recommended tensor_arena_size:\s+(\d+)KB', content)
+    if arena_match:
+        arena_kb = int(arena_match.group(1))
         config['tensor_arena_size'] = arena_kb * 1024
     
     # Parse total operations count for MAX_OPERATORS
@@ -150,7 +148,9 @@ def parse_model_txt_file(model_path):
         print(f"  Auto-detected MAX_OPERATORS: {config['max_operators']} (from {total_ops} operations + 5 margin)")
     
     # Detect DELEGATE ops (incompatible with TFLite Micro) - informational only
-    if re.search(r'\bDELEGATE\b', content):
+    # Use specific pattern to match only the actual warning (e.g. "Found 3 DELEGATE operation(s)!")
+    # not the OK message ("No DELEGATE operations found") which also contains the word DELEGATE
+    if re.search(r'Found \d+ DELEGATE operation', content):
         print(f"  Note: Model '{os.path.basename(txt_path)}' contains DELEGATE ops.")
         print(f"    DELEGATE ops are NOT compatible with TFLite Micro.")
         print(f"    Re-export the model with delegates disabled:")
