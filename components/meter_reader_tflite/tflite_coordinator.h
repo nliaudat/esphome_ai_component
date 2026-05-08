@@ -44,6 +44,17 @@ class TFLiteCoordinator {
       model_handler_.set_debug(debug);
   }
   
+  // Dynamic model config setters (set from __init__.py at build time)
+  void set_input_type(const std::string& t) { input_type_ = t; }
+  void set_input_channels(int c) { input_channels_ = c; }
+  void set_input_width(int w) { input_width_ = w; }
+  void set_input_height(int h) { input_height_ = h; }
+  void set_output_processing(const std::string& p) { output_processing_ = p; }
+  void set_scale_factor(float f) { scale_factor_ = f; }
+  void set_input_order(const std::string& o) { input_order_ = o; }
+  void set_normalize(bool n) { normalize_ = n; }
+  void set_invert(bool i) { invert_ = i; }
+  
   void setup(const std::string& model_type, size_t tensor_arena_size);
   
   // Model management
@@ -102,7 +113,17 @@ class TFLiteCoordinator {
   const uint8_t *model_{nullptr};
   size_t model_length_{0};
   
-  // State
+  // Dynamic model config (set from __init__.py at build time)
+  std::string input_type_{"uint8"};
+  int input_channels_{3};
+  int input_width_{32};
+  int input_height_{20};
+  std::string output_processing_{"direct_class"};
+  float scale_factor_{1.0f};
+  std::string input_order_{"RGB"};
+  bool normalize_{false};
+  bool invert_{false};
+  
   // State
   bool model_loaded_{false};
   bool debug_{false};

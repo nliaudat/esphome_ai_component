@@ -18,7 +18,10 @@ namespace esphome {
 namespace tflite_micro_helper {
 
 // Maximum number of operators to register
-constexpr int MAX_OPERATORS = 30;
+// Can be overridden by build flag -DMAX_OPERATORS=N (set by meter_reader_tflite codegen from .txt file)
+#ifndef MAX_OPERATORS
+#define MAX_OPERATORS 30
+#endif
 
 struct ModelConfig {
   std::string description;

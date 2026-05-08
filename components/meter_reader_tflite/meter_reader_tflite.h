@@ -79,6 +79,17 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_tensor_arena_size(size_t size_bytes); // -> TFLite
   void set_model(const uint8_t *model, size_t length); // -> TFLite
 
+  // Dynamic model config setters (delegated to TFLiteCoordinator)
+  void set_input_type(const std::string& t) { this->tflite_coord_.set_input_type(t); }
+  void set_input_channels(int c) { this->tflite_coord_.set_input_channels(c); }
+  void set_input_width(int w) { this->tflite_coord_.set_input_width(w); }
+  void set_input_height(int h) { this->tflite_coord_.set_input_height(h); }
+  void set_output_processing(const std::string& p) { this->tflite_coord_.set_output_processing(p); }
+  void set_scale_factor(float f) { this->tflite_coord_.set_scale_factor(f); }
+  void set_input_order(const std::string& o) { this->tflite_coord_.set_input_order(o); }
+  void set_normalize(bool n) { this->tflite_coord_.set_normalize(n); }
+  void set_invert(bool i) { this->tflite_coord_.set_invert(i); }
+
   void set_value_sensor(sensor::Sensor *sensor) { this->value_sensor_ = sensor; }
   void set_confidence_sensor(sensor::Sensor *sensor) { this->confidence_sensor_ = sensor; }
   
