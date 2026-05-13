@@ -40,7 +40,7 @@ class TFLiteMicroHelper {
    * 
    * @return TfLiteTensor*
    */
-  TfLiteTensor* input_tensor() const {
+  TfLiteTensor* input_tensor() {
     return model_handler_.input_tensor();
   }
 
@@ -49,7 +49,7 @@ class TFLiteMicroHelper {
    * 
    * @return TfLiteTensor*
    */
-  TfLiteTensor* output_tensor() const {
+  TfLiteTensor* output_tensor() {
     return model_handler_.output_tensor();
   }
 

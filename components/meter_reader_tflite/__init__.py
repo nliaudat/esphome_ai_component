@@ -45,7 +45,6 @@ CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL = 'debug_image_out_serial'
 CONF_DEBUG_MEMORY = 'debug_memory'
 CONF_VALIDATOR = 'validator'
 
-# CONF_MODEL_TYPE = 'model_type' 
 CONF_PREVIEW = 'preview_camera'
 CONF_GENERATE_PREVIEW = 'generate_preview'
 CONF_START_FLASH_CALIBRATION_BUTTON = 'start_flash_calibration_button'
@@ -202,16 +201,10 @@ CONFIG_SCHEMA = cv.Schema({
         min=0.0, max=1.0
     ),
     # Make tensor_arena_size optional since it's auto-detected from .txt file
-    cv.Optional(CONF_TENSOR_ARENA_SIZE): cv.Any(
-        cv.All(
-            datasize_to_bytes,
-            cv.Range(min=50 * 1024, max=1000 * 1024)
-        ),
-        cv.All(
-            cv.string,
-            cv.Length(min=3, max=10),
-            lambda v: cv.Range(min=50 * 1024, max=1000 * 1024)(datasize_to_bytes(v)),
-        ),
+    # datasize_to_bytes handles both int and string inputs (e.g. "110KB")
+    cv.Optional(CONF_TENSOR_ARENA_SIZE): cv.All(
+        datasize_to_bytes,
+        cv.Range(min=50 * 1024, max=1000 * 1024),
     ),
     cv.GenerateID(CONF_RAW_DATA_ID): cv.declare_id(cg.uint8),
     cv.Optional(CONF_DEBUG, default=False): cv.boolean, 
@@ -238,7 +231,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_CAMERA_RESOLUTION, default="640x480"): cv.All(
         cv.string_strict,
         cv.Length(min=5, max=12),
-        lambda v: v if re.match(r'^\d+x\d+$', v) else cv.Invalid(f"Invalid resolution format: {v} (expected e.g. 640x480)"),
+        lambda v: v if re.match(r'^\d+x\d+$', v) else (_ for _ in ()).throw(cv.Invalid(f"Invalid resolution format: {v} (expected e.g. 640x480)")),
     ),
     
     # Dynamic model config overrides (optional - auto-detected from .txt file)
@@ -401,7 +394,7 @@ async def to_code(config):
     # Get camera resolution from config (defaults to 640x480)
     res = config.get(CONF_CAMERA_RESOLUTION, "640x480")
     width, height = map(int, res.split('x'))
-    pixel_format = "RGB888"
+    pixel_format = CORE.config.get("substitutions", {}).get("camera_pixel_format", "RGB888")
     cg.add(var.set_camera_image_format(width, height, pixel_format))
     
     # Find esp32_camera_utils instance to allow updating its helper sensors and for rotation detection
@@ -508,12 +501,6 @@ async def to_code(config):
         cg.add(var.set_process_free_psram_sensor(s))
 
 
-    # if CONF_PREVIEW in config:
-    #     preview_conf = config[CONF_PREVIEW]
-    #     preview_cam = cg.new_Pvariable(preview_conf[CONF_ID], var)
-    #     await camera_component.register_camera(preview_cam, preview_conf)
-    #     cg.add(var.set_preview_camera(preview_cam))
-   
     # Check for web_server component to enable preview handler
     if 'web_server' in CORE.config:
         cg.add_define("USE_WEB_SERVER")
@@ -555,23 +542,6 @@ async def to_code(config):
             cg.add(var.set_collect_min_digit_confidence(config[CONF_COLLECT_MIN_DIGIT_CONFIDENCE]))
         cg.add_define("USE_DATA_COLLECTOR")
     
-    # Handle optional camera window configuration
-    # if CONF_CAMERA_WINDOW in config:
-    #     window_config = config[CONF_CAMERA_WINDOW]
-    #     if 'width' in window_config and 'height' in window_config:
-    #         offset_x = window_config.get('offset_x', 0)
-    #         offset_y = window_config.get('offset_y', 0)
-    #         width = window_config['width']
-    #         height = window_config['height']
-            
-    #         # Store window configuration as member variables
-    #         cg.add(var.set_camera_window_offset_x(offset_x))
-    #         cg.add(var.set_camera_window_offset_y(offset_y))
-    #         cg.add(var.set_camera_window_width(width))
-    #         cg.add(var.set_camera_window_height(height))
-    #         cg.add(var.set_camera_window_configured(True)) 
-
-
     # Set timeout parameters
     if CONF_FRAME_REQUEST_TIMEOUT in config:
         cg.add(var.set_frame_request_timeout(config[CONF_FRAME_REQUEST_TIMEOUT]))
