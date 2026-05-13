@@ -91,6 +91,9 @@ bool TFLiteCoordinator::load_model() {
         ESP_LOGE(TAG, "  Input size: %dx%d", 
                  config.input_size.size() >= 1 ? config.input_size[0] : 0,
                  config.input_size.size() >= 2 ? config.input_size[1] : 0);
+        // Free the tensor arena to prevent leak on retry
+        tensor_arena_allocation_.data.reset();
+        tensor_arena_allocation_.actual_size = 0;
         return false;
     }
 

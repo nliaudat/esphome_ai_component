@@ -15,6 +15,7 @@
 #include <string>
 #include <vector>
 #include <mutex>
+#include <atomic>
 #include <span>
 
 namespace esphome {
@@ -125,7 +126,7 @@ class TFLiteCoordinator {
   bool invert_{false};
   
   // State
-  bool model_loaded_{false};
+  std::atomic<bool> model_loaded_{false};
   bool debug_{false};
   
   // Arena stats cache for thread-safe dual-core access (Core 0 inference, Core 1 main loop)
@@ -136,8 +137,6 @@ class TFLiteCoordinator {
   tflite_micro_helper::MemoryManager memory_manager_;
   tflite_micro_helper::MemoryManager::AllocationResult tensor_arena_allocation_;
   tflite_micro_helper::ModelHandler model_handler_;
-  // Last known specs
-  float rotation_{0.0f};
 
   bool allocate_tensor_arena();
   bool process_model_result(const esp32_camera_utils::ImageProcessor::ProcessResult& result, float* value, float* confidence);

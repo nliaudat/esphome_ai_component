@@ -176,24 +176,15 @@ std::vector<CameraCoordinator::ProcessResult> CameraCoordinator::process_frame(
          return {};
     }
     
-    // Validation moved to ImageProcessor which has access to actual decoded frame dimensions.
+    // Validation is handled by ImageProcessor which has access to actual decoded frame dimensions.
     // Local check logic can be stale if camera windowing (ROI) is used.
-    
-    // We pass all zones to ImageProcessor. It will validate against the actual image.
-    std::vector<esp32_camera_utils::CropZone> valid_zones;
-    valid_zones.reserve(zones.size());
-
-    for (const auto& zone : zones) {
-        valid_zones.push_back(zone);
-    }
-    
-    if (valid_zones.empty() && !zones.empty()) {
-        ESP_LOGE(TAG, "All crop zones appear invalid or out of bounds. Skipping processing to prevent crash.");
+    // Pass all zones directly — ImageProcessor validates against the actual image.
+    if (zones.empty()) {
+        ESP_LOGE(TAG, "No crop zones provided. Skipping processing.");
         return {};
     }
 
-    // Process only valid zones
-    return this->image_processor_->split_image_in_zone(frame, valid_zones);
+    return this->image_processor_->split_image_in_zone(frame, zones);
 
 }
 

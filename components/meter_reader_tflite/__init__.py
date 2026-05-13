@@ -59,6 +59,7 @@ CONF_COLLECT_MIN_DIGIT_CONFIDENCE = 'collect_min_digit_confidence'
 CONF_CROP_ZONES = 'crop_zones_global'
 
 CONF_CAMERA_WINDOW = 'camera_window'
+CONF_CAMERA_RESOLUTION = 'camera_resolution'
 
 CONF_FRAME_REQUEST_TIMEOUT = 'frame_request_timeout'
 CONF_UNLOAD_BUTTON = 'unload_button'
@@ -110,6 +111,7 @@ def parse_model_txt_file(model_path):
     
     # Parse input type and shape from INPUT/OUTPUT SUMMARY section
     # Example: "Input 0:  [ 1 32 20  3]   <class 'numpy.float32'>"
+    # TFLite NHWC layout: [batch, height, width, channels]
     input_match = re.search(r'Input\s+0:\s+\[\s*\d+\s+(\d+)\s+(\d+)\s+(\d+)\].*?numpy\.(\w+)', content)
     if input_match:
         config['input_height'] = int(input_match.group(1))
@@ -205,7 +207,11 @@ CONFIG_SCHEMA = cv.Schema({
             datasize_to_bytes,
             cv.Range(min=50 * 1024, max=1000 * 1024)
         ),
-        cv.string,  # Allow string like "110KB" for auto-detection override
+        cv.All(
+            cv.string,
+            cv.Length(min=3, max=10),
+            lambda v: cv.Range(min=50 * 1024, max=1000 * 1024)(datasize_to_bytes(v)),
+        ),
     ),
     cv.GenerateID(CONF_RAW_DATA_ID): cv.declare_id(cg.uint8),
     cv.Optional(CONF_DEBUG, default=False): cv.boolean, 
@@ -238,6 +244,12 @@ CONFIG_SCHEMA = cv.Schema({
     # ),
     # cv.Optional(CONF_AUTO_CAMERA_WINDOW, default=False): cv.boolean,
     cv.Optional(CONF_FRAME_REQUEST_TIMEOUT, default=15000): cv.int_range(min=1000, max=60000),
+    cv.Optional(CONF_CAMERA_RESOLUTION, default="640x480"): cv.All(
+        cv.string,
+        cv.Length(min=5, max=12),
+        lambda v: cv.int_range(min=1, max=4096)(int(v.split('x')[0])) and
+                  cv.int_range(min=1, max=4096)(int(v.split('x')[1])) or v,
+    ),
     
     # Dynamic model config overrides (optional - auto-detected from .txt file)
     cv.Optional(CONF_INPUT_TYPE): cv.enum({'uint8': 'uint8', 'float32': 'float32'}, lower=True),
@@ -296,7 +308,6 @@ async def to_code(config):
 
     var = cg.new_Pvariable(config[CONF_ID])
     cg.add_global(cg.RawStatement('#include "esphome/components/meter_reader_tflite/meter_reader_tflite.h"'))
-    cg.add_global(cg.RawStatement('using namespace esphome::meter_reader_tflite;'))
     await cg.register_component(var, config)
     
     cg.add_define("USE_METER_READER_TFLITE")
@@ -420,15 +431,10 @@ async def to_code(config):
     if "show_crop_areas" in config:
         cg.add(var.set_show_crop_areas(config["show_crop_areas"]))
     
-    # Get camera resolution from substitutions
-    width, height = 640, 480  # Defaults
-    substitutions = CORE.config.get("substitutions", {})
-    if substitutions.get("camera_resolution"):
-        res = substitutions["camera_resolution"]
-        if 'x' in res:
-            width, height = map(int, res.split('x'))
-    
-    pixel_format = substitutions.get("camera_pixel_format", "RGB888")
+    # Get camera resolution from config (defaults to 640x480)
+    res = config.get(CONF_CAMERA_RESOLUTION, "640x480")
+    width, height = map(int, res.split('x'))
+    pixel_format = "RGB888"
     cg.add(var.set_camera_image_format(width, height, pixel_format))
     
     # Find esp32_camera_utils instance to allow updating its helper sensors and for rotation detection
@@ -646,8 +652,9 @@ async def to_code(config):
     if config.get("enable_flash_calibration", False):
         cg.add(var.set_enable_flash_calibration(True))
 
-    cg.add_define("DEBUG_METER_READER_TIMING")
-    cg.add(var.set_debug_timing(config.get("debug_timing", False)))
+    if config.get("debug_timing", False):
+        cg.add_define("DEBUG_METER_READER_TIMING")
+        cg.add(var.set_debug_timing(True))
 
     if "total_inference_time_sensor" in config:
         s = await cg.get_variable(config["total_inference_time_sensor"])
