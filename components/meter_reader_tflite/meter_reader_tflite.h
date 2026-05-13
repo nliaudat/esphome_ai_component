@@ -164,8 +164,11 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
   // Calibration
   void start_flash_calibration();
-  void update_calibration(float confidence); // Modified signature to match logic
+  // Public overload: called after each inference during calibration with the resulting confidence.
+  // The private no-arg overload (update_calibration()) is the legacy interface kept for internal use.
+  void update_calibration(float confidence);
   bool is_calibrating() const { return calibration_.state != FlashCalibrationHandler::IDLE; }
+
 
   // Window Control
   void set_camera_window_offset_x(int x);

@@ -64,29 +64,37 @@ class ModelHandler {
     return interpreter_->Invoke();
   }
 
-  TfLiteTensor* input_tensor() const {
+  TfLiteTensor* input_tensor() {
     return interpreter_->input(0);
   }
 
-  TfLiteTensor* output_tensor() const {
+  const TfLiteTensor* input_tensor() const {
+    return interpreter_->input(0);
+  }
+
+  TfLiteTensor* output_tensor() {
+    return interpreter_->output(0);
+  }
+
+  const TfLiteTensor* output_tensor() const {
     return interpreter_->output(0);
   }
   
   // Helper methods for input dimensions
   int get_input_width() const {
-    TfLiteTensor* input = input_tensor();
+    const TfLiteTensor* input = input_tensor();
     if (!input || input->dims->size < 4) return 0;
     return input->dims->data[2]; // [batch, height, width, channels]
   }
   
   int get_input_height() const {
-    TfLiteTensor* input = input_tensor();
+    const TfLiteTensor* input = input_tensor();
     if (!input || input->dims->size < 4) return 0;
     return input->dims->data[1];
   }
   
   int get_input_channels() const {
-    TfLiteTensor* input = input_tensor();
+    const TfLiteTensor* input = input_tensor();
     if (!input || input->dims->size < 4) return 0;
     return input->dims->data[3];
   }

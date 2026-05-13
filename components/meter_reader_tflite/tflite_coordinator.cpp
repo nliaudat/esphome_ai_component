@@ -91,6 +91,9 @@ bool TFLiteCoordinator::load_model() {
         ESP_LOGE(TAG, "  Input size: %dx%d", 
                  config.input_size.size() >= 1 ? config.input_size[0] : 0,
                  config.input_size.size() >= 2 ? config.input_size[1] : 0);
+        // Free the tensor arena to prevent leak on retry
+        tensor_arena_allocation_.data.reset();
+        tensor_arena_allocation_.actual_size = 0;
         return false;
     }
 
@@ -212,8 +215,8 @@ TFLiteCoordinator::ModelSpec TFLiteCoordinator::get_model_spec() const {
     
     // Determine input type by checking tensor size
     // Float32 = W*H*C*4, Uint8 = W*H*C*1
-    // Use const_cast explicitly (documented) since input_tensor() lacks a const overload
-    TfLiteTensor* input = const_cast<tflite_micro_helper::ModelHandler&>(model_handler_).input_tensor();
+    // Use const overload of input_tensor() since this is a const method
+    const TfLiteTensor* input = model_handler_.input_tensor();
     
     size_t num_elements = spec.input_width * spec.input_height * spec.input_channels;
     

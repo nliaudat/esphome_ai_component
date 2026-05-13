@@ -839,6 +839,7 @@ void ValueValidator::ensure_last_valid_digits_size(size_t num_digits) {
   if (new_data) {
       if (last_valid_digits_data_) free(last_valid_digits_data_);
       last_valid_digits_data_ = new_data;
+      memset(new_data, 0, num_digits * sizeof(int));
       last_valid_digits_count_ = num_digits;
   } else {
       // Allocation failed — keep existing data if available

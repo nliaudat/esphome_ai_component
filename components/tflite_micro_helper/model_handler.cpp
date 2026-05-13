@@ -127,15 +127,9 @@ bool ModelHandler::load_model_with_arena(const uint8_t *model_data, size_t model
     
     this->tflite_model_ = tflite::GetModel(model_data);
     
-    if (this->tflite_model_ == nullptr) {
-        ESP_LOGW(TAG, "Direct PROGMEM access failed, copying to RAM");
-        // Note: This is risky if RAM is low, but sometimes necessary
-        // Ideally we should avoid this path by ensuring GetModel works with PROGMEM
-        // or passing a RAM buffer if needed.
-        // For now, we assume GetModel works or we fail.
-        // std::vector<uint8_t> ram_model(model_data, model_data + model_size);
-        // this->tflite_model_ = tflite::GetModel(ram_model.data());
-    }
+    // Note: If GetModel fails with PROGMEM data, the model may need to be
+    // copied to RAM first. This is rare — most PROGMEM data works with GetModel.
+    // If you encounter issues, ensure the model data is properly aligned.
   
   if (this->tflite_model_ == nullptr) {
     ESP_LOGE(TAG, "Failed to parse model - invalid data");
@@ -244,27 +238,19 @@ bool ModelHandler::load_model_with_arena(const uint8_t *model_data, size_t model
     }
   }
 
-  // Auto-detect model type if output processing not specified
+  // Calculate output size from tensor dimensions
   TfLiteTensor* output = this->output_tensor();
   if (output) {
-      // Calculate output size
       int size = 1;
       for (int i = 0; i < output->dims->size; i++) {
           size *= output->dims->data[i];
       }
       this->output_size_ = size;
       
-      if (this->config_.output_processing.empty()) {
-        if (output->dims->size >= 2 && output->dims->data[1] == 100) {
-          this->config_.output_processing = "logits";
-          this->config_.scale_factor = 10.0f;
-          ESP_LOGW(TAG, "Auto-detected class100 model, using softmax processing");
-        } else if (output->dims->size >= 2 && output->dims->data[1] == 10) {
-          this->config_.output_processing = "softmax";
-          this->config_.scale_factor = 1.0f;
-          ESP_LOGW(TAG, "Auto-detected class10 model, using softmax processing");
-        }
-      }
+      // Note: output_processing is always set by __init__.py (defaults to "direct_class"),
+      // so the auto-detection branch (when output_processing is empty) is never reached
+      // at runtime. It's kept here as a safety net for future use cases where
+      // load_model_with_arena() might be called directly without going through __init__.py.
   }
   
   ESP_LOGI(TAG, "Model loaded successfully");
@@ -273,10 +259,10 @@ bool ModelHandler::load_model_with_arena(const uint8_t *model_data, size_t model
 }
 
 void ModelHandler::log_input_stats() const {
-    TfLiteTensor* input = const_cast<ModelHandler*>(this)->input_tensor();
+    const TfLiteTensor* input = input_tensor();
     if (input == nullptr) return;
     
-    const int total_elements = const_cast<ModelHandler*>(this)->get_input_width() * const_cast<ModelHandler*>(this)->get_input_height() * const_cast<ModelHandler*>(this)->get_input_channels();
+    const int total_elements = get_input_width() * get_input_height() * get_input_channels();
     const int sample_size = std::min(20, total_elements); // Show first 20 values
     
     ESP_LOGD(TAG, "First %d %s inputs (%s):", sample_size, 
@@ -309,14 +295,14 @@ void ModelHandler::log_input_stats() const {
 }
 
 void ModelHandler::debug_input_pattern() const {
-    TfLiteTensor* input = const_cast<ModelHandler*>(this)->input_tensor();
+    const TfLiteTensor* input = input_tensor();
     if (!input || input->type != kTfLiteFloat32) return;
     
     const float* data = input->data.f;
     const int total_elements = input->bytes / sizeof(float);
-    const int channels = const_cast<ModelHandler*>(this)->get_input_channels();
-    const int height = const_cast<ModelHandler*>(this)->get_input_height();
-    const int width = const_cast<ModelHandler*>(this)->get_input_width();
+    const int channels = get_input_channels();
+    const int height = get_input_height();
+    const int width = get_input_width();
     
     ESP_LOGD(TAG, "Input pattern analysis: %dx%dx%d", width, height, channels);
     
@@ -696,7 +682,17 @@ uint32_t ModelHandler::calculate_crc32(const uint8_t *data, size_t length) {
 bool ModelHandler::verify_model_crc(const uint8_t *model_data, size_t length) {
     uint32_t crc = calculate_crc32(model_data, length);
     ESP_LOGI(TAG, "Model CRC32: 0x%08X", crc);
+#ifdef MODEL_CRC32
+    if (crc != MODEL_CRC32) {
+        ESP_LOGE(TAG, "Model CRC32 mismatch! Expected: 0x%08X, Got: 0x%08X", MODEL_CRC32, crc);
+        return false;
+    }
+    ESP_LOGI(TAG, "Model CRC32 verification passed");
     return true;
+#else
+    ESP_LOGW(TAG, "MODEL_CRC32 not defined — skipping verification");
+    return true;
+#endif
 }
 
 void ModelHandler::debug_model_architecture() const {
@@ -719,7 +715,7 @@ void ModelHandler::debug_model_architecture() const {
 }
 
 bool ModelHandler::validate_model_config() const {
-    TfLiteTensor* input = const_cast<ModelHandler*>(this)->input_tensor();
+    const TfLiteTensor* input = input_tensor();
     if (!input) return false;
     
     // Check input dimensions
