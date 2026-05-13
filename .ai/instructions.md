@@ -921,6 +921,13 @@ std::array<uint8_t, JPEG_BUFFER_SIZE> buffer;
 - Are there sensible defaults?
 - Are errors reported clearly with `cv.Invalid`?
 
+**⚠️ ESPHome config validation compatibility:**
+- Use ONLY validators available in `esphome.config_validation` (e.g. `cv.string_strict`, `cv.Length`, `cv.Range`, `cv.int_range`, `cv.float_range`, `cv.boolean`, `cv.one_of`, `cv.enum`, `cv.file_`, `cv.percentage`, `cv.Regex` is NOT available)
+- To raise `cv.Invalid` inside a lambda, use the generator expression pattern: `(_ for _ in ()).throw(cv.Invalid("..."))`
+- Do NOT use `cv.Regex` — it does not exist in ESPHome's config_validation module
+- Do NOT return `cv.Invalid(...)` from a lambda — it must be raised, not returned
+- Prefer composing built-in validators with `cv.All()` over custom lambdas where possible
+
 ### 12.9 When Uncertain
 
 **If you are unsure whether a suggestion follows these rules:**

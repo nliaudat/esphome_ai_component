@@ -249,8 +249,8 @@ bool ModelHandler::load_model_with_arena(const uint8_t *model_data, size_t model
       
       // Note: output_processing is always set by __init__.py (defaults to "direct_class"),
       // so the auto-detection branch (when output_processing is empty) is never reached
-      // at runtime. It's kept here as a safety net for future use cases where
-      // load_model_with_arena() might be called directly without going through __init__.py.
+      // at runtime. If load_model_with_arena() is called directly, ensure output_processing
+      // is set explicitly in the ModelConfig before calling.
   }
   
   ESP_LOGI(TAG, "Model loaded successfully");
@@ -259,10 +259,10 @@ bool ModelHandler::load_model_with_arena(const uint8_t *model_data, size_t model
 }
 
 void ModelHandler::log_input_stats() const {
-    const TfLiteTensor* input = input_tensor();
+    const TfLiteTensor* input = this->input_tensor();
     if (input == nullptr) return;
     
-    const int total_elements = get_input_width() * get_input_height() * get_input_channels();
+    const int total_elements = this->get_input_width() * this->get_input_height() * this->get_input_channels();
     const int sample_size = std::min(20, total_elements); // Show first 20 values
     
     ESP_LOGD(TAG, "First %d %s inputs (%s):", sample_size, 
@@ -295,14 +295,14 @@ void ModelHandler::log_input_stats() const {
 }
 
 void ModelHandler::debug_input_pattern() const {
-    const TfLiteTensor* input = input_tensor();
+    const TfLiteTensor* input = this->input_tensor();
     if (!input || input->type != kTfLiteFloat32) return;
     
     const float* data = input->data.f;
     const int total_elements = input->bytes / sizeof(float);
-    const int channels = get_input_channels();
-    const int height = get_input_height();
-    const int width = get_input_width();
+    const int channels = this->get_input_channels();
+    const int height = this->get_input_height();
+    const int width = this->get_input_width();
     
     ESP_LOGD(TAG, "Input pattern analysis: %dx%dx%d", width, height, channels);
     
@@ -715,7 +715,7 @@ void ModelHandler::debug_model_architecture() const {
 }
 
 bool ModelHandler::validate_model_config() const {
-    const TfLiteTensor* input = input_tensor();
+    const TfLiteTensor* input = this->input_tensor();
     if (!input) return false;
     
     // Check input dimensions
