@@ -238,27 +238,19 @@ bool ModelHandler::load_model_with_arena(const uint8_t *model_data, size_t model
     }
   }
 
-  // Auto-detect model type if output processing not specified
+  // Calculate output size from tensor dimensions
   TfLiteTensor* output = this->output_tensor();
   if (output) {
-      // Calculate output size
       int size = 1;
       for (int i = 0; i < output->dims->size; i++) {
           size *= output->dims->data[i];
       }
       this->output_size_ = size;
       
-      if (this->config_.output_processing.empty()) {
-        if (output->dims->size >= 2 && output->dims->data[1] == 100) {
-          this->config_.output_processing = "logits";
-          this->config_.scale_factor = 10.0f;
-          ESP_LOGW(TAG, "Auto-detected class100 model, using softmax processing");
-        } else if (output->dims->size >= 2 && output->dims->data[1] == 10) {
-          this->config_.output_processing = "softmax";
-          this->config_.scale_factor = 1.0f;
-          ESP_LOGW(TAG, "Auto-detected class10 model, using softmax processing");
-        }
-      }
+      // Note: output_processing is always set by __init__.py (defaults to "direct_class"),
+      // so the auto-detection branch (when output_processing is empty) is never reached
+      // at runtime. It's kept here as a safety net for future use cases where
+      // load_model_with_arena() might be called directly without going through __init__.py.
   }
   
   ESP_LOGI(TAG, "Model loaded successfully");

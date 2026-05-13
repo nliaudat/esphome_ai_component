@@ -197,7 +197,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Required(CONF_MODEL): cv.file_,
     cv.Optional(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator) if value_validator else cv.string,
     cv.Optional(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera) if CORE.target_platform == "esp32" else cv.string,
-    # cv.Optional(CONF_MODEL_TYPE, default="class100-0180"): cv.string,  # Add model type selection
+
     cv.Optional(CONF_CONFIDENCE_THRESHOLD, default=0.85): cv.float_range(
         min=0.0, max=1.0
     ),
@@ -234,21 +234,11 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_COLLECT_MIN_DIGIT_CONFIDENCE, default=0.90): cv.float_range(min=0.0, max=1.0),
 
     cv.Optional(CONF_CROP_ZONES): cv.use_id(globals.GlobalsComponent),
-    # cv.Optional(CONF_CAMERA_WINDOW): cv.Any(
-    # cv.Schema({  # Or detailed configuration
-    #     cv.Optional('offset_x', default=0): cv.int_,
-    #     cv.Optional('offset_y', default=0): cv.int_,
-    #     cv.Optional('width'): cv.int_,
-    #     cv.Optional('height'): cv.int_,
-    #     })
-    # ),
-    # cv.Optional(CONF_AUTO_CAMERA_WINDOW, default=False): cv.boolean,
     cv.Optional(CONF_FRAME_REQUEST_TIMEOUT, default=15000): cv.int_range(min=1000, max=60000),
     cv.Optional(CONF_CAMERA_RESOLUTION, default="640x480"): cv.All(
-        cv.string,
+        cv.string_strict,
         cv.Length(min=5, max=12),
-        lambda v: cv.int_range(min=1, max=4096)(int(v.split('x')[0])) and
-                  cv.int_range(min=1, max=4096)(int(v.split('x')[1])) or v,
+        lambda v: v if re.match(r'^\d+x\d+$', v) else cv.Invalid(f"Invalid resolution format: {v} (expected e.g. 640x480)"),
     ),
     
     # Dynamic model config overrides (optional - auto-detected from .txt file)
@@ -276,37 +266,14 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("total_inference_time_sensor"): cv.use_id(sensor.Sensor),
     cv.Optional("capture_to_publish_time_sensor"): cv.use_id(sensor.Sensor),
     cv.Optional("debug_timing", default=False): cv.boolean,
-    # cv.Optional(CONF_PREVIEW): camera_component.CAMERA_SCHEMA.extend({
-    #     cv.GenerateID(): cv.declare_id(MeterPreviewCamera),
-    # }),
 }).extend(cv.polling_component_schema('60s'))
+
 
 async def to_code(config):
     """Code generation for the component."""
 
-    # esp32.add_idf_component(
-    #     name="espressif/esp-tflite-micro",
-    #     # ref="~1.3.4" #https://github.com/espressif/esp-tflite-micro/issues/120
-    #     ref="1.3.4" # fix to 1.3.4 cause 1.3.5 has bug
-    # )
-    
-    # esp32.add_idf_component(
-    #     name="espressif/esp-nn",
-    #     ref="~1.1.2"
-    # )
-    
-    # esp32.add_idf_component(
-    #     name="espressif/esp_new_jpeg",
-    #     ref="1.0.0"
-    # )
-        
-    # cg.add_build_flag("-DTF_LITE_STATIC_MEMORY")
-    # cg.add_build_flag("-DTF_LITE_DISABLE_X86_NEON")
-    # cg.add_build_flag("-DESP_NN")
-    # cg.add_build_flag("-DUSE_ESP32_CAMERA_CONV")
-    # cg.add_build_flag("-DOPTIMIZED_KERNEL=esp_nn")
-
     var = cg.new_Pvariable(config[CONF_ID])
+
     cg.add_global(cg.RawStatement('#include "esphome/components/meter_reader_tflite/meter_reader_tflite.h"'))
     await cg.register_component(var, config)
     
