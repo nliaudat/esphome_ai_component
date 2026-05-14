@@ -32,7 +32,7 @@ class TFLiteMicroHelper {
    * @return TfLiteStatus
    */
   TfLiteStatus invoke() {
-    return model_handler_.invoke();
+    return this->model_handler_.invoke();
   }
 
   /**
@@ -41,7 +41,7 @@ class TFLiteMicroHelper {
    * @return TfLiteTensor*
    */
   TfLiteTensor* input_tensor() {
-    return model_handler_.input_tensor();
+    return this->model_handler_.input_tensor();
   }
 
   /**
@@ -50,7 +50,7 @@ class TFLiteMicroHelper {
    * @return TfLiteTensor*
    */
   TfLiteTensor* output_tensor() {
-    return model_handler_.output_tensor();
+    return this->model_handler_.output_tensor();
   }
 
   /**
@@ -60,31 +60,31 @@ class TFLiteMicroHelper {
    * @return ProcessedOutput
    */
   ProcessedOutput process_output(const float *output_data) const {
-    return model_handler_.process_output(output_data);
+    return this->model_handler_.process_output(output_data);
   }
 
   // Accessors for model dimensions
-  int get_input_width() const { return model_handler_.get_input_width(); }
-  int get_input_height() const { return model_handler_.get_input_height(); }
-  int get_input_channels() const { return model_handler_.get_input_channels(); }
-  const ModelConfig& get_config() const { return model_handler_.get_config(); }
+  int get_input_width() const { return this->model_handler_.get_input_width(); }
+  int get_input_height() const { return this->model_handler_.get_input_height(); }
+  int get_input_channels() const { return this->model_handler_.get_input_channels(); }
+  const ModelConfig& get_config() const { return this->model_handler_.get_config(); }
 
   // Memory usage reporting
-  size_t get_arena_used_bytes() const { return model_handler_.get_arena_used_bytes(); }
-  size_t get_tensor_arena_size() const { return tensor_arena_allocation_.actual_size; }
+  size_t get_arena_used_bytes() const { return this->model_handler_.get_arena_used_bytes(); }
+  size_t get_tensor_arena_size() const { return this->tensor_arena_allocation_.actual_size; }
   
   void report_memory_status() {
-    memory_manager_.report_memory_status(
-        tensor_arena_size_requested_,
-        tensor_arena_allocation_.actual_size,
-        model_handler_.get_arena_used_bytes(),
-        model_length_
+    this->memory_manager_.report_memory_status(
+        this->tensor_arena_size_requested_,
+        this->tensor_arena_allocation_.actual_size,
+        this->model_handler_.get_arena_used_bytes(),
+        this->model_length_
     );
   }
 
   void set_debug(bool debug) { 
-      debug_ = debug; 
-      model_handler_.set_debug(debug);
+      this->debug_ = debug; 
+      this->model_handler_.set_debug(debug);
   }
  private:
   ModelHandler model_handler_;
