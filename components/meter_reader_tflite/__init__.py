@@ -394,7 +394,11 @@ async def to_code(config):
     # Get camera resolution from config (defaults to 640x480)
     res = config.get(CONF_CAMERA_RESOLUTION, "640x480")
     width, height = map(int, res.split('x'))
+    # Validate pixel_format from YAML substitutions
+    VALID_PIXEL_FORMATS = ("RGB888", "RGB565", "GRAYSCALE", "JPEG")
     pixel_format = CORE.config.get("substitutions", {}).get("camera_pixel_format", "RGB888")
+    if pixel_format not in VALID_PIXEL_FORMATS:
+        raise cv.Invalid(f"Invalid camera_pixel_format: '{pixel_format}'. Must be one of {VALID_PIXEL_FORMATS}")
     cg.add(var.set_camera_image_format(width, height, pixel_format))
     
     # Find esp32_camera_utils instance to allow updating its helper sensors and for rotation detection
