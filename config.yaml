@@ -303,7 +303,7 @@ packages:
   # camera configs
   - !include camera_options.yaml
   - !include esp32_camera.yaml
-  # - !include camera_webserver.yaml
+  # - !include camera_webserver.yaml # generate_preview must be set to true is used
   
   # network choice
   - !include wifi.yaml
