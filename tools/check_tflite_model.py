@@ -488,8 +488,8 @@ def get_peak_memory_analysis(interpreter):
     
     summary_lines.append(f"\nTotal memory (sum of all tensors): {total_memory / 1024:.2f} KB")
     summary_lines.append(f"Peak active memory (lifetime analysis): {peak_memory / 1024:.2f} KB at op index {peak_op}")
-    summary_lines.append(f"TFLite Micro arena estimate (1.5x peak): {peak_memory * 1.5 / 1024:.2f} KB")
-    summary_lines.append(f"\nRecommended tensor_arena_size: {int(peak_memory * 1.5 / 1024) + 1}KB")
+    summary_lines.append(f"TFLite Micro arena estimate (2.0x peak): {peak_memory * 2.0 / 1024:.2f} KB")
+    summary_lines.append(f"\nRecommended tensor_arena_size: {int(peak_memory * 2.0 / 1024) + 1}KB")
     
     # Show top tensors by memory
     tensor_memory = []

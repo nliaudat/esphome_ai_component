@@ -7,34 +7,119 @@ namespace tflite_micro_helper {
 
 static const char *const TAG = "MemoryManager";
 
+bool MemoryManager::has_psram() {
+  size_t total_psram = heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
+  return total_psram > 0;
+}
+
 MemoryManager::AllocationResult MemoryManager::allocate_tensor_arena(size_t requested_size) {
   ESP_LOGD(TAG, "Attempting to allocate %zu bytes for tensor arena", requested_size);
   
   AllocationResult result;
   result.actual_size = requested_size;
-
-  // First try PSRAM
-  uint8_t *arena_ptr = static_cast<uint8_t*>(
-      heap_caps_malloc(requested_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
   
-  if (!arena_ptr) {
-    ESP_LOGW(TAG, "PSRAM allocation failed, trying internal RAM");
-    arena_ptr = static_cast<uint8_t*>(
+  // Check build-time override flags (these don't need has_psram() check)
+  #ifdef TFLITE_FORCE_SRAM
+    ESP_LOGI(TAG, "TFLITE_FORCE_SRAM is defined — forcing SRAM allocation");
+    uint8_t *arena_ptr = static_cast<uint8_t*>(
         heap_caps_malloc(requested_size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
-  }
-
-  if (arena_ptr) {
-    // Use the HeapCapsDeleter from the AllocationResult struct
+    
+    if (!arena_ptr) {
+      size_t free_sram = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+      ESP_LOGE(TAG, "TFLITE_FORCE_SRAM: Failed to allocate %zu bytes from SRAM (only %zu bytes free)",
+               requested_size, free_sram);
+    }
+    if (arena_ptr) {
+      result.data = std::unique_ptr<uint8_t[], AllocationResult::HeapCapsDeleter>(
+          arena_ptr, 
+          AllocationResult::HeapCapsDeleter());
+      result.from_psram = false;
+      ESP_LOGD(TAG, "Allocated tensor arena: %zu bytes @ %p (SRAM, forced)", requested_size, arena_ptr);
+    } else {
+      result.actual_size = 0;
+    }
+    return result;
+  #endif
+  
+  #ifdef TFLITE_FORCE_PSRAM
+    ESP_LOGI(TAG, "TFLITE_FORCE_PSRAM is defined — forcing PSRAM allocation");
+    uint8_t *arena_ptr = static_cast<uint8_t*>(
+        heap_caps_malloc(requested_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+    
+    if (!arena_ptr) {
+      size_t free_psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+      ESP_LOGE(TAG, "TFLITE_FORCE_PSRAM: Failed to allocate %zu bytes from PSRAM (only %zu bytes free)",
+               requested_size, free_psram);
+    }
+    
+    if (arena_ptr) {
+      result.data = std::unique_ptr<uint8_t[], AllocationResult::HeapCapsDeleter>(
+          arena_ptr, 
+          AllocationResult::HeapCapsDeleter());
+      result.from_psram = true;
+      ESP_LOGD(TAG, "Allocated tensor arena: %zu bytes @ %p (PSRAM, forced)", requested_size, arena_ptr);
+    } else {
+      result.actual_size = 0;
+    }
+    return result;
+  #endif
+  
+  // ===== Normal (no override) path =====
+  bool psram_available = has_psram();
+  if (psram_available) {
+    // PSRAM is present: try PSRAM only, no fallback to SRAM.
+    // The tensor arena (typically 50-200KB) is too large for the small internal SRAM
+    // on most ESP32-S3 boards. Falling back to SRAM would silently exhaust heap space
+    // and cause hard-to-debug crashes later.
+    size_t free_psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+    ESP_LOGD(TAG, "PSRAM available: %zu bytes free", free_psram);
+    
+    uint8_t *arena_ptr = static_cast<uint8_t*>(
+        heap_caps_malloc(requested_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+    
+    if (!arena_ptr) {
+      ESP_LOGE(TAG, "PSRAM allocation failed! Requested: %zu bytes, Free PSRAM: %zu bytes",
+               requested_size, free_psram);
+      ESP_LOGE(TAG, "  Possible causes:");
+      ESP_LOGE(TAG, "  - PSRAM is fragmented (try a smaller tensor_arena_size)");
+      ESP_LOGE(TAG, "  - PSRAM is full (other components using it)");
+      ESP_LOGE(TAG, "  - PSRAM not properly initialized in board config");
+      ESP_LOGE(TAG, "  To force SRAM allocation, add build flag: -DTFLITE_FORCE_SRAM");
+      result.actual_size = 0;
+      return result;
+    }
+    
     result.data = std::unique_ptr<uint8_t[], AllocationResult::HeapCapsDeleter>(
         arena_ptr, 
         AllocationResult::HeapCapsDeleter());
+    result.from_psram = true;
+    ESP_LOGI(TAG, "Allocated tensor arena: %zu bytes @ %p (PSRAM)", requested_size, arena_ptr);
     
-    ESP_LOGD(TAG, "Successfully allocated tensor arena at %p", arena_ptr);
   } else {
-    ESP_LOGE(TAG, "Failed to allocate tensor arena");
-    result.actual_size = 0;
+    // No PSRAM: allocate from SRAM (internal RAM)
+    // This is the normal case for boards without PSRAM (some ESP32 variants)
+    size_t free_sram = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+    ESP_LOGD(TAG, "No PSRAM available. SRAM free: %zu bytes", free_sram);
+    
+    uint8_t *arena_ptr = static_cast<uint8_t*>(
+        heap_caps_malloc(requested_size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+    
+    if (!arena_ptr) {
+      ESP_LOGE(TAG, "Internal SRAM allocation failed! Requested: %zu bytes, Free SRAM: %zu bytes",
+               requested_size, free_sram);
+      ESP_LOGE(TAG, "  The tensor arena is too large for the available SRAM.");
+      ESP_LOGE(TAG, "  Try reducing tensor_arena_size or use a board with PSRAM.");
+      result.actual_size = 0;
+      return result;
+    }
+    
+    result.data = std::unique_ptr<uint8_t[], AllocationResult::HeapCapsDeleter>(
+        arena_ptr, 
+        AllocationResult::HeapCapsDeleter());
+    result.from_psram = false;
+    ESP_LOGI(TAG, "Allocated tensor arena: %zu bytes @ %p (SRAM)", requested_size, arena_ptr);
   }
-
+  
   return result;
 }
 

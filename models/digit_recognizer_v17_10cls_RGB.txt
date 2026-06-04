@@ -3,7 +3,7 @@
 TFLITE MODEL COMPREHENSIVE INSPECTION REPORT
 ================================================================================
 Model: C:\Users\nl\Dropbox\home_automation\esphome_ai_component\models\digit_recognizer_v17_10cls_RGB.tflite
-Timestamp: 2026-05-07 19:24:11
+Timestamp: 2026-06-04 17:57:10
 TensorFlow Version: 2.20.0
 File Size: 71.02 KB
 
@@ -107,9 +107,9 @@ PEAK MEMORY ANALYSIS (TFLite Micro Arena Estimate)
 
 Total memory (sum of all tensors): 191.32 KB
 Peak active memory (lifetime analysis): 40.00 KB at op index 4
-TFLite Micro arena estimate (1.5x peak): 60.00 KB
+TFLite Micro arena estimate (2.0x peak): 80.00 KB
 
-Recommended tensor_arena_size: 61KB
+Recommended tensor_arena_size: 81KB
 
 Top tensors by memory:
   [117]    16.88 KB  [ 1 32 20 27]             <class 'numpy.int8'> 
