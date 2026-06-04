@@ -39,9 +39,7 @@ substitutions:
   href_pin: GPIO23
   pixel_clock_pin: GPIO22
   
-  # Power Down / Reset (NC for Wrover Kit per defines.h)
-  camera_pwdn_pin: "-1"
-  camera_reset_pin: "-1"
+  # No Power Down / Reset - no camera board connections
 
   # LED Pins
   status_led_pin: GPIO33
@@ -54,7 +52,23 @@ esp32:
     type: ${framework}
     version: recommended
     sdkconfig_options:
+      CONFIG_COMPILER_OPTIMIZATION_PERF: y
+      CONFIG_ESP32_DEFAULT_CPU_FREQ_240: y
       CONFIG_ESP32_SPIRAM_SUPPORT: y
+      CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY: "y"
+      CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP: "y"
+      CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: "y"
+      CONFIG_MBEDTLS_SSL_PROTO_TLS1_3: "y"
+      CONFIG_TASK_WDT: "y" # prevents watchdog timeouts
+      CONFIG_TASK_WDT_TIMEOUT_S: "30" # prevents watchdog timeouts
+      CONFIG_TASK_WDT_CHECK_IDLE_TASK_CPU0: "n" # prevents watchdog timeouts
+      ### needed by new jpeg camera : https://github.com/esphome/esphome/pull/9496
+      CONFIG_SPIRAM_SUPPORT: y
+      CONFIG_SPIRAM_USE_CAPS_ALLOC: y
+      CONFIG_SPIRAM_USE_MALLOC: y
+      CONFIG_LOG_DEFAULT_LEVEL: "0" # prevents "ESP-IDF" Guru Meditation Error
+      CONFIG_CAMERA_TASK_STACK_SIZE: "8192"
+      CONFIG_FREERTOS_HZ: "1000"
 
 psram:
   

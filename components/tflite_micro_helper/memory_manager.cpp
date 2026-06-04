@@ -22,7 +22,7 @@ MemoryManager::AllocationResult MemoryManager::allocate_tensor_arena(size_t requ
   #ifdef TFLITE_FORCE_SRAM
     ESP_LOGI(TAG, "TFLITE_FORCE_SRAM is defined — forcing SRAM allocation");
     uint8_t *arena_ptr = static_cast<uint8_t*>(
-        heap_caps_malloc(requested_size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+        heap_caps_aligned_alloc(16, requested_size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
     
     if (!arena_ptr) {
       size_t free_sram = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
@@ -44,7 +44,7 @@ MemoryManager::AllocationResult MemoryManager::allocate_tensor_arena(size_t requ
   #ifdef TFLITE_FORCE_PSRAM
     ESP_LOGI(TAG, "TFLITE_FORCE_PSRAM is defined — forcing PSRAM allocation");
     uint8_t *arena_ptr = static_cast<uint8_t*>(
-        heap_caps_malloc(requested_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+        heap_caps_aligned_alloc(16, requested_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
     
     if (!arena_ptr) {
       size_t free_psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
@@ -75,7 +75,7 @@ MemoryManager::AllocationResult MemoryManager::allocate_tensor_arena(size_t requ
     ESP_LOGD(TAG, "PSRAM available: %zu bytes free", free_psram);
     
     uint8_t *arena_ptr = static_cast<uint8_t*>(
-        heap_caps_malloc(requested_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+        heap_caps_aligned_alloc(16, requested_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
     
     if (!arena_ptr) {
       ESP_LOGE(TAG, "PSRAM allocation failed! Requested: %zu bytes, Free PSRAM: %zu bytes",
@@ -102,7 +102,7 @@ MemoryManager::AllocationResult MemoryManager::allocate_tensor_arena(size_t requ
     ESP_LOGD(TAG, "No PSRAM available. SRAM free: %zu bytes", free_sram);
     
     uint8_t *arena_ptr = static_cast<uint8_t*>(
-        heap_caps_malloc(requested_size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+        heap_caps_aligned_alloc(16, requested_size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
     
     if (!arena_ptr) {
       ESP_LOGE(TAG, "Internal SRAM allocation failed! Requested: %zu bytes, Free SRAM: %zu bytes",

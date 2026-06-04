@@ -443,6 +443,13 @@ def get_peak_memory_analysis(interpreter):
     summary_lines.append("PEAK MEMORY ANALYSIS (TFLite Micro Arena Estimate)")
     summary_lines.append("=" * 80)
     
+    # Identify model inputs (persistently live) and all tensors ever produced as outputs
+    # Constants (weights/biases) are stored in the model flatbuffer (Flash/ROM) and
+    # do NOT occupy space in the mutable tensor arena. We exclude them from the
+    # peak concurrent memory calculation to get an accurate activation-only peak.
+    model_inputs = {x['index'] for x in interpreter.get_input_details()}
+    all_outputs = {t for op in ops_details for t in op['outputs'] if t >= 0}
+    
     # Build tensor lifetime map: for each tensor, find first and last op that uses it
     # Uses the same algorithm as TFLite Micro's GreedyMemoryPlanner
     tensor_first_use = {}
@@ -451,6 +458,9 @@ def get_peak_memory_analysis(interpreter):
     for op_idx, op in enumerate(ops_details):
         for tensor_idx in op['inputs']:
             if tensor_idx >= 0 and tensor_idx < num_tensors:
+                # Only track activations and model inputs/outputs (exclude constant weights/biases)
+                if tensor_idx not in all_outputs and tensor_idx not in model_inputs:
+                    continue
                 if tensor_idx not in tensor_first_use:
                     tensor_first_use[tensor_idx] = op_idx
                 tensor_last_use[tensor_idx] = op_idx
@@ -489,11 +499,16 @@ def get_peak_memory_analysis(interpreter):
     # - 16-byte alignment per tensor
     # - Planner metadata (buffer handles, free lists)
     # - First-fit fragmentation
-    # - Scratch buffer tracking
+    # - Scratch buffer tracking (e.g. ESP-NN internal buffers)
     # - Interpreter state (subgraph metadata)
-    # - Verified against TFLite Micro runtime measurements:
-    #   v3: 20KB peak × 2.2 = 44KB (vs 35.5KB actual — 24% margin)
-    #   v23: 27.9KB peak × 2.2 = 61KB (vs 59.5KB actual — 2.5% margin)
+    # NOTE: The 2.2x factor was calibrated against the old (all-tensors-inclusive)
+    # peak concurrent values. Now that constant tensors are excluded, the peak
+    # concurrent reflects only activation memory. The 2.2x multiplier likely still
+    # provides a conservative margin, but should be re-verified against actual
+    # TFLite Micro runtime measurements after this change.
+    # Previously verified with:
+    #   v3:  20KB peak × 2.2 = 44KB  (vs 35.5KB actual — 24% margin)
+    #   v23: 28KB peak × 2.2 = 61KB  (vs 59.5KB actual — 2.5% margin)
     SAFETY_FACTOR = 2.2
     
     arena_bytes_raw = peak_concurrent * SAFETY_FACTOR

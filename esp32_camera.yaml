@@ -17,8 +17,6 @@ esp32_camera:
   href_pin: ${href_pin} 
   pixel_clock_pin: ${pixel_clock_pin} 
   
-
-  
   # reset_pin: ${camera_reset_pin}
   # power_down_pin: ${camera_pwdn_pin} # needed for AiThinker ESP32-CAM
   # Image Settings
@@ -78,5 +76,3 @@ esp32_camera:
   wb_mode: AUTO
   # test pattern
   test_pattern: False
-  
- 

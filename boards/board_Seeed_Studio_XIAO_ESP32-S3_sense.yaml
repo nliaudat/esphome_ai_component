@@ -107,8 +107,8 @@ esp32:
       # CONFIG_CAMERA_TASK_STACK_SIZE: "4096"
       CONFIG_CAMERA_TASK_STACK_SIZE: "8192"
       #### testing 
-      CONFIG_ESP32_DEFAULT_CPU_FREQ_240: y
       # CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: y
+      CONFIG_FATFS_LFN_STACK: "y" # to support long file name in sdcard
       CONFIG_FREERTOS_HZ: "1000"
       CONFIG_ESP32S3_SPIRAM_SUPPORT: y
       CONFIG_SPIRAM_SPEED_80M: y
@@ -164,17 +164,21 @@ psram:
       # name: "SD card type"
   
 light:
-  - platform: status_led
+  - platform: binary
+    output: ${id_prefix}_flash_light_output
     name: "${name} Flash LED"
     id: ${id_prefix}_flash
-
     icon: "mdi:alarm-light"
-    restore_mode: ALWAYS_OFF
-    pin: ${flash_led_pin}
-    
+  
   - platform: status_led
     name: "${name} Status LED"
     id: ${id_prefix}_status_led
     icon: "mdi:alarm-light"
     restore_mode: ALWAYS_OFF
     pin: ${status_led_pin}
+
+output:
+  - platform: gpio
+    pin: ${flash_led_pin}
+    id: ${id_prefix}_flash_light_output
+    inverted: true
