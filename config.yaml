@@ -221,7 +221,7 @@ meter_reader_tflite:
 
   ### Advanced parameters
   # frame_request_timeout: 15000  # ms (1000-60000)
-
+  # tensor_arena_size: "110KB"
   # Pool efficiency monitoring (optional, requires DEBUG_METER_READER_MEMORY)
   # pool_job_efficiency_sensor: ${id_prefix}_pool_job_efficiency
   # pool_result_efficiency_sensor: ${id_prefix}_pool_result_efficiency
