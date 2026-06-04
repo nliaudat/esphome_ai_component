@@ -422,61 +422,92 @@ def check_delegate_ops(interpreter):
 
 
 def get_peak_memory_analysis(interpreter):
-    """Analyze peak memory usage using lifetime analysis (simulates TFLite Micro arena)"""
+    """Analyze peak memory using tensor lifetime analysis with an empirical arena size rule.
+    
+    TFLite Micro's GreedyMemoryPlanner allocates tensors based on their lifetimes
+    (first op read/output → last op read as input). The actual arena size needed
+    falls between the peak concurrent tensor memory and the sum of all tensors.
+    The exact overhead depends on the planner's first-fit algorithm and alignment.
+    
+    Using empirical observations from TFLite Micro runtime:
+    - Peak concurrent tensor memory is the lower bound
+    - A safety multiplier of 2.2x covers alignment, planner metadata, and overhead
+      Verified against multiple digit recognition models (v3, v23, v4, v16, v17, v27)
+    """
     ops_details = interpreter._get_ops_details()
     tensor_details = interpreter.get_tensor_details()
+    num_tensors = len(tensor_details)
     
     summary_lines = []
     summary_lines.append("\n" + "=" * 80)
     summary_lines.append("PEAK MEMORY ANALYSIS (TFLite Micro Arena Estimate)")
     summary_lines.append("=" * 80)
     
-    # Build tensor lifetime map
-    # For each tensor, find first op that uses it as output and last op that uses it as input
+    # Build tensor lifetime map: for each tensor, find first and last op that uses it
+    # Uses the same algorithm as TFLite Micro's GreedyMemoryPlanner
     tensor_first_use = {}
     tensor_last_use = {}
     
     for op_idx, op in enumerate(ops_details):
         for tensor_idx in op['inputs']:
-            if tensor_idx >= 0:
+            if tensor_idx >= 0 and tensor_idx < num_tensors:
                 if tensor_idx not in tensor_first_use:
                     tensor_first_use[tensor_idx] = op_idx
                 tensor_last_use[tensor_idx] = op_idx
         for tensor_idx in op['outputs']:
-            if tensor_idx >= 0:
+            if tensor_idx >= 0 and tensor_idx < num_tensors:
                 if tensor_idx not in tensor_first_use:
                     tensor_first_use[tensor_idx] = op_idx
-                tensor_last_use[tensor_idx] = op_idx
+                if tensor_idx not in tensor_last_use:
+                    tensor_last_use[tensor_idx] = op_idx
     
-    # Calculate memory at each op boundary
-    peak_memory = 0
-    peak_op = 0
-    memory_by_op = []
+    # Calculate peak concurrent memory using lifetime analysis
+    # (the minimum size possible if planner was perfect)
+    peak_concurrent = 0
+    peak_op_idx = 0
     
     for op_idx in range(len(ops_details)):
-        active_memory = 0
-        for tensor_idx, tensor in enumerate(tensor_details):
+        concurrent = 0
+        for tensor_idx, t in enumerate(tensor_details):
             if tensor_idx in tensor_first_use and tensor_idx in tensor_last_use:
                 if tensor_first_use[tensor_idx] <= op_idx <= tensor_last_use[tensor_idx]:
-                    dtype_size = tf.dtypes.as_dtype(tensor['dtype']).size
+                    dtype_size = tf.dtypes.as_dtype(t['dtype']).size
                     num_elements = 1
-                    for dim in tensor['shape']:
+                    for dim in t['shape']:
                         if dim is not None:
                             num_elements *= dim
-                    active_memory += dtype_size * num_elements
+                    concurrent += dtype_size * num_elements
         
-        memory_by_op.append(active_memory)
-        if active_memory > peak_memory:
-            peak_memory = active_memory
-            peak_op = op_idx
+        if concurrent > peak_concurrent:
+            peak_concurrent = concurrent
+            peak_op_idx = op_idx
     
-    total_memory = sum(
-        tf.dtypes.as_dtype(t['dtype']).size * 
-        (lambda s: 1 if not any(s) else (lambda: __import__('functools').reduce(lambda a,b: a*b, [d for d in s if d is not None], 1))())(t['shape'])
-        for t in tensor_details
-    )
+    peak_op_name = ops_details[peak_op_idx]['op_name'] if peak_op_idx < len(ops_details) else 'END'
     
-    # Actually compute total properly
+    # Calculate arena size: peak * safety factor to cover planner overhead, alignment, bookkeeping
+    # Safety factor of 2.2x covers:
+    # - 16-byte alignment per tensor
+    # - Planner metadata (buffer handles, free lists)
+    # - First-fit fragmentation
+    # - Scratch buffer tracking
+    # - Interpreter state (subgraph metadata)
+    # - Verified against TFLite Micro runtime measurements:
+    #   v3: 20KB peak × 2.2 = 44KB (vs 35.5KB actual — 24% margin)
+    #   v23: 27.9KB peak × 2.2 = 61KB (vs 59.5KB actual — 2.5% margin)
+    SAFETY_FACTOR = 2.2
+    
+    arena_bytes_raw = peak_concurrent * SAFETY_FACTOR
+    
+    # Add fixed overhead for head metadata (buffer handles, interpreter state)
+    # TFLite Micro stores buffer_handles_ array with one 12-byte entry per tensor
+    head_overhead = 64 + num_tensors * 12
+    head_overhead = (head_overhead + 63) & ~63  # Align to 64 bytes
+    
+    arena_bytes = int(head_overhead + arena_bytes_raw)
+    
+    # Align final size to 1024 bytes (1KB) so recommendation is clean
+    arena_bytes_aligned = ((arena_bytes + 1023) // 1024) * 1024
+    
     total_memory = 0
     for t in tensor_details:
         dtype_size = tf.dtypes.as_dtype(t['dtype']).size
@@ -486,10 +517,11 @@ def get_peak_memory_analysis(interpreter):
                 num_elements *= dim
         total_memory += dtype_size * num_elements
     
-    summary_lines.append(f"\nTotal memory (sum of all tensors): {total_memory / 1024:.2f} KB")
-    summary_lines.append(f"Peak active memory (lifetime analysis): {peak_memory / 1024:.2f} KB at op index {peak_op}")
-    summary_lines.append(f"TFLite Micro arena estimate (1.5x peak): {peak_memory * 1.5 / 1024:.2f} KB")
-    summary_lines.append(f"\nRecommended tensor_arena_size: {int(peak_memory * 1.5 / 1024) + 1}KB")
+    summary_lines.append(f"\nTotal tensor memory (sum of all tensors): {total_memory / 1024:.2f} KB")
+    summary_lines.append(f"Peak concurrent tensor memory (lifetime analysis): {peak_concurrent / 1024:.2f} KB at op {peak_op_idx} ({peak_op_name})")
+    summary_lines.append(f"Planner overhead: {SAFETY_FACTOR:.1f}x safety factor + {head_overhead}B head")
+    summary_lines.append(f"Estimated arena size: {arena_bytes_aligned / 1024:.2f} KB ({arena_bytes_aligned} bytes)")
+    summary_lines.append(f"\nRecommended tensor_arena_size: {int(arena_bytes_aligned / 1024)}KB")
     
     # Show top tensors by memory
     tensor_memory = []

@@ -1,0 +1,459 @@
+
+================================================================================
+TFLITE MODEL COMPREHENSIVE INSPECTION REPORT
+================================================================================
+Model: C:\Users\nl\Dropbox\home_automation\esphome_ai_component\models\digit_recognizer_v24_10cls_RGB_TQT.tflite
+Timestamp: 2026-06-04 18:29:38
+TensorFlow Version: 2.20.0
+File Size: 68.70 KB
+
+================================================================================
+MODEL SUMMARY: TFLite Model
+================================================================================
+Layer (type)              Output Shape         Param #         Size (KB) 
+--------------------------------------------------------------------------------
+STRIDED_SLICE_0           [ 1 32 20  1]        0               2.50      
+MUL_1                     [ 1 32 20  1]        0               3.28      
+STRIDED_SLICE_2           [ 1 32 20  1]        0               2.50      
+MUL_3                     [ 1 32 20  1]        0               1.94      
+STRIDED_SLICE_4           [ 1 32 20  1]        0               2.50      
+MUL_5                     [ 1 32 20  1]        0               2.20      
+ADD_6                     [ 1 32 20  1]        0               0.03      
+ADD_7                     [ 1 32 20  1]        0               0.03      
+TRANSPOSE_8               [ 1  1 32 20]        0               5.63      
+RESHAPE_9                 [ 1 32 20  1]        0               13.28     
+MEAN_10                   [1 1 1 1]            0               13.28     
+LESS_11                   [1 1 1 1]            0               0.23      
+CAST_12                   [1 1 1 1]            0               0.00      
+QUANTIZE_13               [1 1 1 1]            0               0.00      
+SUB_14                    [1 1 1 1]            0               0.01      
+MUL_15                    [ 1 32 20  1]        0               0.00      
+SUB_16                    [ 1 32 20  1]        0               0.00      
+TRANSPOSE_17              [ 1  1 32 20]        0               0.00      
+RESHAPE_18                [ 1 32 20  1]        0               0.62      
+MUL_19                    [ 1 32 20  1]        0               0.00      
+ADD_20                    [ 1 32 20  1]        0               0.00      
+REDUCE_MAX_21             [1 1 1 1]            0               12.50     
+REDUCE_MIN_22             [1 1 1 1]            0               3.12      
+SUB_23                    [1 1 1 1]            0               0.00      
+MAXIMUM_24                [1 1 1 1]            0               12.66     
+SUB_25                    [ 1 32 20  1]        0               0.00      
+DIV_26                    [ 1 32 20  1]        0               0.00      
+RESHAPE_27                [ 1  1 32 20]        0               0.05      
+TRANSPOSE_28              [ 1 32 20  1]        0               0.01      
+CONV_2D_29                [ 1 32 20 20]        0               0.23      
+MAX_POOL_2D_30            [ 1 16 10 20]        0               0.00      
+CONV_2D_31                [ 1 16 10 36]        0               0.23      
+MAX_POOL_2D_32            [ 1  8  5 36]        0               0.00      
+CONV_2D_33                [ 1  8  5 48]        0               0.23      
+CONV_2D_34                [ 1  8  5 56]        0               0.02      
+MEAN_35                   [ 1  1  1 56]        0               0.01      
+RESHAPE_36                [ 1 56]              0               28.12     
+FULLY_CONNECTED_37        [ 1 64]              0               0.23      
+FULLY_CONNECTED_38        [ 1 10]              0               0.02      
+SOFTMAX_39                [ 1 10]              0               0.00      
+--------------------------------------------------------------------------------
+Total params: 0
+Total memory: 105.47 KB
+Total operations: 40
+
+================================================================================
+INPUT/OUTPUT SUMMARY
+================================================================================
+Input 0:  [ 1 32 20  3]   <class 'numpy.int8'>
+Output 0: [ 1 10]         <class 'numpy.int8'>
+
+================================================================================
+MEMORY USAGE ANALYSIS
+================================================================================
+Tensor Name                    Shape                Dtype      Elements     Memory (KB) 
+--------------------------------------------------------------------------------
+                               [  1  16  10 180]    <class 'numpy.int8'> 28,800       28.12       
+tfl.pseudo_qconst5             [56  3  3 48]        <class 'numpy.int8'> 24,192       23.62       
+                               [  1   8   5 432]    <class 'numpy.int8'> 17,280       16.88       
+tfl.pseudo_qconst7             [48  3  3 36]        <class 'numpy.int8'> 15,552       15.19       
+                               [  1   8   5 324]    <class 'numpy.int8'> 12,960       12.66       
+model_108/tf.nn.relu6_242/Re   [ 1 32 20 20]        <class 'numpy.int8'> 12,800       12.50       
+tfl.pseudo_qconst9             [36  3  3 20]        <class 'numpy.int8'> 6,480        6.33        
+model_108/tf.nn.relu6_243/Re   [ 1 16 10 36]        <class 'numpy.int8'> 5,760        5.62        
+                               [ 1 32 20  9]        <class 'numpy.int8'> 5,760        5.62        
+tfl.pseudo_qconst3             [64 56]              <class 'numpy.int8'> 3,584        3.50        
+model_108/tf.nn.max_pool2d_1   [ 1 16 10 20]        <class 'numpy.int8'> 3,200        3.12        
+model_108/tf.nn.relu6_245/Re   [ 1  8  5 56]        <class 'numpy.int8'> 2,240        2.19        
+serving_default_input:0        [ 1 32 20  3]        <class 'numpy.int8'> 1,920        1.88        
+model_108/tf.nn.relu6_244/Re   [ 1  8  5 48]        <class 'numpy.int8'> 1,920        1.88        
+model_108/tf.nn.max_pool2d_2   [ 1  8  5 36]        <class 'numpy.int8'> 1,440        1.41        
+tfl.pseudo_qconst1             [10 64]              <class 'numpy.int8'> 640          0.62        
+model_108/tf.strided_slice_1   [ 1 32 20  1]        <class 'numpy.int8'> 640          0.62        
+model_108/tf.math.multiply_2   [ 1 32 20  1]        <class 'numpy.int8'> 640          0.62        
+model_108/tf.strided_slice_1   [ 1 32 20  1]        <class 'numpy.int8'> 640          0.62        
+model_108/tf.math.multiply_2   [ 1 32 20  1]        <class 'numpy.int8'> 640          0.62        
+--------------------------------------------------------------------------------
+Total Memory Usage: 155.44 KB
+Number of Tensors: 86
+
+================================================================================
+PEAK MEMORY ANALYSIS (TFLite Micro Arena Estimate)
+================================================================================
+
+Total tensor memory (sum of all tensors): 155.44 KB
+Peak concurrent tensor memory (lifetime analysis): 27.91 KB at op 34 (CONV_2D)
+Planner overhead: 2.2x safety factor + 1152B head
+Estimated arena size: 63.00 KB (64512 bytes)
+
+Recommended tensor_arena_size: 63KB
+
+Top tensors by memory:
+  [ 80]    28.12 KB  [  1  16  10 180]         <class 'numpy.int8'> 
+  [ 18]    23.62 KB  [56  3  3 48]             <class 'numpy.int8'> tfl.pseudo_qconst5
+  [ 82]    16.88 KB  [  1   8   5 432]         <class 'numpy.int8'> 
+  [ 20]    15.19 KB  [48  3  3 36]             <class 'numpy.int8'> tfl.pseudo_qconst7
+  [ 81]    12.66 KB  [  1   8   5 324]         <class 'numpy.int8'> 
+  [ 61]    12.50 KB  [ 1 32 20 20]             <class 'numpy.int8'> model_108/tf.nn.relu6_242/Relu6;model_108/tf.math.
+  [ 22]     6.33 KB  [36  3  3 20]             <class 'numpy.int8'> tfl.pseudo_qconst9
+  [ 63]     5.62 KB  [ 1 16 10 36]             <class 'numpy.int8'> model_108/tf.nn.relu6_243/Relu6;model_108/tf.math.
+  [ 79]     5.62 KB  [ 1 32 20  9]             <class 'numpy.int8'> 
+  [ 16]     3.50 KB  [64 56]                   <class 'numpy.int8'> tfl.pseudo_qconst3
+
+================================================================================
+TFLITE MICRO COMPATIBILITY CHECK
+================================================================================
+
+[OK] No DELEGATE operations found - compatible with TFLite Micro
+
+[INFO] Model has 40 operations
+   Recommended MAX_OPERATORS: 45 (total ops + 5 margin)
+   Set via build flag: -DMAX_OPERATORS=45
+
+Unique operator types: 18
+  ADD: 3
+  CAST: 1
+  CONV_2D: 4
+  DIV: 1
+  FULLY_CONNECTED: 2
+  LESS: 1
+  MAXIMUM: 1
+  MAX_POOL_2D: 2
+  MEAN: 2
+  MUL: 5
+  QUANTIZE: 1
+  REDUCE_MAX: 1
+  REDUCE_MIN: 1
+  RESHAPE: 4
+  SOFTMAX: 1
+  STRIDED_SLICE: 3
+  SUB: 4
+  TRANSPOSE: 3
+
+================================================================================
+DETAILED OPERATIONS BREAKDOWN
+================================================================================
+
+OPERATION COUNTS:
+  ADD: 3
+  CAST: 1
+  CONV_2D: 4
+  DIV: 1
+  FULLY_CONNECTED: 2
+  LESS: 1
+  MAXIMUM: 1
+  MAX_POOL_2D: 2
+  MEAN: 2
+  MUL: 5
+  QUANTIZE: 1
+  REDUCE_MAX: 1
+  REDUCE_MIN: 1
+  RESHAPE: 4
+  SOFTMAX: 1
+  STRIDED_SLICE: 3
+  SUB: 4
+  TRANSPOSE: 3
+
+DETAILED OPERATION INFO:
+
+STRIDED_SLICE (index: 0):
+  Input tensors: [0 1 2 3]
+  Output tensors: [32]
+    Input 0: shape=[ 1 32 20  3], dtype=<class 'numpy.int8'>
+    Input 1: shape=[4], dtype=<class 'numpy.int32'>
+    Input 2: shape=[4], dtype=<class 'numpy.int32'>
+    Input 3: shape=[4], dtype=<class 'numpy.int32'>
+    Output 32: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+
+MUL (index: 1):
+  Input tensors: [32 31]
+  Output tensors: [33]
+    Input 32: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+    Input 31: shape=[], dtype=<class 'numpy.int8'>
+    Output 33: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+
+STRIDED_SLICE (index: 2):
+  Input tensors: [0 4 1 3]
+  Output tensors: [34]
+    Input 0: shape=[ 1 32 20  3], dtype=<class 'numpy.int8'>
+    Input 4: shape=[4], dtype=<class 'numpy.int32'>
+    Input 1: shape=[4], dtype=<class 'numpy.int32'>
+    Input 3: shape=[4], dtype=<class 'numpy.int32'>
+    Output 34: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+
+MUL (index: 3):
+  Input tensors: [34 30]
+  Output tensors: [35]
+    Input 34: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+    Input 30: shape=[], dtype=<class 'numpy.int8'>
+    Output 35: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+
+STRIDED_SLICE (index: 4):
+  Input tensors: [0 5 4 3]
+  Output tensors: [36]
+    Input 0: shape=[ 1 32 20  3], dtype=<class 'numpy.int8'>
+    Input 5: shape=[4], dtype=<class 'numpy.int32'>
+    Input 4: shape=[4], dtype=<class 'numpy.int32'>
+    Input 3: shape=[4], dtype=<class 'numpy.int32'>
+    Output 36: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+
+MUL (index: 5):
+  Input tensors: [36 29]
+  Output tensors: [37]
+    Input 36: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+    Input 29: shape=[], dtype=<class 'numpy.int8'>
+    Output 37: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+
+ADD (index: 6):
+  Input tensors: [37 35]
+  Output tensors: [38]
+    Input 37: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+    Input 35: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+    Output 38: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+
+ADD (index: 7):
+  Input tensors: [38 33]
+  Output tensors: [39]
+    Input 38: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+    Input 33: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+    Output 39: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+
+TRANSPOSE (index: 8):
+  Input tensors: [39  6]
+  Output tensors: [40]
+    Input 39: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+    Input 6: shape=[4], dtype=<class 'numpy.int32'>
+    Output 40: shape=[ 1  1 32 20], dtype=<class 'numpy.int8'>
+
+RESHAPE (index: 9):
+  Input tensors: [40  7]
+  Output tensors: [41]
+    Input 40: shape=[ 1  1 32 20], dtype=<class 'numpy.int8'>
+    Input 7: shape=[4], dtype=<class 'numpy.int32'>
+    Output 41: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+
+MEAN (index: 10):
+  Input tensors: [39  8]
+  Output tensors: [42]
+    Input 39: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+    Input 8: shape=[3], dtype=<class 'numpy.int32'>
+    Output 42: shape=[1 1 1 1], dtype=<class 'numpy.int8'>
+
+LESS (index: 11):
+  Input tensors: [42 28]
+  Output tensors: [43]
+    Input 42: shape=[1 1 1 1], dtype=<class 'numpy.int8'>
+    Input 28: shape=[], dtype=<class 'numpy.int8'>
+    Output 43: shape=[1 1 1 1], dtype=<class 'numpy.bool_'>
+
+CAST (index: 12):
+  Input tensors: [43]
+  Output tensors: [44]
+    Input 43: shape=[1 1 1 1], dtype=<class 'numpy.bool_'>
+    Output 44: shape=[1 1 1 1], dtype=<class 'numpy.float32'>
+
+QUANTIZE (index: 13):
+  Input tensors: [44]
+  Output tensors: [45]
+    Input 44: shape=[1 1 1 1], dtype=<class 'numpy.float32'>
+    Output 45: shape=[1 1 1 1], dtype=<class 'numpy.int8'>
+
+SUB (index: 14):
+  Input tensors: [27 45]
+  Output tensors: [46]
+    Input 27: shape=[], dtype=<class 'numpy.int8'>
+    Input 45: shape=[1 1 1 1], dtype=<class 'numpy.int8'>
+    Output 46: shape=[1 1 1 1], dtype=<class 'numpy.int8'>
+
+MUL (index: 15):
+  Input tensors: [46 41]
+  Output tensors: [47]
+    Input 46: shape=[1 1 1 1], dtype=<class 'numpy.int8'>
+    Input 41: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+    Output 47: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+
+SUB (index: 16):
+  Input tensors: [26 39]
+  Output tensors: [48]
+    Input 26: shape=[1 1 1 1], dtype=<class 'numpy.int8'>
+    Input 39: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+    Output 48: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+
+TRANSPOSE (index: 17):
+  Input tensors: [48  6]
+  Output tensors: [49]
+    Input 48: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+    Input 6: shape=[4], dtype=<class 'numpy.int32'>
+    Output 49: shape=[ 1  1 32 20], dtype=<class 'numpy.int8'>
+
+RESHAPE (index: 18):
+  Input tensors: [49  7]
+  Output tensors: [50]
+    Input 49: shape=[ 1  1 32 20], dtype=<class 'numpy.int8'>
+    Input 7: shape=[4], dtype=<class 'numpy.int32'>
+    Output 50: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+
+MUL (index: 19):
+  Input tensors: [45 50]
+  Output tensors: [51]
+    Input 45: shape=[1 1 1 1], dtype=<class 'numpy.int8'>
+    Input 50: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+    Output 51: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+
+ADD (index: 20):
+  Input tensors: [47 51]
+  Output tensors: [52]
+    Input 47: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+    Input 51: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+    Output 52: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+
+REDUCE_MAX (index: 21):
+  Input tensors: [52  8]
+  Output tensors: [53]
+    Input 52: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+    Input 8: shape=[3], dtype=<class 'numpy.int32'>
+    Output 53: shape=[1 1 1 1], dtype=<class 'numpy.int8'>
+
+REDUCE_MIN (index: 22):
+  Input tensors: [52  8]
+  Output tensors: [54]
+    Input 52: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+    Input 8: shape=[3], dtype=<class 'numpy.int32'>
+    Output 54: shape=[1 1 1 1], dtype=<class 'numpy.int8'>
+
+SUB (index: 23):
+  Input tensors: [53 54]
+  Output tensors: [55]
+    Input 53: shape=[1 1 1 1], dtype=<class 'numpy.int8'>
+    Input 54: shape=[1 1 1 1], dtype=<class 'numpy.int8'>
+    Output 55: shape=[1 1 1 1], dtype=<class 'numpy.int8'>
+
+MAXIMUM (index: 24):
+  Input tensors: [55 25]
+  Output tensors: [56]
+    Input 55: shape=[1 1 1 1], dtype=<class 'numpy.int8'>
+    Input 25: shape=[], dtype=<class 'numpy.int8'>
+    Output 56: shape=[1 1 1 1], dtype=<class 'numpy.int8'>
+
+SUB (index: 25):
+  Input tensors: [52 54]
+  Output tensors: [57]
+    Input 52: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+    Input 54: shape=[1 1 1 1], dtype=<class 'numpy.int8'>
+    Output 57: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+
+DIV (index: 26):
+  Input tensors: [57 56]
+  Output tensors: [58]
+    Input 57: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+    Input 56: shape=[1 1 1 1], dtype=<class 'numpy.int8'>
+    Output 58: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+
+RESHAPE (index: 27):
+  Input tensors: [58  9]
+  Output tensors: [59]
+    Input 58: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+    Input 9: shape=[4], dtype=<class 'numpy.int32'>
+    Output 59: shape=[ 1  1 32 20], dtype=<class 'numpy.int8'>
+
+TRANSPOSE (index: 28):
+  Input tensors: [59 10]
+  Output tensors: [60]
+    Input 59: shape=[ 1  1 32 20], dtype=<class 'numpy.int8'>
+    Input 10: shape=[4], dtype=<class 'numpy.int32'>
+    Output 60: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+
+CONV_2D (index: 29):
+  Input tensors: [60 24 23]
+  Output tensors: [61]
+    Input 60: shape=[ 1 32 20  1], dtype=<class 'numpy.int8'>
+    Input 24: shape=[20  3  3  1], dtype=<class 'numpy.int8'>
+    Input 23: shape=[20], dtype=<class 'numpy.int32'>
+    Output 61: shape=[ 1 32 20 20], dtype=<class 'numpy.int8'>
+
+MAX_POOL_2D (index: 30):
+  Input tensors: [61]
+  Output tensors: [62]
+    Input 61: shape=[ 1 32 20 20], dtype=<class 'numpy.int8'>
+    Output 62: shape=[ 1 16 10 20], dtype=<class 'numpy.int8'>
+
+CONV_2D (index: 31):
+  Input tensors: [62 22 21]
+  Output tensors: [63]
+    Input 62: shape=[ 1 16 10 20], dtype=<class 'numpy.int8'>
+    Input 22: shape=[36  3  3 20], dtype=<class 'numpy.int8'>
+    Input 21: shape=[36], dtype=<class 'numpy.int32'>
+    Output 63: shape=[ 1 16 10 36], dtype=<class 'numpy.int8'>
+
+MAX_POOL_2D (index: 32):
+  Input tensors: [63]
+  Output tensors: [64]
+    Input 63: shape=[ 1 16 10 36], dtype=<class 'numpy.int8'>
+    Output 64: shape=[ 1  8  5 36], dtype=<class 'numpy.int8'>
+
+CONV_2D (index: 33):
+  Input tensors: [64 20 19]
+  Output tensors: [65]
+    Input 64: shape=[ 1  8  5 36], dtype=<class 'numpy.int8'>
+    Input 20: shape=[48  3  3 36], dtype=<class 'numpy.int8'>
+    Input 19: shape=[48], dtype=<class 'numpy.int32'>
+    Output 65: shape=[ 1  8  5 48], dtype=<class 'numpy.int8'>
+
+CONV_2D (index: 34):
+  Input tensors: [65 18 17]
+  Output tensors: [66]
+    Input 65: shape=[ 1  8  5 48], dtype=<class 'numpy.int8'>
+    Input 18: shape=[56  3  3 48], dtype=<class 'numpy.int8'>
+    Input 17: shape=[56], dtype=<class 'numpy.int32'>
+    Output 66: shape=[ 1  8  5 56], dtype=<class 'numpy.int8'>
+
+MEAN (index: 35):
+  Input tensors: [66 11]
+  Output tensors: [67]
+    Input 66: shape=[ 1  8  5 56], dtype=<class 'numpy.int8'>
+    Input 11: shape=[2], dtype=<class 'numpy.int32'>
+    Output 67: shape=[ 1  1  1 56], dtype=<class 'numpy.int8'>
+
+RESHAPE (index: 36):
+  Input tensors: [67 12]
+  Output tensors: [68]
+    Input 67: shape=[ 1  1  1 56], dtype=<class 'numpy.int8'>
+    Input 12: shape=[2], dtype=<class 'numpy.int32'>
+    Output 68: shape=[ 1 56], dtype=<class 'numpy.int8'>
+
+FULLY_CONNECTED (index: 37):
+  Input tensors: [68 16 15]
+  Output tensors: [69]
+    Input 68: shape=[ 1 56], dtype=<class 'numpy.int8'>
+    Input 16: shape=[64 56], dtype=<class 'numpy.int8'>
+    Input 15: shape=[64], dtype=<class 'numpy.int32'>
+    Output 69: shape=[ 1 64], dtype=<class 'numpy.int8'>
+
+FULLY_CONNECTED (index: 38):
+  Input tensors: [69 14 13]
+  Output tensors: [70]
+    Input 69: shape=[ 1 64], dtype=<class 'numpy.int8'>
+    Input 14: shape=[10 64], dtype=<class 'numpy.int8'>
+    Input 13: shape=[10], dtype=<class 'numpy.int32'>
+    Output 70: shape=[ 1 10], dtype=<class 'numpy.int8'>
+
+SOFTMAX (index: 39):
+  Input tensors: [70]
+  Output tensors: [71]
+    Input 70: shape=[ 1 10], dtype=<class 'numpy.int8'>
+    Output 71: shape=[ 1 10], dtype=<class 'numpy.int8'>
