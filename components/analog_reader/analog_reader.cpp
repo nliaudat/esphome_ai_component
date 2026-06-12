@@ -5,6 +5,8 @@
 #include <cfloat>
 #include <memory>
 #include <algorithm>
+#include <numeric>    // std::iota
+#include <vector>
 #include "esphome/components/esp32_camera_utils/image_processor.h"
 #include <esp_jpeg_dec.h> // Required for local decoding
 
@@ -208,8 +210,28 @@ void AnalogReader::setup() {
       ESP_LOGD(TAG, "Trigonometric LUTs initialized");
   }
   
-  // Setup Flashlight (Default: None)
+  // Setup Flashlight. When a flash controller is wired, the analog reader runs its own
+  // flash+capture sequence (flash on -> stabilize/autofocus -> request frame -> flash
+  // off) so it processes a properly lit, stable image instead of scavenging whatever
+  // frame happens to be flowing on the camera bus. The coordinator skips if the
+  // controller is already mid-sequence (e.g. triggered by the TFLite reader), so the
+  // two components don't fight over the flash/camera.
+#ifdef USE_FLASH_LIGHT_CONTROLLER
+  this->flashlight_coord_.setup(this, nullptr, this->flash_controller_);
+#else
   this->flashlight_coord_.setup(this, nullptr, nullptr);
+#endif
+  this->flashlight_coord_.set_update_interval(this->get_update_interval());
+  // The controller requests the frame only once the flash has warmed up; wire that back
+  // to our frame-request flag so on_camera_image() captures the flashed frame.
+  this->flashlight_coord_.set_request_frame_callback([this]() {
+      std::lock_guard<std::mutex> lock(this->frame_mutex_);
+      if (!this->processing_frame_) {
+          this->frame_requested_ = true;
+          this->last_request_time_ = millis();
+          if (this->debug_) ESP_LOGD(TAG, "Flash ready, requesting frame");
+      }
+  });
 
   // Pre-allocate scratch buffers to max crop size to prevent reallocations during loop
   size_t max_crop_area = 0;
@@ -230,9 +252,9 @@ void AnalogReader::dump_config() {
   ESP_LOGCONFIG(TAG, "  Debug: %s", this->debug_ ? "YES" : "NO");
   ESP_LOGCONFIG(TAG, "  Update Interval: %u ms", this->get_update_interval());
   for (const auto &dial : this->dials_) {
-      ESP_LOGCONFIG(TAG, "  Dial '%s': Scale=%.3f, Crop=[%d,%d,%d,%d], AutoContrast=%s, Contrast=%.2f", 
+      ESP_LOGCONFIG(TAG, "  Dial '%s': Scale=%.3f, Crop=[%d,%d,%d,%d], AutoContrast=%s, Contrast=%.2f, Deadzone=%.1fpx", 
           dial.id.c_str(), dial.scale, dial.crop_x, dial.crop_y, dial.crop_w, dial.crop_h,
-          dial.auto_contrast ? "ON" : "OFF", dial.contrast);
+          dial.auto_contrast ? "ON" : "OFF", dial.contrast, dial.deadzone_diameter);
   }
 }
 
@@ -294,8 +316,14 @@ void AnalogReader::loop() {
         this->frame_requested_ = false;
     }
 
-    // Timeout check
-    if (this->frame_requested_ && millis() - this->last_request_time_ > 5000) {
+    // Timeout check. A frame request may be outstanding for as long as the flash takes
+    // to warm up (flash_pre_time, e.g. 7 s) before the lit frame is captured, so don't
+    // expire the request while a flash sequence is in progress.
+    bool flash_active = false;
+#ifdef USE_FLASH_LIGHT_CONTROLLER
+    if (this->flash_controller_) flash_active = this->flash_controller_->is_active();
+#endif
+    if (this->frame_requested_ && !flash_active && millis() - this->last_request_time_ > 10000) {
         ESP_LOGW(TAG, "Frame timeout");
         this->frame_requested_ = false;
         this->processing_frame_ = false;
@@ -462,6 +490,12 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
   std::string debug_str;
   debug_str.reserve(this->dials_.size() * 10); // reserve space for "XX.X, " per dial
   
+  // Collect per-dial measured values so they can be combined after every dial is read.
+  // Positional/odometer combination needs each dial's less-significant neighbour.
+  struct DialReading { const DialConfig* dial; float value; };
+  std::vector<DialReading> readings;
+  readings.reserve(this->dials_.size());
+  
   for (const auto& dial : this->dials_) {
       // Determine effective image dimensions for checking
       int check_w = (processing_w > 0) ? processing_w : this->img_width_;
@@ -570,15 +604,26 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
           uint8_t tg = (dial.target_color >> 8) & 0xFF;
           uint8_t tb = dial.target_color & 0xFF;
           
+          // When a tolerance is set, stretch [0..tol] -> [0..255] and clamp anything
+          // beyond it to 255 (flat background). This removes off-colour noise (digits,
+          // markings) that would otherwise survive the linear 0-442 mapping.
+          float tol = dial.color_tolerance;
+          bool use_tol = tol > 0.0f && tol < 442.0f;
+          
           for (int i = 0; i < crop_w * crop_h; i++) {
               uint8_t r = raw[i*3 + 0];
               uint8_t g = raw[i*3 + 1];
               uint8_t b = raw[i*3 + 2];
               
               float dist = sqrtf(powf(static_cast<float>(r - tr), 2) + powf(static_cast<float>(g - tg), 2) + powf(static_cast<float>(b - tb), 2));
-              // Map 0-442 to 0-255 directly (Close = Dark/Low Value)
-              // This ensures compatibility with default needle_type (DARK)
-              float val = (dist * 255.0f / 442.0f);
+              float val;
+              if (use_tol) {
+                  val = (dist >= tol) ? 255.0f : (dist * 255.0f / tol);
+              } else {
+                  // Map 0-442 to 0-255 directly (Close = Dark/Low Value)
+                  // This ensures compatibility with default needle_type (DARK)
+                  val = (dist * 255.0f / 442.0f);
+              }
               if (val > 255) val = 255;
               this->scratch_buffer_[i] = static_cast<uint8_t>(val);
           }
@@ -615,26 +660,165 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
       
       ESP_LOGD(TAG, "Dial %s: Angle=%.1f (North), Val=%.2f, Conf=%.2f, Time=%u us", dial.id.c_str(), display_angle, val, confidence, dur_algo);
       
-      // Publish to per-dial sensors
+      // Publish to per-dial sensors (direction-independent ones now; value is
+      // published after combination so stacked mode can report the resolved digit).
       if (dial.angle_sensor) dial.angle_sensor->publish_state(display_angle);
       if (dial.confidence_sensor) dial.confidence_sensor->publish_state(confidence);
-      if (dial.value_sensor) {
-         dial.value_sensor->publish_state(val);
-      }
       
-      // Aggregate
-      total_value += val * dial.scale;
-      
-      char val_buf[16];
-      snprintf(val_buf, sizeof(val_buf), "%.1f", val);
-      if (!debug_str.empty()) debug_str += ", ";
-      debug_str += val_buf;
+      readings.push_back({&dial, val});
   }
   
-  // Truncate to configured decimal precision
-  total_value = truncf(total_value * kDecimalPrecision) / kDecimalPrecision;
+if (this->stacked_digits_) {
+    const int n = static_cast<int>(readings.size());
 
-  ESP_LOGI(TAG, "Result: (Raw: %.4f) [%s]", total_value, debug_str.c_str());
+    auto wrap10 = [](float x) -> float {
+        x = fmodf(x, 10.0f);
+        if (x < 0.0f) x += 10.0f;
+        return x;
+    };
+
+    auto round_digit10 = [&](float x) -> int {
+        x = wrap10(x);
+        int d = static_cast<int>(floorf(x + 0.5f));
+        if (d >= 10) d -= 10;
+        return d;
+    };
+
+    std::vector<int> digits(n, 0);
+
+    // Resolved, unambiguous dial phase in [0, 10).
+    // This is NOT always the raw reading.
+    // Example: raw 9.98 resolved as digit 0 with lower_fraction 0.09
+    // becomes phase 0.09, not 9.98.
+    std::vector<float> phase(n, 0.0f);
+
+    // Sort by scale so the code does not depend on visual/config order.
+    // Smallest scale = least significant dial.
+    std::vector<int> order(n);
+    std::iota(order.begin(), order.end(), 0);
+
+    std::stable_sort(order.begin(), order.end(), [&](int a, int b) {
+        return readings[a].dial->scale < readings[b].dial->scale;
+    });
+
+    for (int p = 0; p < n; ++p) {
+        const int i = order[p];
+
+        const float raw = wrap10(readings[i].value);
+
+        float lower_fraction = 0.0f;
+        if (p > 0) {
+            const int lower_i = order[p - 1];
+
+            // Use the RESOLVED lower phase, not the raw lower reading.
+            lower_fraction = phase[lower_i] / 10.0f;
+        }
+
+        const float corrected = wrap10(raw - lower_fraction);
+        const int d = round_digit10(corrected);
+
+        digits[i] = d;
+
+        if (p == 0) {
+            // Finest dial has no lower dial, so keep its actual continuous phase.
+            phase[i] = raw;
+        } else {
+            // Reconstruct the physically consistent phase of this dial.
+            phase[i] = wrap10(static_cast<float>(d) + lower_fraction);
+        }
+
+        if (this->debug_) {
+            ESP_LOGD(
+                TAG,
+                "Stacked dial %s: raw=%.3f lower_frac=%.3f corrected=%.3f local_digit=%d phase=%.3f",
+                readings[i].dial->id.c_str(),
+                raw,
+                lower_fraction,
+                corrected,
+                d,
+                phase[i]
+            );
+        }
+    }
+
+    // Build the continuous value first.
+    // Do not sum the rounded finest digit directly, otherwise 9.9 -> 0 loses the carry.
+    const int finest_i = order[0];
+    const float finest_scale = readings[finest_i].dial->scale;
+
+    float continuous_total = phase[finest_i] * finest_scale;
+
+    for (int p = 1; p < n; ++p) {
+        const int i = order[p];
+        continuous_total += static_cast<float>(digits[i]) * readings[i].dial->scale;
+    }
+
+    // Preserve your old behaviour: final value rounded to the finest dial step.
+    // For conservative meter-style reading, replace llroundf() with floorf().
+    const long long rounded_steps = llroundf(continuous_total / finest_scale);
+    total_value = static_cast<float>(rounded_steps) * finest_scale;
+
+    // Publish/debug digits derived from the final rounded total,
+    // so carry is consistent across all dials.
+    for (int i = 0; i < n; ++i) {
+        const DialConfig* dial = readings[i].dial;
+
+        const float ratio_f = dial->scale / finest_scale;
+        long long place = llroundf(ratio_f);
+        if (place <= 0) place = 1;
+
+        int published_digit = static_cast<int>((rounded_steps / place) % 10);
+        if (published_digit < 0) published_digit += 10;
+
+        if (dial->value_sensor) {
+            dial->value_sensor->publish_state(static_cast<float>(published_digit));
+        }
+
+        char val_buf[8];
+        snprintf(val_buf, sizeof(val_buf), "%d", published_digit);
+
+        if (!debug_str.empty()) debug_str += ", ";
+        debug_str += val_buf;
+
+        if (this->debug_) {
+            ESP_LOGD(
+                TAG,
+                "Stacked dial %s: final_digit=%d scale=%.7f",
+                dial->id.c_str(),
+                published_digit,
+                dial->scale
+            );
+        }
+    }
+} else {
+    // Legacy behaviour: weighted sum of the raw needle values.
+    for (const auto& r : readings) {
+        total_value += r.value * r.dial->scale;
+        if (r.dial->value_sensor) r.dial->value_sensor->publish_state(r.value);
+
+        char val_buf[16];
+        snprintf(val_buf, sizeof(val_buf), "%.1f", r.value);
+
+        if (!debug_str.empty()) debug_str += ", ";
+        debug_str += val_buf;
+    }
+}
+  
+  // Round to a precision derived from the dials. In stacked mode every dial contributes
+  // a single integer digit, so the finest meaningful resolution is the smallest scale;
+  // round to it to drop float noise (e.g. 0.330343008 -> 0.3303). Otherwise fall back to
+  // the fixed precision.
+  float precision = kDecimalPrecision;
+  if (this->stacked_digits_ && !this->dials_.empty()) {
+      float min_scale = this->dials_.front().scale;
+      for (const auto& d : this->dials_) {
+          if (d.scale > 0.0f && d.scale < min_scale) min_scale = d.scale;
+      }
+      if (min_scale > 0.0f) precision = 1.0f / min_scale;
+  }
+  total_value = roundf(total_value * precision) / precision;
+
+  ESP_LOGI(TAG, "Result: (Raw: %.6f) [%s]", total_value, debug_str.c_str());
   if (this->value_sensor_) {
       this->value_sensor_->publish_state(total_value);
   }
@@ -743,6 +927,13 @@ float AnalogReader::angle_to_value(float image_angle, const DialConfig& dial) {
     
     float dial_angle = fmodf(image_angle + 90.0f, 360.0f);
     
+    // Needle sweep direction. The detection works in a clockwise frame; for dials
+    // whose value increases counter-clockwise (common on alternating odometer dials),
+    // mirror the angle so the linear mapping below still increases with the value.
+    if (!dial.clockwise) {
+        dial_angle = fmodf(360.0f - dial_angle, 360.0f);
+    }
+    
     // Apply user's angle offset
     dial_angle = fmodf(dial_angle - dial.angle_offset + 360.0f, 360.0f);
     
@@ -846,7 +1037,6 @@ void AnalogReader::debug_dial_image(const uint8_t* img, int w, int h, float dete
     // 171-255: . in Bright White
     
     std::vector<std::string> lines(grid_h, std::string(grid_w, ' '));
-    std::vector<uint8_t> grid_vals(grid_w * grid_h, 0);
     
     // Initialize grid
     for (int y = 0; y < grid_h; y++) {
@@ -855,7 +1045,6 @@ void AnalogReader::debug_dial_image(const uint8_t* img, int w, int h, float dete
             int py = y * h / grid_h;
             if (px < w && py < h) {
                 uint8_t val = img[py * w + px];
-                grid_vals[y * grid_w + x] = val;
                 
                 if (val <= 85) lines[y][x] = '#';
                 else if (val <= 170) lines[y][x] = '+';
@@ -897,7 +1086,7 @@ void AnalogReader::debug_dial_image(const uint8_t* img, int w, int h, float dete
     ESP_LOGD(TAG, "Dial visualization (Raw %.1f / North %.1f):", detected_angle, north_angle);
     ESP_LOGD(TAG, "Legend: '%s#'%s=0-85 | '%s+'%s=86-170 | '%s.'%s=171-255 | %sX%s = Detected needle", 
              COLOR_LOW, COLOR_RESET, COLOR_MID, COLOR_RESET, COLOR_HIGH, COLOR_RESET, COLOR_RED, COLOR_RESET);
-    
+
     // Print grid with colors
     for (int y = 0; y < grid_h; y++) {
         std::string colored_line = "|";

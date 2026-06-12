@@ -48,16 +48,22 @@ struct DialConfig {
   float min_angle = 0.0f;   // Degrees
   float max_angle = 360.0f; // Degrees
   float angle_offset = 0.0f; // 0 = North, 90 = East
+  bool clockwise = true;     // Needle sweep direction (false = counter-clockwise)
   float min_value = 0.0f;
   float max_value = 10.0f;
   bool auto_contrast = true; // Normalization (Min-Max Stretch)
   float contrast = 1.0f;      // Multiplier (1.0 = original)
   uint32_t target_color = 0;  // RGB hex
   bool use_color = false;
+  // Color match tolerance (0 = legacy 0-442 linear map). When >0, the colour-distance
+  // map is thresholded: pixels farther than this are pushed to flat background, which
+  // removes off-colour features (e.g. black digits) that otherwise compete with the needle.
+  float color_tolerance = 0.0f;
   ProcessChannel process_channel = PROCESS_CHANNEL_GRAYSCALE;
   // Scan Parameters
   float min_scan_radius = 0.3f; // % of radius (0.0-1.0)
   float max_scan_radius = 0.9f; // % of radius (0.0-1.0)
+  float deadzone_diameter = 0.0f; // Pixels (center circle ignored by detection)
   
   // Sensors
   sensor::Sensor *value_sensor = nullptr;
@@ -83,6 +89,9 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
 #endif
   
   void set_camera(esphome::camera::Camera *camera) { camera_ = camera; }
+#ifdef USE_FLASH_LIGHT_CONTROLLER
+  void set_flash_controller(flash_light_controller::FlashLightController *controller) { flash_controller_ = controller; }
+#endif
   void set_camera_image_format(int width, int height, const std::string &format) {
       img_width_ = width;
       img_height_ = height;
@@ -106,8 +115,12 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   void set_all_algorithm(const std::string &algorithm) {
       for (auto &dial : dials_) dial.algorithm = algorithm;
   }
+
+  // When enabled, dials are combined as positional digits (odometer-style) with
+  // neighbour carry-correction instead of a weighted sum of raw needle values.
+  void set_stacked_digits(bool enabled) { stacked_digits_ = enabled; }
   
-  void set_update_interval(uint32_t interval) override;
+  void set_update_interval(uint32_t interval);
 
   void add_dial(DialConfig config) { dials_.push_back(config); }
   
@@ -125,6 +138,7 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   };
 
   bool paused_{false};
+  bool stacked_digits_{false};
   // Coordinators
   // Note: We reuse CameraCoordinator from ssocr_reader/meter_reader context
   // Assuming it's available in include path (it is in same 'components' root usually or library)
@@ -133,6 +147,10 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
 
   FlashlightCoordinator flashlight_coord_;
   ValueValidatorCoordinator validation_coord_;
+
+#ifdef USE_FLASH_LIGHT_CONTROLLER
+  flash_light_controller::FlashLightController *flash_controller_{nullptr};
+#endif
 
   esphome::camera::Camera *camera_{nullptr};
   bool capture_next_{false};

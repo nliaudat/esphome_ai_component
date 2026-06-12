@@ -257,8 +257,10 @@ AnalogReader::DetectionResult AnalogReader::detect_radial_profile(const uint8_t*
     std::vector<float> edge_strength(360, 0.0f);
     
     // Connectivity Scan
-    int start_r = 5; // Start close to center (skip nut)
+    int deadzone_r = static_cast<int>(std::max(0.0f, dial.deadzone_diameter * 0.5f));
+    int start_r = std::max(5, deadzone_r); // Start after center deadzone
     int max_radius_scan = static_cast<int>(radius * dial.max_scan_radius);
+    if (start_r >= max_radius_scan) start_r = std::max(0, max_radius_scan - 1);
     
     // Configurable gap threshold
     const int MAX_GAP = 5;
@@ -427,8 +429,10 @@ AnalogReader::DetectionResult AnalogReader::detect_hough_transform(const uint8_t
     std::vector<int> accumulator(NUM_ANGLES, 0);
     
     // Only consider edges in the dial area (30-90% radius)
-    int min_r = static_cast<int>(radius * dial.min_scan_radius);
+    int deadzone_r = static_cast<int>(std::max(0.0f, dial.deadzone_diameter * 0.5f));
+    int min_r = std::max(static_cast<int>(radius * dial.min_scan_radius), deadzone_r);
     int max_r = static_cast<int>(radius * dial.max_scan_radius);
+    if (min_r >= max_r) min_r = std::max(0, max_r - 1);
     
     // Step 1.5: NMS Pass on edges buffer -> Voting
     // We iterate edges and vote
@@ -491,8 +495,10 @@ AnalogReader::DetectionResult AnalogReader::detect_template_match(const uint8_t*
         int count = 0;
         
         // Sample along needle direction (30-90% radius)
-        int start_r = static_cast<int>(radius * dial.min_scan_radius);
+        int deadzone_r = static_cast<int>(std::max(0.0f, dial.deadzone_diameter * 0.5f));
+        int start_r = std::max(static_cast<int>(radius * dial.min_scan_radius), deadzone_r);
         int end_r = static_cast<int>(radius * dial.max_scan_radius);
+        if (start_r >= end_r) start_r = std::max(0, end_r - 1);
         
         for (int r = start_r; r < end_r; r++) {
             int px = cx + static_cast<int>(r * dx);
@@ -535,8 +541,10 @@ AnalogReader::DetectionResult AnalogReader::detect_template_match(const uint8_t*
         float score = 0.0f;
         int count = 0;
         
-        int start_r = static_cast<int>(radius * dial.min_scan_radius);
+        int deadzone_r = static_cast<int>(std::max(0.0f, dial.deadzone_diameter * 0.5f));
+        int start_r = std::max(static_cast<int>(radius * dial.min_scan_radius), deadzone_r);
         int end_r = static_cast<int>(radius * dial.max_scan_radius);
+        if (start_r >= end_r) start_r = std::max(0, end_r - 1);
         
         for (int r = start_r; r < end_r; r++) {
             int px = cx + static_cast<int>(r * dx);
@@ -581,8 +589,10 @@ AnalogReader::DetectionResult AnalogReader::detect_legacy(const uint8_t* img, in
     std::vector<float> edge_strength(360, 0.0f);
     
     // Ray Continuity Scan
-    int start_r = static_cast<int>(radius * 0.15f); // Start close to center
+    int deadzone_r = static_cast<int>(std::max(0.0f, dial.deadzone_diameter * 0.5f));
+    int start_r = std::max(static_cast<int>(radius * 0.15f), deadzone_r); // Start after center deadzone
     int end_r = static_cast<int>(radius * kScanEndRadius); // Use existing end_r
+    if (start_r >= end_r) start_r = std::max(0, end_r - 1);
     
     const int MAX_GAP = 5;
 

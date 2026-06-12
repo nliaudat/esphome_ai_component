@@ -6,6 +6,35 @@
 
 This component provides a lightweight, non-AI solution for reading analog gauges (dials) using traditional computer vision.
 
+## New Features
+
+### Center Deadzone (Hub Ignore)
+
+You can now ignore the center hub/screw area with `deadzone_diameter` (in pixels).
+
+- Purpose: avoid false needle detections caused by central cap, reflections, or shadows.
+- Behavior: pixels inside the deadzone circle are excluded from radial scans and line voting.
+- Scope: applied in all production detection algorithms (`radial_profile`, `legacy`, `hough_transform`, `template_match`).
+
+Example:
+
+```yaml
+analog_reader:
+  id: analog_main
+  camera_id: my_camera
+  dials:
+    - id: dial_1
+      crop_x: 0
+      crop_y: 0
+      crop_w: 100
+      crop_h: 100
+      deadzone_diameter: 18  # pixels at crop scale
+      min_angle: 0
+      max_angle: 360
+      min_value: 0
+      max_value: 10
+```
+
 ## 🚀 Performance Gains vs AI
 Using this component instead of an AI model (`meter_reader_tflite`) offers significant advantages for standard analog dials:
 
@@ -91,6 +120,7 @@ analog_reader:
       auto_contrast: true   # Enhances contrast before processing (Recommended)
       contrast: 1.0         # Manual contrast multiplier
       target_color: 0xFF0000 # Optional: Target needle color (e.g. Red) for Color Detection Mode
+      deadzone_diameter: 18  # Optional: ignore center hub/cap in pixels (0 = disabled)
       
 
       # Angle Calibration

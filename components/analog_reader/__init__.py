@@ -5,6 +5,10 @@ try:
     from esphome.components import value_validator
 except ImportError:
     value_validator = None
+try:
+    import esphome.components.flash_light_controller as flash_light_controller
+except ImportError:
+    flash_light_controller = None
 
 from esphome.const import CONF_ID, CONF_NAME
 from esphome.core import CORE
@@ -22,6 +26,7 @@ CONF_SCALE = "scale"
 CONF_MIN_ANGLE = "min_angle"
 CONF_MAX_ANGLE = "max_angle"
 CONF_ANGLE_OFFSET = "angle_offset"
+CONF_CLOCKWISE = "clockwise"
 CONF_MIN_VALUE = "min_value"
 CONF_MAX_VALUE = "max_value"
 CONF_CROP_X = "crop_x"
@@ -29,10 +34,12 @@ CONF_CROP_Y = "crop_y"
 CONF_CROP_W = "crop_w"
 CONF_CROP_H = "crop_h"
 CONF_VALIDATOR = "validator"
+CONF_FLASH_LIGHT_CONTROLLER = "flash_light_controller"
 CONF_PAUSED = "paused"
 CONF_AUTO_CONTRAST = "auto_contrast"
 CONF_CONTRAST = "contrast"
 CONF_DEBUG = "debug"
+CONF_STACKED_DIGITS = "stacked_digits"
 
 CONF_NEEDLE_TYPE = "needle_type"
 CONF_TYPE_DARK = "DARK"
@@ -52,6 +59,7 @@ CONF_RAW = "raw"
 CONF_MAPPED = "mapped"
 CONF_MIN_SCAN_RADIUS = "min_scan_radius"
 CONF_MAX_SCAN_RADIUS = "max_scan_radius"
+CONF_DEADZONE_DIAMETER = "deadzone_diameter"
 CONF_PROCESS_CHANNEL = "process_channel"
 CONF_CHANNEL_GRAYSCALE = "GRAYSCALE"
 CONF_CHANNEL_RED = "RED"
@@ -81,13 +89,16 @@ DIAL_SCHEMA = cv.Schema({
     cv.Optional(CONF_MIN_ANGLE, default=0): cv.float_,
     cv.Optional(CONF_MAX_ANGLE, default=360): cv.float_,
     cv.Optional(CONF_ANGLE_OFFSET, default=0): cv.float_, 
+    cv.Optional(CONF_CLOCKWISE, default=True): cv.boolean,
     cv.Optional(CONF_MIN_VALUE, default=0): cv.float_,
     cv.Optional(CONF_MAX_VALUE, default=10): cv.float_,
     cv.Optional(CONF_MIN_SCAN_RADIUS, default=0.3): cv.float_,
     cv.Optional(CONF_MAX_SCAN_RADIUS, default=0.9): cv.float_,
+    cv.Optional(CONF_DEADZONE_DIAMETER, default=0.0): cv.float_,
     cv.Optional(CONF_AUTO_CONTRAST, default=True): cv.boolean,
     cv.Optional(CONF_CONTRAST, default=1.0): cv.float_,
     cv.Optional("target_color"): cv.hex_int, 
+    cv.Optional("color_tolerance", default=255.0): cv.float_,
     
     # Per-dial sensors
     cv.Optional(CONF_VALUE): sensor.sensor_schema(),
@@ -105,11 +116,13 @@ DIAL_SCHEMA = cv.Schema({
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(AnalogReader),
     cv.Optional(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator) if value_validator else cv.string,
+    cv.Optional(CONF_FLASH_LIGHT_CONTROLLER): cv.use_id(flash_light_controller.FlashLightController) if flash_light_controller else cv.string,
     cv.Required(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera),
     cv.Optional(CONF_VALUE_SENSOR): sensor.sensor_schema(),
     cv.Required(CONF_DIALS): cv.ensure_list(DIAL_SCHEMA),
     cv.Optional(CONF_PAUSED, default=False): cv.boolean,
     cv.Optional(CONF_DEBUG, default=False): cv.boolean,
+    cv.Optional(CONF_STACKED_DIGITS, default=False): cv.boolean,
 }).extend(cv.polling_component_schema("60s"))
 
 
@@ -128,11 +141,21 @@ async def to_code(config):
     cam = await cg.get_variable(config[CONF_CAMERA_ID])
     cg.add(var.set_camera(cam))
 
+    # Optional flash light controller: lets the analog reader drive its own
+    # flash+capture sequence instead of scavenging frames flowing on the camera bus.
+    if CONF_FLASH_LIGHT_CONTROLLER in config:
+        cg.add_define("USE_FLASH_LIGHT_CONTROLLER")
+        flash_controller = await cg.get_variable(config[CONF_FLASH_LIGHT_CONTROLLER])
+        cg.add(var.set_flash_controller(flash_controller))
+
     if config[CONF_PAUSED]:
         cg.add(var.set_pause_processing(True))
         
     if config[CONF_DEBUG]:
         cg.add(var.set_debug(True))
+
+    if config[CONF_STACKED_DIGITS]:
+        cg.add(var.set_stacked_digits(True))
 
     if CONF_VALUE_SENSOR in config:
         sens = await sensor.new_sensor(config[CONF_VALUE_SENSOR])
@@ -160,15 +183,18 @@ async def to_code(config):
             ("min_angle", dial[CONF_MIN_ANGLE]),
             ("max_angle", dial[CONF_MAX_ANGLE]),
             ("angle_offset", dial[CONF_ANGLE_OFFSET]),
+            ("clockwise", dial[CONF_CLOCKWISE]),
             ("min_value", dial[CONF_MIN_VALUE]),
             ("max_value", dial[CONF_MAX_VALUE]),
             ("auto_contrast", dial[CONF_AUTO_CONTRAST]),
             ("contrast", dial[CONF_CONTRAST]),
             ("target_color", dial.get("target_color", 0)),
             ("use_color", "target_color" in dial),
+            ("color_tolerance", dial["color_tolerance"]),
             ("process_channel", dial[CONF_PROCESS_CHANNEL]),
             ("min_scan_radius", dial[CONF_MIN_SCAN_RADIUS]),
             ("max_scan_radius", dial[CONF_MAX_SCAN_RADIUS]),
+            ("deadzone_diameter", dial[CONF_DEADZONE_DIAMETER]),
             ("value_sensor", await sensor.new_sensor(dial[CONF_VALUE]) if CONF_VALUE in dial else None),
             ("confidence_sensor", await sensor.new_sensor(dial[CONF_CONFIDENCE]) if CONF_CONFIDENCE in dial else None),
             ("angle_sensor", await sensor.new_sensor(dial[CONF_ANGLE]) if CONF_ANGLE in dial else None),

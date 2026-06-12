@@ -57,3 +57,35 @@ Defines sub-regions for post-processing.
 *   **Reference System**: Relative to the *resulting* output image.
 *   **Transform**: Because the `camera_window` generates a new image which is *then* rotated by the implementation, these coordinates must be transformed *again* into the final rotated visual space.
 *   **Format**: `[[x1, y1, x2, y2], ...]` stringified JSON.
+
+## Analog Dial Workflow (New)
+
+The `draw_regions/index.html` tool now includes integrated analog-dial tuning and preview:
+
+- Per-dial processing previews (raw crop, grayscale/color map, CLAHE, top-hat, final profile)
+- Import from `config.yaml` (dials + digit zones + dial settings)
+- Color picker from image for `target_color`
+- Deadzone support with visible center overlay
+
+### Deadzone in UI and YAML
+
+- Control: `Deadzone diameter (px)` in Analog mode.
+- Visualization: center deadzone circle shown on each dial overlay.
+- Export: generated YAML includes `deadzone_diameter` per dial.
+
+Example output snippet:
+
+```yaml
+analog_reader:
+  dials:
+    - id: dial_1
+      crop_x: 516
+      crop_y: 229
+      crop_w: 140
+      crop_h: 140
+      deadzone_diameter: 18
+      min_angle: 0
+      max_angle: 360
+      min_value: 0
+      max_value: 10
+```

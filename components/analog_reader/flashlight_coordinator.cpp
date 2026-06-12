@@ -49,15 +49,22 @@ bool FlashlightCoordinator::update_scheduling() {
     // If controller is present, it handles everything
     if (this->controller_) {
         if (!this->controller_->is_active()) {
-             // Not running: Start it
+             // Not running: start our own flash sequence. The frame is requested by the
+             // callback once the flash has warmed up.
              ESP_LOGD(TAG, "Controller idle, initiating sequence");
              this->controller_->initiate_capture_sequence([this]() {
                  if (this->request_frame_callback_) this->request_frame_callback_();
              });
              return true; // We initiated, so we are "busy" in a sense, or rather we handled it.
         } else {
-             // Already running
-             ESP_LOGD(TAG, "Controller already active, skipping trigger");
+             // A flash sequence is already in progress (e.g. triggered by the TFLite
+             // reader on the shared controller). The flash is on and a lit capture is
+             // coming, so instead of skipping we arm a frame request and ride along: the
+             // camera broadcasts every captured frame to all listeners, so we grab the
+             // same lit frame. This matters because the analog interval is often a
+             // multiple of the TFLite interval, making the two coincide every cycle.
+             ESP_LOGD(TAG, "Controller already active, piggybacking on the in-progress flash capture");
+             if (this->request_frame_callback_) this->request_frame_callback_();
              return true;
         }
     }
