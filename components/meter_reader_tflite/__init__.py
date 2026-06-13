@@ -157,6 +157,29 @@ def parse_model_txt_file(model_path):
         print(f"    Re-export the model with delegates disabled:")
         print(f"      converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS]")
     
+    # Detect hybrid quantization (float32 I/O + int8 weights) — incompatible with TFLite Micro
+    # Pattern: float32 input but int8 weight/bias tensors present (pseudo_qconst / int8 weight tensors)
+    input_dtype = config.get('input_type', '')
+    has_float32_io = (input_dtype == 'float32')
+    has_int8_weights = bool(re.search(r"pseudo_qconst.*<class 'numpy\.int8'>", content))
+    
+    if has_float32_io and has_int8_weights:
+        # Hybrid quantization detected: float32 I/O with int8 quantized weights
+        # TFLite Micro does NOT support this mixed-precision pattern on ESP32
+        model_name = os.path.basename(txt_path).replace('.txt', '.tflite')
+        raise cv.Invalid(
+            f"Model '{model_name}' uses hybrid quantization (float32 I/O + int8 weights).\n"
+            f"  TFLite Micro on ESP32 does NOT support hybrid execution.\n"
+            f"  This model will fail at runtime with 'Failed to allocate tensors'.\n"
+            f"  Use a full integer quantized model instead (int8 I/O int8 weights).\n"
+            f"  Re-export with:\n"
+            f"    converter.optimizations = [tf.lite.Optimize.DEFAULT]\n"
+            f"    converter.representative_dataset = representative_dataset\n"
+            f"    converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]\n"
+            f"    converter.inference_input_type = tf.int8\n"
+            f"    converter.inference_output_type = tf.int8"
+        )
+    
     return config
 
 
