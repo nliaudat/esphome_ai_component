@@ -161,7 +161,7 @@ def parse_model_txt_file(model_path):
     # Pattern: float32 input but int8 weight/bias tensors present (pseudo_qconst / int8 weight tensors)
     input_dtype = config.get('input_type', '')
     has_float32_io = (input_dtype == 'float32')
-    has_int8_weights = bool(re.search(r"pseudo_qconst.*<class 'numpy\.int8'>", content))
+    has_int8_weights = bool(re.search(r"<class 'numpy\.(int8|uint8)'>", content))
     
     if has_float32_io and has_int8_weights:
         # Hybrid quantization detected: float32 I/O with int8 quantized weights
