@@ -107,7 +107,7 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
       for (auto &dial : dials_) dial.algorithm = algorithm;
   }
   
-  void set_update_interval(uint32_t interval) override;
+  void set_update_interval(uint32_t interval);
 
   void add_dial(DialConfig config) { dials_.push_back(config); }
   
