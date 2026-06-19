@@ -111,11 +111,6 @@ AnalogReader::~AnalogReader() {
   this->persistent_buffer_.reset();
 }
 
-void AnalogReader::set_update_interval(uint32_t interval) {
-  PollingComponent::set_update_interval(interval);
-  ESP_LOGI(TAG, "Update interval set to %u ms", interval);
-}
-
 void AnalogReader::setup() {
   ESP_LOGCONFIG(TAG, "Setting up Analog Reader...");
 
