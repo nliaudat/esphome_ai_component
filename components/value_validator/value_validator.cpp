@@ -443,9 +443,9 @@ bool ValueValidator::validate_reading(std::span<const float> digits, std::span<c
       return false;
   }
 
+#ifdef USE_ANALOG_READER
   // --- Local storage for fresh dial fraction (shared between dial correction and float publish) ---
   float current_fraction = 0.0f;
-#ifdef USE_ANALOG_READER
   int corrected_val = filtered_val;
   if (this->has_dial_fraction_) {
     current_fraction = this->dial_fraction_;
