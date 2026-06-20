@@ -21,16 +21,16 @@ class Esp32CameraUtils : public Component {
   void dump_config() override;
   
   void set_camera_window_config(int offset_x, int offset_y, int width, int height) {
-    offset_x_ = offset_x;
-    offset_y_ = offset_y;
-    width_ = width;
-    height_ = height;
-    has_config_ = true;
+    this->offset_x_ = offset_x;
+    this->offset_y_ = offset_y;
+    this->width_ = width;
+    this->height_ = height;
+    this->has_config_ = true;
   }
 
   bool set_camera_window(int offset_x, int offset_y, int width, int height);
 
-  void set_camera(esp32_camera::ESP32Camera *camera) { camera_ = camera; }
+  void set_camera(esp32_camera::ESP32Camera *camera) { this->camera_ = camera; }
 
   // New methods for image processing and camera management
   void set_camera_image_format(int width, int height, const std::string &pixel_format);
@@ -42,38 +42,38 @@ class Esp32CameraUtils : public Component {
   bool reset_window(int &width, int &height);
   
   // Expose image processor for usage
-  ImageProcessor* get_image_processor() { return image_processor_.get(); }
+  ImageProcessor* get_image_processor() { return this->image_processor_.get(); }
   
   // Helper to process a zone directly
   bool process_zone(std::shared_ptr<camera::CameraImage> frame, const CropZone& zone, 
                    uint8_t* output_buffer, size_t output_size);
   
   // Image rotation configuration (0, 90, 180, 270 degrees clockwise, or arbitrary)
-  void set_rotation(float rotation) { rotation_ = rotation; }
-  float get_rotation() const { return rotation_; }
+  void set_rotation(float rotation) { this->rotation_ = rotation; }
+  float get_rotation() const { return this->rotation_; }
 
   // Modular feature configuration
   void set_scaler_config(int width, int height) {
-    scaler_width_ = width;
-    scaler_height_ = height;
-    has_scaler_config_ = true;
+    this->scaler_width_ = width;
+    this->scaler_height_ = height;
+    this->has_scaler_config_ = true;
   }
   
   void set_cropper_config(int width, int height, int offset_x = 0, int offset_y = 0) {
-    cropper_width_ = width;
-    cropper_height_ = height;
-    cropper_offset_x_ = offset_x;
-    cropper_offset_y_ = offset_y;
-    has_cropper_config_ = true;
+    this->cropper_width_ = width;
+    this->cropper_height_ = height;
+    this->cropper_offset_x_ = offset_x;
+    this->cropper_offset_y_ = offset_y;
+    this->has_cropper_config_ = true;
   }
 
   // Manually trigger sensor updates
   void update_memory_sensors();
-  void set_debug(bool debug) { debug_ = debug; }
+  void set_debug(bool debug) { this->debug_ = debug; }
 
 #ifdef DEBUG_ESP32_CAMERA_UTILS_MEMORY
-  void set_camera_buffer_size_sensor(sensor::Sensor *s) { camera_buffer_size_sensor_ = s; }
-  void set_camera_free_psram_sensor(sensor::Sensor *s) { camera_free_psram_sensor_ = s; }
+  void set_camera_buffer_size_sensor(sensor::Sensor *s) { this->camera_buffer_size_sensor_ = s; }
+  void set_camera_free_psram_sensor(sensor::Sensor *s) { this->camera_free_psram_sensor_ = s; }
 #endif
 
 

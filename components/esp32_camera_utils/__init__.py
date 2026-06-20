@@ -126,7 +126,6 @@ async def to_code(config):
                 CONF_NAME: name.replace("_", " ").title(),
                 CONF_DISABLED_BY_DEFAULT: False,
                 CONF_INTERNAL: False,
-                CONF_INTERNAL: False,
                 CONF_ICON: icon,
                 CONF_FORCE_UPDATE: False,
             }
