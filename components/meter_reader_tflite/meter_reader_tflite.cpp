@@ -890,6 +890,7 @@ void MeterReaderTFLite::publish_inference_result(const std::string& digit_str, f
         // Validator loaded: always publish raw value for transparency
         // The validator publishes its own validated_value_sensor on accept
         if (this->value_sensor_) this->value_sensor_->publish_state(validated_val);
+        if (this->confidence_sensor_) this->confidence_sensor_->publish_state(avg_conf * 100.0f);
         if (valid) {
             ESP_LOGI(TAG, "Result: VALID (Raw: %s, Conf: %.3f, %s)", 
                      digit_str.c_str(), avg_conf, conf_list.c_str());
