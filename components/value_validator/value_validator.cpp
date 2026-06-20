@@ -27,15 +27,15 @@ static void *psram_alloc(size_t size) {
 }
 
 void ReadingHistory::setup() {
-  clear();
-  ensure_capacity();
+  this->clear();
+  this->ensure_capacity();
 }
 
 void ReadingHistory::ensure_capacity() {
-  if (capacity_ > 0) return;
+  if (this->capacity_ > 0) return;
   
   // Calculate capacity based on max bytes
-  size_t max_count_by_bytes = max_history_size_bytes_ / sizeof(HistoricalReading);
+  size_t max_count_by_bytes = this->max_history_size_bytes_ / sizeof(HistoricalReading);
   static constexpr size_t MAX_DAY_COUNT = 1440; // 24h * 60min
   
   size_t target = std::min(max_count_by_bytes, MAX_DAY_COUNT);
@@ -45,61 +45,61 @@ void ReadingHistory::ensure_capacity() {
   // RAII: unique_ptr with custom deleter (free for psram_alloc compatibility)
   void* raw = psram_alloc(target * sizeof(HistoricalReading));
   if (raw) {
-      buffer_.reset(static_cast<HistoricalReading*>(raw));
-      capacity_ = target;
-      head_ = 0;
-      count_ = 0;
+      this->buffer_.reset(static_cast<HistoricalReading*>(raw));
+      this->capacity_ = target;
+      this->head_ = 0;
+      this->count_ = 0;
       ESP_LOGI(TAG, "Allocated history buffer for %d entries (PSRAM preferred)", static_cast<int>(target));
   } else {
       ESP_LOGE(TAG, "Failed to allocate history buffer!");
-      capacity_ = 0;
+      this->capacity_ = 0;
   }
 }
 
 void ReadingHistory::add_reading(int value, uint32_t timestamp, float confidence) {
-  if (!buffer_ || capacity_ == 0) return;
+  if (!this->buffer_ || this->capacity_ == 0) return;
   
   HistoricalReading reading{value, timestamp, confidence};
   
-  buffer_[head_] = reading;
-  head_ = (head_ + 1) % capacity_;
+  this->buffer_[this->head_] = reading;
+  this->head_ = (this->head_ + 1) % this->capacity_;
   
-  if (count_ < capacity_) {
-      count_++;
+  if (this->count_ < this->capacity_) {
+      this->count_++;
   }
 }
 
 int ReadingHistory::get_last_reading() const {
-  if (count_ == 0 || !buffer_) return 0;
-  size_t idx = (head_ == 0) ? (capacity_ - 1) : (head_ - 1);
-  return buffer_[idx].value;
+  if (this->count_ == 0 || !this->buffer_) return 0;
+  size_t idx = (this->head_ == 0) ? (this->capacity_ - 1) : (this->head_ - 1);
+  return this->buffer_[idx].value;
 }
 
 float ReadingHistory::get_last_confidence() const {
-  if (count_ == 0 || !buffer_) return 0.0f;
-  size_t idx = (head_ == 0) ? (capacity_ - 1) : (head_ - 1);
-  return buffer_[idx].confidence;
+  if (this->count_ == 0 || !this->buffer_) return 0.0f;
+  size_t idx = (this->head_ == 0) ? (this->capacity_ - 1) : (this->head_ - 1);
+  return this->buffer_[idx].confidence;
 }
 
 int ReadingHistory::get_hour_median() const { return get_median_within_ms(3600000UL); }
 int ReadingHistory::get_day_median() const { return get_median_within_ms(86400000UL); }
 
 int ReadingHistory::get_median_within_ms(uint32_t max_elapsed_ms) const {
-  if (count_ == 0 || !buffer_) return 0;
+  if (this->count_ == 0 || !this->buffer_) return 0;
   
-  size_t last_idx = (head_ + capacity_ - 1) % capacity_;
-  uint32_t now = buffer_[last_idx].timestamp;
+  size_t last_idx = (this->head_ + this->capacity_ - 1) % this->capacity_;
+  uint32_t now = this->buffer_[last_idx].timestamp;
 
   std::vector<int> values;
-  values.reserve(count_);
+  values.reserve(this->count_);
   size_t curr = last_idx;
-  for (size_t i = 0; i < count_; i++) {
+  for (size_t i = 0; i < this->count_; i++) {
       // Unsigned subtraction handles millis() overflow correctly
-      uint32_t elapsed = now - buffer_[curr].timestamp;
+      uint32_t elapsed = now - this->buffer_[curr].timestamp;
       if (elapsed > max_elapsed_ms) break;
-      values.push_back(buffer_[curr].value);
+      values.push_back(this->buffer_[curr].value);
       
-      if (curr == 0) curr = capacity_ - 1;
+      if (curr == 0) curr = this->capacity_ - 1;
       else curr--;
   }
   
@@ -118,16 +118,16 @@ int ReadingHistory::get_median_within_ms(uint32_t max_elapsed_ms) const {
 
 std::vector<int> ReadingHistory::get_recent_readings(size_t count) const {
   std::vector<int> recent;
-  if (count_ == 0 || !buffer_) return recent;
+  if (this->count_ == 0 || !this->buffer_) return recent;
   
-  size_t actual_count = std::min(count, count_);
+  size_t actual_count = std::min(count, this->count_);
   recent.reserve(actual_count);
   
   for (size_t k = 0; k < actual_count; k++) {
       // Chronological order: oldest first
       size_t offset = actual_count - 1 - k;
-      size_t idx = (head_ + capacity_ - 1 - offset) % capacity_;
-      recent.push_back(buffer_[idx].value);
+      size_t idx = (this->head_ + this->capacity_ - 1 - offset) % this->capacity_;
+      recent.push_back(this->buffer_[idx].value);
   }
   
   return recent;
@@ -135,23 +135,23 @@ std::vector<int> ReadingHistory::get_recent_readings(size_t count) const {
 
 std::vector<std::pair<int, float>> ReadingHistory::get_recent_readings_with_confidence(size_t count) const {
   std::vector<std::pair<int, float>> recent;
-  if (count_ == 0 || !buffer_) return recent;
+  if (this->count_ == 0 || !this->buffer_) return recent;
   
-  size_t actual_count = std::min(count, count_);
+  size_t actual_count = std::min(count, this->count_);
   recent.reserve(actual_count);
   
   for (size_t k = 0; k < actual_count; k++) {
       size_t offset = actual_count - 1 - k;
-      size_t idx = (head_ + capacity_ - 1 - offset) % capacity_;
-      recent.push_back({buffer_[idx].value, buffer_[idx].confidence});
+      size_t idx = (this->head_ + this->capacity_ - 1 - offset) % this->capacity_;
+      recent.push_back({this->buffer_[idx].value, this->buffer_[idx].confidence});
   }
   
   return recent;
 }
 
 void ReadingHistory::clear() {
-  head_ = 0;
-  count_ = 0;
+  this->head_ = 0;
+  this->count_ = 0;
 }
 
 void ValueValidator::setup() {
@@ -616,7 +616,7 @@ int ValueValidator::apply_smart_validation(int new_reading, float confidence, fl
            }
 
            ESP_LOGW(TAG, "Large change confirmed by %d precise consecutive readings: %d -> %d", 
-                    (int)CONSISTENCY_COUNT, last_valid_reading_, new_reading);
+                     static_cast<int>(CONSISTENCY_COUNT), last_valid_reading_, new_reading);
            
            // If the deviation is huge, clear old history to prevent it from dragging us back
            if (std::abs(new_reading - last_valid_reading_) > (config_.max_absolute_diff * 5)) {
@@ -712,7 +712,7 @@ int ValueValidator::apply_smart_validation(int new_reading, float confidence, fl
               ESP_LOGW(TAG, "Self-correcting via consensus: %d consecutive rejections (avg conf: %.2f >= %.2f). "
                        "Consensus value %d (seen %d/%d, total conf weight: %.1f). Was stuck at %d",
                        consecutive_rejections_, avg_conf, config_.high_confidence_threshold,
-                       best_val, best_count, (int)recent_all.size(), best_conf, last_valid_reading_);
+                       best_val, best_count, static_cast<int>(recent_all.size()), best_conf, last_valid_reading_);
               consecutive_rejections_ = 0;
               rejection_confidence_sum_ = 0.0f;
               return best_val;
@@ -1084,7 +1084,7 @@ void ValueValidator::dump_config() {
   ESP_LOGCONFIG(TAG, "  Max Consecutive Rejections: %d", this->config_.max_consecutive_rejections);
   ESP_LOGCONFIG(TAG, "  Small Negative Tolerance: %d", this->config_.small_negative_tolerance);
   ESP_LOGCONFIG(TAG, "  Persist State: %s", YESNO(this->config_.persist_state));
-  ESP_LOGCONFIG(TAG, "  Max History Size: %d bytes", (int)this->config_.max_history_size_bytes);
+  ESP_LOGCONFIG(TAG, "  Max History Size: %d bytes", static_cast<int>(this->config_.max_history_size_bytes));
 #ifdef USE_ANALOG_READER
   ESP_LOGCONFIG(TAG, "  Dial Correction: %s", YESNO(this->config_.enable_dial_correction));
   if (this->config_.enable_dial_correction) {
