@@ -13,6 +13,7 @@
 #include <cstring>
 #include <numeric>
 #include <limits>
+#include <string>
 
 namespace esphome {
 namespace value_validator {
@@ -26,15 +27,15 @@ static void *psram_alloc(size_t size) {
 }
 
 void ReadingHistory::setup() {
-  clear();
-  ensure_capacity();
+  this->clear();
+  this->ensure_capacity();
 }
 
 void ReadingHistory::ensure_capacity() {
-  if (capacity_ > 0) return;
+  if (this->capacity_ > 0) return;
   
   // Calculate capacity based on max bytes
-  size_t max_count_by_bytes = max_history_size_bytes_ / sizeof(HistoricalReading);
+  size_t max_count_by_bytes = this->max_history_size_bytes_ / sizeof(HistoricalReading);
   static constexpr size_t MAX_DAY_COUNT = 1440; // 24h * 60min
   
   size_t target = std::min(max_count_by_bytes, MAX_DAY_COUNT);
@@ -44,61 +45,61 @@ void ReadingHistory::ensure_capacity() {
   // RAII: unique_ptr with custom deleter (free for psram_alloc compatibility)
   void* raw = psram_alloc(target * sizeof(HistoricalReading));
   if (raw) {
-      buffer_.reset(static_cast<HistoricalReading*>(raw));
-      capacity_ = target;
-      head_ = 0;
-      count_ = 0;
+      this->buffer_.reset(static_cast<HistoricalReading*>(raw));
+      this->capacity_ = target;
+      this->head_ = 0;
+      this->count_ = 0;
       ESP_LOGI(TAG, "Allocated history buffer for %d entries (PSRAM preferred)", static_cast<int>(target));
   } else {
       ESP_LOGE(TAG, "Failed to allocate history buffer!");
-      capacity_ = 0;
+      this->capacity_ = 0;
   }
 }
 
 void ReadingHistory::add_reading(int value, uint32_t timestamp, float confidence) {
-  if (!buffer_ || capacity_ == 0) return;
+  if (!this->buffer_ || this->capacity_ == 0) return;
   
   HistoricalReading reading{value, timestamp, confidence};
   
-  buffer_[head_] = reading;
-  head_ = (head_ + 1) % capacity_;
+  this->buffer_[this->head_] = reading;
+  this->head_ = (this->head_ + 1) % this->capacity_;
   
-  if (count_ < capacity_) {
-      count_++;
+  if (this->count_ < this->capacity_) {
+      this->count_++;
   }
 }
 
 int ReadingHistory::get_last_reading() const {
-  if (count_ == 0 || !buffer_) return 0;
-  size_t idx = (head_ == 0) ? (capacity_ - 1) : (head_ - 1);
-  return buffer_[idx].value;
+  if (this->count_ == 0 || !this->buffer_) return 0;
+  size_t idx = (this->head_ == 0) ? (this->capacity_ - 1) : (this->head_ - 1);
+  return this->buffer_[idx].value;
 }
 
 float ReadingHistory::get_last_confidence() const {
-  if (count_ == 0 || !buffer_) return 0.0f;
-  size_t idx = (head_ == 0) ? (capacity_ - 1) : (head_ - 1);
-  return buffer_[idx].confidence;
+  if (this->count_ == 0 || !this->buffer_) return 0.0f;
+  size_t idx = (this->head_ == 0) ? (this->capacity_ - 1) : (this->head_ - 1);
+  return this->buffer_[idx].confidence;
 }
 
 int ReadingHistory::get_hour_median() const { return get_median_within_ms(3600000UL); }
 int ReadingHistory::get_day_median() const { return get_median_within_ms(86400000UL); }
 
 int ReadingHistory::get_median_within_ms(uint32_t max_elapsed_ms) const {
-  if (count_ == 0 || !buffer_) return 0;
+  if (this->count_ == 0 || !this->buffer_) return 0;
   
-  size_t last_idx = (head_ + capacity_ - 1) % capacity_;
-  uint32_t now = buffer_[last_idx].timestamp;
+  size_t last_idx = (this->head_ + this->capacity_ - 1) % this->capacity_;
+  uint32_t now = this->buffer_[last_idx].timestamp;
 
   std::vector<int> values;
-  values.reserve(count_);
+  values.reserve(this->count_);
   size_t curr = last_idx;
-  for (size_t i = 0; i < count_; i++) {
+  for (size_t i = 0; i < this->count_; i++) {
       // Unsigned subtraction handles millis() overflow correctly
-      uint32_t elapsed = now - buffer_[curr].timestamp;
+      uint32_t elapsed = now - this->buffer_[curr].timestamp;
       if (elapsed > max_elapsed_ms) break;
-      values.push_back(buffer_[curr].value);
+      values.push_back(this->buffer_[curr].value);
       
-      if (curr == 0) curr = capacity_ - 1;
+      if (curr == 0) curr = this->capacity_ - 1;
       else curr--;
   }
   
@@ -117,16 +118,16 @@ int ReadingHistory::get_median_within_ms(uint32_t max_elapsed_ms) const {
 
 std::vector<int> ReadingHistory::get_recent_readings(size_t count) const {
   std::vector<int> recent;
-  if (count_ == 0 || !buffer_) return recent;
+  if (this->count_ == 0 || !this->buffer_) return recent;
   
-  size_t actual_count = std::min(count, count_);
+  size_t actual_count = std::min(count, this->count_);
   recent.reserve(actual_count);
   
   for (size_t k = 0; k < actual_count; k++) {
       // Chronological order: oldest first
       size_t offset = actual_count - 1 - k;
-      size_t idx = (head_ + capacity_ - 1 - offset) % capacity_;
-      recent.push_back(buffer_[idx].value);
+      size_t idx = (this->head_ + this->capacity_ - 1 - offset) % this->capacity_;
+      recent.push_back(this->buffer_[idx].value);
   }
   
   return recent;
@@ -134,23 +135,23 @@ std::vector<int> ReadingHistory::get_recent_readings(size_t count) const {
 
 std::vector<std::pair<int, float>> ReadingHistory::get_recent_readings_with_confidence(size_t count) const {
   std::vector<std::pair<int, float>> recent;
-  if (count_ == 0 || !buffer_) return recent;
+  if (this->count_ == 0 || !this->buffer_) return recent;
   
-  size_t actual_count = std::min(count, count_);
+  size_t actual_count = std::min(count, this->count_);
   recent.reserve(actual_count);
   
   for (size_t k = 0; k < actual_count; k++) {
       size_t offset = actual_count - 1 - k;
-      size_t idx = (head_ + capacity_ - 1 - offset) % capacity_;
-      recent.push_back({buffer_[idx].value, buffer_[idx].confidence});
+      size_t idx = (this->head_ + this->capacity_ - 1 - offset) % this->capacity_;
+      recent.push_back({this->buffer_[idx].value, this->buffer_[idx].confidence});
   }
   
   return recent;
 }
 
 void ReadingHistory::clear() {
-  head_ = 0;
-  count_ = 0;
+  this->head_ = 0;
+  this->count_ = 0;
 }
 
 void ValueValidator::setup() {
@@ -183,19 +184,6 @@ void ValueValidator::setup() {
       ESP_LOGI(TAG, "Restored persistent state: last_valid_reading = %d", restored);
     }
   }
-}
-
-void ValueValidator::dump_config() {
-  ESP_LOGCONFIG(TAG, "Value Validator:");
-  ESP_LOGCONFIG(TAG, "  Max Absolute Diff: %d", this->config_.max_absolute_diff);
-  ESP_LOGCONFIG(TAG, "  Max Rate Change: %.0f%%", this->config_.max_rate_change * 100.0f);
-  ESP_LOGCONFIG(TAG, "  Allow Negative Rates: %s", YESNO(this->config_.allow_negative_rates));
-  ESP_LOGCONFIG(TAG, "  Strict Confidence Check: %s", YESNO(this->config_.strict_confidence_check));
-  ESP_LOGCONFIG(TAG, "  Per Digit Conf Threshold: %.2f", this->config_.per_digit_confidence_threshold);
-  ESP_LOGCONFIG(TAG, "  Max Consecutive Rejections: %d", this->config_.max_consecutive_rejections);
-  ESP_LOGCONFIG(TAG, "  Small Negative Tolerance: %d", this->config_.small_negative_tolerance);
-  ESP_LOGCONFIG(TAG, "  Persist State: %s", YESNO(this->config_.persist_state));
-  ESP_LOGCONFIG(TAG, "  Max History Size: %d bytes", (int)this->config_.max_history_size_bytes);
 }
 
 bool ValueValidator::validate_reading(int new_reading, float confidence, int& validated_reading) {
@@ -289,6 +277,38 @@ bool ValueValidator::validate_reading(int new_reading, float confidence, int& va
   
   return is_valid;
 }
+
+// ---------------------------------------------------------------------------
+// Dial-Aware Correction (USE_ANALOG_READER)
+// ---------------------------------------------------------------------------
+
+#ifdef USE_ANALOG_READER
+
+/**
+ * @brief Subtract 1 from an integer, handling borrow across all digits.
+ * Example: 210600 -> 210599, 100000 -> 99999
+ */
+static int dial_correct_decrement(int value) {
+  if (value <= 0) return value;  // Can't decrement below 0
+  return value - 1;
+}
+
+void ValueValidator::set_dial_fraction(float fraction) {
+  // Clamp to [0.0, 1.0)
+  if (fraction < 0.0f) fraction = 0.0f;
+  if (fraction >= 1.0f) fraction = fraction - std::floor(fraction);
+  dial_fraction_ = fraction;
+  has_dial_fraction_ = true;
+  if (debug_) {
+    ESP_LOGD(TAG, "Dial fraction set: %.4f", fraction);
+  }
+}
+
+void ValueValidator::clear_dial_fraction() {
+  has_dial_fraction_ = false;
+  dial_fraction_ = 0.0f;
+}
+#endif
 
 bool ValueValidator::validate_reading(std::span<const float> digits, std::span<const float> confidences, int& validated_reading) {
   // If we don't have per-digit history yet, fallback to standard validation
@@ -423,9 +443,49 @@ bool ValueValidator::validate_reading(std::span<const float> digits, std::span<c
       return false;
   }
 
-  // Now pass the FILTERED value to the standard validator
+#ifdef USE_ANALOG_READER
+  // --- Dial Correction (only when analog_reader provides fraction) ---
+  int corrected_val = filtered_val;
+  if (this->config_.enable_dial_correction && this->has_dial_fraction_ && !this->first_reading_) {
+    if (this->dial_fraction_ > this->config_.dial_correction_high_threshold) {
+      // Dial near full rotation → subtract 1 with borrow
+      corrected_val = dial_correct_decrement(filtered_val);
+      ESP_LOGD(TAG, "Dial correction: raw=%d, fraction=%.4f > %.2f → corrected=%d",
+               filtered_val, this->dial_fraction_, this->config_.dial_correction_high_threshold, corrected_val);
+    } else if (this->dial_fraction_ < this->config_.dial_correction_low_threshold) {
+      // Dial at start → keep integer as-is (digit is solid)
+      ESP_LOGD(TAG, "Dial correction: fraction=%.4f < %.2f → keeping raw=%d (solid digit)",
+               this->dial_fraction_, this->config_.dial_correction_low_threshold, filtered_val);
+    } else {
+      ESP_LOGD(TAG, "Dial correction: fraction=%.4f in middle zone (%.2f-%.2f) → no correction",
+               this->dial_fraction_, this->config_.dial_correction_low_threshold, this->config_.dial_correction_high_threshold);
+    }
+    this->has_dial_fraction_ = false;  // Consume for this cycle
+  }
+#else
+  int corrected_val = filtered_val;
+#endif
+
+  // Now pass the CORRECTED value to the standard validator
   // This will perform rate checks, consistency checks, etc.
-  bool final_valid = validate_reading(filtered_val, avg_conf, validated_reading);
+  bool final_valid = validate_reading(corrected_val, avg_conf, validated_reading);
+
+  // Publish validated value to optional sensor on accept
+  // When USE_ANALOG_READER is active, this includes dial fraction
+  if (final_valid && this->validated_value_sensor_) {
+#ifdef USE_ANALOG_READER
+    float float_result = static_cast<float>(validated_reading) + this->dial_fraction_;
+    if (this->debug_) {
+      ESP_LOGD(TAG, "Float result: %d + %.4f = %.4f", validated_reading, this->dial_fraction_, float_result);
+    }
+#else
+    float float_result = static_cast<float>(validated_reading);
+    if (this->debug_) {
+      ESP_LOGD(TAG, "Validated int result: %d", validated_reading);
+    }
+#endif
+    this->validated_value_sensor_->publish_state(float_result);
+  }
   
   if (final_valid) {
       // If accepted, update our digit history
@@ -556,7 +616,7 @@ int ValueValidator::apply_smart_validation(int new_reading, float confidence, fl
            }
 
            ESP_LOGW(TAG, "Large change confirmed by %d precise consecutive readings: %d -> %d", 
-                    (int)CONSISTENCY_COUNT, last_valid_reading_, new_reading);
+                     static_cast<int>(CONSISTENCY_COUNT), last_valid_reading_, new_reading);
            
            // If the deviation is huge, clear old history to prevent it from dragging us back
            if (std::abs(new_reading - last_valid_reading_) > (config_.max_absolute_diff * 5)) {
@@ -652,7 +712,7 @@ int ValueValidator::apply_smart_validation(int new_reading, float confidence, fl
               ESP_LOGW(TAG, "Self-correcting via consensus: %d consecutive rejections (avg conf: %.2f >= %.2f). "
                        "Consensus value %d (seen %d/%d, total conf weight: %.1f). Was stuck at %d",
                        consecutive_rejections_, avg_conf, config_.high_confidence_threshold,
-                       best_val, best_count, (int)recent_all.size(), best_conf, last_valid_reading_);
+                       best_val, best_count, static_cast<int>(recent_all.size()), best_conf, last_valid_reading_);
               consecutive_rejections_ = 0;
               rejection_confidence_sum_ = 0.0f;
               return best_val;
@@ -1012,6 +1072,26 @@ void ValueValidator::save_state_() {
   if (config_.persist_state && last_valid_reading_ >= 0) {
     this->pref_.save(&last_valid_reading_);
   }
+}
+
+void ValueValidator::dump_config() {
+  ESP_LOGCONFIG(TAG, "Value Validator:");
+  ESP_LOGCONFIG(TAG, "  Max Absolute Diff: %d", this->config_.max_absolute_diff);
+  ESP_LOGCONFIG(TAG, "  Max Rate Change: %.0f%%", this->config_.max_rate_change * 100.0f);
+  ESP_LOGCONFIG(TAG, "  Allow Negative Rates: %s", YESNO(this->config_.allow_negative_rates));
+  ESP_LOGCONFIG(TAG, "  Strict Confidence Check: %s", YESNO(this->config_.strict_confidence_check));
+  ESP_LOGCONFIG(TAG, "  Per Digit Conf Threshold: %.2f", this->config_.per_digit_confidence_threshold);
+  ESP_LOGCONFIG(TAG, "  Max Consecutive Rejections: %d", this->config_.max_consecutive_rejections);
+  ESP_LOGCONFIG(TAG, "  Small Negative Tolerance: %d", this->config_.small_negative_tolerance);
+  ESP_LOGCONFIG(TAG, "  Persist State: %s", YESNO(this->config_.persist_state));
+  ESP_LOGCONFIG(TAG, "  Max History Size: %d bytes", static_cast<int>(this->config_.max_history_size_bytes));
+#ifdef USE_ANALOG_READER
+  ESP_LOGCONFIG(TAG, "  Dial Correction: %s", YESNO(this->config_.enable_dial_correction));
+  if (this->config_.enable_dial_correction) {
+    ESP_LOGCONFIG(TAG, "  Dial Corr High Thresh: %.2f", this->config_.dial_correction_high_threshold);
+    ESP_LOGCONFIG(TAG, "  Dial Corr Low Thresh: %.2f", this->config_.dial_correction_low_threshold);
+  }
+#endif
 }
 
 }  // namespace value_validator

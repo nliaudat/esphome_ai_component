@@ -26,6 +26,10 @@ CONF_PERSIST_STATE = "persist_state"
 CONF_REJECTION_COUNT_SENSOR = "rejection_count_sensor"
 CONF_RAW_READING_SENSOR = "raw_reading_sensor"
 CONF_VALIDATOR_STATE_SENSOR = "validator_state_sensor"
+CONF_ENABLE_DIAL_CORRECTION = "enable_dial_correction"
+CONF_DIAL_CORRECTION_HIGH_THRESHOLD = "dial_correction_high_threshold"
+CONF_DIAL_CORRECTION_LOW_THRESHOLD = "dial_correction_low_threshold"
+CONF_VALIDATED_VALUE_SENSOR = "validated_value_sensor"
 
 CONFIG_SCHEMA = cv.All(cv.ensure_list(cv.Schema({
     cv.GenerateID(): cv.declare_id(ValueValidator),
@@ -42,6 +46,9 @@ CONFIG_SCHEMA = cv.All(cv.ensure_list(cv.Schema({
     cv.Optional(CONF_MAX_CONSECUTIVE_REJECTIONS, default=10): cv.positive_int,
     cv.Optional(CONF_SMALL_NEGATIVE_TOLERANCE, default=5): cv.positive_int,
     cv.Optional(CONF_PERSIST_STATE, default=False): cv.boolean,
+    cv.Optional(CONF_ENABLE_DIAL_CORRECTION, default=True): cv.boolean,
+    cv.Optional(CONF_DIAL_CORRECTION_HIGH_THRESHOLD, default=0.80): cv.percentage,
+    cv.Optional(CONF_DIAL_CORRECTION_LOW_THRESHOLD, default=0.20): cv.percentage,
     cv.Optional(CONF_REJECTION_COUNT_SENSOR): sensor.sensor_schema(
         accuracy_decimals=0,
         icon="mdi:counter",
@@ -52,6 +59,9 @@ CONFIG_SCHEMA = cv.All(cv.ensure_list(cv.Schema({
     ),
     cv.Optional(CONF_VALIDATOR_STATE_SENSOR): text_sensor.text_sensor_schema(
         icon="mdi:state-machine",
+    ),
+    cv.Optional(CONF_VALIDATED_VALUE_SENSOR): sensor.sensor_schema(
+        icon="mdi:check-circle",
     ),
     cv.Optional("debug", default=False): cv.boolean,
 }).extend(cv.COMPONENT_SCHEMA)))
@@ -77,6 +87,9 @@ async def to_code(config):
         cg.add(var.set_max_consecutive_rejections(conf[CONF_MAX_CONSECUTIVE_REJECTIONS]))
         cg.add(var.set_small_negative_tolerance(conf[CONF_SMALL_NEGATIVE_TOLERANCE]))
         cg.add(var.set_persist_state(conf[CONF_PERSIST_STATE]))
+        cg.add(var.set_enable_dial_correction(conf[CONF_ENABLE_DIAL_CORRECTION]))
+        cg.add(var.set_dial_correction_high_threshold(conf[CONF_DIAL_CORRECTION_HIGH_THRESHOLD]))
+        cg.add(var.set_dial_correction_low_threshold(conf[CONF_DIAL_CORRECTION_LOW_THRESHOLD]))
         cg.add(var.set_debug(conf["debug"]))
         
         # Optional diagnostic sensors
@@ -89,4 +102,6 @@ async def to_code(config):
         if CONF_VALIDATOR_STATE_SENSOR in conf:
             sens = await text_sensor.new_text_sensor(conf[CONF_VALIDATOR_STATE_SENSOR])
             cg.add(var.set_validator_state_sensor(sens))
-
+        if CONF_VALIDATED_VALUE_SENSOR in conf:
+            sens = await sensor.new_sensor(conf[CONF_VALIDATED_VALUE_SENSOR])
+            cg.add(var.set_validated_value_sensor(sens))

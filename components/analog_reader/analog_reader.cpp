@@ -634,6 +634,9 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
       this->value_sensor_->publish_state(total_value);
   }
 
+  // Feed the summed dial value to the value_validator for digit correction
+  this->validation_coord_.set_dial_fraction(total_value);
+
   this->processing_frame_ = false;
 }
 
