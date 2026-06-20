@@ -104,6 +104,18 @@ class ValueValidatorCoordinator {
         return true; 
   }
 
+  bool validate_reading(std::span<const float> digits, std::span<const float> confidences, float &validated_value) {
+      if (digits.empty()) return false;
+      long long val = 0;
+      for (float d : digits) {
+          int digit = static_cast<int>(round(d));
+          if (digit < 0 || digit >= 10) digit = 0;
+          val = val * 10 + digit;
+      }
+      validated_value = static_cast<float>(val);
+      return true;
+  }
+
   void set_last_valid_reading(int value) {}
   void set_last_valid_reading(const std::string &value) {}
   void* get_validator() const { return nullptr; }

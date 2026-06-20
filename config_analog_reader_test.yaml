@@ -14,7 +14,7 @@ external_components:
       type: local
       path: components 
     #components: [meter_reader_tflite, tflite_micro_helper, esp32_camera_utils, flash_light_controller] #, ssocr_reader] 
-    components: [analog_reader, esp32_camera_utils, flash_light_controller, value_validator]
+    components: [meter_reader_tflite, analog_reader, tflite_micro_helper, esp32_camera_utils, flash_light_controller, value_validator]
       
 
 
@@ -70,6 +70,12 @@ safe_mode:
 # network:
     # enable_ipv6: false
     
+globals:
+  - id: ${id_prefix}_crop_zones
+    type: std::string
+    max_restore_data_length: 254 
+    initial_value: '"[[6,43,67,161],[110,48,169,166],[209,47,264,167],[306,50,364,171],[400,53,453,171],[495,53,552,172],[585,58,644,174],[680,62,733,173]]"'
+    
 
 api:
   reboot_timeout: 0s # do not reboot if hassio connection is lost.
@@ -86,8 +92,8 @@ api:
   #             id(${id_prefix}_meter_reader).set_camera_window(offset_x, offset_y, width, height);
   #           }
 
-# tflite_micro_helper:
-#   debug: true
+tflite_micro_helper:
+  debug: true
 
 # globals:
 #   - id: ${id_prefix}_crop_zones
@@ -203,6 +209,88 @@ flash_light_controller:
 #   value:
 #     name: "SSOCR Value"
 
+meter_reader_tflite:
+  id: ${id_prefix}_meter_reader
+  validator: ${id_prefix}_validator
+  camera_id: ${id_prefix}_espcam
+  # model: "models/digit_recognizer_v27_10cls_RGB.tflite" #testing
+  # model: "models/digit_recognizer_v24_10cls_RGB_TQT.tflite" # testing TQT
+  # model: "models/digit_recognizer_v23_10cls_RGB_QAT.tflite" # testing TQT
+  # model: "models/digit_recognizer_v23_10cls_RGB_TQT.tflite" # testing TQT
+  # model: "models/digit_recognizer_v23_10cls_RGB.tflite" #v17 also works great-25.05.2026
+  # model: "models/digit_recognizer_v16_10cls_GRAY.tflite" 
+  # model: "models/digit_recognizer_v3_10cls_RGB.tflite" # 38.41 KB in flash | 0.9788 accuracy | 5172 inf/s | 70.11 KB memory footprint
+  # model: "models/digit_recognizer_v4_10cls_RGB.tflite" # 78.33 KB in flash | 0.9924 accuracy | 6380 inf/s | 103.02 KB memory footprint
+  # model: "models/digit_recognizer_v16_10cls_RGB.tflite" # 128.84 KB in flash | 0.9918 accuracy | 3907 inf/s | 246.28 KB memory footprint
+  # model: "models/digit_recognizer_v17_10cls_RGB.tflite" # 71 Kb in flash | 0.9867 accuracy | 4810 inf/s | 174.11 KB memory footprint
+  # model: "models/digit_recognizer_v23_10cls_RGB.tflite" # 62 Kb in flash | 0.9929 accuracy | 7585 inf/s | 81.61 KB memory footprint
+  # model: "models/digit_recognizer_v16_full_integer_quant.tflite" #bad
+  # model: "models/v23_full_integer_quant.tflite" #new good !
+  ################### 19.06.2026
+  # model: "models/digit_recognizer_v23_quantized_integer_quant_uint8.tflite" # 97.87% acc | inference in 2300ms | 262.33 KB memory footprint
+  # model: "models/digit_recognizer_v24_quantized_integer_quant_uint8.tflite" # 98.86% acc | inference in 2600ms | 135.29 KB memory footprint
+  # model: "models/digit_recognizer_v16_quantized_integer_quant_uint8.tflite" # 99.46% acc | inference in 4150ms | 263.76 KB memory footprint
+  model: "models/digit_recognizer_v3_quantized_integer_quant_uint8.tflite" # 97.95% acc | inference in 1500ms | 153.83 KB memory footprint
+
+
+
+  update_interval: 60s
+  # Data collection requires data_collector component to be loaded
+  # collect_low_confidence: true
+  # collect_min_global_confidence: 0.90
+  # collect_min_digit_confidence: 0.90
+
+
+  # debug: true
+  # debug_image: false # static embedded image (debug.jpg)
+  # debug_image_out_serial: false
+  # debug_memory: true
+  # debug_timing: true
+
+  # Preview of what the AI sees (Rotated Live Cam)
+  # Set to true to enable continuous updates, or false for on-demand only (via button)
+  # generate_preview: true
+  # show_crop_areas: true # Draw boxes on preview
+
+
+
+  crop_zones_global: ${id_prefix}_crop_zones  # local
+  flash_light_controller: ${id_prefix}_flash_controller
+  # data_collector: ${id_prefix}_data_collector  # Commented out: data_collector component not loaded
+
+  ### Enhanced validation parameters
+  # allow_negative_rates: false    # Prevent meter rollbacks
+  # max_absolute_diff: 300         # Maximum allowed absolute difference
+
+  value_sensor: ${id_prefix}_meter_value
+  confidence_sensor: ${id_prefix}_meter_confidence
+  
+
+  inference_logs: ${id_prefix}_inference_logs
+  main_logs: ${id_prefix}_main_logs
+  
+  total_inference_time_sensor: ${id_prefix}_inference_time
+  capture_to_publish_time_sensor: ${id_prefix}_capture_to_publish_time
+  
+  
+  
+  enable_flash_calibration: false # still in dev
+
+  ### Advanced parameters
+  # frame_request_timeout: 15000  # ms (1000-60000)
+  # high_confidence_threshold: 0.95
+  # strict_confidence_check: true #all digits must be min at "high_confidence_threshold"
+
+  # Pool efficiency monitoring (optional, requires DEBUG_METER_READER_MEMORY)
+  # pool_job_efficiency_sensor: ${id_prefix}_pool_job_efficiency
+  # pool_result_efficiency_sensor: ${id_prefix}_pool_result_efficiency
+  # arena_efficiency_sensor: ${id_prefix}_arena_efficiency
+  # heap_fragmentation_sensor: ${id_prefix}_heap_fragmentation
+
+  unload_button: ${id_prefix}_unload_btn
+  reload_button: ${id_prefix}_reload_btn
+
+
 value_validator:
   id: ${id_prefix}_validator
   allow_negative_rates: false
@@ -217,14 +305,14 @@ value_validator:
   # max_history_size: 50kB               # Max history memory usage (default: 50kB)
 
 analog_reader: # DEV !
-  id: ${id_prefix}_analog_main
+  id: ${id_prefix}_analog_reader
   camera_id: ${id_prefix}_espcam
   validator: ${id_prefix}_validator
   value_sensor:
     name: "Analog Total"
   dials: 
     - id: dial_1
-      scale: 1.0 
+      scale: 0.1
       crop_x: 0
       crop_y: 0
       crop_w: 100
@@ -272,11 +360,12 @@ packages:
   # - !include debug_board.yaml
   
   # Component-specific controls (uncomment to disable individual controls)
-  # - !include components/meter_reader_tflite/meter_reader_tflite_controls.yaml
+  - !include components/meter_reader_tflite/meter_reader_tflite_controls.yaml
   - !include components/value_validator/value_validator_controls.yaml
+  - !include components/value_validator/value_validator_dial_controls.yaml
   - !include components/flash_light_controller/flash_light_controller_controls.yaml
   - !include components/esp32_camera_utils/esp32_camera_utils_controls.yaml
-  # - !include components/analog_reader/analog_reader_controls.yaml
+  - !include components/analog_reader/analog_reader_controls.yaml
   # camera configs
   - !include camera_options.yaml
   - !include esp32_camera.yaml

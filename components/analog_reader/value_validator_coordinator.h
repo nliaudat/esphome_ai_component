@@ -40,6 +40,13 @@ class ValueValidatorCoordinator {
     }
   }
 
+  // Feed the summed dial value to the validator for digit correction
+  void set_dial_fraction(float fraction) {
+    if (validator_ != nullptr) {
+      validator_->set_dial_fraction(fraction);
+    }
+  }
+
  protected:
   value_validator::ValueValidator *validator_{nullptr};
 #else
@@ -56,6 +63,7 @@ class ValueValidatorCoordinator {
   }
 
   void set_last_valid_reading(int value) {}
+  void set_dial_fraction(float fraction) {}
 #endif
 };
 

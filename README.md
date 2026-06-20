@@ -41,7 +41,7 @@ The repository allows you to use specific components based on your needs:
 
 | Component | Description |
 |-----------|-------------|
-| **[value_validator](./components/value_validator)** | Robust validation engine for meter readings. Eliminates outliers, tracks history, and prevents impossible value jumps. |
+| **[value_validator](./components/value_validator)** | Robust validation engine for meter readings. Eliminates outliers, tracks history, prevents impossible value jumps, and supports dial-aware digit correction when combined with `analog_reader`. Outputs float values when analog_reader is active. Publishes a separate `validated_value_sensor` (only on accept) while the raw value_sensor always shows raw digits. |
 | **[esp32_camera_utils](./components/esp32_camera_utils)** | Powerful image processing utilities. Handles cropping, scaling, rotation (JPEG/Raw), and format conversion using `esp_new_jpeg` library. |
 | **[tflite_micro_helper](./components/tflite_micro_helper)** | Wrapper for TensorFlow Lite Micro runtime (checking model CRC32, etc..) and `esp-nn` optimizations. Manages tensor arena and model loading. |
 | **[flash_light_controller](./components/flash_light_controller)** | Manages flash light timing for optimal image capture conditions. |
