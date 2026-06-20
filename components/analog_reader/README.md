@@ -186,3 +186,4 @@ This exposes:
    - **Hough**: Votes for lines passing through center.
 4.  **Detect & Score**: The angle with the highest score (Needle Head) is selected. Connectivity logic ignores the Tail.
 5. **Map**: The detected angle is normalized to North-based coordinates.
+6. **Feed to Validator**: The summed dial value's fractional part is fed to the `value_validator` via `set_dial_fraction()`. This enables **dial-aware digit correction** when combined with `meter_reader_tflite` — the validator uses the dial fraction to correct digit boundary transitions (e.g., when a digit wheel is physically turning, the dial tells the validator whether to trust or decrement the TFLite reading).

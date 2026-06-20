@@ -58,6 +58,25 @@ class ValueValidatorCoordinator {
     return validator_->validate_reading(digits, confidences, validated_value);
   }
 
+  // Float overload: uses dial correction when analog_reader is active
+  bool validate_reading(std::span<const float> digits, std::span<const float> confidences, float &validated_value) {
+    if (validator_ == nullptr) {
+        // Fallback: convert digits to float
+        if (digits.empty()) {
+            return false;
+        }
+        long long val = 0;
+        for (float d : digits) {
+            int digit = static_cast<int>(round(d));
+            if (digit < 0 || digit >= 10) digit = 0;
+            val = val * 10 + digit;
+        }
+        validated_value = static_cast<float>(val);
+        return true;
+    }
+    return validator_->validate_reading(digits, confidences, validated_value);
+  }
+
   void set_last_valid_reading(int value) {
     if (validator_ != nullptr) {
       validator_->set_last_valid_reading(value);
@@ -102,6 +121,18 @@ class ValueValidatorCoordinator {
             validated_value = static_cast<int>(val);
         }
         return true; 
+  }
+
+  bool validate_reading(std::span<const float> digits, std::span<const float> confidences, float &validated_value) {
+      if (digits.empty()) return false;
+      long long val = 0;
+      for (float d : digits) {
+          int digit = static_cast<int>(round(d));
+          if (digit < 0 || digit >= 10) digit = 0;
+          val = val * 10 + digit;
+      }
+      validated_value = static_cast<float>(val);
+      return true;
   }
 
   void set_last_valid_reading(int value) {}

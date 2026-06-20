@@ -83,6 +83,11 @@ class ValueValidator : public Component {
     int max_consecutive_rejections{10}; // Self-correct after N consecutive high-confidence rejections
     int small_negative_tolerance{5}; // Allow negative changes up to this many units
     bool persist_state{false}; // Persist last_valid_reading_ across reboots
+    
+    // Dial-aware correction (used when analog_reader provides dial fraction)
+    bool enable_dial_correction{true};
+    float dial_correction_high_threshold{0.80f}; // Above this fraction → subtract 1 from integer reading
+    float dial_correction_low_threshold{0.20f};  // Below this fraction → keep integer as-is (digit is solid)
   };
 
   ~ValueValidator();
@@ -92,8 +97,10 @@ class ValueValidator : public Component {
 
   // Legacy single-value validation
   bool validate_reading(int new_reading, float confidence, int& validated_reading);
-  // Per-digit validation
+  // Per-digit validation (returns int)
   bool validate_reading(std::span<const float> digits, std::span<const float> confidences, int& validated_reading);
+  // Per-digit validation with dial correction (returns float). Declared always, dial logic guarded.
+  bool validate_reading(std::span<const float> digits, std::span<const float> confidences, float& validated_reading);
   
   void set_config(const ValidationConfig& config) { config_ = config; }
   const ValidationConfig& get_config() const { return config_; }
@@ -112,11 +119,15 @@ class ValueValidator : public Component {
   void set_max_consecutive_rejections(int v) { config_.max_consecutive_rejections = v; }
   void set_small_negative_tolerance(int v) { config_.small_negative_tolerance = v; }
   void set_persist_state(bool v) { config_.persist_state = v; }
+  void set_enable_dial_correction(bool v) { config_.enable_dial_correction = v; }
+  void set_dial_correction_high_threshold(float v) { config_.dial_correction_high_threshold = v; }
+  void set_dial_correction_low_threshold(float v) { config_.dial_correction_low_threshold = v; }
 
   // Diagnostic sensors (optional)
   void set_rejection_count_sensor(sensor::Sensor *s) { rejection_count_sensor_ = s; }
   void set_raw_reading_sensor(sensor::Sensor *s) { raw_reading_sensor_ = s; }
   void set_validator_state_sensor(text_sensor::TextSensor *s) { validator_state_sensor_ = s; }
+  void set_validated_value_sensor(sensor::Sensor *s) { validated_value_sensor_ = s; }
 
   int get_last_valid_reading() const { return last_valid_reading_; }
   int get_consecutive_rejections() const { return consecutive_rejections_; }
@@ -128,6 +139,11 @@ class ValueValidator : public Component {
   void set_last_valid_reading(const std::string &value);
   bool is_hallucination_pattern(std::span<const float> digits) const;
 
+#ifdef USE_ANALOG_READER
+  // Dial fraction input from analog_reader
+  void set_dial_fraction(float fraction);
+  void clear_dial_fraction();
+#endif
 
  private:
   ValidationConfig config_;
@@ -157,6 +173,7 @@ class ValueValidator : public Component {
   // Diagnostic sensors (optional)
   sensor::Sensor *rejection_count_sensor_{nullptr};
   sensor::Sensor *raw_reading_sensor_{nullptr};
+  sensor::Sensor *validated_value_sensor_{nullptr};
   text_sensor::TextSensor *validator_state_sensor_{nullptr};
   
   // Persistent state
@@ -167,7 +184,13 @@ class ValueValidator : public Component {
   size_t last_good_values_capacity_{0};
   size_t last_good_values_head_{0};
   size_t last_good_values_count_{0};
-  
+
+#ifdef USE_ANALOG_READER
+  // Dial correction state
+  bool has_dial_fraction_{false};
+  float dial_fraction_{0.0f};  // Fractional part of summed dials [0.0, 1.0)
+#endif
+
   bool is_digit_plausible(int new_reading, int last_reading) const;
   int apply_smart_validation(int new_reading, float confidence, float last_confidence);
   int find_most_plausible_reading(int new_reading, const std::vector<int>& recent_readings);

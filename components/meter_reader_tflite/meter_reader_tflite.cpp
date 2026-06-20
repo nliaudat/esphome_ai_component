@@ -885,54 +885,71 @@ void MeterReaderTFLite::publish_inference_result(const std::string& digit_str, f
     }
     conf_list += "]";
 
-    if (valid && (this->validation_coord_.has_validator() || avg_conf >= this->confidence_threshold_)) {
+#ifdef USE_VALUE_VALIDATOR
+    if (this->validation_coord_.has_validator()) {
+        // Validator loaded: always publish raw value for transparency
+        // The validator publishes its own validated_value_sensor on accept
+        if (this->value_sensor_) this->value_sensor_->publish_state(validated_val);
+        if (valid) {
+            ESP_LOGI(TAG, "Result: VALID (Raw: %s, Conf: %.3f, %s)", 
+                     digit_str.c_str(), avg_conf, conf_list.c_str());
+            return;  // Valid with validator → no data collection needed
+        }
+        ESP_LOGI(TAG, "Result: INVALID (Raw: %s, Conf: %.3f, %s)", 
+                 digit_str.c_str(), avg_conf, conf_list.c_str());
+    } else
+#endif
+    // No validator: gate on confidence only (existing behavior)
+    if (valid && avg_conf >= this->confidence_threshold_) {
         ESP_LOGI(TAG, "Result: VALID (Raw: %s, Conf: %.3f, %s)", 
                  digit_str.c_str(), avg_conf, conf_list.c_str());
         if (this->value_sensor_) this->value_sensor_->publish_state(validated_val);
         if (this->confidence_sensor_) this->confidence_sensor_->publish_state(avg_conf * 100.0f);
+        return;
     } else {
         ESP_LOGI(TAG, "Result: INVALID (Raw: %s, Conf: %.3f, %s)", 
                  digit_str.c_str(), avg_conf, conf_list.c_str());
+    }
 
-        #ifdef USE_DATA_COLLECTOR
-        // Data Collection Trigger Logic
-        bool trigger_collection = true; // Default to true for invalid readings
+    // If we reach here, the reading was not accepted: trigger data collection if enabled
+    #ifdef USE_DATA_COLLECTOR
+    // Data Collection Trigger Logic
+    bool trigger_collection = true; // Default to true for invalid readings
 
-        // Detect suspicious patterns
-        bool suspicious = false;
-        #ifdef USE_VALUE_VALIDATOR
-        if (this->validation_coord_.has_validator()) {
-            suspicious = this->validation_coord_.get_validator()->is_hallucination_pattern(readings);
-        }
-        #endif
+    // Detect suspicious patterns
+    bool suspicious = false;
+    #ifdef USE_VALUE_VALIDATOR
+    if (this->validation_coord_.has_validator()) {
+        suspicious = this->validation_coord_.get_validator()->is_hallucination_pattern(readings);
+    }
+    #endif
 
-        // Check thresholds
-        if (!trigger_collection && this->collect_min_global_confidence_ > 0 && avg_conf < this->collect_min_global_confidence_) {
-            trigger_collection = true;
-            ESP_LOGW(TAG, "Data Collection Triggered: Global Confidence %.2f < %.2f", avg_conf, this->collect_min_global_confidence_);
-        }
+    // Check thresholds
+    if (!trigger_collection && this->collect_min_global_confidence_ > 0 && avg_conf < this->collect_min_global_confidence_) {
+        trigger_collection = true;
+        ESP_LOGW(TAG, "Data Collection Triggered: Global Confidence %.2f < %.2f", avg_conf, this->collect_min_global_confidence_);
+    }
 
-        if (!trigger_collection && this->collect_min_digit_confidence_ > 0) {
-            for (float c : confidences) {
-                if (c < this->collect_min_digit_confidence_) {
-                    trigger_collection = true;
-                    ESP_LOGW(TAG, "Data Collection Triggered: A digit confidence %.2f < %.2f", c, this->collect_min_digit_confidence_);
-                    break;
-                }
+    if (!trigger_collection && this->collect_min_digit_confidence_ > 0) {
+        for (float c : confidences) {
+            if (c < this->collect_min_digit_confidence_) {
+                trigger_collection = true;
+                ESP_LOGW(TAG, "Data Collection Triggered: A digit confidence %.2f < %.2f", c, this->collect_min_digit_confidence_);
+                break;
             }
         }
-
-        if (trigger_collection) {
-            std::string metadata = "";
-            metadata = this->serialize_inference_metadata(digit_str, avg_conf, readings, confidences,
-                                                        this->camera_coord_.get_width(), this->camera_coord_.get_height());
-
-            ESP_LOGW(TAG, "Data Collection Triggered: Reading Invalid/LowConf (Conf: %.1f%%, Suspicious: %s)", 
-                     avg_conf * 100.0f, suspicious ? "YES" : "NO");
-            this->trigger_low_confidence_collection(digit_str, avg_conf, metadata);
-        }
-        #endif
     }
+
+    if (trigger_collection) {
+        std::string metadata = "";
+        metadata = this->serialize_inference_metadata(digit_str, avg_conf, readings, confidences,
+                                                    this->camera_coord_.get_width(), this->camera_coord_.get_height());
+
+        ESP_LOGW(TAG, "Data Collection Triggered: Reading Invalid/LowConf (Conf: %.1f%%, Suspicious: %s)", 
+                 avg_conf * 100.0f, suspicious ? "YES" : "NO");
+        this->trigger_low_confidence_collection(digit_str, avg_conf, metadata);
+    }
+    #endif
 }
 
 void MeterReaderTFLite::set_crop_zones(const std::string &zones_json) {
@@ -1109,10 +1126,16 @@ bool MeterReaderTFLite::validate_and_update_reading(float raw, float conf, float
 }
 
 bool MeterReaderTFLite::validate_and_update_reading(const esphome::StaticVector<float, 16>& digits, const esphome::StaticVector<float, 16>& confidences, float& val) {
+#ifdef USE_ANALOG_READER
+    // Float overload: includes dial correction when analog_reader provides dial fraction
+    bool valid = this->validation_coord_.validate_reading(digits, confidences, val);
+    return valid;
+#else
     int oval = 0;
     bool valid = this->validation_coord_.validate_reading(digits, confidences, oval);
     val = static_cast<float>(oval);
     return valid;
+#endif
 }
 
 // Window Control

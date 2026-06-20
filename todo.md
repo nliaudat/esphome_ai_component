@@ -22,6 +22,20 @@ Savings: You completely eliminate the JPEG Decoding step, which is computational
 ### make OV2640 zoom functionnal with non 4:3 images
 - change image processor routine
 
+### implement dial-aware digit correction in value_validator
+- Added `float validate_reading()` overload with dial correction
+- Added `set_dial_fraction()` for analog_reader integration
+- All code guarded by `#ifdef USE_ANALOG_READER`
+- New config: `enable_dial_correction`, `dial_correction_high_threshold`, `dial_correction_low_threshold`
+- analog_reader feeds summed dial fraction to validator each frame
+- float output = corrected_int + dial_fraction
+
+### raw/validated publishing split
+- meter_reader_tflite `value_sensor_` always publishes raw digits when validator is loaded (removed the "only on valid" gate)
+- Added `validated_value_sensor` to value_validator — only published on accepted readings
+- Without validator: original "only on high confidence" behavior preserved (guarded by `#ifdef USE_VALUE_VALIDATOR`)
+- Easy to debug: compare raw (always updates) vs validated (frozen on reject)
+
 ### add error checking for final readings
 
 ### correcting validation logic
