@@ -278,6 +278,38 @@ bool ValueValidator::validate_reading(int new_reading, float confidence, int& va
   return is_valid;
 }
 
+// ---------------------------------------------------------------------------
+// Dial-Aware Correction (USE_ANALOG_READER)
+// ---------------------------------------------------------------------------
+
+#ifdef USE_ANALOG_READER
+
+/**
+ * @brief Subtract 1 from an integer, handling borrow across all digits.
+ * Example: 210600 -> 210599, 100000 -> 99999
+ */
+static int dial_correct_decrement(int value) {
+  if (value <= 0) return value;  // Can't decrement below 0
+  return value - 1;
+}
+
+void ValueValidator::set_dial_fraction(float fraction) {
+  // Clamp to [0.0, 1.0)
+  if (fraction < 0.0f) fraction = 0.0f;
+  if (fraction >= 1.0f) fraction = fraction - std::floor(fraction);
+  dial_fraction_ = fraction;
+  has_dial_fraction_ = true;
+  if (debug_) {
+    ESP_LOGD(TAG, "Dial fraction set: %.4f", fraction);
+  }
+}
+
+void ValueValidator::clear_dial_fraction() {
+  has_dial_fraction_ = false;
+  dial_fraction_ = 0.0f;
+}
+#endif
+
 bool ValueValidator::validate_reading(std::span<const float> digits, std::span<const float> confidences, int& validated_reading) {
   // If we don't have per-digit history yet, fallback to standard validation
   
@@ -411,9 +443,49 @@ bool ValueValidator::validate_reading(std::span<const float> digits, std::span<c
       return false;
   }
 
-  // Now pass the FILTERED value to the standard validator
+#ifdef USE_ANALOG_READER
+  // --- Dial Correction (only when analog_reader provides fraction) ---
+  int corrected_val = filtered_val;
+  if (this->config_.enable_dial_correction && this->has_dial_fraction_ && !this->first_reading_) {
+    if (this->dial_fraction_ > this->config_.dial_correction_high_threshold) {
+      // Dial near full rotation → subtract 1 with borrow
+      corrected_val = dial_correct_decrement(filtered_val);
+      ESP_LOGD(TAG, "Dial correction: raw=%d, fraction=%.4f > %.2f → corrected=%d",
+               filtered_val, this->dial_fraction_, this->config_.dial_correction_high_threshold, corrected_val);
+    } else if (this->dial_fraction_ < this->config_.dial_correction_low_threshold) {
+      // Dial at start → keep integer as-is (digit is solid)
+      ESP_LOGD(TAG, "Dial correction: fraction=%.4f < %.2f → keeping raw=%d (solid digit)",
+               this->dial_fraction_, this->config_.dial_correction_low_threshold, filtered_val);
+    } else {
+      ESP_LOGD(TAG, "Dial correction: fraction=%.4f in middle zone (%.2f-%.2f) → no correction",
+               this->dial_fraction_, this->config_.dial_correction_low_threshold, this->config_.dial_correction_high_threshold);
+    }
+    this->has_dial_fraction_ = false;  // Consume for this cycle
+  }
+#else
+  int corrected_val = filtered_val;
+#endif
+
+  // Now pass the CORRECTED value to the standard validator
   // This will perform rate checks, consistency checks, etc.
-  bool final_valid = validate_reading(filtered_val, avg_conf, validated_reading);
+  bool final_valid = validate_reading(corrected_val, avg_conf, validated_reading);
+
+  // Publish validated value to optional sensor on accept
+  // When USE_ANALOG_READER is active, this includes dial fraction
+  if (final_valid && this->validated_value_sensor_) {
+#ifdef USE_ANALOG_READER
+    float float_result = static_cast<float>(validated_reading) + this->dial_fraction_;
+    if (this->debug_) {
+      ESP_LOGD(TAG, "Float result: %d + %.4f = %.4f", validated_reading, this->dial_fraction_, float_result);
+    }
+#else
+    float float_result = static_cast<float>(validated_reading);
+    if (this->debug_) {
+      ESP_LOGD(TAG, "Validated int result: %d", validated_reading);
+    }
+#endif
+    this->validated_value_sensor_->publish_state(float_result);
+  }
   
   if (final_valid) {
       // If accepted, update our digit history
@@ -1000,199 +1072,6 @@ void ValueValidator::save_state_() {
   if (config_.persist_state && last_valid_reading_ >= 0) {
     this->pref_.save(&last_valid_reading_);
   }
-}
-
-// ---------------------------------------------------------------------------
-// Dial-Aware Correction (USE_ANALOG_READER)
-// ---------------------------------------------------------------------------
-
-/**
- * @brief Subtract 1 from an integer, handling borrow across all digits.
- * Example: 210600 -> 210599, 100000 -> 99999
- */
-static int dial_correct_decrement(int value) {
-  if (value <= 0) return value;  // Can't decrement below 0
-  return value - 1;
-}
-
-#ifdef USE_ANALOG_READER
-void ValueValidator::set_dial_fraction(float fraction) {
-  // Clamp to [0.0, 1.0)
-  if (fraction < 0.0f) fraction = 0.0f;
-  if (fraction >= 1.0f) fraction = fraction - std::floor(fraction);
-  dial_fraction_ = fraction;
-  has_dial_fraction_ = true;
-  if (debug_) {
-    ESP_LOGD(TAG, "Dial fraction set: %.4f", fraction);
-  }
-}
-
-void ValueValidator::clear_dial_fraction() {
-  has_dial_fraction_ = false;
-  dial_fraction_ = 0.0f;
-}
-#endif
-
-bool ValueValidator::validate_reading(std::span<const float> digits, std::span<const float> confidences, float& validated_reading) {
-  // Step 1: Convert digits to integer using the same stable-filter pipeline as the int overload
-  std::vector<int> current_digits;
-  current_digits.reserve(digits.size());
-  
-  for (float d : digits) {
-      int digit = static_cast<int>(std::round(d));
-      if (digit >= 10) digit = 0;
-      current_digits.push_back(digit);
-  }
-  
-  // --- Per-Digit History & Stability Filter ---
-  ensure_digit_history_size(current_digits.size());
-  
-  int raw_val = 0;
-  for (size_t i = 0; i < current_digits.size(); i++) {
-      int stable_d = get_stable_digit(i, current_digits[i]);
-      current_digits[i] = stable_d;
-      raw_val = raw_val * 10 + stable_d;
-  }
-  
-  float avg_conf = 0.0f;
-  if (!confidences.empty()) {
-      avg_conf = std::accumulate(confidences.begin(), confidences.end(), 0.0f) / static_cast<float>(confidences.size());
-  }
-
-  // --- Dial Correction (only when analog_reader provides fraction) ---
-  int corrected_int = raw_val;
-#ifdef USE_ANALOG_READER
-  if (config_.enable_dial_correction && has_dial_fraction_ && !first_reading_) {
-    if (dial_fraction_ > config_.dial_correction_high_threshold) {
-      // Dial near full rotation → subtract 1 with borrow
-      corrected_int = dial_correct_decrement(raw_val);
-      ESP_LOGD(TAG, "Dial correction: raw=%d, fraction=%.4f > %.2f → corrected=%d",
-               raw_val, dial_fraction_, config_.dial_correction_high_threshold, corrected_int);
-    } else if (dial_fraction_ < config_.dial_correction_low_threshold) {
-      // Dial at start → keep integer as-is (digit is solid)
-      ESP_LOGD(TAG, "Dial correction: fraction=%.4f < %.2f → keeping raw=%d (solid digit)",
-               dial_fraction_, config_.dial_correction_low_threshold, raw_val);
-    } else {
-      ESP_LOGD(TAG, "Dial correction: fraction=%.4f in middle zone (%.2f-%.2f) → no correction",
-               dial_fraction_, config_.dial_correction_low_threshold, config_.dial_correction_high_threshold);
-    }
-    has_dial_fraction_ = false;  // Consume for this cycle
-  }
-#else
-  (void)avg_conf; // Suppress unused warning when no analog_reader
-#endif
-
-  // Step 2: Per-digit confidence filtering against last valid digits
-  if (!first_reading_ && last_valid_digits_count_ == current_digits.size()) {
-      // Check if dial correction actually changed digits — if so, skip strict per-digit
-      // confidence checks on the corrected position to prevent the correction from being
-      // rejected by confidence thresholds.
-      bool correction_applied = (corrected_int != raw_val);
-      
-      // Rebuild digits from corrected_int
-      std::string corr_str = std::to_string(corrected_int);
-      if (corr_str.length() < current_digits.size()) {
-          corr_str = std::string(current_digits.size() - corr_str.length(), '0') + corr_str;
-      }
-      
-      std::vector<int> corr_digits(current_digits.size(), 0);
-      for (size_t i = 0; i < corr_str.length() && i < corr_digits.size(); i++) {
-          corr_digits[i] = corr_str[i] - '0';
-      }
-      
-      std::string filtered_digit_string;
-      bool modified = false;
-      
-      for (size_t i = 0; i < corr_digits.size(); i++) {
-          int new_d = corr_digits[i];
-          int old_d = last_valid_digits_data_[i];
-          float conf = (i < confidences.size()) ? confidences[i] : 0.0f;
-          
-          if (new_d != old_d) {
-              // If dial correction caused this change and it's the LSD position,
-              // accept it unconditionally (the dial correction is the ground truth)
-              if (correction_applied && i == corr_digits.size() - 1) {
-                  if (debug_) {
-                      ESP_LOGD(TAG, "Digit %d: dial-corrected change %d->%d accepted (override)", 
-                               static_cast<int>(i), old_d, new_d);
-                  }
-                  filtered_digit_string += std::to_string(new_d);
-                  continue;
-              }
-              
-              // Normal confidence check
-              if (conf < config_.per_digit_confidence_threshold) {
-                  ESP_LOGW(TAG, "Digit %d change rejected (Val: %d->%d, Conf: %.2f < %.2f)", 
-                           static_cast<int>(i), old_d, new_d, conf, config_.per_digit_confidence_threshold);
-                  filtered_digit_string += std::to_string(old_d);
-                  modified = true;
-              } else {
-                  filtered_digit_string += std::to_string(new_d);
-              }
-          } else {
-              filtered_digit_string += std::to_string(new_d);
-          }
-      }
-      
-      if (modified) {
-          std::string val_str = filtered_digit_string;
-          char *end;
-          long val = strtol(val_str.c_str(), &end, 10);
-          if (end == val_str.c_str() + val_str.length()) {
-              corrected_int = static_cast<int>(val & 0x7FFFFFFF);  // Prevent overflow
-              if (debug_) {
-                  ESP_LOGD(TAG, "Per-digit filter modified corrected reading: %d -> %d", 
-                           raw_val, corrected_int);
-              }
-          }
-      }
-  }
-
-  // Step 3: Hallucination check on corrected value
-  if (is_hallucination_pattern(digits)) {
-      ESP_LOGW(TAG, "Rejected dial-corrected reading due to hallucination pattern");
-      validated_reading = 0.0f;
-      return false;
-  }
-
-  // Step 4: Run through standard integer validation (uses history, rate checks, etc.)
-  int int_validated = 0;
-  bool final_valid = validate_reading(corrected_int, avg_conf, int_validated);
-
-  // Step 5: Convert to final float by adding dial fraction (if analog_reader is active)
-#ifdef USE_ANALOG_READER
-  if (final_valid) {
-    validated_reading = static_cast<float>(int_validated) + dial_fraction_;
-    if (debug_) {
-      ESP_LOGD(TAG, "Float result: %d + %.4f = %.4f", int_validated, dial_fraction_, validated_reading);
-    }
-  } else {
-    validated_reading = static_cast<float>(int_validated);  // Falls back to last valid int
-  }
-#else
-  validated_reading = static_cast<float>(int_validated);
-#endif
-
-  // Publish validated value to optional sensor on accept
-  if (final_valid && validated_value_sensor_) {
-    validated_value_sensor_->publish_state(validated_reading);
-  }
-
-  if (final_valid) {
-      // Update digit history
-      ensure_last_valid_digits_size(current_digits.size());
-      std::string val_str = std::to_string(int_validated);
-      if (val_str.length() < current_digits.size()) {
-          val_str = std::string(current_digits.size() - val_str.length(), '0') + val_str;
-      }
-      if (last_valid_digits_data_) {
-          for (size_t i = 0; i < val_str.length() && i < last_valid_digits_count_; i++) {
-              last_valid_digits_data_[i] = val_str[i] - '0';
-          }
-      }
-  }
-
-  return final_valid;
 }
 
 void ValueValidator::dump_config() {

@@ -887,9 +887,12 @@ void MeterReaderTFLite::publish_inference_result(const std::string& digit_str, f
 
 #ifdef USE_VALUE_VALIDATOR
     if (this->validation_coord_.has_validator()) {
-        // Validator loaded: always publish raw value for transparency
+        // Validator loaded: publish raw combined digits for transparency
         // The validator publishes its own validated_value_sensor on accept
-        if (this->value_sensor_) this->value_sensor_->publish_state(validated_val);
+        if (this->value_sensor_) {
+            float raw_val = std::stof(digit_str);
+            this->value_sensor_->publish_state(raw_val);
+        }
         if (this->confidence_sensor_) this->confidence_sensor_->publish_state(avg_conf * 100.0f);
         if (valid) {
             ESP_LOGI(TAG, "Result: VALID (Raw: %s, Conf: %.3f, %s)", 
@@ -1127,16 +1130,10 @@ bool MeterReaderTFLite::validate_and_update_reading(float raw, float conf, float
 }
 
 bool MeterReaderTFLite::validate_and_update_reading(const esphome::StaticVector<float, 16>& digits, const esphome::StaticVector<float, 16>& confidences, float& val) {
-#ifdef USE_ANALOG_READER
-    // Float overload: includes dial correction when analog_reader provides dial fraction
-    bool valid = this->validation_coord_.validate_reading(digits, confidences, val);
-    return valid;
-#else
     int oval = 0;
     bool valid = this->validation_coord_.validate_reading(digits, confidences, oval);
     val = static_cast<float>(oval);
     return valid;
-#endif
 }
 
 // Window Control

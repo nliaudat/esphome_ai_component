@@ -99,8 +99,6 @@ class ValueValidator : public Component {
   bool validate_reading(int new_reading, float confidence, int& validated_reading);
   // Per-digit validation (returns int)
   bool validate_reading(std::span<const float> digits, std::span<const float> confidences, int& validated_reading);
-  // Per-digit validation with dial correction (returns float). Declared always, dial logic guarded.
-  bool validate_reading(std::span<const float> digits, std::span<const float> confidences, float& validated_reading);
   
   void set_config(const ValidationConfig& config) { config_ = config; }
   const ValidationConfig& get_config() const { return config_; }
