@@ -59,25 +59,6 @@ switch:
             id(${id_prefix}_validator)->set_strict_confidence_check(false);
           }
 
-  # Enable Dial Correction
-  - platform: template
-    name: "Enable Dial Correction"
-    id: ${id_prefix}_enable_dial_correction
-    icon: "mdi:sync"
-    entity_category: config
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_ON
-    turn_on_action:
-      - lambda: |-
-          if (id(${id_prefix}_validator) != nullptr) {
-            id(${id_prefix}_validator)->set_enable_dial_correction(true);
-          }
-    turn_off_action:
-      - lambda: |-
-          if (id(${id_prefix}_validator) != nullptr) {
-            id(${id_prefix}_validator)->set_enable_dial_correction(false);
-          }
-
 number:
   # Max Absolute Difference
   - platform: template
@@ -173,40 +154,3 @@ number:
             id(${id_prefix}_validator)->set_per_digit_confidence_threshold(x / 100.0);
           }
 
-  # Dial Correction High Threshold
-  - platform: template
-    name: "Dial Correction High Threshold"
-    id: ${id_prefix}_dial_corr_high
-    icon: "mdi:arrow-up-bold-circle"
-    unit_of_measurement: "%"
-    min_value: 50
-    max_value: 99
-    step: 1
-    initial_value: 80
-    entity_category: config
-    optimistic: true
-    restore_value: true
-    set_action:
-      - lambda: |-
-          if (id(${id_prefix}_validator) != nullptr) {
-            id(${id_prefix}_validator)->set_dial_correction_high_threshold(x / 100.0);
-          }
-
-  # Dial Correction Low Threshold
-  - platform: template
-    name: "Dial Correction Low Threshold"
-    id: ${id_prefix}_dial_corr_low
-    icon: "mdi:arrow-down-bold-circle"
-    unit_of_measurement: "%"
-    min_value: 1
-    max_value: 49
-    step: 1
-    initial_value: 20
-    entity_category: config
-    optimistic: true
-    restore_value: true
-    set_action:
-      - lambda: |-
-          if (id(${id_prefix}_validator) != nullptr) {
-            id(${id_prefix}_validator)->set_dial_correction_low_threshold(x / 100.0);
-          }
