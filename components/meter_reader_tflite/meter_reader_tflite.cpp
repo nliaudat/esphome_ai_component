@@ -889,9 +889,12 @@ void MeterReaderTFLite::publish_inference_result(const std::string& digit_str, f
     if (this->validation_coord_.has_validator()) {
         // Validator loaded: publish raw combined digits for transparency
         // The validator publishes its own validated_value_sensor on accept
-        if (this->value_sensor_) {
-            float raw_val = std::stof(digit_str);
-            this->value_sensor_->publish_state(raw_val);
+        if (this->value_sensor_ && !digit_str.empty()) {
+            char *end;
+            float raw_val = strtof(digit_str.c_str(), &end);
+            if (end == digit_str.c_str() + digit_str.size()) {
+                this->value_sensor_->publish_state(raw_val);
+            }
         }
         if (this->confidence_sensor_) this->confidence_sensor_->publish_state(avg_conf * 100.0f);
         if (valid) {

@@ -443,24 +443,28 @@ bool ValueValidator::validate_reading(std::span<const float> digits, std::span<c
       return false;
   }
 
+  // --- Local storage for fresh dial fraction (shared between dial correction and float publish) ---
+  float current_fraction = 0.0f;
 #ifdef USE_ANALOG_READER
-  // --- Dial Correction (only when analog_reader provides fraction) ---
   int corrected_val = filtered_val;
-  if (this->config_.enable_dial_correction && this->has_dial_fraction_ && !this->first_reading_) {
-    if (this->dial_fraction_ > this->config_.dial_correction_high_threshold) {
-      // Dial near full rotation → subtract 1 with borrow
-      corrected_val = dial_correct_decrement(filtered_val);
-      ESP_LOGD(TAG, "Dial correction: raw=%d, fraction=%.4f > %.2f → corrected=%d",
-               filtered_val, this->dial_fraction_, this->config_.dial_correction_high_threshold, corrected_val);
-    } else if (this->dial_fraction_ < this->config_.dial_correction_low_threshold) {
-      // Dial at start → keep integer as-is (digit is solid)
-      ESP_LOGD(TAG, "Dial correction: fraction=%.4f < %.2f → keeping raw=%d (solid digit)",
-               this->dial_fraction_, this->config_.dial_correction_low_threshold, filtered_val);
-    } else {
-      ESP_LOGD(TAG, "Dial correction: fraction=%.4f in middle zone (%.2f-%.2f) → no correction",
-               this->dial_fraction_, this->config_.dial_correction_low_threshold, this->config_.dial_correction_high_threshold);
-    }
+  if (this->has_dial_fraction_) {
+    current_fraction = this->dial_fraction_;
     this->has_dial_fraction_ = false;  // Consume for this cycle
+    if (this->config_.enable_dial_correction && !this->first_reading_) {
+      if (current_fraction > this->config_.dial_correction_high_threshold) {
+        // Dial near full rotation → subtract 1 with borrow
+        corrected_val = dial_correct_decrement(filtered_val);
+        ESP_LOGD(TAG, "Dial correction: raw=%d, fraction=%.4f > %.2f → corrected=%d",
+                 filtered_val, current_fraction, this->config_.dial_correction_high_threshold, corrected_val);
+      } else if (current_fraction < this->config_.dial_correction_low_threshold) {
+        // Dial at start → keep integer as-is (digit is solid)
+        ESP_LOGD(TAG, "Dial correction: fraction=%.4f < %.2f → keeping raw=%d (solid digit)",
+                 current_fraction, this->config_.dial_correction_low_threshold, filtered_val);
+      } else {
+        ESP_LOGD(TAG, "Dial correction: fraction=%.4f in middle zone (%.2f-%.2f) → no correction",
+                 current_fraction, this->config_.dial_correction_low_threshold, this->config_.dial_correction_high_threshold);
+      }
+    }
   }
 #else
   int corrected_val = filtered_val;
@@ -474,9 +478,9 @@ bool ValueValidator::validate_reading(std::span<const float> digits, std::span<c
   // When USE_ANALOG_READER is active, this includes dial fraction
   if (final_valid && this->validated_value_sensor_) {
 #ifdef USE_ANALOG_READER
-    float float_result = static_cast<float>(validated_reading) + this->dial_fraction_;
+    float float_result = static_cast<float>(validated_reading) + current_fraction;
     if (this->debug_) {
-      ESP_LOGD(TAG, "Float result: %d + %.4f = %.4f", validated_reading, this->dial_fraction_, float_result);
+      ESP_LOGD(TAG, "Float result: %d + %.4f = %.4f", validated_reading, current_fraction, float_result);
     }
 #else
     float float_result = static_cast<float>(validated_reading);
