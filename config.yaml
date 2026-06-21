@@ -120,7 +120,7 @@ esp32_camera_utils:
   #   offset_x: 0
   #   offset_y: 0
   
-  # enable_drawing: true
+  # enable_drawing: true # enable drawing subsystem, needed if meter_reader_tflite: generate_preview: true + show_crop_areas: true
 
   debug_memory: false
 
@@ -194,7 +194,7 @@ meter_reader_tflite:
 
   # Preview of what the AI sees (Rotated Live Cam)
   # Set to true to enable continuous updates, or false for on-demand only (via button)
-  generate_preview: false # need web_server: port: 80 (wait for update_interval to be reached)
+  generate_preview: false # need web_server: port: 80 (wait for update_interval to be reached) + esp32_camera_utils: enable drawing subsystem
   # show_crop_areas: true # DEV (not ready for production) Draw boxes on preview
 
 

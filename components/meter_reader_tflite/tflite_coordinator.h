@@ -39,7 +39,7 @@ class TFLiteCoordinator {
   };
 
   void set_model_type(const std::string& model_type) { model_type_ = model_type; }
-  void set_tensor_arena_size(size_t size) { tensor_arena_size_requested_ = size; }
+  void set_tensor_arena_size(size_t size);
   void set_debug(bool debug) { 
       debug_ = debug; 
       model_handler_.set_debug(debug);
