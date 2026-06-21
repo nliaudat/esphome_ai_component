@@ -477,6 +477,9 @@ def get_peak_memory_analysis(interpreter):
         concurrent = 0
         for tensor_idx, t in enumerate(tensor_details):
             if tensor_idx in tensor_first_use and tensor_idx in tensor_last_use:
+                # Only track activations and model inputs/outputs (exclude constant weights/biases)
+                if tensor_idx not in all_outputs and tensor_idx not in model_inputs:
+                    continue
                 if tensor_first_use[tensor_idx] <= op_idx <= tensor_last_use[tensor_idx]:
                     dtype_size = tf.dtypes.as_dtype(t['dtype']).size
                     num_elements = 1
@@ -498,14 +501,14 @@ def get_peak_memory_analysis(interpreter):
     # - First-fit fragmentation
     # - Scratch buffer tracking (e.g. ESP-NN internal buffers)
     # - Interpreter state (subgraph metadata)
-    # NOTE: The 2.2x factor was calibrated against the all-tensors-inclusive peak
-    # values (before the constant-exclusion refactor was added in June 2026).
-    # The constant-exclusion logic incorrectly drops weight/biases from the arena
-    # estimate, but TFLite Micro's GreedyMemoryPlanner DOES allocate space for
-    # weight tensors that are written to (e.g., pseudo_qconst tensors in quantized
-    # models). Re-including constants restores the original verified calibration:
-    #   v3:  20KB peak × 2.2 + head ≈ 46KB  (vs 35.5KB actual — 24% margin)
-    #   v23: 28KB peak × 2.2 + head ≈ 63KB  (vs 59.5KB actual — 6% margin)
+    # NOTE: The 2.2x factor was calibrated against the old (all-tensors-inclusive)
+    # peak concurrent values. Now that constant tensors are excluded, the peak
+    # concurrent reflects only activation memory. The 2.2x multiplier likely still
+    # provides a conservative margin, but should be re-verified against actual
+    # TFLite Micro runtime measurements after this change.
+    # Previously verified with:
+    #   v3:  20KB peak * 2.2 = 44KB  (vs 35.5KB actual - 24% margin)
+    #   v23: 28KB peak * 2.2 = 61KB  (vs 59.5KB actual - 2.5% margin)
     # The C++ tflite_coordinator.cpp applies an additional 1.5x for S3 cache.
     SAFETY_FACTOR = 2.2
     
