@@ -72,6 +72,18 @@ bool TFLiteCoordinator::load_model() {
     ESP_LOGI(TAG, "  Order: %s, normalize=%d, invert=%d", input_order_.c_str(), normalize_, invert_);
     ESP_LOGI(TAG, "  Tensor arena: %zu bytes", tensor_arena_size_requested_);
 
+    // ESP32-S3 with 64B cache-line alignment causes the GreedyMemoryPlanner
+    // to require more padding/fragmentation overhead in the tensor arena.
+    // Bump by 50% when the S3 data cache configs are active.
+    #if defined(CONFIG_ESP32S3_DATA_CACHE_64KB) && defined(CONFIG_ESP32S3_DATA_CACHE_LINE_64B)
+    if (tensor_arena_size_requested_ < 40 * 1024) {
+        size_t original = tensor_arena_size_requested_;
+        tensor_arena_size_requested_ = (tensor_arena_size_requested_ * 3 + 1) / 2;
+        ESP_LOGI(TAG, "ESP32-S3 cache detected: bumped arena from %zu to %zu bytes",
+                 original, tensor_arena_size_requested_);
+    }
+    #endif
+
     if (!allocate_tensor_arena()) {
         return false;
     }
