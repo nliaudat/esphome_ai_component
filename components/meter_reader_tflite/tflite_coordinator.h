@@ -128,6 +128,7 @@ class TFLiteCoordinator {
   // State
   std::atomic<bool> model_loaded_{false};
   bool debug_{false};
+  bool arena_bumped_{false};  // ESP32-S3: bump applied once per instance
   
   // Arena stats cache for thread-safe dual-core access (Core 0 inference, Core 1 main loop)
   mutable std::mutex arena_stats_mutex_;

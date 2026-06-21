@@ -74,17 +74,14 @@ bool TFLiteCoordinator::load_model() {
 
     // ESP32-S3 with 64B cache-line alignment and ESP-NN SIMD scratch buffers
     // cause the GreedyMemoryPlanner to need ~1.5x arena space vs ESP32.
-    // Static guard prevents compounding on subsequent reloads.
+    // Per-instance arena_bumped_ flag prevents compounding on reloads.
     #if defined(CONFIG_ESP32S3_DATA_CACHE_64KB) && defined(CONFIG_ESP32S3_DATA_CACHE_LINE_64B)
-    {
-        static bool arena_bumped = false;
-        if (!arena_bumped) {
-            size_t original = tensor_arena_size_requested_;
-            tensor_arena_size_requested_ = (tensor_arena_size_requested_ * 3 + 1) / 2;
-            arena_bumped = true;
-            ESP_LOGI(TAG, "ESP32-S3 cache: bumped arena (%zu -> %zu bytes, 1.5x)",
-                     original, tensor_arena_size_requested_);
-        }
+    if (!this->arena_bumped_) {
+        size_t original = tensor_arena_size_requested_;
+        tensor_arena_size_requested_ = (tensor_arena_size_requested_ * 3 + 1) / 2;
+        this->arena_bumped_ = true;
+        ESP_LOGI(TAG, "ESP32-S3 cache: bumped arena (%zu -> %zu bytes, 1.5x)",
+                 original, tensor_arena_size_requested_);
     }
     #endif
 
