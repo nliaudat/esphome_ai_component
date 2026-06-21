@@ -291,13 +291,17 @@ void MeterReaderTFLite::setup() {
          
           // Setup Web Server Preview
           #ifdef USE_WEB_SERVER
-          #ifdef DEV_ENABLE_ROTATION
           if (this->web_server_) {
               this->web_server_->add_handler(new esphome::esp32_camera_utils::PreviewWebHandler([this]() {
                   return this->get_preview_image();
               }));
           }
-          #endif
+          // Kick off frame capture immediately so preview is available without waiting for first poll cycle
+          if (this->generate_preview_) {
+              this->frame_state_.store(FrameState::REQUESTED);
+              this->last_request_time_ = millis();
+              ESP_LOGI(TAG, "Preview mode: immediate frame requested");
+          }
           #endif
 
           // Print debug info on success (legacy behavior)
@@ -726,6 +730,24 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
                  #endif
              }
              this->update_preview_image(preview);
+        } else if (frame && this->generate_preview_) {
+            // Fallback: the image processor did not cache a preview (non-JPEG format or memory pressure).
+            // Copy the raw frame's JPEG data so /preview serves it directly.
+            size_t len = frame->get_data_length();
+            auto* buf = static_cast<uint8_t*>(heap_caps_malloc(len, MALLOC_CAP_8BIT));
+            if (buf) {
+                memcpy(buf, frame->get_data_buffer(), len);
+                bool is_spiram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM) > 0;
+                esp32_camera_utils::ImageProcessor::UniqueBufferPtr tracked_buf(
+                    new esp32_camera_utils::ImageProcessor::TrackedBuffer(
+                        buf, is_spiram, false, false, len));
+                auto cached = std::make_shared<esp32_camera_utils::RotatedPreviewImage>(
+                    std::move(tracked_buf), len,
+                    this->camera_coord_.get_width(), this->camera_coord_.get_height(),
+                    PIXFORMAT_JPEG);
+                this->update_preview_image(cached);
+                ESP_LOGD(TAG, "Preview: cached raw frame fallback (%u bytes, spiram=%s)", len, is_spiram ? "yes" : "no");
+            }
         }
         if (this->request_preview_) this->request_preview_ = false;
     }
@@ -772,8 +794,8 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     // esp_cache_msync() is a no-op on ESP32 (no data cache), so it's safe always.
     #ifdef SUPPORT_DOUBLE_BUFFERING
     for (const auto& crop : job->crops) {
-        if (crop.data) {
-            esp_cache_msync(crop.data.get(), crop.size, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
+        if (crop.data && crop.data->get()) {
+            esp_cache_msync(crop.data->get(), crop.size, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
         }
     }
     #endif

@@ -1,7 +1,6 @@
 
 
 #include "esphome/core/defines.h"
-#ifdef USE_CAMERA_ROTATOR
 #ifdef USE_WEB_SERVER
 #include "preview_web_handler.h"
 #include <esp_camera.h>
@@ -18,7 +17,8 @@ PreviewWebHandler::PreviewWebHandler(std::function<std::shared_ptr<camera::Camer
     : image_provider_(image_provider) {}
 
 bool PreviewWebHandler::canHandle(web_server_idf::AsyncWebServerRequest *request) const {
-  return request->url() == "/preview";
+  char url_buf[web_server_idf::AsyncWebServerRequest::URL_BUF_SIZE];
+  return request->url_to(url_buf) == "/preview";
 }
 
 void PreviewWebHandler::handleRequest(web_server_idf::AsyncWebServerRequest *request) {
@@ -34,13 +34,8 @@ void PreviewWebHandler::handleRequest(web_server_idf::AsyncWebServerRequest *req
       return;
   }
 
-  // Use dynamic_pointer_cast for safe runtime type checking
-  auto image = std::dynamic_pointer_cast<RotatedPreviewImage>(img_ptr);
-  if (!image) {
-      ESP_LOGE(TAG, "Image provider returned incompatible image type (expected RotatedPreviewImage)");
-      request->send(500, "text/plain", "Internal error: incompatible image type");
-      return;
-  }
+  // std::static_pointer_cast: safe because get_preview_image() always returns RotatedPreviewImage
+  auto image = std::static_pointer_cast<RotatedPreviewImage>(img_ptr);
 
   size_t len = image->get_data_length();
   uint8_t *buf = image->get_data_buffer();
@@ -102,7 +97,6 @@ void PreviewWebHandler::handleRequest(web_server_idf::AsyncWebServerRequest *req
 
 }  // namespace esp32_camera_utils
 }  // namespace esphome
-#endif
 #endif
 
 
