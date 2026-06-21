@@ -7,9 +7,15 @@ namespace meter_reader_tflite {
 
 static const char *const TAG = "tflite_coordinator";
 
+void TFLiteCoordinator::set_tensor_arena_size(size_t size) {
+    this->tensor_arena_size_requested_ = size;
+    this->arena_bumped_ = false;  // Reset so next load_model() applies the 1.5x bump
+}
+
 void TFLiteCoordinator::setup(const std::string& model_type, size_t tensor_arena_size) {
     model_type_ = model_type;
     tensor_arena_size_requested_ = tensor_arena_size;
+    this->arena_bumped_ = false;
 }
 
 void TFLiteCoordinator::set_model(const uint8_t *model, size_t length) {

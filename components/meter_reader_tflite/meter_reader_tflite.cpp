@@ -3,6 +3,7 @@
 
 
 #include <esp_heap_caps.h>
+#include <esp_cache.h>
 
 #include <numeric>
 
@@ -763,6 +764,19 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     job->request_time = this->last_request_time_; // Pass request time for cycle calculation 
     
     ESP_LOGI(TAG, "Job prepared. Enqueuing... (Preprocessing took %u ms)", millis() - start_time);
+
+    // Flush data cache for any PSRAM-backed crop buffers before cross-core read.
+    // Core 1 writes these buffers to PSRAM, Core 0 reads them for inference.
+    // Without a writeback on ESP32-S3 (which has data cache), Core 0 reads stale
+    // cache lines → subtly wrong pixel data → lower accuracy.
+    // esp_cache_msync() is a no-op on ESP32 (no data cache), so it's safe always.
+    #ifdef SUPPORT_DOUBLE_BUFFERING
+    for (const auto& crop : job->crops) {
+        if (crop.data) {
+            esp_cache_msync(crop.data.get(), crop.size, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
+        }
+    }
+    #endif
 
     InferenceJob* job_ptr = job.get();
     if (xQueueSend(this->input_queue_, &job_ptr, 0) != pdTRUE) {
