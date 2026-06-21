@@ -3,7 +3,7 @@
 TFLITE MODEL COMPREHENSIVE INSPECTION REPORT
 ================================================================================
 Model: C:\Users\nl\Dropbox\home_automation\esphome_ai_component\models\digit_recognizer_v24_quantized_integer_quant_uint8.tflite
-Timestamp: 2026-06-19 12:58:34
+Timestamp: 2026-06-21 13:13:02
 TensorFlow Version: 2.20.0
 File Size: 69.01 KB
 
@@ -99,11 +99,11 @@ PEAK MEMORY ANALYSIS (TFLite Micro Arena Estimate)
 ================================================================================
 
 Total tensor memory (sum of all tensors): 157.32 KB
-Peak concurrent tensor memory (lifetime analysis): 15.62 KB at op 31 (MAX_POOL_2D)
+Peak concurrent tensor memory (lifetime analysis): 27.91 KB at op 35 (CONV_2D)
 Planner overhead: 2.2x safety factor + 1152B head
-Estimated arena size: 36.00 KB (36864 bytes)
+Estimated arena size: 63.00 KB (64512 bytes)
 
-Recommended tensor_arena_size: 36KB
+Recommended tensor_arena_size: 63KB
 
 Top tensors by memory:
   [ 82]    28.12 KB  [  1  16  10 180]         <class 'numpy.int8'> 
