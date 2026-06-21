@@ -73,13 +73,15 @@ bool TFLiteCoordinator::load_model() {
     ESP_LOGI(TAG, "  Tensor arena: %zu bytes", tensor_arena_size_requested_);
 
     // ESP32-S3 with 64B cache-line alignment causes the GreedyMemoryPlanner
-    // to require more padding/fragmentation overhead in the tensor arena.
-    // Bump by 50% when the S3 data cache configs are active.
+    // to allocate each tensor with 64-byte alignment instead of 16-byte,
+    // adding up to ~64 bytes of padding per tensor. With ~37 tensors in
+    // the v3 model this adds ~1.2KB, but we add a flat 4KB to be safe
+    // for larger models and any ESP-NN internal alignment requirements.
     #if defined(CONFIG_ESP32S3_DATA_CACHE_64KB) && defined(CONFIG_ESP32S3_DATA_CACHE_LINE_64B)
-    if (tensor_arena_size_requested_ < 40 * 1024) {
+    {
         size_t original = tensor_arena_size_requested_;
-        tensor_arena_size_requested_ = (tensor_arena_size_requested_ * 3 + 1) / 2;
-        ESP_LOGI(TAG, "ESP32-S3 cache detected: bumped arena from %zu to %zu bytes",
+        tensor_arena_size_requested_ += 4 * 1024;  // flat 4KB for 64B alignment waste
+        ESP_LOGI(TAG, "ESP32-S3 cache: added 4KB arena overhead (%zu -> %zu bytes)",
                  original, tensor_arena_size_requested_);
     }
     #endif
