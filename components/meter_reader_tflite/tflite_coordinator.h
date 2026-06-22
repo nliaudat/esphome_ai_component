@@ -38,23 +38,23 @@ class TFLiteCoordinator {
       bool success;
   };
 
-  void set_model_type(const std::string& model_type) { model_type_ = model_type; }
+  void set_model_type(const std::string& model_type) { this->model_type_ = model_type; }
   void set_tensor_arena_size(size_t size);
   void set_debug(bool debug) { 
-      debug_ = debug; 
-      model_handler_.set_debug(debug);
+      this->debug_ = debug; 
+      this->model_handler_.set_debug(debug);
   }
   
   // Dynamic model config setters (set from __init__.py at build time)
-  void set_input_type(const std::string& t) { input_type_ = t; }
-  void set_input_channels(int c) { input_channels_ = c; }
-  void set_input_width(int w) { input_width_ = w; }
-  void set_input_height(int h) { input_height_ = h; }
-  void set_output_processing(const std::string& p) { output_processing_ = p; }
-  void set_scale_factor(float f) { scale_factor_ = f; }
-  void set_input_order(const std::string& o) { input_order_ = o; }
-  void set_normalize(bool n) { normalize_ = n; }
-  void set_invert(bool i) { invert_ = i; }
+  void set_input_type(const std::string& t) { this->input_type_ = t; }
+  void set_input_channels(int c) { this->input_channels_ = c; }
+  void set_input_width(int w) { this->input_width_ = w; }
+  void set_input_height(int h) { this->input_height_ = h; }
+  void set_output_processing(const std::string& p) { this->output_processing_ = p; }
+  void set_scale_factor(float f) { this->scale_factor_ = f; }
+  void set_input_order(const std::string& o) { this->input_order_ = o; }
+  void set_normalize(bool n) { this->normalize_ = n; }
+  void set_invert(bool i) { this->invert_ = i; }
   
   void setup(const std::string& model_type, size_t tensor_arena_size);
   

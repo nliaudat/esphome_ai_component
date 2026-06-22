@@ -26,7 +26,7 @@ class FlashlightCoordinator {
   // Configuration
   void set_timing(uint32_t pre_time, uint32_t post_time);
   void set_update_interval(uint32_t interval_ms);
-  uint32_t get_pre_time() const { return pre_time_; }
+  uint32_t get_pre_time() const { return this->pre_time_; }
   
   // Logic
   bool update_scheduling(); 
@@ -38,12 +38,12 @@ class FlashlightCoordinator {
   
   // Helpers
   void capture_preview_sequence(std::function<void()> frame_request_callback);
-  bool is_active() const { return scheduled_ || (controller_ && controller_->is_active()); }
+  bool is_active() const { return this->scheduled_ || (this->controller_ && this->controller_->is_active()); }
 
   // Setters required for logic
-  void set_request_frame_callback(std::function<void()> cb) { request_frame_callback_ = cb; }
+  void set_request_frame_callback(std::function<void()> cb) { this->request_frame_callback_ = cb; }
 
-  void set_debug(bool debug) { debug_ = debug; }
+  void set_debug(bool debug) { this->debug_ = debug; }
 
  private:
   Component* parent_{nullptr};

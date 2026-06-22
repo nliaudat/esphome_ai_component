@@ -106,14 +106,14 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_camera_image_format(int width, int height, const std::string &pixel_format); // -> CameraCoord & TFLite
   void set_camera(camera::Camera *camera); // -> CameraCoord
 
-  sensor::Sensor *get_value_sensor() const { return value_sensor_; }
-  sensor::Sensor *get_confidence_sensor() const { return confidence_sensor_; }
+  sensor::Sensor *get_value_sensor() const { return this->value_sensor_; }
+  sensor::Sensor *get_confidence_sensor() const { return this->confidence_sensor_; }
 
   void set_model_config(const std::string &model_type); // -> TFLite
-  void set_rotation(float rotation) { rotation_ = rotation; } // Storage, passed to TFLite late
+  void set_rotation(float rotation) { this->rotation_ = rotation; } // Storage, passed to TFLite late
 
   void set_generate_preview(bool generate);
-  void set_show_crop_areas(bool show) { show_crop_areas_ = show; }
+  void set_show_crop_areas(bool show) { this->show_crop_areas_ = show; }
 
   void take_preview_image();
   void capture_preview();
@@ -132,18 +132,14 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void print_debug_info();
 
   // Validation
-  // Obsolete local validation setters - removed or must be handled by external validator config
-  // void set_allow_negative_rates(bool allow); 
-  // void set_max_absolute_diff(int max_diff);
-  // ...
-  void set_frame_request_timeout(uint32_t ms) { frame_request_timeout_ms_ = ms; }
-  void set_high_confidence_threshold(float threshold) { high_confidence_threshold_ = threshold; }
+  void set_frame_request_timeout(uint32_t ms) { this->frame_request_timeout_ms_ = ms; }
+  void set_high_confidence_threshold(float threshold) { this->high_confidence_threshold_ = threshold; }
   void set_last_valid_value(float value);
   void set_last_valid_value(const std::string &value);
 
   // Pause
-  void set_pause_processing(bool pause) { pause_processing_.store(pause); }
-  bool get_pause_processing() const { return pause_processing_.load(); }
+  void set_pause_processing(bool pause) { this->pause_processing_.store(pause); }
+  bool get_pause_processing() const { return this->pause_processing_.load(); }
 
   // Overrides
   void set_update_interval(uint32_t ms);
@@ -156,14 +152,12 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_flash_pre_time(uint32_t ms);
   void set_flash_post_time(uint32_t ms);
   void force_flash_inference(); // Service
-  void set_enable_flash_calibration(bool enable) { enable_flash_calibration_ = enable; }
+  void set_enable_flash_calibration(bool enable) { this->enable_flash_calibration_ = enable; }
 
   // Calibration
   void start_flash_calibration();
-  // Public overload: called after each inference during calibration with the resulting confidence.
-  // The private no-arg overload (update_calibration()) is the legacy interface kept for internal use.
   void update_calibration(float confidence);
-  bool is_calibrating() const { return calibration_.state != FlashCalibrationHandler::IDLE; }
+  bool is_calibrating() const { return this->calibration_.state != FlashCalibrationHandler::IDLE; }
 
 
   // Window Control
@@ -177,39 +171,39 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   bool set_camera_window(int offset_x, int offset_y, int width, int height);
 
   // Logs
-  void set_inference_logs(text_sensor::TextSensor *sensor) { inference_logs_ = sensor; }
-  void set_main_logs(text_sensor::TextSensor *main_logs) { main_logs_ = main_logs; }
+  void set_inference_logs(text_sensor::TextSensor *sensor) { this->inference_logs_ = sensor; }
+  void set_main_logs(text_sensor::TextSensor *main_logs) { this->main_logs_ = main_logs; }
 
-  void set_esp32_camera_utils(esp32_camera_utils::Esp32CameraUtils *utils) { esp32_camera_utils_ = utils; }
+  void set_esp32_camera_utils(esp32_camera_utils::Esp32CameraUtils *utils) { this->esp32_camera_utils_ = utils; }
   
   #ifdef USE_DATA_COLLECTOR
-  void set_data_collector(data_collector::DataCollector *collector) { data_collector_ = collector; }
-  void set_collect_low_confidence(bool collect) { collect_low_confidence_ = collect; }
-  void set_collect_min_global_confidence(float min_conf) { collect_min_global_confidence_ = min_conf; }
-  void set_collect_min_digit_confidence(float min_conf) { collect_min_digit_confidence_ = min_conf; }
+  void set_data_collector(data_collector::DataCollector *collector) { this->data_collector_ = collector; }
+  void set_collect_low_confidence(bool collect) { this->collect_low_confidence_ = collect; }
+  void set_collect_min_global_confidence(float min_conf) { this->collect_min_global_confidence_ = min_conf; }
+  void set_collect_min_digit_confidence(float min_conf) { this->collect_min_digit_confidence_ = min_conf; }
   #endif
 
   // Dynamic Resource Management
   void unload_resources();
   void reload_resources();
-  void set_unload_button(button::Button *b) { unload_button_ = b; }
-  void set_reload_button(button::Button *b) { reload_button_ = b; }
+  void set_unload_button(button::Button *b) { this->unload_button_ = b; }
+  void set_reload_button(button::Button *b) { this->reload_button_ = b; }
 
 #ifdef DEBUG_METER_READER_MEMORY
-  void set_tensor_arena_size_sensor(sensor::Sensor *s) { tensor_arena_size_sensor_ = s; }
-  void set_tensor_arena_used_sensor(sensor::Sensor *s) { tensor_arena_used_sensor_ = s; }
-  void set_process_free_heap_sensor(sensor::Sensor *s) { process_free_heap_sensor_ = s; }
-  void set_process_free_psram_sensor(sensor::Sensor *s) { process_free_psram_sensor_ = s; }
-  void set_pool_job_efficiency_sensor(sensor::Sensor *s) { pool_job_efficiency_sensor_ = s; }
-  void set_pool_result_efficiency_sensor(sensor::Sensor *s) { pool_result_efficiency_sensor_ = s; }
-  void set_arena_efficiency_sensor(sensor::Sensor *s) { arena_efficiency_sensor_ = s; }
-  void set_heap_fragmentation_sensor(sensor::Sensor *s) { heap_fragmentation_sensor_ = s; }
-  void set_debug_memory_enabled(bool enabled) { debug_memory_enabled_ = enabled; }
+  void set_tensor_arena_size_sensor(sensor::Sensor *s) { this->tensor_arena_size_sensor_ = s; }
+  void set_tensor_arena_used_sensor(sensor::Sensor *s) { this->tensor_arena_used_sensor_ = s; }
+  void set_process_free_heap_sensor(sensor::Sensor *s) { this->process_free_heap_sensor_ = s; }
+  void set_process_free_psram_sensor(sensor::Sensor *s) { this->process_free_psram_sensor_ = s; }
+  void set_pool_job_efficiency_sensor(sensor::Sensor *s) { this->pool_job_efficiency_sensor_ = s; }
+  void set_pool_result_efficiency_sensor(sensor::Sensor *s) { this->pool_result_efficiency_sensor_ = s; }
+  void set_arena_efficiency_sensor(sensor::Sensor *s) { this->arena_efficiency_sensor_ = s; }
+  void set_heap_fragmentation_sensor(sensor::Sensor *s) { this->heap_fragmentation_sensor_ = s; }
+  void set_debug_memory_enabled(bool enabled) { this->debug_memory_enabled_ = enabled; }
 #endif
 
-  void set_total_inference_time_sensor(sensor::Sensor *s) { total_inference_time_sensor_ = s; }
-  void set_capture_to_publish_time_sensor(sensor::Sensor *s) { capture_to_publish_time_sensor_ = s; }
-  void set_debug_timing(bool enabled) { debug_timing_ = enabled; }
+  void set_total_inference_time_sensor(sensor::Sensor *s) { this->total_inference_time_sensor_ = s; }
+  void set_capture_to_publish_time_sensor(sensor::Sensor *s) { this->capture_to_publish_time_sensor_ = s; }
+  void set_debug_timing(bool enabled) { this->debug_timing_ = enabled; }
 
 #ifdef USE_WEB_SERVER
   void set_web_server(web_server_base::WebServerBase *web_server);
@@ -238,7 +232,6 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   esp32_camera_utils::CropZoneHandler crop_zone_handler_;
   
   // Refactor: Use coordinator instead of local object
-  // ValueValidator output_validator_; 
   ValueValidatorCoordinator validation_coord_;
 
   // State — Single atomic state machine (replaces 3 separate bool flags, eliminates TOCTOU CWE-367)
@@ -258,17 +251,19 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
   // Config
   float confidence_threshold_{0.85f};
-  // bool allow_negative_rates_{false}; // Moved to validator component
-  // int max_absolute_diff_{100};       // Moved
   uint32_t frame_request_timeout_ms_{15000};
-  float high_confidence_threshold_{0.90f}; // Threshold for 'high confidence' logging distinction
+  float high_confidence_threshold_{0.90f};
   float rotation_{0.0f};
   bool generate_preview_{false};
   bool show_crop_areas_{true};
   bool debug_{false};
-  bool debug_memory_enabled_{false}; // Runtime flag
+  bool debug_memory_enabled_{false};
   bool window_active_{false};
   bool enable_flash_calibration_{false};
+
+  // Preview fallback buffer — pre-allocated to avoid heap alloc in loop()
+  std::unique_ptr<uint8_t[]> preview_fallback_buffer_;
+  size_t preview_fallback_buffer_size_{0};
 
   // Data Collection
   #ifdef USE_DATA_COLLECTOR
@@ -286,7 +281,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   
   // Storage for pending collection
   struct PendingCollection {
-      std::string value; // Changed from float to string
+      std::string value;
       float confidence;
       std::string extra_metadata;
   } pending_collection_;
@@ -298,11 +293,10 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
                                           int width, int height); 
   #endif
 
-  // bool strict_confidence_check_{false}; // Moved
-
   // Calibration
   struct FlashCalibrationHandler {
       enum State { IDLE, CALIBRATING_PRE, CALIBRATING_POST, FINISHED };
+
       State state{IDLE};
       uint32_t current_pre{0};
       uint32_t current_post{0};
@@ -312,14 +306,13 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
       float best_confidence{0.0f};
       uint32_t step_start_time{0};
 
-      // Configuration
-      uint32_t start_pre{7000};
-      uint32_t end_pre{100};
-      uint32_t step_pre{500};
-
-      uint32_t start_post{2000};
-      uint32_t end_post{0};
-      uint32_t step_post{200};
+      // Configuration — initialised by start_flash_calibration() from .cpp constexpr values
+      uint32_t start_pre;
+      uint32_t end_pre;
+      uint32_t step_pre;
+      uint32_t start_post;
+      uint32_t end_post;
+      uint32_t step_post;
   } calibration_;
 
   void update_calibration(); 
@@ -353,7 +346,6 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   // Helper
   void process_available_frame();
   void process_full_image(std::shared_ptr<camera::CameraImage> frame);
-  // Updated signature to return string as out-parameter or return
   float combine_readings(const esphome::StaticVector<float, 16>& readings, std::string &out_str);
   bool validate_and_update_reading(float raw, float conf, float& val);
   bool validate_and_update_reading(const esphome::StaticVector<float, 16>& digits, const esphome::StaticVector<float, 16>& confidences, float& val);
@@ -371,18 +363,18 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 // Double Buffering / Multithreading
  public:
   struct InferenceJob {
-      std::shared_ptr<camera::CameraImage> frame; // Keep managed
+      std::shared_ptr<camera::CameraImage> frame;
       std::vector<esp32_camera_utils::ImageProcessor::ProcessResult> crops;
       uint32_t start_time;
-      uint32_t request_time; // Added for cycle time calculation
+      uint32_t request_time;
   };
 
   struct InferenceResult {
       esphome::StaticVector<float, 16> readings;
-      esphome::StaticVector<float, 16> probabilities; // Confidence
+      esphome::StaticVector<float, 16> probabilities;
       uint32_t inference_time;
       uint32_t total_start_time;
-      uint32_t request_time; // Added for cycle time calculation
+      uint32_t request_time;
       #ifdef DEBUG_METER_READER_MEMORY
       size_t arena_used_bytes;
       #endif
