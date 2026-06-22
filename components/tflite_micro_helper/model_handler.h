@@ -61,23 +61,23 @@ class ModelHandler {
                  const ModelConfig &config);
 
   TfLiteStatus invoke() {
-    return interpreter_->Invoke();
+    return this->interpreter_->Invoke();
   }
 
   TfLiteTensor* input_tensor() {
-    return interpreter_->input(0);
+    return this->interpreter_->input(0);
   }
 
   const TfLiteTensor* input_tensor() const {
-    return interpreter_->input(0);
+    return this->interpreter_->input(0);
   }
 
   TfLiteTensor* output_tensor() {
-    return interpreter_->output(0);
+    return this->interpreter_->output(0);
   }
 
   const TfLiteTensor* output_tensor() const {
-    return interpreter_->output(0);
+    return this->interpreter_->output(0);
   }
   
   // Helper methods for input dimensions
@@ -102,14 +102,14 @@ class ModelHandler {
   ProcessedOutput process_output(const float *output_data) const;
   ProcessedOutput process_output(TfLiteTensor* output_tensor) const;
   
-  const ModelConfig& get_config() const { return config_; }
+  const ModelConfig& get_config() const { return this->config_; }
   
   size_t get_arena_used_bytes() const {
-    return interpreter_->arena_used_bytes();
+    return this->interpreter_->arena_used_bytes();
   }
   
   // Memory management helpers
-  size_t get_tensor_arena_size() const { return tensor_arena_allocation_.actual_size; }
+  size_t get_tensor_arena_size() const { return this->tensor_arena_allocation_.actual_size; }
   
   void report_memory_status();
   
@@ -124,16 +124,17 @@ class ModelHandler {
   bool validate_model_config() const;
   
   // Advanced Debugging
-  void debug_input_quantization_analysis(const uint8_t* input_data, size_t input_size, const std::string& stage) const;
-  void debug_input_tensor_details() const;
-  void debug_tensor_types() const;
+  // Note: debug methods that need tensor access are non-const to avoid const_cast
+  void debug_input_quantization_analysis(const uint8_t* input_data, size_t input_size, const std::string& stage);
+  void debug_input_tensor_details();
+  void debug_tensor_types();
   void debug_input_data_stats(const uint8_t* input_data, size_t input_size) const;
   void debug_quantized_input_details(TfLiteTensor* input, size_t input_size) const;
   void debug_int8_conversion_details(TfLiteTensor* input, const uint8_t* input_data, size_t input_size) const;
-  void debug_pre_inference_state() const;
+  void debug_pre_inference_state();
   void debug_output_tensor_details(TfLiteTensor* output) const;
   void debug_raw_outputs(TfLiteTensor* output) const;
-  void debug_qat_model_output() const;
+  void debug_qat_model_output();
 
   // Parameter Sweeping / Testing
   std::vector<ModelConfig> generate_debug_configs() const;
@@ -144,7 +145,7 @@ class ModelHandler {
   bool invoke_model(const uint8_t* data, size_t len); // Helper for tests
   
   static void feed_watchdog();
-  void set_debug(bool debug) { debug_ = debug; }
+  void set_debug(bool debug) { this->debug_ = debug; }
 
  private:
   const tflite::Model *tflite_model_{nullptr};

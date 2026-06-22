@@ -31,36 +31,22 @@ void ModelHandler::unload() {
 bool ModelHandler::load_model(const uint8_t *model_data, size_t model_size, const ModelConfig &config) {
     this->model_length_ = model_size;
     
-    // Determine tensor arena size from config
-    std::string arena_size_str = config.tensor_arena_size;
-    size_t multiplier = 1;
-    
-    if (arena_size_str.find("KB") != std::string::npos) {
-        multiplier = 1024;
-        arena_size_str = arena_size_str.substr(0, arena_size_str.length() - 2);
-    } else if (arena_size_str.find("MB") != std::string::npos) {
-        multiplier = 1024 * 1024;
-        arena_size_str = arena_size_str.substr(0, arena_size_str.length() - 2);
-    } else if (arena_size_str.find("B") != std::string::npos) {
-        arena_size_str = arena_size_str.substr(0, arena_size_str.length() - 1);
+    // Determine tensor arena size from config (uses shared parser in MemoryManager)
+    if (!config.tensor_arena_size.empty()) {
+        size_t parsed = MemoryManager::parse_size_string(config.tensor_arena_size);
+        if (parsed > 0) {
+            this->tensor_arena_size_requested_ = parsed;
+            ESP_LOGI(TAG, "Using model-specific tensor arena size: %s (%zu bytes)", 
+                    config.tensor_arena_size.c_str(), this->tensor_arena_size_requested_);
+        } else {
+            ESP_LOGW(TAG, "Failed to parse tensor arena size from config: %s", 
+                    config.tensor_arena_size.c_str());
+        }
     }
     
-    // Manual string to integer conversion
-    const char* str = arena_size_str.c_str();
-    char* end_ptr;
-    long size_value = strtol(str, &end_ptr, 10);
-    
-    if (end_ptr != str && *end_ptr == '\0' && size_value > 0) {
-        this->tensor_arena_size_requested_ = size_value * multiplier;
-        ESP_LOGI(TAG, "Using model-specific tensor arena size: %s (%zu bytes)", 
-                config.tensor_arena_size.c_str(), this->tensor_arena_size_requested_);
-    } else {
-        ESP_LOGW(TAG, "Failed to parse tensor arena size from config: %s", 
-                config.tensor_arena_size.c_str());
-        if (this->tensor_arena_size_requested_ == 0) {
-             this->tensor_arena_size_requested_ = 100 * 1024; // Default 100KB
-             ESP_LOGW(TAG, "Using default tensor arena size: 100KB");
-        }
+    if (this->tensor_arena_size_requested_ == 0) {
+        this->tensor_arena_size_requested_ = 100 * 1024; // Default 100KB
+        ESP_LOGW(TAG, "Using default tensor arena size: 100KB");
     }
 
     // Allocate tensor arena

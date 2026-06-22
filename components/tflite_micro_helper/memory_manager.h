@@ -36,6 +36,14 @@ class MemoryManager {
                                  size_t model_size);
   
   /**
+   * @brief Parse an arena size string (e.g. "110KB", "2MB", "51200") to bytes.
+   * Shared utility — replaces duplicated logic in ModelHandler and TFLiteMicroHelper.
+   * @param size_str The size string to parse.
+   * @return The size in bytes, or 0 if parsing fails.
+   */
+  static size_t parse_size_string(const std::string& size_str);
+
+  /**
    * @brief Check if PSRAM (SPIRAM) is available on this device.
    * @return true if PSRAM is present and has non-zero total size.
    */
