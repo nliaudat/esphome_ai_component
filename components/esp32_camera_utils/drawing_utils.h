@@ -1,6 +1,7 @@
 #pragma once
 
-// Macro to enable/disable drawing functionality
+// Macro to enable/disable drawing functionality — set via board_build.extra_flags
+// or automatically by __init__.py when enable_drawing: true is in the YAML.
 // #define USE_CAMERA_DRAWING
 
 #ifdef USE_CAMERA_DRAWING

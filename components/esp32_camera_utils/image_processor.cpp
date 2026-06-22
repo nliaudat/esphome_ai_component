@@ -47,7 +47,7 @@ std::atomic<int32_t> ImageProcessor::TrackedBuffer::active_instances{0};
 #define DURATION_END(func) ESP_LOGD(TAG, "%s duration: %lums", func, millis() - duration_start_)
 
 // Debug macros for image processing analysis (restored from legacy code)
-#if defined(DEBUG_ESP32_CAMERA_UTILS) || defined(DEBUG_METER_READER_TFLITE)
+#if defined(DEBUG_ESP32_CAMERA_UTILS) || defined(DEBUG_METER_READER_TFLITE) || defined(DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL)
 #define DEBUG_ZONE_INFO(zone, crop_w, crop_h, model_w, model_h) \
     ESP_LOGI(TAG, "ZONE: [%d,%d,%d,%d] -> %dx%d -> %dx%d", \
              zone.x1, zone.y1, zone.x2, zone.y2, \
@@ -859,8 +859,41 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
           result.size = required_size;
           results.push_back(std::move(result));
           
-          #ifdef DEBUG_ESP32_CAMERA_UTILS
+          #if defined(DEBUG_ESP32_CAMERA_UTILS) || defined(DEBUG_METER_READER_TFLITE) || defined(DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL)
           DEBUG_ZONE_INFO(zone, (zone.x2 - zone.x1), (zone.y2 - zone.y1), this->config_.model_width, this->config_.model_height);
+          // Full pixel analysis for analyze_serial_output.py (matches ZONE_ANALYSIS format)
+          {
+              int w = this->config_.model_width;
+              int h = this->config_.model_height;
+              int c = this->config_.model_channels;
+               ESP_LOGI(TAG, "ZONE_ANALYSIS:zone%zu:%dx%dx%d:normalized=false",
+                        results.size() + 1, w, h, c);
+              const uint8_t* pixel_data = out_buf ? out_buf->get() : nullptr;
+              if (pixel_data && w > 0 && h > 0) {
+                  float min_val = 1e9f, max_val = -1e9f;
+                  double sum = 0.0;
+                  int count = 0;
+                  const int row_stride = w * c;
+                  for (int y = 0; y < h && y < 5; y++) {
+                      for (int x = 0; x < w && x < 5; x++) {
+                          int pos = (y * row_stride + x * c);
+                          ESP_LOGI(TAG, "Pixel[%d,%d]:", x, y);
+                          for (int ch = 0; ch < c; ch++) {
+                              float val = static_cast<float>(pixel_data[pos + ch]);
+                              ESP_LOGI(TAG, "Channel %d: %.1f", ch, val);
+                              if (val < min_val) min_val = val;
+                              if (val > max_val) max_val = val;
+                              sum += val;
+                              count++;
+                          }
+                      }
+                  }
+                  if (count > 0) {
+                      ESP_LOGI(TAG, "Stats: min=%.3f, max=%.3f, mean=%.3f",
+                               min_val, max_val, static_cast<float>(sum) / count);
+                  }
+              }
+          }
           #endif
       } else {
           all_zones_successful = false;
@@ -1573,7 +1606,7 @@ bool ImageProcessor::process_rgb888_crop_and_scale_to_float32(
         }
     }
     
-    #ifdef DEBUG_ESP32_CAMERA_UTILS
+    #if defined(DEBUG_ESP32_CAMERA_UTILS) || defined(DEBUG_METER_READER_TFLITE) || defined(DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL)
     DEBUG_FIRST_PIXELS(float_output, model_width * model_height * channels, channels);
     DEBUG_CHANNEL_ORDER(float_output, model_width * model_height * channels, channels);
     #endif
@@ -1608,7 +1641,7 @@ bool ImageProcessor::process_rgb888_crop_and_scale_to_uint8(
         }
     }
 
-    #ifdef DEBUG_ESP32_CAMERA_UTILS
+    #if defined(DEBUG_ESP32_CAMERA_UTILS) || defined(DEBUG_METER_READER_TFLITE) || defined(DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL)
     // Manual logging can be added here if needed
     #endif
 

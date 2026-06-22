@@ -115,19 +115,15 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_generate_preview(bool generate);
   void set_show_crop_areas(bool show) { show_crop_areas_ = show; }
 
-#ifdef DEV_ENABLE_ROTATION
   void take_preview_image();
   void capture_preview();
   std::shared_ptr<camera::CameraImage> get_preview_image();
-#endif
 
  protected:
-  #ifdef DEV_ENABLE_ROTATION
   void update_preview_image(std::shared_ptr<camera::CameraImage> image);
   std::shared_ptr<camera::CameraImage> last_preview_image_{nullptr};
   std::mutex preview_mutex_;
   bool request_preview_{false};
-  #endif
 
  public:
 

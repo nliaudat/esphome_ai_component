@@ -678,6 +678,18 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     // Inference
     auto zones = this->crop_zone_handler_.get_zones();
     ESP_LOGI(TAG, "Processing Image: Found %d crop zones", zones.size());
+    // Always log zones JSON at INFO for debugging (crop zone positions change per board)
+    {
+        std::string zones_json = "[";
+        for (size_t i = 0; i < zones.size(); i++) {
+            if (i > 0) zones_json += ",";
+            char buf[64];
+            snprintf(buf, sizeof(buf), "[%d,%d,%d,%d]", zones[i].x1, zones[i].y1, zones[i].x2, zones[i].y2);
+            zones_json += buf;
+        }
+        zones_json += "]";
+        ESP_LOGI(TAG, "Crop zones: %s", zones_json.c_str());
+    }
 
     // C++20: Range-based for loop
     for (const auto& zone : zones) {
@@ -699,11 +711,8 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
         
         if (preview) {
              // Draw crop zones on the preview image for debugging visualization.
-             
              if (this->show_crop_areas_) {
-                 #ifdef USE_CAMERA_DRAWING
-                 #ifndef USE_HOST
-                 // Cast to internal type removed. Rely on CameraImage interface and model config.
+                 auto zones = this->crop_zone_handler_.get_zones();
                  if (preview->get_data_buffer()) {
                      uint8_t* buf = preview->get_data_buffer();
                      
@@ -714,20 +723,19 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
                          std::swap(w, h);
                      }
                      
-                     uint16_t color = 0x07E0; // Light Green
-                     
                      auto spec = this->tflite_coord_.get_model_spec();
-                     int channels = spec.input_channels;
-                     // RGB565 is 2 bytes but DrawingUtils usually works with pixels.
+                     // Preview image is RGB888 (3 channels) from ImageProcessor
+                     int channels = 3;
                      
-                     // Simply skip drawing for now to avoid complexity or potential bugs, 
-                     // OR rely on user verification that image is correct.
-                     // Safe to modify 'preview' here because inference buffers were already copied/extracted
-                     // in the `camera_coord_.process_frame` call above.
-                     // The next frame will allocate a new buffer, so this modification does not affect future inference.
+                     #ifdef USE_CAMERA_DRAWING
+                     for (const auto& zone : zones) {
+                         int zone_w = zone.x2 - zone.x1;
+                         int zone_h = zone.y2 - zone.y1;
+                         // Draw light green rectangle per crop zone
+                         esp32_camera_utils::DrawingUtils::draw_rectangle(buf, zone.x1, zone.y1, zone_w, zone_h, w, h, channels, 0x07E0);
+                     }
+                     #endif
                  }
-                 #endif
-                 #endif
              }
              this->update_preview_image(preview);
         } else if (frame && this->generate_preview_) {
@@ -1080,7 +1088,6 @@ void MeterReaderTFLite::set_flash_pre_time(uint32_t ms) { this->flashlight_coord
 void MeterReaderTFLite::set_flash_post_time(uint32_t ms) { this->flashlight_coord_.set_timing(5000, ms); }
 
 // Preview
-#ifdef DEV_ENABLE_ROTATION
 void MeterReaderTFLite::take_preview_image() { this->capture_preview(); }
 void MeterReaderTFLite::capture_preview() {
     this->request_preview_ = true;
@@ -1097,7 +1104,6 @@ void MeterReaderTFLite::update_preview_image(std::shared_ptr<camera::CameraImage
     std::lock_guard<std::mutex> lock(this->preview_mutex_);
     this->last_preview_image_ = image;
 }
-#endif
 
 #ifdef USE_WEB_SERVER
 void MeterReaderTFLite::set_web_server(web_server_base::WebServerBase *web_server) {
@@ -1680,11 +1686,9 @@ std::string MeterReaderTFLite::serialize_inference_metadata(const std::string &v
              value.c_str(), confidence, width, height);
     json += buffer;
 
-    #ifdef DEV_ENABLE_ROTATION
     float rot = (this->esp32_camera_utils_) ? this->esp32_camera_utils_->get_rotation() : this->rotation_;
     snprintf(buffer, sizeof(buffer), ",\"rot\":%.1f", rot);
     json += buffer;
-    #endif
 
     json += ",\"digits\":[";
 

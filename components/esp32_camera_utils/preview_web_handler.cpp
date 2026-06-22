@@ -30,7 +30,13 @@ void PreviewWebHandler::handleRequest(web_server_idf::AsyncWebServerRequest *req
   std::shared_ptr<camera::CameraImage> img_ptr = this->image_provider_();
   if (!img_ptr) {
       ESP_LOGW(TAG, "HTTP Preview requested but no image available");
-      request->send(503, "text/plain", "Preview not available yet. Please try again.");
+      // Send HTML with meta-refresh to auto-retry every 5 seconds
+      const char* html = "<html><head><meta http-equiv=\"refresh\" content=\"5\">"
+                         "<title>Camera Preview</title></head><body>"
+                         "<p>Preview not available yet. Waiting for first frame...</p>"
+                         "<p>Page auto-refreshes every 5 seconds.</p></body></html>";
+      web_server_idf::AsyncWebServerResponse *response = request->beginResponse(200, "text/html", html);
+      request->send(response);
       return;
   }
 
