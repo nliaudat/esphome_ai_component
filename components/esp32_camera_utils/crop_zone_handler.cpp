@@ -10,14 +10,13 @@ namespace esp32_camera_utils {
 const char *const CropZoneHandler::TAG = "CropZoneHandler";
 
 void CropZoneHandler::parse_zones(const std::string &zones_json) {
-  DURATION_START();
+  ScopedDuration _dur(TAG);
   ESP_LOGD(TAG, "Parsing crop zones JSON: %s", zones_json.c_str());
   zones_.clear();
   
   // Handle empty or invalid JSON
   if (zones_json.empty() || zones_json == "[]" || zones_json == "\"[]\"") {
     ESP_LOGD(TAG, "No crop zones defined or empty JSON");
-    DURATION_END("parse_zones_empty");
     return;
   }
 
@@ -36,7 +35,6 @@ void CropZoneHandler::parse_zones(const std::string &zones_json) {
 
   if (stripped.empty() || stripped == "[]") {
     ESP_LOGD(TAG, "No crop zones defined after cleaning");
-    DURATION_END("parse_zones_empty_cleaned");
     return;
   }
 
@@ -108,7 +106,6 @@ void CropZoneHandler::parse_zones(const std::string &zones_json) {
   }
 
   ESP_LOGI(TAG, "Parsed %d crop zones", static_cast<int>(zones_.size()));
-  DURATION_END("parse_zones");
 }
 
 void CropZoneHandler::set_default_zone(int width, int height) {

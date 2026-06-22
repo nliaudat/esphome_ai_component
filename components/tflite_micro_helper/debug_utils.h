@@ -4,12 +4,10 @@
 #include "esphome/core/log.h"
 #include "tensorflow/lite/c/common.h" // For TfLiteType
 
+namespace esphome {
+namespace tflite_micro_helper {
+
 // RAII ScopedDuration — replaces DURATION_START/END/LOG macros
-// This removes function-like #define macros that violate §7.4.
-// Usage:
-//   ScopedDuration _dur(TAG);
-//   // ... work ...
-//   _dur.log_duration("my_func");
 class ScopedDuration {
  public:
   explicit ScopedDuration(const char* tag) : tag_(tag), start_(esphome::millis()) {}
@@ -29,7 +27,10 @@ class ScopedDuration {
   uint32_t start_;
 };
 
-// Helper function to convert TfLiteType to string
+}  // namespace tflite_micro_helper
+}  // namespace esphome
+
+// Helper function to convert TfLiteType to string (namespace-agnostic for compatibility)
 inline const char* tflite_type_to_string(TfLiteType type) {
     switch (type) {
         case kTfLiteFloat32: return "kTfLiteFloat32";
