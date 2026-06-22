@@ -69,9 +69,7 @@ void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, in
       jpeg_len = frame->get_data_length();
       
       // We don't own this buffer, so we shouldn't free it unless we copied it.
-      // But upload_image takes raw pointer.
       this->upload_image(jpeg_buf, jpeg_len, raw_value, confidence, metadata.c_str());
-      // No free needed for frame buffer
       return; 
   }
 
@@ -138,11 +136,13 @@ bool DataCollector::upload_image(const uint8_t *data, size_t len, const std::str
     // Send to queue (non-blocking or small timeout)
     if (xQueueSend(this->upload_queue_, &job, 10 / portTICK_PERIOD_MS) != pdTRUE) {
         ESP_LOGE(TAG, "Upload queue full! Dropping image.");
-        free(copy);
-        if (job.metadata) free(job.metadata);
+        // job destructor handles free(data) and free(metadata) via RAII
         return false;
     }
     
+    // Queued successfully — release ownership so destructor doesn't free
+    job.data = nullptr;
+    job.metadata = nullptr;
     return true;
 }
 
@@ -169,9 +169,14 @@ void DataCollector::upload_task(void *arg) {
             // Process upload
             collector->process_upload_sync(job.data, job.len, std::string(job.value), job.confidence, job.metadata);
             
-            // Free the memory we allocated in upload_image
+            // Null out pointers so RAII destructor doesn't double-free
+            // (job goes out of scope at end of while iteration)
             free(job.data);
-            if (job.metadata) free(job.metadata);
+            job.data = nullptr;
+            if (job.metadata) {
+                free(job.metadata);
+                job.metadata = nullptr;
+            }
         }
     }
     vTaskDelete(nullptr);
@@ -196,8 +201,13 @@ DataCollector::~DataCollector() {
     if (this->upload_queue_) {
         UploadJob job;
         while (xQueueReceive(this->upload_queue_, &job, 0) == pdTRUE) {
+            // Null out pointers before RAII destructor runs
             free(job.data);
-            if (job.metadata) free(job.metadata);
+            job.data = nullptr;
+            if (job.metadata) {
+                free(job.metadata);
+                job.metadata = nullptr;
+            }
         }
         vQueueDelete(this->upload_queue_);
         this->upload_queue_ = nullptr;
