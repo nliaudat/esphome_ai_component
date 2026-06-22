@@ -26,36 +26,45 @@ class SSOCRReader : public PollingComponent, public esphome::camera::CameraListe
   void on_camera_image(const std::shared_ptr<esphome::camera::CameraImage> &image) override;
   void dump_config() override;
 
-  void set_value_sensor(sensor::Sensor *s) { value_sensor_ = s; }
-  void set_confidence_sensor(sensor::Sensor *s) { confidence_sensor_ = s; } 
+  void set_value_sensor(sensor::Sensor *s) { this->value_sensor_ = s; }
+  void set_confidence_sensor(sensor::Sensor *s) { this->confidence_sensor_ = s; } 
 #ifdef USE_VALUE_VALIDATOR
-  void set_validator(value_validator::ValueValidator *v) { validation_coord_.set_validator(v); }
+  void set_validator(value_validator::ValueValidator *v) { this->validation_coord_.set_validator(v); }
 #endif
   
-  void set_threshold_config(int level) { threshold_level_ = level; }
+  void set_threshold_config(int level) { this->threshold_level_ = level; }
   void set_crop_config(int x, int y, int w, int h) {
-      crop_x_ = x; crop_y_ = y; crop_w_ = w; crop_h_ = h;
+      this->crop_x_ = x; this->crop_y_ = y; this->crop_w_ = w; this->crop_h_ = h;
   }
-  void set_digit_config(int count) { digit_count_ = count; }
-  void set_camera(esphome::camera::Camera *camera) { camera_ = camera; }
-  void set_resolution(int w, int h) { img_width_ = w; img_height_ = h; }
-  void set_pixel_format_str(const std::string &fmt);
-  void set_debug(bool debug) { debug_ = debug; }
+  void set_digit_config(int count) { this->digit_count_ = count; }
+  void set_camera(esphome::camera::Camera *camera) { this->camera_ = camera; }
+  void set_resolution(int w, int h) { this->img_width_ = w; this->img_height_ = h; }
+  void set_pixel_format_str(const std::string &fmt) { this->pixel_format_str_ = fmt; }
+  void set_debug(bool debug) { this->debug_ = debug; }
 
  protected:
+  // Single atomic state machine — eliminates TOCTOU CWE-367
+  enum class FrameState : uint8_t {
+    IDLE,
+    REQUESTED,
+    AVAILABLE,
+    PROCESSING,
+    TIMEOUT
+  };
+  std::atomic<FrameState> frame_state_{FrameState::IDLE};
+  uint32_t last_request_time_{0};
+
   // Coordinators
   CameraCoordinator camera_coord_;
   FlashlightCoordinator flashlight_coord_;
   ValueValidatorCoordinator validation_coord_;
 
   esphome::camera::Camera *camera_{nullptr};
-  bool capture_next_{false};
   int img_width_{0}; 
   int img_height_{0}; 
-  // pixformat_t pixel_format_{PIXFORMAT_JPEG}; // Managed by camera_coord_
   std::string pixel_format_str_{"JPEG"};
   sensor::Sensor *value_sensor_{nullptr};
-  sensor::Sensor *confidence_sensor_{nullptr}; // Added for validator/consistency
+  sensor::Sensor *confidence_sensor_{nullptr};
   int threshold_level_{128};
   int crop_x_{0};
   int crop_y_{0};
@@ -63,13 +72,12 @@ class SSOCRReader : public PollingComponent, public esphome::camera::CameraListe
   int crop_h_{0};
   int digit_count_{6};
   
-  // State
-  std::atomic<bool> processing_frame_{false};
   bool debug_{false};
-  uint32_t last_request_time_{0};
-  std::atomic<bool> frame_requested_{false};
-  std::mutex frame_mutex_;  // Protects frame_requested_/processing_frame_ from camera callback
+  std::mutex frame_mutex_;
   
+  // Async processing (non-blocking camera callback)
+  std::shared_ptr<esphome::camera::CameraImage> pending_frame_{nullptr};
+
   // Optimization: Pre-allocated buffers
   std::vector<int> col_sums_;
   std::vector<std::pair<int, int>> digit_bounds_;

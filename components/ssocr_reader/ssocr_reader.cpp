@@ -12,38 +12,22 @@ static const char *const TAG = "ssocr_reader";
 void SSOCRReader::setup() {
   ESP_LOGCONFIG(TAG, "Setting up SSOCR Reader...");
 
-  // 1. Setup Validation
-  // External component handles this
-
-
-  // 2. Setup Camera Coordinator
   if (this->camera_) {
       this->camera_coord_.set_camera(static_cast<esp32_camera::ESP32Camera*>(this->camera_));
-      
-      // We assume img_width_ and img_height_ were set via set_resolution
-      std::string fmt_str = "JPEG"; // Default
-      // Map enum to string for coordinator: Use "JPEG" default or whatever global config set.
-      // camera_coord_ takes a string representation which matches the internal camera config.
   }
   
   if (this->img_width_ > 0 && this->img_height_ > 0) {
        this->camera_coord_.set_config(this->img_width_, this->img_height_, this->pixel_format_str_);
   }
 
-  // 3. Setup Flashlight (Default: None)
   this->flashlight_coord_.setup(this, nullptr, nullptr);
 
-  // 4. Register Listener
   if (this->camera_) {
       this->camera_->add_listener(this);
   }
   
-  // 5. Configure Image Processor
   int effective_crop_w = (this->crop_w_ > 0) ? this->crop_w_ : this->img_width_ - this->crop_x_;
   int effective_crop_h = (this->crop_h_ > 0) ? this->crop_h_ : this->img_height_ - this->crop_y_;
-  
-  // Input type: 1 = kImageProcessorInputTypeUint8 (Grayscale/RGB888).
-  // We explicitly request Uint8 for SSOCR operations.
   
   this->camera_coord_.update_image_processor_config(
       effective_crop_w, effective_crop_h, 1, 
@@ -61,14 +45,13 @@ void SSOCRReader::dump_config() {
 }
 
 void SSOCRReader::update() {
-  // Flash scheduling
   if (this->flashlight_coord_.update_scheduling()) {
       return;
   }
 
-  // Request frame if ready
-  if (!this->frame_requested_ && !this->processing_frame_) {
-      this->frame_requested_ = true;
+  // Request frame via single atomic state machine (eliminates TOCTOU CWE-367)
+  FrameState expected = FrameState::IDLE;
+  if (this->frame_state_.compare_exchange_strong(expected, FrameState::REQUESTED)) {
       this->last_request_time_ = millis();
       ESP_LOGD(TAG, "Requesting frame");
   }
@@ -76,68 +59,64 @@ void SSOCRReader::update() {
 
 void SSOCRReader::on_camera_image(const std::shared_ptr<esphome::camera::CameraImage> &image) {
     std::lock_guard<std::mutex> lock(this->frame_mutex_);
-    if (this->frame_requested_ && !this->processing_frame_) {
-        // Simple lock logic
-        this->capture_next_ = true; // Flag for loop
-        this->process_image(image);
-        this->frame_requested_ = false;
-        this->capture_next_ = false;
+    FrameState expected = FrameState::REQUESTED;
+    if (this->frame_state_.compare_exchange_strong(expected, FrameState::AVAILABLE)) {
+        this->pending_frame_ = image;
     }
 }
 
 void SSOCRReader::loop() {
-    // Timeout check
-    if (this->frame_requested_ && millis() - this->last_request_time_ > 5000) {
-        ESP_LOGW(TAG, "Frame timeout");
-        this->frame_requested_ = false;
+    // Process pending frame if available (non-blocking camera callback)
+    std::shared_ptr<esphome::camera::CameraImage> frame;
+    {
+        std::lock_guard<std::mutex> lock(this->frame_mutex_);
+        if (this->pending_frame_) {
+            frame = this->pending_frame_;
+            this->pending_frame_ = nullptr;
+        }
     }
-}
 
-void SSOCRReader::set_pixel_format_str(const std::string &fmt) {
-    this->pixel_format_str_ = fmt;
+    if (frame) {
+        this->frame_state_.store(FrameState::PROCESSING);
+        this->process_image(frame);
+        frame.reset();
+        this->frame_state_.store(FrameState::IDLE);
+    }
+
+    // Watchdog: If frame requested but not arrived, reset state
+    FrameState state = this->frame_state_.load();
+    if (state == FrameState::REQUESTED && millis() - this->last_request_time_ > 5000) {
+        ESP_LOGW(TAG, "Frame timeout");
+        FrameState expected = FrameState::REQUESTED;
+        this->frame_state_.compare_exchange_strong(expected, FrameState::IDLE);
+        this->pending_frame_ = nullptr;
+    }
 }
 
 void SSOCRReader::process_image(std::shared_ptr<esphome::camera::CameraImage> image) {
   if (this->camera_ == nullptr) return;
-  
-  this->processing_frame_ = true;
   
   // 1. Prepare Zones
   std::vector<esphome::esp32_camera_utils::CropZone> zones;
   int w = this->img_width_; 
   int h = this->img_height_;
   
-  // Default crop
   int cx = this->crop_x_;
   int cy = this->crop_y_;
   int cw = (this->crop_w_ > 0) ? this->crop_w_ : w - cx;
   int ch = (this->crop_h_ > 0) ? this->crop_h_ : h - cy;
   
-  zones.push_back({cx, cy, cx+cw, cy+ch}); // CropZone struct: x1, y1, x2, y2 
+  zones.push_back({cx, cy, cx+cw, cy+ch});
   
-  // 2. Process via Coordinator
   auto results = this->camera_coord_.process_frame(image, zones);
   
   if (results.empty() || !results[0].data) {
       ESP_LOGE(TAG, "Failed to process image via coordinator");
-      this->processing_frame_ = false;
       return;
   }
   
-  // Access the TrackedBuffer safely
   auto& buffer = *results[0].data;
   uint8_t* raw_roi = buffer.get();
-  
-  // Check dimensions match
-  // ImageProcessor resizes to configured `model_width/height`.
-  // We configured it to effective_crop_w/h.
-  // So roi size should be cw * ch * 1.
-  
-  // 4. Binarize
-  // The buffer is Grayscale (uint8). 
-  // We need to apply threshold.
-  // We can do this in-place (on the raw buffer) or separate buffer.
-  // We'll modify the raw buffer in-place since we own it (it's a copy/new buffer from IP).
   int roi_w = cw;
   int roi_h = ch;
   
@@ -146,10 +125,7 @@ void SSOCRReader::process_image(std::shared_ptr<esphome::camera::CameraImage> im
       raw_roi[i] = (raw_roi[i] > this->threshold_level_) ? 255 : 0;
   }
   
-  // 5. Vertical Projection & Recognition (Reusing existing logic)
-  // Logic adapted to use raw_roi pointer
-  
-  // Sum pixels
+  // Vertical projection
   if (this->col_sums_.size() != static_cast<size_t>(roi_w)) {
       this->col_sums_.resize(roi_w);
   }
@@ -163,7 +139,7 @@ void SSOCRReader::process_image(std::shared_ptr<esphome::camera::CameraImage> im
     }
   }
 
-  // Find gaps
+  // Find digit gaps
   this->digit_bounds_.clear();
   bool in_digit = false;
   int start_x = 0;
@@ -187,7 +163,7 @@ void SSOCRReader::process_image(std::shared_ptr<esphome::camera::CameraImage> im
       ESP_LOGD(TAG, "Found %d potential digits", static_cast<int>(this->digit_bounds_.size()));
   }
 
-  // Recognize
+  // Recognize digits
   std::string result_str;
   result_str.reserve(this->digit_bounds_.size() + 1);
 
@@ -198,7 +174,6 @@ void SSOCRReader::process_image(std::shared_ptr<esphome::camera::CameraImage> im
       int d_w = this->digit_bounds_[k].second - d_x;
       if (d_w < 3) continue;
 
-      // Use zero-copy recognition
       int val = this->recognize_digit(raw_roi + d_x, d_w, roi_h, roi_w);
       if (val >= 0) {
           result_str += std::to_string(val);
@@ -211,13 +186,9 @@ void SSOCRReader::process_image(std::shared_ptr<esphome::camera::CameraImage> im
   ESP_LOGI(TAG, "SSOCR Result: %s", result_str.c_str());
   if (this->value_sensor_) {
       if (result_str.find('?') == std::string::npos && !result_str.empty()) {
-          // Parse as int first because validator expects int
-          // This assumes the result is an integer number.
-          // If we need float support, we must update ValueValidator or implement float logic.
           long v_long = strtol(result_str.c_str(), nullptr, 10);
           int v = static_cast<int>(v_long);
           
-          // Validate
           int validated_v = v;
           bool valid = this->validation_coord_.validate_reading(v, 1.0f, validated_v); 
           
@@ -229,19 +200,12 @@ void SSOCRReader::process_image(std::shared_ptr<esphome::camera::CameraImage> im
           }
       } else {
            ESP_LOGW(TAG, "SSOCR Failed to read all digits");
-           this->value_sensor_->publish_state(NAN); 
+           // Skip publishing on failure — don't publish NaN
       }
   }
-  
-  this->processing_frame_ = false;
 }
 
 int SSOCRReader::recognize_digit(const uint8_t* img, int w, int h, int stride) {
-    // 7-segment sampling points logic
-    // We define 7 segments: A(Top), B(TopRight), C(BotRight), D(Bot), E(BotLeft), F(TopLeft), G(Mid)
-    // We sample small patches.
-    
-    // Normalized coordinates (0.0 - 1.0)
     struct Pt { float x; float y; };
     Pt segments[7] = {
         {0.50, 0.15}, // A: Top
@@ -253,23 +217,7 @@ int SSOCRReader::recognize_digit(const uint8_t* img, int w, int h, int stride) {
         {0.50, 0.50}  // G: Middle
     };
     
-    // Map bitmask to digit (0-9)
-    // A=1, B=2, C=4, D=8, E=16, F=32, G=64
-    // 0: A+B+C+D+E+F = 1+2+4+8+16+32 = 63
-    // 1: B+C = 2+4 = 6
-    // 2: A+B+D+E+G = 1+2+8+16+64 = 91
-    // 3: A+B+C+D+G = 1+2+4+8+64 = 79
-    // 4: B+C+F+G = 2+4+32+64 = 102
-    // 5: A+C+D+F+G = 1+4+8+32+64 = 109
-    // 6: A+C+D+E+F+G = 1+4+8+16+32+64 = 125
-    // 7: A+B+C = 1+2+4 = 7
-    // 8: All = 127
-    // 9: A+B+C+F+G + D. (Usually 9 has D).
-    // Mapping: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
     const uint8_t digit_map[10] = {63, 6, 91, 79, 102, 109, 125, 7, 127, 111};
-    
-    // Map for lookup
-    // A B C D F G = 1+2+4+8+32+64 = 111.
     
     uint8_t mask = 0;
     
@@ -277,7 +225,6 @@ int SSOCRReader::recognize_digit(const uint8_t* img, int w, int h, int stride) {
         int sx = static_cast<int>(segments[i].x * w);
         int sy = static_cast<int>(segments[i].y * h);
         
-        // Sampling: Check a 3x3 window around point to be robust
         int on_pixels = 0;
         int count = 0;
         for (int dy=-1; dy<=1; dy++) {
@@ -296,7 +243,6 @@ int SSOCRReader::recognize_digit(const uint8_t* img, int w, int h, int stride) {
         }
     }
     
-    // Exact match lookup
     for (int i=0; i<10; i++) {
         if (digit_map[i] == mask) return i;
     }
