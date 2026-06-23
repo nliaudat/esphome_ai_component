@@ -527,7 +527,7 @@ int ValueValidator::apply_smart_validation(int new_reading, float confidence, fl
 
   // Log rate limiting: throttle ESP_LOGW to once every 5 minutes for the same rejection pattern
   static constexpr uint32_t REJECTION_LOG_INTERVAL_MS = 300000; // 5 minutes
-  bool should_log = (millis() - this->last_rejection_log_time_ >= REJECTION_LOG_INTERVAL_MS);
+  bool should_log = (this->last_rejection_log_time_ == 0) || (millis() - this->last_rejection_log_time_ >= REJECTION_LOG_INTERVAL_MS);
   
   const size_t CONSISTENCY_COUNT = 3;
   auto recent = this->history_.get_recent_readings(CONSISTENCY_COUNT);

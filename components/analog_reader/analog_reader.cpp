@@ -262,7 +262,10 @@ void AnalogReader::loop() {
         ESP_LOGW(TAG, "Frame timeout");
         FrameState expected = FrameState::REQUESTED;
         this->frame_state_.compare_exchange_strong(expected, FrameState::IDLE);
-        this->pending_frame_ = nullptr;
+        {
+            std::lock_guard<std::mutex> lock(this->frame_mutex_);
+            this->pending_frame_ = nullptr;
+        }
     }
     PollingComponent::loop();
 }

@@ -36,6 +36,11 @@
 #include <atomic>
 #include <mutex>
 
+// FreeDeleter for PSRAM/internal RAM buffers (shared with value_validator pattern)
+struct FreeDeleter {
+  void operator()(uint8_t* p) const { free(p); }
+};
+
 // Check for Dual Core capability
 #if !defined(CONFIG_FREERTOS_UNICORE) && (portNUM_PROCESSORS > 1)
     #define SUPPORT_DOUBLE_BUFFERING
@@ -106,8 +111,8 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_camera_image_format(int width, int height, const std::string &pixel_format); // -> CameraCoord & TFLite
   void set_camera(camera::Camera *camera); // -> CameraCoord
 
-  sensor::Sensor *get_value_sensor() const { return this->value_sensor_; }
-  sensor::Sensor *get_confidence_sensor() const { return this->confidence_sensor_; }
+  sensor::Sensor *get_value_sensor() const { return value_sensor_; }
+  sensor::Sensor *get_confidence_sensor() const { return confidence_sensor_; }
 
   void set_model_config(const std::string &model_type); // -> TFLite
   void set_rotation(float rotation) { this->rotation_ = rotation; } // Storage, passed to TFLite late
@@ -234,7 +239,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   // Refactor: Use coordinator instead of local object
   ValueValidatorCoordinator validation_coord_;
 
-  // State — Single atomic state machine (replaces 3 separate bool flags, eliminates TOCTOU CWE-367)
+  // State — Single atomic state machine
   enum class FrameState : uint8_t {
     IDLE,
     REQUESTED,
@@ -261,8 +266,8 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   bool window_active_{false};
   bool enable_flash_calibration_{false};
 
-  // Preview fallback buffer — pre-allocated to avoid heap alloc in loop()
-  std::unique_ptr<uint8_t[]> preview_fallback_buffer_;
+  // Preview fallback buffer — pre-allocated in PSRAM (preferred) to avoid heap alloc in loop()
+  std::unique_ptr<uint8_t[], FreeDeleter> preview_fallback_buffer_;
   size_t preview_fallback_buffer_size_{0};
 
   // Data Collection
@@ -350,7 +355,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   bool validate_and_update_reading(float raw, float conf, float& val);
   bool validate_and_update_reading(const esphome::StaticVector<float, 16>& digits, const esphome::StaticVector<float, 16>& confidences, float& val);
 
-  // Inference result publishing — extracted to eliminate duplication between sync and async paths
+  // Inference result publishing
   void publish_inference_result(const std::string& digit_str, float avg_conf, float validated_val, bool valid,
                                 const esphome::StaticVector<float, 16>& readings,
                                 const esphome::StaticVector<float, 16>& confidences);
