@@ -21,7 +21,7 @@ class CameraCoordinator {
  public:
   void set_camera(esp32_camera::ESP32Camera* camera);
   void set_config(int width, int height, const std::string& pixel_format);
-  void set_rotation(float rot) { rotation_ = rot; }
+  void set_rotation(float rot) { this->rotation_ = rot; }
   
   void unload();
 
@@ -35,7 +35,7 @@ class CameraCoordinator {
       const std::vector<esp32_camera_utils::CropZone>& zones); 
       
   std::shared_ptr<camera::CameraImage> get_debug_image() const {
-      if (image_processor_) return image_processor_->get_last_processed_image();
+      if (this->image_processor_) return this->image_processor_->get_last_processed_image();
       return nullptr;
   } 
 
@@ -54,19 +54,19 @@ class CameraCoordinator {
   
   // Configuration setters (partial update support)
   void set_window_config(int x, int y, int w, int h) {
-      if (x != -1) window_offset_x_ = x;
-      if (y != -1) window_offset_y_ = y;
-      if (w != -1) window_width_ = w;
-      if (h != -1) window_height_ = h;
-      window_configured_ = true;
+      if (x != -1) this->window_offset_x_ = x;
+      if (y != -1) this->window_offset_y_ = y;
+      if (w != -1) this->window_width_ = w;
+      if (h != -1) this->window_height_ = h;
+      this->window_configured_ = true;
   }
   
   // Helpers
   bool test_camera_after_reset(std::atomic<bool>& frame_available, std::atomic<bool>& frame_requested);
   void basic_recovery();
   std::string get_pixel_format() const { return current_format_; }
-  void set_enable_preview(bool enable) { enable_preview_ = enable; }
-  void set_debug(bool debug) { debug_ = debug; }
+  void set_enable_preview(bool enable) { this->enable_preview_ = enable; }
+  void set_debug(bool debug) { this->debug_ = debug; }
   
  protected:
   esp32_camera::ESP32Camera* camera_{nullptr};

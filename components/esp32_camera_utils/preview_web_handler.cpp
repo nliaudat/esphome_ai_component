@@ -1,7 +1,6 @@
 
 
 #include "esphome/core/defines.h"
-#ifdef USE_CAMERA_ROTATOR
 #ifdef USE_WEB_SERVER
 #include "preview_web_handler.h"
 #include <esp_camera.h>
@@ -18,7 +17,8 @@ PreviewWebHandler::PreviewWebHandler(std::function<std::shared_ptr<camera::Camer
     : image_provider_(image_provider) {}
 
 bool PreviewWebHandler::canHandle(web_server_idf::AsyncWebServerRequest *request) const {
-  return request->url() == "/preview";
+  char url_buf[web_server_idf::AsyncWebServerRequest::URL_BUF_SIZE];
+  return request->url_to(url_buf) == "/preview";
 }
 
 void PreviewWebHandler::handleRequest(web_server_idf::AsyncWebServerRequest *request) {
@@ -30,17 +30,18 @@ void PreviewWebHandler::handleRequest(web_server_idf::AsyncWebServerRequest *req
   std::shared_ptr<camera::CameraImage> img_ptr = this->image_provider_();
   if (!img_ptr) {
       ESP_LOGW(TAG, "HTTP Preview requested but no image available");
-      request->send(503, "text/plain", "Preview not available yet. Please try again.");
+      // Send HTML with meta-refresh to auto-retry every 5 seconds
+      const char* html = "<html><head><meta http-equiv=\"refresh\" content=\"5\">"
+                         "<title>Camera Preview</title></head><body>"
+                         "<p>Preview not available yet. Waiting for first frame...</p>"
+                         "<p>Page auto-refreshes every 5 seconds.</p></body></html>";
+      web_server_idf::AsyncWebServerResponse *response = request->beginResponse(200, "text/html", html);
+      request->send(response);
       return;
   }
 
-  // Use dynamic_pointer_cast for safe runtime type checking
-  auto image = std::dynamic_pointer_cast<RotatedPreviewImage>(img_ptr);
-  if (!image) {
-      ESP_LOGE(TAG, "Image provider returned incompatible image type (expected RotatedPreviewImage)");
-      request->send(500, "text/plain", "Internal error: incompatible image type");
-      return;
-  }
+  // std::static_pointer_cast: safe because get_preview_image() always returns RotatedPreviewImage
+  auto image = std::static_pointer_cast<RotatedPreviewImage>(img_ptr);
 
   size_t len = image->get_data_length();
   uint8_t *buf = image->get_data_buffer();
@@ -102,7 +103,6 @@ void PreviewWebHandler::handleRequest(web_server_idf::AsyncWebServerRequest *req
 
 }  // namespace esp32_camera_utils
 }  // namespace esphome
-#endif
 #endif
 
 

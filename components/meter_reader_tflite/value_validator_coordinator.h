@@ -19,29 +19,26 @@ namespace meter_reader_tflite {
 class ValueValidatorCoordinator {
  public:
 #ifdef USE_VALUE_VALIDATOR
-  void set_validator(value_validator::ValueValidator *validator) { validator_ = validator; }
+  void set_validator(value_validator::ValueValidator *validator) { this->validator_ = validator; }
   
-  bool has_validator() const { return validator_ != nullptr; }
+  bool has_validator() const { return this->validator_ != nullptr; }
 
   bool validate_reading(int raw_value, float confidence, int &validated_value) {
-    if (validator_ == nullptr) {
+    if (this->validator_ == nullptr) {
       validated_value = raw_value;
       return true; 
     }
-    return validator_->validate_reading(raw_value, confidence, validated_value);
+    return this->validator_->validate_reading(raw_value, confidence, validated_value);
   }
 
   bool validate_reading(std::span<const float> digits, std::span<const float> confidences, int &validated_value) {
-    if (validator_ == nullptr) {
-        // Fallback: No validator = No strict per-digit check here.
-        // We need to convert digits to value manually as fallback.
+    if (this->validator_ == nullptr) {
         if (digits.empty()) {
             return false;
         }
         long long val = 0;
         for (float d : digits) {
             int digit = static_cast<int>(round(d));
-            // Ensure digit is in the range [0, 9]
             if (digit < 0 || digit >= 10) {
                 digit = 0;
             }
@@ -55,22 +52,22 @@ class ValueValidatorCoordinator {
         }
         return true; 
     }
-    return validator_->validate_reading(digits, confidences, validated_value);
+    return this->validator_->validate_reading(digits, confidences, validated_value);
   }
 
   void set_last_valid_reading(int value) {
-    if (validator_ != nullptr) {
-      validator_->set_last_valid_reading(value);
+    if (this->validator_ != nullptr) {
+      this->validator_->set_last_valid_reading(value);
     }
   }
 
   void set_last_valid_reading(const std::string &value) {
-    if (validator_ != nullptr) {
-      validator_->set_last_valid_reading(value);
+    if (this->validator_ != nullptr) {
+      this->validator_->set_last_valid_reading(value);
     }
   }
 
-  value_validator::ValueValidator* get_validator() const { return validator_; }
+  value_validator::ValueValidator* get_validator() const { return this->validator_; }
 
 
  protected:
@@ -86,7 +83,6 @@ class ValueValidatorCoordinator {
   }
 
   bool validate_reading(std::span<const float> digits, std::span<const float> confidences, int &validated_value) {
-      // Logic duplicated from above for fallback
         if (digits.empty()) {
             return false;
         }

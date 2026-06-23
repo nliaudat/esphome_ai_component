@@ -52,7 +52,7 @@ substitutions:
   # camera_jpeg_quality: 10 # From 10 (best) to 63 (worst). | Must be 0 if non JPEG
   camera_jpeg_quality: 10
   # camera_max_framerate: 1fps
-  camera_max_framerate: 5fps # Increased for performance testing
+  camera_max_framerate: 1fps 
   camera_idle_framerate: 0.2fps
       
   #time
@@ -173,9 +173,8 @@ meter_reader_tflite:
   validator: ${id_prefix}_validator
   # confidence_threshold: 0.85 # Only if validator is disabled
   camera_id: ${id_prefix}_espcam
-  model: "models/digit_recognizer_v3_quantized_integer_quant_uint8.tflite"  # best performance / accuracy
-  # model: "models/digit_recognizer_v23_quantized_integer_quant_uint8.tflite" # 97.87% acc | inference in 2300ms | 262.33 KB memory footprint
-  # model: "models/digit_recognizer_v24_quantized_integer_quant_uint8.tflite" # 98.86% acc | inference in 2600ms | 135.29 KB memory footprint
+  # model: "models/digit_recognizer_v3_quantized_integer_quant_uint8.tflite"  # best performance / accuracy
+  model: "models/digit_recognizer_v24_quantized_integer_quant_uint8.tflite" # 98.86% acc | inference in 2600ms | 135.29 KB memory footprint
   # model: "models/digit_recognizer_v16_quantized_integer_quant_uint8.tflite" # 99.46% acc | inference in 4150ms | 263.76 KB memory footprint
   # model: "models/digit_recognizer_v3_quantized_integer_quant_uint8.tflite" # 97.95% acc | inference in 1500ms | 153.83 KB memory footprint
 
@@ -196,6 +195,14 @@ meter_reader_tflite:
   # Set to true to enable continuous updates, or false for on-demand only (via button)
   generate_preview: false # need web_server: port: 80 (wait for update_interval to be reached) + esp32_camera_utils: enable drawing subsystem
   # show_crop_areas: true # DEV (not ready for production) Draw boxes on preview
+  ## other needs : 
+    # esp32_camera_utils: enable_drawing: true
+    # generate_preview: true
+    # show_crop_areas: true
+    # web_server: 
+        # port: 80	# commented	uncomment
+    # - !include camera_webserver.yaml
+
 
 
 

@@ -234,6 +234,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_DEBUG_IMAGE, default=False): cv.boolean, 
     cv.Optional(CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL, default=False): cv.boolean,
     cv.Optional(CONF_DEBUG_MEMORY, default=False): cv.boolean,
+    cv.Optional("debug_camera", default=False): cv.boolean,
     cv.Optional("tensor_arena_size_sensor"): cv.use_id(sensor.Sensor),
     cv.Optional("tensor_arena_used_sensor"): cv.use_id(sensor.Sensor),
     cv.Optional("process_free_heap_sensor"): cv.use_id(sensor.Sensor),
@@ -440,9 +441,6 @@ async def to_code(config):
         cg.add(var.set_esp32_camera_utils(utils_var))
 
     # Auto-enable rotation if esp32_camera_utils is present
-    if camera_utils_id is not None:
-        cg.add_define("DEV_ENABLE_ROTATION")
-    
     cg.add_define("USE_SERVICE_DEBUG")
 
     if config.get(CONF_DEBUG_IMAGE, False):
@@ -481,7 +479,10 @@ async def to_code(config):
         
     if config.get(CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL, False):
         cg.add_define("DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL")
-     
+
+    if config.get("debug_camera", False):
+        cg.add_build_flag("-DDEBUG_ESP32_CAMERA_UTILS")
+
     if config.get(CONF_GENERATE_PREVIEW, False):
         cg.add(var.set_generate_preview(True))
         

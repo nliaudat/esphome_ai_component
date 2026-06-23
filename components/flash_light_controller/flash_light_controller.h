@@ -16,12 +16,12 @@ class FlashLightController : public Component {
  public:
   void setup() override;
   void set_flash_light(light::LightState *flash_light);
-  void set_flash_pre_time(uint32_t pre_time) { flash_pre_time_ = pre_time; }
-  void set_flash_post_time(uint32_t post_time) { flash_post_time_ = post_time; }
-  uint32_t get_flash_pre_time() const { return flash_pre_time_; }
-  uint32_t get_flash_post_time() const { return flash_post_time_; }
+  void set_flash_pre_time(uint32_t pre_time) { this->flash_pre_time_ = pre_time; }
+  void set_flash_post_time(uint32_t post_time) { this->flash_post_time_ = post_time; }
+  uint32_t get_flash_pre_time() const { return this->flash_pre_time_; }
+  uint32_t get_flash_post_time() const { return this->flash_post_time_; }
   
-  void set_debug(bool debug) { debug_ = debug; }
+  void set_debug(bool debug) { this->debug_ = debug; }
   
   using CaptureCallback = std::function<void()>;
   
@@ -39,7 +39,7 @@ class FlashLightController : public Component {
    */
   void initiate_capture_sequence(CaptureCallback callback);
   
-  bool is_active() const { return is_active_; }
+  bool is_active() const { return this->is_active_; }
 
   void enable_flash();
   void disable_flash();

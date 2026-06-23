@@ -4,17 +4,33 @@
 #include "esphome/core/log.h"
 #include "tensorflow/lite/c/common.h" // For TfLiteType
 
-#ifdef DEBUG_DURATION
-#define DURATION_START() uint32_t duration_start_ = millis()
-#define DURATION_END(func) ESP_LOGD(TAG, "%s duration: %lums", func, millis() - duration_start_)
-#define DURATION_LOG(msg, val) ESP_LOGD(TAG, "%s: %lums", msg, val)
-#else
-#define DURATION_START()
-#define DURATION_END(func)
-#define DURATION_LOG(msg, val)
-#endif
+namespace esphome {
+namespace tflite_micro_helper {
 
-// Helper function to convert TfLiteType to string
+// RAII ScopedDuration — replaces DURATION_START/END/LOG macros
+class ScopedDuration {
+ public:
+  explicit ScopedDuration(const char* tag) : tag_(tag), start_(esphome::millis()) {}
+
+  uint32_t elapsed() const { return esphome::millis() - this->start_; }
+  
+  void log_duration(const char* func) {
+    ESP_LOGD(this->tag_, "%s duration: %lums", func, this->elapsed());
+  }
+  
+  void log(const char* msg, uint32_t val) {
+    ESP_LOGD(this->tag_, "%s: %lums", msg, val);
+  }
+
+ private:
+  const char* tag_;
+  uint32_t start_;
+};
+
+}  // namespace tflite_micro_helper
+}  // namespace esphome
+
+// Helper function to convert TfLiteType to string (namespace-agnostic for compatibility)
 inline const char* tflite_type_to_string(TfLiteType type) {
     switch (type) {
         case kTfLiteFloat32: return "kTfLiteFloat32";

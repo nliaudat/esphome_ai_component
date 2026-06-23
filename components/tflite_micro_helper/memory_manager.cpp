@@ -12,6 +12,31 @@ bool MemoryManager::has_psram() {
   return total_psram > 0;
 }
 
+size_t MemoryManager::parse_size_string(const std::string& size_str) {
+    size_t multiplier = 1;
+    std::string str = size_str;
+    
+    if (str.find("KB") != std::string::npos) {
+        multiplier = 1024;
+        str = str.substr(0, str.length() - 2);
+    } else if (str.find("MB") != std::string::npos) {
+        multiplier = 1024 * 1024;
+        str = str.substr(0, str.length() - 2);
+    } else if (str.find("B") != std::string::npos) {
+        str = str.substr(0, str.length() - 1);
+    }
+    
+    // Manual string to integer conversion
+    const char* cstr = str.c_str();
+    char* end_ptr;
+    long size_value = strtol(cstr, &end_ptr, 10);
+    
+    if (end_ptr != cstr && *end_ptr == '\0' && size_value > 0) {
+        return static_cast<size_t>(size_value) * multiplier;
+    }
+    return 0; // Parsing failed
+}
+
 MemoryManager::AllocationResult MemoryManager::allocate_tensor_arena(size_t requested_size) {
   ESP_LOGD(TAG, "Attempting to allocate %zu bytes for tensor arena", requested_size);
   

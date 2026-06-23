@@ -20,6 +20,11 @@
 namespace esphome {
 namespace value_validator {
 
+// FreeDeleter for RAII-managed PSRAM/internal RAM buffers (shared by ReadingHistory and ValueValidator)
+struct FreeDeleter {
+  void operator()(void* p) const { free(p); }
+};
+
 /**
  * @class ReadingHistory
  * @brief Manages historical meter readings for validation
@@ -34,7 +39,7 @@ class ReadingHistory {
 
   void setup();
   void add_reading(int value, uint32_t timestamp, float confidence);
-  void set_max_history_size_bytes(size_t size) { max_history_size_bytes_ = size; }
+  void set_max_history_size_bytes(size_t size) { this->max_history_size_bytes_ = size; }
   
   int get_last_reading() const;
   float get_last_confidence() const;
@@ -44,15 +49,12 @@ class ReadingHistory {
   std::vector<int> get_recent_readings(size_t count) const;
   std::vector<std::pair<int, float>> get_recent_readings_with_confidence(size_t count) const;
   
-  size_t get_day_count() const { return count_; }
+  size_t get_day_count() const { return this->count_; }
   
   void clear();
 
  private:
   // RAII-managed buffer using unique_ptr with custom deleter (free for psram_alloc)
-  struct FreeDeleter {
-    void operator()(HistoricalReading* p) const { free(p); }
-  };
   std::unique_ptr<HistoricalReading[], FreeDeleter> buffer_;
   size_t capacity_{0};
   size_t head_{0}; // Write index (points to next free slot)
@@ -100,39 +102,39 @@ class ValueValidator : public Component {
   // Per-digit validation (returns int)
   bool validate_reading(std::span<const float> digits, std::span<const float> confidences, int& validated_reading);
   
-  void set_config(const ValidationConfig& config) { config_ = config; }
-  const ValidationConfig& get_config() const { return config_; }
+  void set_config(const ValidationConfig& config) { this->config_ = config; }
+  const ValidationConfig& get_config() const { return this->config_; }
   
   // Setters for configuration
-  void set_allow_negative_rates(bool v) { config_.allow_negative_rates = v; }
-  void set_max_absolute_diff(int v) { config_.max_absolute_diff = v; }
-  void set_max_rate_change(float v) { config_.max_rate_change = v; }
-  void set_enable_smart_validation(bool v) { config_.enable_smart_validation = v; }
-  void set_smart_validation_window(int v) { config_.smart_validation_window = v; }
-  void set_high_confidence_threshold(float v) { config_.high_confidence_threshold = v; }
-  void set_max_history_size_bytes(size_t v) { config_.max_history_size_bytes = v; }
-  void set_per_digit_confidence_threshold(float v) { config_.per_digit_confidence_threshold = v; }
-  void set_strict_confidence_check(bool v) { config_.strict_confidence_check = v; }
-  void set_first_reading_digit_threshold(float v) { config_.first_reading_digit_threshold = v; }
-  void set_max_consecutive_rejections(int v) { config_.max_consecutive_rejections = v; }
-  void set_small_negative_tolerance(int v) { config_.small_negative_tolerance = v; }
-  void set_persist_state(bool v) { config_.persist_state = v; }
-  void set_enable_dial_correction(bool v) { config_.enable_dial_correction = v; }
-  void set_dial_correction_high_threshold(float v) { config_.dial_correction_high_threshold = v; }
-  void set_dial_correction_low_threshold(float v) { config_.dial_correction_low_threshold = v; }
+  void set_allow_negative_rates(bool v) { this->config_.allow_negative_rates = v; }
+  void set_max_absolute_diff(int v) { this->config_.max_absolute_diff = v; }
+  void set_max_rate_change(float v) { this->config_.max_rate_change = v; }
+  void set_enable_smart_validation(bool v) { this->config_.enable_smart_validation = v; }
+  void set_smart_validation_window(int v) { this->config_.smart_validation_window = v; }
+  void set_high_confidence_threshold(float v) { this->config_.high_confidence_threshold = v; }
+  void set_max_history_size_bytes(size_t v) { this->config_.max_history_size_bytes = v; }
+  void set_per_digit_confidence_threshold(float v) { this->config_.per_digit_confidence_threshold = v; }
+  void set_strict_confidence_check(bool v) { this->config_.strict_confidence_check = v; }
+  void set_first_reading_digit_threshold(float v) { this->config_.first_reading_digit_threshold = v; }
+  void set_max_consecutive_rejections(int v) { this->config_.max_consecutive_rejections = v; }
+  void set_small_negative_tolerance(int v) { this->config_.small_negative_tolerance = v; }
+  void set_persist_state(bool v) { this->config_.persist_state = v; }
+  void set_enable_dial_correction(bool v) { this->config_.enable_dial_correction = v; }
+  void set_dial_correction_high_threshold(float v) { this->config_.dial_correction_high_threshold = v; }
+  void set_dial_correction_low_threshold(float v) { this->config_.dial_correction_low_threshold = v; }
 
   // Diagnostic sensors (optional)
-  void set_rejection_count_sensor(sensor::Sensor *s) { rejection_count_sensor_ = s; }
-  void set_raw_reading_sensor(sensor::Sensor *s) { raw_reading_sensor_ = s; }
-  void set_validator_state_sensor(text_sensor::TextSensor *s) { validator_state_sensor_ = s; }
-  void set_validated_value_sensor(sensor::Sensor *s) { validated_value_sensor_ = s; }
+  void set_rejection_count_sensor(sensor::Sensor *s) { this->rejection_count_sensor_ = s; }
+  void set_raw_reading_sensor(sensor::Sensor *s) { this->raw_reading_sensor_ = s; }
+  void set_validator_state_sensor(text_sensor::TextSensor *s) { this->validator_state_sensor_ = s; }
+  void set_validated_value_sensor(sensor::Sensor *s) { this->validated_value_sensor_ = s; }
 
-  int get_last_valid_reading() const { return last_valid_reading_; }
-  int get_consecutive_rejections() const { return consecutive_rejections_; }
-  const ReadingHistory& get_history() const { return history_; }
+  int get_last_valid_reading() const { return this->last_valid_reading_; }
+  int get_consecutive_rejections() const { return this->consecutive_rejections_; }
+  const ReadingHistory& get_history() const { return this->history_; }
   
   void reset();
-  void set_debug(bool debug) { debug_ = debug; }
+  void set_debug(bool debug) { this->debug_ = debug; }
   void set_last_valid_reading(int value);
   void set_last_valid_reading(const std::string &value);
   bool is_hallucination_pattern(std::span<const float> digits) const;
@@ -143,20 +145,20 @@ class ValueValidator : public Component {
   void clear_dial_fraction();
 #endif
 
- private:
+ protected:
   ValidationConfig config_;
   ReadingHistory history_;
   bool debug_{false};
   int last_valid_reading_{0};
   
-  // Last valid digits (PSRAM array)
-  int* last_valid_digits_data_{nullptr};
+  // Last valid digits (PSRAM array) — RAII via unique_ptr with FreeDeleter
+  std::unique_ptr<int[], FreeDeleter> last_valid_digits_data_;
   size_t last_valid_digits_count_{0};
 
-  // Per-digit history for stability check (Flat arrays for PSRAM efficiency)
-  int* digit_history_data_{nullptr};      // [num_digits * 5]
-  uint8_t* digit_history_counts_{nullptr}; // [num_digits]
-  uint8_t* digit_history_heads_{nullptr};  // [num_digits]
+  // Per-digit history for stability check (Flat arrays for PSRAM efficiency) — RAII
+  std::unique_ptr<int[], FreeDeleter> digit_history_data_;      // [num_digits * 5]
+  std::unique_ptr<uint8_t[], FreeDeleter> digit_history_counts_; // [num_digits]
+  std::unique_ptr<uint8_t[], FreeDeleter> digit_history_heads_;  // [num_digits]
   size_t digit_history_num_digits_{0};
   static constexpr size_t DIGIT_HISTORY_SIZE = 5;
 
@@ -177,8 +179,8 @@ class ValueValidator : public Component {
   // Persistent state
   ESPPreferenceObject pref_;
   
-  // Recent good values ring buffer (PSRAM)
-  int* last_good_values_data_{nullptr};
+  // Recent good values ring buffer (PSRAM) — RAII
+  std::unique_ptr<int[], FreeDeleter> last_good_values_data_;
   size_t last_good_values_capacity_{0};
   size_t last_good_values_head_{0};
   size_t last_good_values_count_{0};
@@ -188,6 +190,9 @@ class ValueValidator : public Component {
   bool has_dial_fraction_{false};
   float dial_fraction_{0.0f};  // Fractional part of summed dials [0.0, 1.0)
 #endif
+
+  // Log rate limiting for rejection spam
+  uint32_t last_rejection_log_time_{0};
 
   bool is_digit_plausible(int new_reading, int last_reading) const;
   int apply_smart_validation(int new_reading, float confidence, float last_confidence);

@@ -26,12 +26,12 @@ private:
 };
 
 void DebugCoordinator::set_debug_image(const uint8_t* data, size_t size, int width, int height) {
-    debug_image_ = std::make_shared<DebugCameraImage>(data, size, width, height);
+    this->debug_image_ = std::make_shared<DebugCameraImage>(data, size, width, height);
     ESP_LOGI(TAG, "Debug image set: %zu bytes", size);
 }
 
 void DebugCoordinator::run_debug_tests(TFLiteCoordinator& tflite_coord) {
-    if (!debug_image_) {
+    if (!this->debug_image_) {
         ESP_LOGW(TAG, "No debug image set");
         return;
     }

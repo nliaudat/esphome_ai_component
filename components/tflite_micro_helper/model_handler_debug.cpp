@@ -21,8 +21,8 @@ static const char *const TAG = "ModelHandler";
 
 void ModelHandler::debug_input_quantization_analysis(const uint8_t* input_data, 
                                                    size_t input_size,
-                                                   const std::string& stage) const {
-    TfLiteTensor* input = const_cast<ModelHandler*>(this)->input_tensor();
+                                                   const std::string& stage) {
+    TfLiteTensor* input = this->input_tensor();
     if (!input || !input_data || input_size == 0) return;
     
     ESP_LOGI(TAG, "=== INPUT QUANTIZATION ANALYSIS: %s ===", stage.c_str());
@@ -67,8 +67,8 @@ void ModelHandler::debug_input_quantization_analysis(const uint8_t* input_data,
     ESP_LOGI(TAG, "=== END INPUT ANALYSIS ===");
 }
 
-void ModelHandler::debug_input_tensor_details() const {
-    TfLiteTensor* input = const_cast<ModelHandler*>(this)->input_tensor();
+void ModelHandler::debug_input_tensor_details() {
+    TfLiteTensor* input = this->input_tensor();
     if (!input) return;
     
     ESP_LOGI(TAG, "=== INPUT TENSOR DETAILS ===");
@@ -83,9 +83,9 @@ void ModelHandler::debug_input_tensor_details() const {
     ESP_LOGI(TAG, "=== END TENSOR DETAILS ===");
 }
 
-void ModelHandler::debug_tensor_types() const {
-    TfLiteTensor* input = const_cast<ModelHandler*>(this)->input_tensor();
-    TfLiteTensor* output = const_cast<ModelHandler*>(this)->output_tensor();
+void ModelHandler::debug_tensor_types() {
+    TfLiteTensor* input = this->input_tensor();
+    TfLiteTensor* output = this->output_tensor();
     
     ESP_LOGI(TAG, "=== TENSOR TYPE VERIFICATION ===");
     if (input) {
@@ -143,8 +143,8 @@ void ModelHandler::debug_int8_conversion_details(TfLiteTensor* input, const uint
     }
 }
 
-void ModelHandler::debug_pre_inference_state() const {
-    TfLiteTensor* input = const_cast<ModelHandler*>(this)->input_tensor();
+void ModelHandler::debug_pre_inference_state() {
+    TfLiteTensor* input = this->input_tensor();
     if (input) {
         ESP_LOGI(TAG, "Pre-inference: Input type %s, bytes %zu", 
                  tflite_type_to_string(input->type), input->bytes);
@@ -172,9 +172,9 @@ void ModelHandler::debug_raw_outputs(TfLiteTensor* output) const {
     }
 }
 
-void ModelHandler::debug_qat_model_output() const {
+void ModelHandler::debug_qat_model_output() {
     // Basic implementation for QAT debugging
-    TfLiteTensor* output = const_cast<ModelHandler*>(this)->output_tensor();
+    TfLiteTensor* output = this->output_tensor();
     if (!output) return;
     this->debug_raw_outputs(output);
 }

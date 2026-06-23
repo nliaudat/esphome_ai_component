@@ -17,6 +17,11 @@
 5.  [Memory Management](#5-memory-management-critical)
 6.  [Configuration Schema Patterns](#6-configuration-schema-patterns)
 7.  [C++ Standards & Style](#7-c-standards--style-non-negotiable)
+    7.1 [Language Version](#71-language-version)
+    7.2 [Member Access](#72-member-access---mandatory)
+    7.3 [Field Visibility](#73-field-visibility)
+    7.4 [Preprocessor Directives](#74-preprocessor-directives)
+    7.4.1 [Macro Guarding](#741-macro-guarding-for-featurecode-path-control)
 8.  [Security & Thread Safety](#8-security--thread-safety)
 9.  [Testing Requirements](#9-testing-requirements)
 10. [Common Anti-Patterns (REJECT)](#10-common-anti-patterns-reject)
@@ -508,6 +513,54 @@ enum : size_t { BUFFER_SIZE = 1024 };
 **⚠️ REQUIRED:**
 All `cg.add_define()` calls MUST be mirrored in `esphome/core/defines.h` for static analysis.
 
+### 7.4.1 Macro Guarding for Feature/Code Path Control
+
+**Every optional code path MUST be guarded by a macro definition.** This prevents unnecessary code from being compiled into the binary when the corresponding YAML feature is disabled.
+
+**Pattern (Python `__init__.py`):**
+```python
+# In config schema — accept the YAML option:
+cv.Optional("enable_drawing", default=False): cv.boolean,
+
+# In to_code() — only define the macro when the option is enabled:
+if config.get("enable_drawing", False):
+    cg.add_define("USE_CAMERA_DRAWING")
+```
+
+**Pattern (C++ `.h`/`.cpp`):**
+```cpp
+// The header guard is passive — it only activates when the define exists:
+#ifdef USE_CAMERA_DRAWING
+void draw_rectangle(...);
+#endif
+
+// Call sites are similarly guarded:
+#ifdef USE_CAMERA_DRAWING
+DrawingUtils::draw_rectangle(...);
+#endif
+```
+
+**❌ NEVER:**
+- Hardcode `#define USE_CAMERA_DRAWING` in a header file that bypasses the YAML control
+- Leave optional code unguarded (it will be compiled for ALL boards, wasting flash)
+- Use `#if 0` / `#if 1` for feature toggles
+
+**✅ ALWAYS:**
+- Define the macro in `__init__.py`'s `to_code()`, conditioned on the YAML option
+- Guard the corresponding C++ code with `#ifdef MACRO_NAME`
+- Use `cg.add_define()` (compilation unit) or `cg.add_build_flag("-DMACRO")` (global)
+- Document the YAML option → macro mapping in `wiki/Debugging.md`
+
+**Macro naming convention:**
+- Use `USE_FEATURE_NAME` for compile-time feature gates (e.g. `USE_CAMERA_DRAWING`)
+- Use `DEBUG_FEATURE_NAME` for debug-only gates (e.g. `DEBUG_METER_READER_MEMORY`)
+- Use `CONFIG_FEATURE_NAME` for ESP-IDF sdkconfig-derived gates (e.g. `CONFIG_ESP32S3_DATA_CACHE_64KB`)
+
+**If a define is ALWAYS set (unconditional), it must be justified:**
+- Platform detection (`SUPPORT_DOUBLE_BUFFERING` when `portNUM_PROCESSORS > 1`) — OK
+- Core component activation (`USE_METER_READER_TFLITE`) — OK
+- Any other unconditional define must be documented in `.ai/instructions.md`
+
 ### 7.5 Naming Conventions
 
 | Item | Convention | Example |
@@ -945,6 +998,31 @@ std::array<uint8_t, JPEG_BUFFER_SIZE> buffer;
 
 - **DO NOT** add "open questions" sections in code comments.
 - Keep review output focused on findings, fixes, and actionable recommendations only.
+
+### 12.12 PonyTail — Lazy Senior Developer Mode
+
+Lazy means efficient, not careless. The best code is the code never written.
+
+**Decision ladder** — stop at the first rung that holds:
+1. **YAGNI.** Does this need to be built at all?
+2. **std lib.** Does the standard library already do this? Use it.
+3. **Platform.** Does a native platform feature cover it? Use it.
+4. **Existing dep.** Does an already-installed dependency solve it? Use it.
+5. **One line.** Can this be one line? Make it one line.
+6. **Write the minimum code that works.**
+
+**Rules:**
+- No abstractions that weren't explicitly requested.
+- No new dependency if it can be avoided.
+- No boilerplate nobody asked for.
+- Deletion over addition. Boring over clever. Fewest files possible.
+- Question complex requests: "Do you actually need X, or does Y cover it?"
+- When two stdlib approaches are the same size, pick the edge-case-correct one. Lazy means less code, not the flimsier algorithm.
+- Mark intentional simplifications with a `ponytail:` comment. If the shortcut has a known ceiling (global lock, O(n²) scan, naive heuristic), the comment names the ceiling and the upgrade path.
+
+**Not lazy about:** Input validation at trust boundaries, error handling that prevents data loss, security, accessibility, the calibration real hardware needs (the platform is never the spec ideal; a clock drifts, a sensor reads off), anything explicitly requested.
+
+**One check:** Non-trivial logic leaves ONE runnable check behind — the smallest thing that fails if the logic breaks (an assert-based demo/self-check or one small test file; no frameworks, no fixtures). Trivial one-liners need no test.
 
 ---
 
