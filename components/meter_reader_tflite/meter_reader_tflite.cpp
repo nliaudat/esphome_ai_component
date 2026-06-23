@@ -743,11 +743,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
                 copy_dst = static_cast<uint8_t*>(heap_caps_malloc(len, MALLOC_CAP_8BIT));
             }
             if (copy_dst) {
-                if (!from_prealloc) {
-                    memcpy(copy_dst, frame->get_data_buffer(), len);
-                } else {
-                    memcpy(copy_dst, frame->get_data_buffer(), len);
-                }
+                memcpy(copy_dst, frame->get_data_buffer(), len);
                 bool is_spiram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM) > 0;
                 esp32_camera_utils::ImageProcessor::UniqueBufferPtr tracked_buf(
                     new esp32_camera_utils::ImageProcessor::TrackedBuffer(
@@ -1064,9 +1060,19 @@ void MeterReaderTFLite::set_generate_preview(bool generate) {
     
     // Pre-allocate preview fallback buffer if needed (avoids heap alloc in loop())
     if (generate && !this->preview_fallback_buffer_) {
-        this->preview_fallback_buffer_ = std::make_unique<uint8_t[]>(PREVIEW_FALLBACK_BUFFER_SIZE);
-        this->preview_fallback_buffer_size_ = PREVIEW_FALLBACK_BUFFER_SIZE;
-        ESP_LOGI(TAG, "Pre-allocated preview fallback buffer: %u bytes", PREVIEW_FALLBACK_BUFFER_SIZE);
+        // Prefer PSRAM for large buffers to preserve internal SRAM
+        uint8_t* buf = static_cast<uint8_t*>(heap_caps_malloc(PREVIEW_FALLBACK_BUFFER_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+        if (!buf) {
+            // Fallback to internal RAM if PSRAM not available
+            buf = static_cast<uint8_t*>(malloc(PREVIEW_FALLBACK_BUFFER_SIZE));
+        }
+        if (buf) {
+            this->preview_fallback_buffer_.reset(buf);
+            this->preview_fallback_buffer_size_ = PREVIEW_FALLBACK_BUFFER_SIZE;
+            ESP_LOGI(TAG, "Pre-allocated preview fallback buffer: %u bytes (PSRAM preferred)", PREVIEW_FALLBACK_BUFFER_SIZE);
+        } else {
+            ESP_LOGW(TAG, "Failed to allocate preview fallback buffer (%u bytes)", PREVIEW_FALLBACK_BUFFER_SIZE);
+        }
     } else if (!generate && this->preview_fallback_buffer_) {
         this->preview_fallback_buffer_.reset();
         this->preview_fallback_buffer_size_ = 0;
