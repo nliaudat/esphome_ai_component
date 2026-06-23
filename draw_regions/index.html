@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESP32 AI Rotation & ROI Tool v4</title>
+    <title>ESP32 AI Rotation & ROI Tool v5</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -207,6 +207,135 @@
             margin-bottom: 15px;
             border-radius: 4px;
         }
+
+        /* Dial Preview & Debug Controls CSS (from PR #126) */
+        .dial-preview-section {
+            max-width: none;
+            margin: 20px 0 0;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .dial-preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+
+        .dial-preview-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+
+        .dial-preview-card {
+            border: 1px solid #d9e0e7;
+            border-radius: 10px;
+            padding: 12px;
+            background: #fdfefe;
+        }
+
+        .dial-preview-card h4 {
+            margin: 0 0 6px;
+            color: #2c3e50;
+        }
+
+        .dial-preview-summary {
+            margin: 0 0 10px;
+            font-size: 0.9em;
+            color: #5f6b7a;
+        }
+
+        .dial-preview-stages {
+            display: flex;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            gap: 10px;
+        }
+
+        .dial-stage {
+            flex: 0 0 180px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background: #fff;
+            padding: 8px;
+        }
+
+        .dial-stage h5 {
+            margin: 0 0 6px;
+            font-size: 0.78em;
+            color: #627085;
+        }
+
+        .dial-stage canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 4px;
+            background: #000;
+        }
+
+        .dial-controls-panel {
+            border: 1px solid #d9e0e7;
+            border-radius: 10px;
+            background: #f8fbfd;
+            padding: 14px;
+            margin-bottom: 16px;
+        }
+
+        .dial-controls-panel h4 {
+            margin: 0 0 10px;
+            color: #2c3e50;
+        }
+
+        .dial-control-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 10px;
+        }
+
+        .dial-control {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 0.85em;
+            color: #4b5a69;
+        }
+
+        .dial-control-inline {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .dial-color-swatch {
+            width: 22px;
+            height: 22px;
+            border-radius: 4px;
+            border: 1px solid #cfd8e3;
+            background: #ff0000;
+            flex: 0 0 22px;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+        }
+
+        .dial-control input,
+        .dial-control select {
+            width: 100%;
+            padding: 7px 8px;
+            border: 1px solid #cfd8e3;
+            border-radius: 6px;
+            font: inherit;
+            background: #fff;
+        }
+
+        .dial-control-wide {
+            grid-column: 1 / -1;
+        }
     </style>
 </head>
 
@@ -219,6 +348,10 @@
                 <input type="file" id="imageInput" accept="image/*" style="display: none;">
                 <button class="btn btn-primary" onclick="document.getElementById('imageInput').click()">📂 Load
                     Image</button>
+                <input type="file" id="configInput" accept=".yaml,.yml,text/yaml,text/plain" style="display: none;">
+                <button class="btn btn-secondary" onclick="document.getElementById('configInput').click()">📄 Load
+                    config.yaml</button>
+                <span class="help-text" id="config-status" style="margin:0; align-self:center;">No config loaded</span>
             </div>
 
             <div class="mode-toggles">
@@ -360,6 +493,26 @@
             </div>
             <div id="card-actions-analog" class="card" style="display:none;">
                 <h3>Actions</h3>
+                <div id="card-dial-debug-controls" style="display:none;">
+                    <h4>Dial Debug Controls</h4>
+                    <div class="dial-control-grid">
+                        <label class="dial-control"><span>Color detection</span><select id="debug_use_color"><option value="true">Enabled</option><option value="false">Disabled</option></select></label>
+                        <label class="dial-control"><span>Target color</span><div class="dial-control-inline"><input id="debug_target_color" type="text" value="0xFF0000"><button class="btn btn-secondary" type="button" id="debug_pick_color_btn" style="padding:7px 10px; white-space:nowrap;">Pick from image</button><span id="debug_color_swatch" class="dial-color-swatch" title="Selected color"></span></div></label>
+                        <label class="dial-control"><span>Color tolerance</span><input id="debug_color_tolerance" type="number" value="0" min="0" max="442" step="1"></label>
+                        <label class="dial-control"><span>Needle type</span><select id="debug_needle_type"><option value="DARK">DARK</option><option value="LIGHT">LIGHT</option></select></label>
+                        <label class="dial-control"><span>Top-hat</span><select id="debug_tophat"><option value="true">Enabled</option><option value="false">Disabled</option></select></label>
+                        <label class="dial-control"><span>Auto contrast</span><select id="debug_auto_contrast"><option value="true">Enabled</option><option value="false">Disabled</option></select></label>
+                        <label class="dial-control"><span>Contrast</span><input id="debug_contrast" type="number" value="1.0" step="0.1"></label>
+                        <label class="dial-control"><span>Max scan radius</span><input id="debug_max_scan" type="number" value="0.9" step="0.05" min="0" max="1"></label>
+                        <label class="dial-control"><span>Deadzone diameter (px)</span><input id="debug_deadzone_diameter" type="number" value="0" step="1" min="0"></label>
+                        <label class="dial-control"><span>Min angle</span><input id="debug_min_angle" type="number" value="0" step="1"></label>
+                        <label class="dial-control"><span>Max angle</span><input id="debug_max_angle" type="number" value="360" step="1"></label>
+                        <label class="dial-control"><span>Min value</span><input id="debug_min_value" type="number" value="0" step="0.01"></label>
+                        <label class="dial-control"><span>Max value</span><input id="debug_max_value" type="number" value="10" step="0.01"></label>
+                        <label class="dial-control"><span>Angle offset</span><input id="debug_angle_offset" type="number" value="0" step="1"></label>
+                        <label class="dial-control"><span>Clockwise</span><select id="debug_clockwise"><option value="true">Enabled</option><option value="false">Disabled</option></select></label>
+                    </div>
+                </div>
                 <button class="btn btn-secondary" style="width: 100%; margin-bottom: 10px;"
                     onclick="resetCurrent()">Undo Last Dial</button>
                 <button class="btn btn-danger" style="width: 100%;"
@@ -367,7 +520,7 @@
             </div>
         </div>
 
-        <!-- NEW HELP SIDEBAR -->
+        <!-- HELP SIDEBAR -->
         <div class="help-sidebar" id="help-sidebar">
             <h3>Instructions</h3>
             <div id="help-content">
@@ -376,23 +529,884 @@
         </div>
 
     </div>
+
+    <div class="dial-preview-section" id="dial-preview-section">
+        <div class="dial-preview-header">
+            <h3 style="margin:0;">Dial Previews</h3>
+            <p class="help-text" style="margin:0;">Per-dial stage previews are shown here so the canvas itself stays readable.</p>
+        </div>
+        <div id="dial-preview-content">
+            <p class="help-text" style="margin:0;">Load an image and add at least one dial to see the stage previews.</p>
+        </div>
+    </div>
+
     <script>
         // State
         let state = {
             image: null,
             rotation: 0, // 0, 90, 180, 270
-            mode: 'roi', // 'roi', 'digits'
+            mode: 'roi', // 'roi', 'digits', 'analog'
             roi: null, // {x, y, w, h} in ROTATED coordinates
-            digits: [], // Array of {x, y, w, h} in ROTATED coordinates relative to 0,0 of canvas
-            dials: [], // Array of {x, y, w, h} for analog dials
+            digits: [], // Array of {x, y, w, h} in ROTATED coordinates
+            dials: [], // Array of {x, y, w, h, cfg} for analog dials
             isDrawing: false,
             startPos: null,
             sensorRes: { w: 1600, h: 1200, name: "OV2640 UXGA (1600x1200)" },
-            force43: false
+            force43: false,
+            importedConfig: null
         };
+        window.__debugState = state;
 
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
+        const imageCanvas = document.createElement('canvas');
+        const imageCtx = imageCanvas.getContext('2d', { willReadFrequently: true });
+        const COS = new Float32Array(360);
+        const SIN = new Float32Array(360);
+
+        for (let i = 0; i < 360; i++) {
+            const radians = i * Math.PI / 180;
+            COS[i] = Math.cos(radians);
+            SIN[i] = Math.sin(radians);
+        }
+
+        let rotatedImageData = null;
+        let colorPickMode = false;
+
+        function clamp(value, min, max) {
+            return value < min ? min : (value > max ? max : value);
+        }
+
+        function extractCropRGB(sourceImageData, rect) {
+            const { x, y, w, h } = rect;
+            const r = new Uint8Array(w * h);
+            const g = new Uint8Array(w * h);
+            const b = new Uint8Array(w * h);
+            const src = sourceImageData.data;
+            const sw = sourceImageData.width;
+            const sh = sourceImageData.height;
+
+            for (let row = 0; row < h; row++) {
+                for (let col = 0; col < w; col++) {
+                    const sx = Math.round(x + col);
+                    const sy = Math.round(y + row);
+                    const outIndex = row * w + col;
+
+                    if (sx >= 0 && sx < sw && sy >= 0 && sy < sh) {
+                        const srcIndex = (sy * sw + sx) * 4;
+                        r[outIndex] = src[srcIndex];
+                        g[outIndex] = src[srcIndex + 1];
+                        b[outIndex] = src[srcIndex + 2];
+                    }
+                }
+            }
+
+            return { r, g, b, w, h };
+        }
+
+        function grayscale(rgb) {
+            const out = new Uint8Array(rgb.w * rgb.h);
+            for (let i = 0; i < out.length; i++) {
+                out[i] = (0.299 * rgb.r[i] + 0.587 * rgb.g[i] + 0.114 * rgb.b[i]) | 0;
+            }
+            return out;
+        }
+
+        function colorDistanceMap(rgb, hex, tol) {
+            const tr = (hex >> 16) & 0xFF;
+            const tg = (hex >> 8) & 0xFF;
+            const tb = hex & 0xFF;
+            const out = new Uint8Array(rgb.w * rgb.h);
+            // tol=0 means legacy linear mapping (0-442 -> 0-255)
+            const useTol = tol > 0 && tol < 442;
+
+            for (let i = 0; i < out.length; i++) {
+                const dr = rgb.r[i] - tr;
+                const dg = rgb.g[i] - tg;
+                const db = rgb.b[i] - tb;
+                const dist = Math.sqrt(dr * dr + dg * dg + db * db);
+                let value;
+
+                if (useTol) {
+                    value = dist >= tol ? 255 : (dist * 255 / tol);
+                } else {
+                    value = dist * 255 / 442;
+                }
+
+                if (value > 255) value = 255;
+                out[i] = value | 0;
+            }
+
+            return out;
+        }
+
+        function applyAutoContrast(buf) {
+            let min = 255;
+            let max = 0;
+            for (let i = 0; i < buf.length; i++) {
+                if (buf[i] < min) min = buf[i];
+                if (buf[i] > max) max = buf[i];
+            }
+
+            const range = max - min;
+            if (range <= 0) return;
+
+            for (let i = 0; i < buf.length; i++) {
+                buf[i] = ((buf[i] - min) * 255 / range) | 0;
+            }
+        }
+
+        function applyContrast(buf, contrast) {
+            if (Math.abs(contrast - 1) < 0.01) return;
+            for (let i = 0; i < buf.length; i++) {
+                let val = (buf[i] - 128) * contrast + 128;
+                if (val < 0) val = 0;
+                if (val > 255) val = 255;
+                buf[i] = val | 0;
+            }
+        }
+
+        function applyClahe(buf, w, h, tile = 8) {
+            for (let ty = 0; ty < h; ty += tile) {
+                for (let tx = 0; tx < w; tx += tile) {
+                    const hist = new Int32Array(256);
+                    let n = 0;
+                    const yEnd = Math.min(ty + tile, h);
+                    const xEnd = Math.min(tx + tile, w);
+
+                    for (let y = ty; y < yEnd; y++) {
+                        for (let x = tx; x < xEnd; x++) {
+                            hist[buf[y * w + x]]++;
+                            n++;
+                        }
+                    }
+
+                    const cdf = new Int32Array(256);
+                    cdf[0] = hist[0];
+                    for (let i = 1; i < 256; i++) cdf[i] = cdf[i - 1] + hist[i];
+
+                    if (n > 0) {
+                        for (let y = ty; y < yEnd; y++) {
+                            for (let x = tx; x < xEnd; x++) {
+                                const value = buf[y * w + x];
+                                buf[y * w + x] = (cdf[value] * 255 / n) | 0;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function erode(src, dst, w, h, kernel) {
+            const radius = kernel >> 1;
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    let min = 255;
+                    for (let dy = -radius; dy <= radius; dy++) {
+                        for (let dx = -radius; dx <= radius; dx++) {
+                            const ny = y + dy;
+                            const nx = x + dx;
+                            if (ny >= 0 && ny < h && nx >= 0 && nx < w) {
+                                const value = src[ny * w + nx];
+                                if (value < min) min = value;
+                            }
+                        }
+                    }
+                    dst[y * w + x] = min;
+                }
+            }
+        }
+
+        function dilate(src, dst, w, h, kernel) {
+            const radius = kernel >> 1;
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    let max = 0;
+                    for (let dy = -radius; dy <= radius; dy++) {
+                        for (let dx = -radius; dx <= radius; dx++) {
+                            const ny = y + dy;
+                            const nx = x + dx;
+                            if (ny >= 0 && ny < h && nx >= 0 && nx < w) {
+                                const value = src[ny * w + nx];
+                                if (value > max) max = value;
+                            }
+                        }
+                    }
+                    dst[y * w + x] = max;
+                }
+            }
+        }
+
+        function applyTophat(buf, w, h, kernel, needleType) {
+            const a = new Uint8Array(w * h);
+            const b = new Uint8Array(w * h);
+
+            if (needleType === 'LIGHT') {
+                erode(buf, a, w, h, kernel);
+                dilate(a, b, w, h, kernel);
+                for (let i = 0; i < buf.length; i++) {
+                    const value = buf[i] - b[i];
+                    buf[i] = value < 0 ? 0 : value;
+                }
+            } else {
+                dilate(buf, a, w, h, kernel);
+                erode(a, b, w, h, kernel);
+                for (let i = 0; i < buf.length; i++) {
+                    const value = b[i] - buf[i];
+                    buf[i] = value < 0 ? 0 : value;
+                }
+            }
+        }
+
+        function median3x3(buf, w, h) {
+            const tmp = buf.slice();
+            const win = new Uint8Array(9);
+
+            for (let y = 1; y < h - 1; y++) {
+                for (let x = 1; x < w - 1; x++) {
+                    let index = 0;
+                    for (let dy = -1; dy <= 1; dy++) {
+                        for (let dx = -1; dx <= 1; dx++) {
+                            win[index++] = tmp[(y + dy) * w + (x + dx)];
+                        }
+                    }
+                    win.sort();
+                    buf[y * w + x] = win[4];
+                }
+            }
+        }
+
+        function detectRadialProfile(buf, w, h, maxScan, deadzoneDiameter) {
+            const cx = w >> 1;
+            const cy = h >> 1;
+            const radius = Math.min(cx, cy) - 2;
+            const deadzoneRadius = Math.max(0, (deadzoneDiameter || 0) * 0.5);
+            const startR = Math.max(5, Math.floor(deadzoneRadius));
+            const maxR = Math.max(startR + 1, (radius * maxScan) | 0);
+            const maxGap = 5;
+            const profile = new Float32Array(360);
+
+            for (let deg = 0; deg < 360; deg++) {
+                const dx = COS[deg];
+                const dy = SIN[deg];
+                let score = 0;
+                let gap = 0;
+
+                for (let r = startR; r < maxR; r++) {
+                    const px = cx + Math.trunc(r * dx);
+                    const py = cy + Math.trunc(r * dy);
+
+                    if (px >= 0 && px < w && py >= 0 && py < h) {
+                        const value = buf[py * w + px];
+                        if (value > 20) {
+                            score += value;
+                            gap = 0;
+                        } else {
+                            gap++;
+                            if (gap > maxGap) break;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+
+                profile[deg] = score;
+            }
+
+            let best = -Infinity;
+            let bestIndex = 0;
+            let min = Infinity;
+
+            for (let deg = 0; deg < 360; deg++) {
+                if (profile[deg] > best) {
+                    best = profile[deg];
+                    bestIndex = deg;
+                }
+                if (profile[deg] < min) min = profile[deg];
+            }
+
+            let angle = bestIndex;
+            const y1 = profile[(bestIndex - 1 + 360) % 360];
+            const y2 = profile[bestIndex];
+            const y3 = profile[(bestIndex + 1) % 360];
+            const denom = y1 - 2 * y2 + y3;
+            if (Math.abs(denom) > 0.0001) angle += (y1 - y3) / (2 * denom);
+            if (angle < 0) angle += 360;
+            if (angle >= 360) angle -= 360;
+
+            const range = best - min;
+            let confidence = range > 50 ? 0.8 + range / 200 : range / 100;
+            if (confidence > 1) confidence = 1;
+
+            return { angle, confidence, profile, range };
+        }
+
+        function angleToValue(imageAngle, params) {
+            let dialAngle = (imageAngle + 90) % 360;
+            if (!params.clockwise) dialAngle = (360 - dialAngle) % 360;
+            dialAngle = (dialAngle - params.angleOffset + 360) % 360;
+
+            let fraction = (dialAngle - params.minAngle) / (params.maxAngle - params.minAngle);
+            fraction = Math.max(0, Math.min(1, fraction));
+
+            return params.minValue + fraction * (params.maxValue - params.minValue);
+        }
+
+        function readDebugSettings() {
+            return {
+                useColor: document.getElementById('debug_use_color')?.value === 'true',
+                targetColor: parseInt((document.getElementById('debug_target_color')?.value || '0xFF0000').replace(/^#/, '0x'), 16) || 0,
+                colorTolerance: parseFloat(document.getElementById('debug_color_tolerance')?.value || '0'),
+                needleType: document.getElementById('debug_needle_type')?.value || 'DARK',
+                tophatOn: document.getElementById('debug_tophat')?.value !== 'false',
+                autoContrast: document.getElementById('debug_auto_contrast')?.value !== 'false',
+                contrast: parseFloat(document.getElementById('debug_contrast')?.value || '1.0'),
+                maxScan: parseFloat(document.getElementById('debug_max_scan')?.value || '0.9'),
+                deadzoneDiameter: parseFloat(document.getElementById('debug_deadzone_diameter')?.value || '0'),
+                minAngle: parseFloat(document.getElementById('debug_min_angle')?.value || '0'),
+                maxAngle: parseFloat(document.getElementById('debug_max_angle')?.value || '360'),
+                minValue: parseFloat(document.getElementById('debug_min_value')?.value || '0'),
+                maxValue: parseFloat(document.getElementById('debug_max_value')?.value || '10'),
+                angleOffset: parseFloat(document.getElementById('debug_angle_offset')?.value || '0'),
+                clockwise: document.getElementById('debug_clockwise')?.value !== 'false'
+            };
+        }
+
+        function runDialDebug(rect, dial) {
+            if (!rotatedImageData || rect.w < 8 || rect.h < 8) return null;
+
+            const rgb = extractCropRGB(rotatedImageData, rect);
+            const w = rgb.w;
+            const h = rgb.h;
+
+            if (w < 8 || h < 8) return null;
+
+            const settings = getDialDebugSettings(dial || rect);
+            const stages = [];
+            stages.push({ title: '1. Raw crop (RGB)', kind: 'rgb', rgb: { r: rgb.r.slice(), g: rgb.g.slice(), b: rgb.b.slice(), w, h } });
+
+            let buf;
+            if (settings.useColor) {
+                buf = colorDistanceMap(rgb, settings.targetColor, settings.colorTolerance);
+                stages.push({ title: `2. Color-distance (tol=${settings.colorTolerance})`, kind: 'gray', buf: buf.slice(), w, h });
+            } else {
+                buf = grayscale(rgb);
+                stages.push({ title: '2. Grayscale (base)', kind: 'gray', buf: buf.slice(), w, h });
+                if (settings.autoContrast) {
+                    applyAutoContrast(buf);
+                    stages.push({ title: '2. Grayscale (+auto contrast)', kind: 'gray', buf: buf.slice(), w, h });
+                }
+                if (Math.abs(settings.contrast - 1) > 0.01) {
+                    applyContrast(buf, settings.contrast);
+                    stages.push({ title: `2. Grayscale (+contrast ${settings.contrast.toFixed(1)})`, kind: 'gray', buf: buf.slice(), w, h });
+                }
+            }
+
+            const radius = Math.min(w >> 1, h >> 1) - 2;
+            let kernel = Math.max(3, (radius / 10) | 0);
+            if (kernel % 2 === 0) kernel++;
+
+            applyClahe(buf, w, h, 8);
+            stages.push({ title: '3. CLAHE', kind: 'gray', buf: buf.slice(), w, h });
+
+            if (settings.tophatOn) {
+                applyTophat(buf, w, h, kernel, settings.needleType);
+                stages.push({ title: `4. Top-hat (k=${kernel}, ${settings.needleType})`, kind: 'gray', buf: buf.slice(), w, h });
+            } else {
+                if (settings.needleType === 'DARK' || settings.useColor) {
+                    for (let i = 0; i < buf.length; i++) buf[i] = 255 - buf[i];
+                }
+                stages.push({ title: '4. Top-hat (skipped, inverted)', kind: 'gray', buf: buf.slice(), w, h });
+            }
+
+            median3x3(buf, w, h);
+            stages.push({ title: '5. Median 3×3 (final)', kind: 'gray', buf: buf.slice(), w, h });
+
+            const det = detectRadialProfile(buf, w, h, settings.maxScan, settings.deadzoneDiameter);
+            const params = {
+                clockwise: settings.clockwise,
+                angleOffset: settings.angleOffset,
+                minAngle: settings.minAngle,
+                maxAngle: settings.maxAngle,
+                minValue: settings.minValue,
+                maxValue: settings.maxValue
+            };
+
+            stages.push({ title: '6. Detected needle', kind: 'needle', buf: buf.slice(), w, h, angle: det.angle, maxScan: settings.maxScan });
+            stages.push({ title: '7. Radial profile (0–360°, 0=East)', kind: 'profile', profile: det.profile, bestAngle: det.angle });
+
+            return {
+                value: angleToValue(det.angle, params),
+                angle: det.angle,
+                confidence: det.confidence,
+                range: det.range,
+                kernel,
+                stages,
+                settings
+            };
+        }
+
+        function drawDialDebugOverlay(d, index, debug) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(d.x, d.y, d.w, d.h);
+            ctx.clip();
+
+            const cx = d.x + d.w / 2;
+            const cy = d.y + d.h / 2;
+            const angle = debug.angle * Math.PI / 180;
+            const lineLength = Math.max(6, Math.min(d.w, d.h) * 0.38);
+
+            ctx.strokeStyle = 'rgba(255, 77, 77, 0.95)';
+            ctx.lineWidth = Math.max(2, Math.round(Math.min(d.w, d.h) / 40));
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + Math.cos(angle) * lineLength, cy + Math.sin(angle) * lineLength);
+            ctx.stroke();
+
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(cx, cy, Math.max(4, Math.min(d.w, d.h) / 2 - 3), 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.fillStyle = 'rgba(79, 156, 255, 0.95)';
+            ctx.beginPath();
+            ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawGrayStage(canvasEl, buf, w, h) {
+            const stageCtx = canvasEl.getContext('2d');
+            canvasEl.width = w;
+            canvasEl.height = h;
+            const id = stageCtx.createImageData(w, h);
+            for (let i = 0; i < buf.length; i++) {
+                const value = buf[i];
+                const offset = i * 4;
+                id.data[offset] = value;
+                id.data[offset + 1] = value;
+                id.data[offset + 2] = value;
+                id.data[offset + 3] = 255;
+            }
+            stageCtx.putImageData(id, 0, 0);
+        }
+
+        function drawRGBStage(canvasEl, rgb) {
+            const stageCtx = canvasEl.getContext('2d');
+            canvasEl.width = rgb.w;
+            canvasEl.height = rgb.h;
+            const id = stageCtx.createImageData(rgb.w, rgb.h);
+            for (let i = 0; i < rgb.w * rgb.h; i++) {
+                const offset = i * 4;
+                id.data[offset] = rgb.r[i];
+                id.data[offset + 1] = rgb.g[i];
+                id.data[offset + 2] = rgb.b[i];
+                id.data[offset + 3] = 255;
+            }
+            stageCtx.putImageData(id, 0, 0);
+        }
+
+        function drawNeedleStage(canvasEl, buf, w, h, angleDeg, maxScan) {
+            drawGrayStage(canvasEl, buf, w, h);
+            const stageCtx = canvasEl.getContext('2d');
+            const cx = w >> 1;
+            const cy = h >> 1;
+            const radius = Math.min(cx, cy) - 2;
+            const len = radius * maxScan;
+            const radians = angleDeg * Math.PI / 180;
+            stageCtx.strokeStyle = '#ff4d4d';
+            stageCtx.lineWidth = 1;
+            stageCtx.beginPath();
+            stageCtx.moveTo(cx + 0.5, cy + 0.5);
+            stageCtx.lineTo(cx + 0.5 + Math.cos(radians) * len, cy + 0.5 + Math.sin(radians) * len);
+            stageCtx.stroke();
+            stageCtx.fillStyle = '#4f9cff';
+            stageCtx.fillRect(cx, cy, 1, 1);
+        }
+
+        function sampleCanvasColor(x, y) {
+            if (!rotatedImageData) return null;
+            const px = Math.max(0, Math.min(rotatedImageData.width - 1, Math.round(x)));
+            const py = Math.max(0, Math.min(rotatedImageData.height - 1, Math.round(y)));
+            const index = (py * rotatedImageData.width + px) * 4;
+            const data = rotatedImageData.data;
+            return {
+                r: data[index],
+                g: data[index + 1],
+                b: data[index + 2]
+            };
+        }
+
+        function rgbToHex(color) {
+            return `0x${[color.r, color.g, color.b].map((value) => value.toString(16).toUpperCase().padStart(2, '0')).join('')}`;
+        }
+
+        function normalizeHexColor(value) {
+            const raw = String(value || '').trim().toUpperCase();
+            const match = raw.match(/^(?:0X|#)?([0-9A-F]{6})$/);
+            if (!match) return null;
+            return `#${match[1]}`;
+        }
+
+        function updateDebugColorSwatch() {
+            const swatch = document.getElementById('debug_color_swatch');
+            const input = document.getElementById('debug_target_color');
+            if (!swatch || !input) return;
+            const hex = normalizeHexColor(input.value);
+            swatch.style.background = hex || '#ffffff';
+            swatch.style.opacity = hex ? '1' : '0.45';
+            swatch.title = hex ? `Selected color ${hex}` : 'Invalid color format (expected #RRGGBB or 0xRRGGBB)';
+        }
+
+        function setColorPickMode(enabled) {
+            colorPickMode = !!enabled;
+            state.isDrawing = false;
+            const button = document.getElementById('debug_pick_color_btn');
+            if (button) button.textContent = colorPickMode ? 'Click image...' : 'Pick from image';
+            canvas.style.cursor = colorPickMode ? 'crosshair' : 'default';
+        }
+
+        function setDebugTargetColor(hexValue) {
+            const input = document.getElementById('debug_target_color');
+            if (input) input.value = hexValue;
+            updateDebugColorSwatch();
+            setColorPickMode(false);
+            if (state.image) updateCanvas();
+        }
+
+        function drawProfileStage(canvasEl, profile, bestAngle) {
+            const w = canvasEl.width;
+            const h = canvasEl.height;
+            const stageCtx = canvasEl.getContext('2d');
+            stageCtx.fillStyle = '#000';
+            stageCtx.fillRect(0, 0, w, h);
+
+            let maxValue = 0;
+            for (let i = 0; i < 360; i++) if (profile[i] > maxValue) maxValue = profile[i];
+            if (maxValue <= 0) maxValue = 1;
+
+            stageCtx.strokeStyle = '#4f9cff';
+            stageCtx.lineWidth = 1;
+            stageCtx.beginPath();
+            for (let i = 0; i < 360; i++) {
+                const x = i / 360 * w;
+                const y = h - (profile[i] / maxValue) * (h - 2) - 1;
+                if (i === 0) stageCtx.moveTo(x, y);
+                else stageCtx.lineTo(x, y);
+            }
+            stageCtx.stroke();
+
+            const x = (bestAngle / 360) * w;
+            stageCtx.strokeStyle = '#ff4d4d';
+            stageCtx.beginPath();
+            stageCtx.moveTo(x, 0);
+            stageCtx.lineTo(x, h);
+            stageCtx.stroke();
+        }
+
+        function renderDialPreviews(debugResults) {
+            const container = document.getElementById('dial-preview-content');
+            if (!container) return;
+
+            if (!state.image || !debugResults.length) {
+                container.innerHTML = '<p class="help-text" style="margin:0;">Load an image and add at least one dial to see the stage previews.</p>';
+                return;
+            }
+
+            container.innerHTML = '';
+            const grid = document.createElement('div');
+            grid.className = 'dial-preview-grid';
+
+            debugResults.forEach((debug, index) => {
+                const card = document.createElement('section');
+                card.className = 'dial-preview-card';
+
+                const title = document.createElement('h4');
+                title.textContent = `Dial ${index + 1}`;
+                card.appendChild(title);
+
+                const summary = document.createElement('p');
+                summary.className = 'dial-preview-summary';
+                summary.textContent = `Value ${debug.value.toFixed(2)} | angle ${debug.angle.toFixed(1)}° | confidence ${debug.confidence.toFixed(2)} | kernel ${debug.kernel}`;
+                card.appendChild(summary);
+
+                const stages = document.createElement('div');
+                stages.className = 'dial-preview-stages';
+
+                debug.stages.forEach((stage) => {
+                    const stageBox = document.createElement('div');
+                    stageBox.className = 'dial-stage';
+                    const stageTitle = document.createElement('h5');
+                    stageTitle.textContent = stage.title;
+                    stageBox.appendChild(stageTitle);
+
+                    const stageCanvas = document.createElement('canvas');
+                    if (stage.kind === 'rgb') drawRGBStage(stageCanvas, stage.rgb);
+                    else if (stage.kind === 'gray') drawGrayStage(stageCanvas, stage.buf, stage.w, stage.h);
+                    else if (stage.kind === 'needle') drawNeedleStage(stageCanvas, stage.buf, stage.w, stage.h, stage.angle, stage.maxScan);
+                    else if (stage.kind === 'profile') {
+                        stageCanvas.width = 360;
+                        stageCanvas.height = 120;
+                        drawProfileStage(stageCanvas, stage.profile, stage.bestAngle);
+                    }
+                    stageBox.appendChild(stageCanvas);
+                    stages.appendChild(stageBox);
+                });
+
+                card.appendChild(stages);
+                grid.appendChild(card);
+            });
+
+            container.appendChild(grid);
+        }
+
+        function parseYamlText(text) {
+            const statePatch = {};
+            const digits = [];
+            const dials = [];
+            const lines = text.replace(/\r/g, '').split('\n');
+            const sections = {
+                globals: [],
+                esp32_camera_utils: [],
+                analog_reader: []
+            };
+
+            function parseBool(value) {
+                return /^(true|yes|on)$/i.test(String(value).trim());
+            }
+
+            function parseValue(value) {
+                let trimmed = String(value).trim();
+                const commentIndex = trimmed.search(/\s+#/);
+                if (commentIndex !== -1) {
+                    trimmed = trimmed.slice(0, commentIndex).trim();
+                }
+                if (/^(true|false)$/i.test(trimmed)) return parseBool(trimmed);
+                if (/^0x[0-9a-f]+$/i.test(trimmed)) return parseInt(trimmed, 16);
+                if (/^-?\d+(?:\.\d+)?$/.test(trimmed)) return parseFloat(trimmed);
+                return trimmed.replace(/^['"]|['"]$/g, '');
+            }
+
+            let currentSection = null;
+            for (const rawLine of lines) {
+                const line = rawLine.replace(/\t/g, '  ');
+                const trimmed = line.trim();
+                if (!trimmed || trimmed.startsWith('#')) continue;
+
+                if (!line.startsWith(' ')) {
+                    currentSection = trimmed.replace(/:.*$/, '');
+                    if (sections[currentSection]) continue;
+                    currentSection = null;
+                    continue;
+                }
+
+                if (currentSection && sections[currentSection]) {
+                    sections[currentSection].push(line);
+                }
+            }
+
+            let rotation = null;
+            let sensorW = null;
+            let sensorH = null;
+
+            const cameraText = sections.esp32_camera_utils.join('\n');
+            const rotationMatch = cameraText.match(/(?:^|\n)\s*rotation:\s*(.+)/);
+            if (rotationMatch) rotation = parseValue(rotationMatch[1]);
+            const resolutionMatch = cameraText.match(/(?:^|\n)\s*camera_resolution:\s*(\d+)x(\d+)\s*/);
+            if (resolutionMatch) {
+                sensorW = parseFloat(resolutionMatch[1]);
+                sensorH = parseFloat(resolutionMatch[2]);
+            }
+
+            const globalsText = sections.globals.join('\n');
+            const cropMatch = globalsText.match(/\[\[(.*?)\]\]/s);
+            if (cropMatch) {
+                const coords = cropMatch[1].split('],[').map(part => part.replace(/[\[\]]/g, '').split(',').map(v => parseFloat(v.trim())));
+                digits.splice(0, digits.length, ...coords.filter(zone => zone.length >= 4).map(zone => ({ x: zone[0], y: zone[1], w: zone[2] - zone[0], h: zone[3] - zone[1] })));
+            }
+
+            const analogLines = sections.analog_reader;
+            let inDials = false;
+            let current = null;
+            let currentTarget = null;
+
+            function finishCurrent() {
+                if (!current) return;
+                if (currentTarget === 'dials') dials.push(current);
+                current = null;
+                currentTarget = null;
+            }
+
+            for (const line of analogLines) {
+                const trimmed = line.trim();
+                if (!trimmed || trimmed.startsWith('#')) continue;
+
+                if (/^\s*dials:\s*$/.test(line)) {
+                    inDials = true;
+                    finishCurrent();
+                    continue;
+                }
+
+                if (!inDials) continue;
+
+                const dialStart = /^\s*-\s+id:\s*(.+)$/.exec(line);
+                if (dialStart) {
+                    finishCurrent();
+                    currentTarget = 'dials';
+                    current = { id: parseValue(dialStart[1]), cfg: {} };
+                    continue;
+                }
+
+                const keyMatch = /^\s+([A-Za-z0-9_]+):\s*(.*)$/.exec(line);
+                if (keyMatch && current) {
+                    const key = keyMatch[1];
+                    const value = keyMatch[2];
+                    if (key === 'crop_x' || key === 'crop_y' || key === 'crop_w' || key === 'crop_h' || key === 'scale' || key === 'min_angle' || key === 'max_angle' || key === 'angle_offset' || key === 'min_value' || key === 'max_value') {
+                        current[key] = parseValue(value);
+                    } else if (key === 'clockwise' || key === 'auto_contrast' || key === 'tophatOn' || key === 'tophat_on') {
+                        current.cfg[key] = parseBool(value);
+                    } else if (key === 'target_color') {
+                        current.cfg[key] = parseValue(value);
+                    } else if (key === 'color_tolerance' || key === 'contrast' || key === 'max_scan_radius' || key === 'deadzone_diameter' || key === 'min_angle' || key === 'max_angle' || key === 'angle_offset' || key === 'min_value' || key === 'max_value' || key === 'scale') {
+                        current.cfg[key] = parseValue(value);
+                    } else if (key === 'needle_type') {
+                        current.cfg[key] = String(value).trim().replace(/^['"]|['"]$/g, '');
+                    }
+                }
+            }
+
+            finishCurrent();
+            return { digits, dials, rotation, sensorW, sensorH, statePatch };
+        }
+
+        function applyImportedConfig(parsed) {
+            state.importedConfig = parsed;
+
+            if (parsed.rotation !== null && parsed.rotation !== undefined) {
+                state.rotation = parsed.rotation;
+                const input = document.getElementById('custom_rot');
+                if (input) input.value = parsed.rotation;
+            }
+
+            if (parsed.sensorW && parsed.sensorH) {
+                state.sensorRes = { w: parsed.sensorW, h: parsed.sensorH, name: `${parsed.sensorW}x${parsed.sensorH}` };
+                const label = document.getElementById('sensor-res-label');
+                if (label) label.textContent = state.sensorRes.name;
+            }
+
+            if (state.image && parsed.digits) {
+                state.digits = parsed.digits.map((zone) => {
+                    const vis = mapFromOriginal(zone.x, zone.y, zone.w, zone.h);
+                    return { x: Math.round(vis.x), y: Math.round(vis.y), w: Math.round(vis.w), h: Math.round(vis.h) };
+                });
+            } else if (parsed.digits) {
+                state.digits = parsed.digits;
+            }
+
+            if (state.image && parsed.dials) {
+                state.dials = parsed.dials.map((dial) => {
+                    const vis = mapFromOriginal(dial.crop_x || dial.x || 0, dial.crop_y || dial.y || 0, dial.crop_w || dial.w || 0, dial.crop_h || dial.h || 0);
+                    return { x: Math.round(vis.x), y: Math.round(vis.y), w: Math.round(vis.w), h: Math.round(vis.h), cfg: dial.cfg || {} };
+                });
+            } else if (parsed.dials) {
+                state.dials = parsed.dials.map((dial) => ({
+                    x: dial.crop_x ?? dial.x ?? 0,
+                    y: dial.crop_y ?? dial.y ?? 0,
+                    w: dial.crop_w ?? dial.w ?? 0,
+                    h: dial.crop_h ?? dial.h ?? 0,
+                    cfg: dial.cfg || {}
+                }));
+            }
+
+            const deadzoneInput = document.getElementById('debug_deadzone_diameter');
+            if (deadzoneInput && state.dials.length > 0) {
+                const firstDeadzone = state.dials[0]?.cfg?.deadzone_diameter;
+                if (Number.isFinite(firstDeadzone)) {
+                    deadzoneInput.value = String(Math.max(0, firstDeadzone));
+                }
+            }
+
+            updateCanvas();
+            generateOutput();
+        }
+
+        function handleConfigUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const parsed = parseYamlText(String(event.target.result || ''));
+                applyImportedConfig(parsed);
+                const status = document.getElementById('config-status');
+                if (status) status.textContent = `Loaded ${file.name}`;
+            };
+            reader.readAsText(file);
+        }
+
+        function bindDebugControlEvents() {
+            const ids = [
+                'debug_use_color', 'debug_target_color', 'debug_color_tolerance', 'debug_needle_type',
+                'debug_tophat', 'debug_auto_contrast', 'debug_contrast', 'debug_max_scan', 'debug_deadzone_diameter',
+                'debug_min_angle', 'debug_max_angle', 'debug_min_value', 'debug_max_value',
+                'debug_angle_offset', 'debug_clockwise'
+            ];
+
+            ids.forEach((id) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                const rerun = () => {
+                    if (id === 'debug_target_color') updateDebugColorSwatch();
+                    if (id === 'debug_deadzone_diameter') {
+                        const value = Math.max(0, parseFloat(el.value || '0'));
+                        state.dials.forEach((dial) => {
+                            if (!dial.cfg) dial.cfg = {};
+                            dial.cfg.deadzone_diameter = Number.isFinite(value) ? value : 0;
+                        });
+                        generateOutput();
+                    }
+                    if (state.image) updateCanvas();
+                };
+                el.addEventListener('change', rerun);
+                el.addEventListener('input', rerun);
+            });
+
+            const pickButton = document.getElementById('debug_pick_color_btn');
+            if (pickButton) {
+                pickButton.addEventListener('click', () => {
+                    setColorPickMode(!colorPickMode);
+                    if (!colorPickMode && state.image) updateCanvas();
+                });
+            }
+
+            updateDebugColorSwatch();
+        }
+
+        function getDialDebugSettings(dial) {
+            const cfg = dial && dial.cfg ? dial.cfg : {};
+            const useColor = cfg.target_color !== undefined || document.getElementById('debug_use_color')?.value === 'true';
+            return {
+                useColor,
+                targetColor: typeof cfg.target_color === 'number'
+                    ? cfg.target_color
+                    : parseInt((document.getElementById('debug_target_color')?.value || '0xFF0000').replace(/^#/, '0x'), 16) || 0,
+                colorTolerance: cfg.color_tolerance !== undefined ? cfg.color_tolerance : parseFloat(document.getElementById('debug_color_tolerance')?.value || '0'),
+                needleType: cfg.needle_type || document.getElementById('debug_needle_type')?.value || 'DARK',
+                tophatOn: cfg.tophatOn !== undefined ? cfg.tophatOn : (document.getElementById('debug_tophat')?.value !== 'false'),
+                autoContrast: cfg.auto_contrast !== undefined ? cfg.auto_contrast : (document.getElementById('debug_auto_contrast')?.value !== 'false'),
+                contrast: cfg.contrast !== undefined ? cfg.contrast : parseFloat(document.getElementById('debug_contrast')?.value || '1.0'),
+                maxScan: cfg.max_scan_radius !== undefined ? cfg.max_scan_radius : parseFloat(document.getElementById('debug_max_scan')?.value || '0.9'),
+                deadzoneDiameter: cfg.deadzone_diameter !== undefined ? cfg.deadzone_diameter : parseFloat(document.getElementById('debug_deadzone_diameter')?.value || '0'),
+                minAngle: cfg.min_angle !== undefined ? cfg.min_angle : parseFloat(document.getElementById('debug_min_angle')?.value || '0'),
+                maxAngle: cfg.max_angle !== undefined ? cfg.max_angle : parseFloat(document.getElementById('debug_max_angle')?.value || '360'),
+                minValue: cfg.min_value !== undefined ? cfg.min_value : parseFloat(document.getElementById('debug_min_value')?.value || '0'),
+                maxValue: cfg.max_value !== undefined ? cfg.max_value : parseFloat(document.getElementById('debug_max_value')?.value || '10'),
+                angleOffset: cfg.angle_offset !== undefined ? cfg.angle_offset : parseFloat(document.getElementById('debug_angle_offset')?.value || '0'),
+                clockwise: cfg.clockwise !== undefined ? cfg.clockwise : (document.getElementById('debug_clockwise')?.value !== 'false')
+            };
+        }
 
         // Init
         canvas.addEventListener('mousedown', startDrawing);
@@ -400,6 +1414,8 @@
         canvas.addEventListener('mouseup', stopDrawing);
         canvas.addEventListener('mouseleave', stopDrawing);
         document.getElementById('imageInput').addEventListener('change', handleImageUpload);
+        document.getElementById('configInput').addEventListener('change', handleConfigUpload);
+        bindDebugControlEvents();
 
         function handleImageUpload(e) {
             const file = e.target.files[0];
@@ -415,10 +1431,15 @@
                     document.getElementById('target_h').value = dims.h;
 
                     state.roi = null;
-                    state.digits = [];
                     updateImageInfo();
-                    updateCanvas();
-                    generateOutput();
+
+                    if (state.importedConfig) {
+                        applyImportedConfig(state.importedConfig);
+                    } else {
+                        state.digits = [];
+                        updateCanvas();
+                        generateOutput();
+                    }
                 };
                 img.src = event.target.result;
             };
@@ -524,6 +1545,7 @@
                         <li><strong>Shape</strong>: This creates a perfect SQUARE box (Orange).</li>
                         <li><strong>Order</strong>: Draw dials in order.</li>
                         <li><strong>Note</strong>: The AI uses 30-90% of the crop radius for needle detection.</li>
+                        <li><strong>Debug Panel</strong>: In analog mode, the Dial Debug Controls let you tweak detection parameters live.</li>
                     </ol>
                 `;
             }
@@ -545,7 +1567,6 @@
             // Update Help Sidebar
             updateHelp(mode);
 
-            // ... (Rest of visibility logic) ...
             // VISIBILITY LOGIC
             const hide = (id) => { const el = document.getElementById(id); if (el) el.style.display = 'none'; };
             const show = (id) => { const el = document.getElementById(id); if (el) el.style.display = 'block'; };
@@ -557,6 +1578,7 @@
             hide('card-actions-roi');
             hide('card-actions-digits');
             hide('card-actions-analog');
+            hide('card-dial-debug-controls');
 
             if (mode === 'roi') {
                 show('card-sensor-settings');
@@ -568,13 +1590,11 @@
             } else if (mode === 'analog') {
                 show('card-target-res');
                 show('card-actions-analog');
+                show('card-dial-debug-controls');
             }
 
             updateCanvas();
         }
-
-        // ... (Rest of existing JS functions) ...
-
 
         function getTransformedDimensions() {
             if (!state.image) return { w: 800, h: 600 };
@@ -591,15 +1611,34 @@
 
         function updateCanvas() {
             const dims = getTransformedDimensions();
+            if (!dims || !Number.isFinite(dims.w) || !Number.isFinite(dims.h) || dims.w < 1 || dims.h < 1) {
+                canvas.width = 800;
+                canvas.height = 600;
+                imageCanvas.width = 800;
+                imageCanvas.height = 600;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                imageCtx.clearRect(0, 0, imageCanvas.width, imageCanvas.height);
+                rotatedImageData = null;
+                ctx.fillStyle = '#ccc';
+                ctx.textAlign = 'center';
+                ctx.fillText('No Image Loaded', canvas.width / 2, canvas.height / 2);
+                renderDialPreviews([]);
+                return;
+            }
             canvas.width = dims.w;
             canvas.height = dims.h;
+            imageCanvas.width = dims.w;
+            imageCanvas.height = dims.h;
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            imageCtx.clearRect(0, 0, imageCanvas.width, imageCanvas.height);
+            rotatedImageData = null;
 
             if (!state.image) {
                 ctx.fillStyle = '#ccc';
                 ctx.textAlign = 'center';
                 ctx.fillText('No Image Loaded', canvas.width / 2, canvas.height / 2);
+                renderDialPreviews([]);
                 return;
             }
 
@@ -610,6 +1649,13 @@
             ctx.drawImage(state.image, -state.image.width / 2, -state.image.height / 2);
             ctx.restore();
 
+            imageCtx.save();
+            imageCtx.translate(imageCanvas.width / 2, imageCanvas.height / 2);
+            imageCtx.rotate(state.rotation * Math.PI / 180);
+            imageCtx.drawImage(state.image, -state.image.width / 2, -state.image.height / 2);
+            imageCtx.restore();
+            rotatedImageData = imageCtx.getImageData(0, 0, imageCanvas.width, imageCanvas.height);
+
             // Draw ROI
             if (state.roi) {
                 ctx.strokeStyle = '#3498db';
@@ -617,15 +1663,6 @@
                 ctx.fillStyle = 'rgba(52, 152, 219, 0.2)';
                 ctx.fillRect(state.roi.x, state.roi.y, state.roi.w, state.roi.h);
                 ctx.strokeRect(state.roi.x, state.roi.y, state.roi.w, state.roi.h);
-
-                // Dim outside ROI
-                /*
-                ctx.fillStyle = 'rgba(0,0,0,0.5)';
-                ctx.beginPath();
-                ctx.rect(0, 0, canvas.width, canvas.height);
-                ctx.rect(state.roi.x, state.roi.y, state.roi.w, state.roi.h);
-                ctx.fill('evenodd');
-                */
 
                 // Sync Manual Inputs to Visual ROI
                 if (!state.isManualUpdate) {
@@ -649,28 +1686,37 @@
 
             // Draw Dials
             drawZones(state.dials, '#f39c12', 'D');
+
+            const dialDebugResults = [];
+            if (state.dials.length > 0 && rotatedImageData) {
+                state.dials.forEach((dial, index) => {
+                    const debug = runDialDebug(dial, dial);
+                    if (debug) {
+                        dialDebugResults.push(debug);
+                        drawDialDebugOverlay(dial, index, debug);
+                    }
+                });
+            }
+
+            renderDialPreviews(dialDebugResults);
         }
 
         // Coordinate Mapping: Rotated (Canvas) -> Original (Sensor)
-        // Returns the Bounding Box in Sensor Space that contains the Visual Box
         function mapToOriginal(x, y, w, h) {
-            const W = state.image.width; // Sensor W
-            const H = state.image.height; // Sensor H
+            const W = state.image.width;
+            const H = state.image.height;
 
-            // Canvas Center (Visual)
             const dims = getTransformedDimensions();
             const cx = dims.w / 2;
             const cy = dims.h / 2;
 
-            // Source Center (Sensor)
             const ocx = W / 2;
             const ocy = H / 2;
 
-            const rad = -state.rotation * Math.PI / 180; // Inverse rotation
+            const rad = -state.rotation * Math.PI / 180;
             const cos = Math.cos(rad);
             const sin = Math.sin(rad);
 
-            // Visual Keypoints (TL, TR, BL, BR) relative to center
             const points = [
                 { x: x, y: y },
                 { x: x + w, y: y },
@@ -681,15 +1727,12 @@
             let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
             points.forEach(p => {
-                // translate to center
                 const dx = p.x - cx;
                 const dy = p.y - cy;
 
-                // rotate
                 const ox_rel = dx * cos - dy * sin;
                 const oy_rel = dx * sin + dy * cos;
 
-                // translate back to source center
                 const ox = ox_rel + ocx;
                 const oy = oy_rel + ocy;
 
@@ -699,7 +1742,6 @@
                 if (oy > maxY) maxY = oy;
             });
 
-            // Clamp to sensor bounds
             minX = Math.max(0, minX);
             minY = Math.max(0, minY);
             maxX = Math.min(W, maxX);
@@ -718,18 +1760,15 @@
         }
 
         function calculateZoneCoordinates(vis_rect, off_x, off_y, scale_x, scale_y, w, h) {
-            // 1. Visual -> Sensor Global (Original Unrotated)
             const sensor_g = mapToOriginal(vis_rect.x, vis_rect.y, vis_rect.w, vis_rect.h);
             const d_sensor_x = sensor_g.x * scale_x;
             const d_sensor_y = sensor_g.y * scale_y;
             const d_sensor_w = sensor_g.w * scale_x;
             const d_sensor_h = sensor_g.h * scale_y;
 
-            // 2. Relativize to Snapped Window (in Sensor Space)
             let rel_x = d_sensor_x - off_x;
             let rel_y = d_sensor_y - off_y;
 
-            // 3. Transform to Configured Rotation Space (Final Output)
             let out_w = (state.rotation % 180 === 0) ? w : h;
             let out_h = (state.rotation % 180 === 0) ? h : w;
 
@@ -749,21 +1788,39 @@
             zones.forEach((d, i) => {
                 ctx.strokeStyle = color;
                 ctx.lineWidth = 2;
-                // Light transparent fill matching stroke
-                // Simple hack: assume hex color input and add opacity? 
-                // Or just hardcode based on type since we only resolve duplication.
-                // The original code used different fill colors.
-                // For 'digits' (#2ecc71) -> rgba(46, 204, 113, 0.3)
-                // For 'dials' (#f39c12) -> rgba(243, 156, 18, 0.3)
-                // We'll keep it simple and just set styles here based on color input being a key or just hardcode if easy.
 
-                // Let's stick to original colors by checking color string since we only have 2 types
                 if (color === '#2ecc71') ctx.fillStyle = 'rgba(46, 204, 113, 0.3)';
                 else if (color === '#f39c12') ctx.fillStyle = 'rgba(243, 156, 18, 0.3)';
                 else ctx.fillStyle = 'rgba(128, 128, 128, 0.3)';
 
                 ctx.fillRect(d.x, d.y, d.w, d.h);
                 ctx.strokeRect(d.x, d.y, d.w, d.h);
+
+                if (labelPrefix === 'D') {
+                    const cx = d.x + d.w / 2;
+                    const cy = d.y + d.h / 2;
+                    const radius = Math.max(4, Math.min(d.w, d.h) / 2 - 3);
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    const deadzoneDiameter = getDialDebugSettings(d).deadzoneDiameter || 0;
+                    const deadzoneRadius = Math.max(0, Math.min(radius - 1, deadzoneDiameter * 0.5));
+                    if (deadzoneRadius >= 1) {
+                        ctx.save();
+                        ctx.strokeStyle = 'rgba(0, 255, 255, 0.95)';
+                        ctx.fillStyle = 'rgba(0, 255, 255, 0.12)';
+                        ctx.lineWidth = 1.5;
+                        ctx.setLineDash([4, 3]);
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, deadzoneRadius, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+                }
 
                 ctx.fillStyle = '#fff';
                 ctx.font = '12px sans-serif';
@@ -773,7 +1830,6 @@
         }
 
         function checkOutsideROI(x, y, w, h, name) {
-            // Define the bounding box (Visual Coordinates)
             let box_x = 0;
             let box_y = 0;
             let box_w = canvas.width;
@@ -786,7 +1842,6 @@
                 box_h = state.roi.h;
             }
 
-            // Strict check with 1px margin
             const margin = 1;
             const safe_x1 = box_x + margin;
             const safe_y1 = box_y + margin;
@@ -817,9 +1872,7 @@
             let target_h = parseInt(target_h_in);
             let use_scaling = !isNaN(target_w) && !isNaN(target_h) && target_w > 0 && target_h > 0;
 
-            // ... (Dimensions) ...
-
-            // Image Dimensions (Unrotated - how it was loaded)
+            // Image Dimensions (Unrotated)
             const img_w = state.image.width;
             const img_h = state.image.height;
 
@@ -836,29 +1889,25 @@
             // ROI Variables
             let off_x = 0;
             let off_y = 0;
-            let w = sensor_w; // Default to full sensor
+            let w = sensor_w;
             let h = sensor_h;
 
             if (state.roi) {
-                // 1. Map Visual ROI -> Unrotated Image Coordinates (0-img_w)
                 const visROI = mapToOriginal(state.roi.x, state.roi.y, state.roi.w, state.roi.h);
 
-                // 2. Scale to Sensor Coordinates
                 let raw_x = visROI.x * scale_x;
                 let raw_y = visROI.y * scale_y;
                 let raw_w = visROI.w * scale_x;
                 let raw_h = visROI.h * scale_y;
 
                 if (state.force43) {
-                    // Force 4:3 Ratio logic (also adhering to Divisible by 8)
                     let nw = raw_w / 32;
                     let nh = raw_h / 24;
                     let n = Math.max(1, Math.round(Math.max(nw, nh)));
 
                     let target_w = n * 32;
-                    let target_h = n * 24; // 4:3 ratio (Div 8)
+                    let target_h = n * 24;
 
-                    // Center it
                     let cx = raw_x + raw_w / 2;
                     let cy = raw_y + raw_h / 2;
 
@@ -870,20 +1919,13 @@
                     w = target_w;
                     h = target_h;
                 } else {
-                    // 3. Snap to 8 (Flexible Ratio)
                     off_x = snapTo8(Math.max(0, raw_x));
                     off_y = snapTo8(Math.max(0, raw_y));
                     w = snapTo8(Math.max(8, raw_w));
                     h = snapTo8(Math.max(8, raw_h));
                 }
-
-                // 4. Bounds Check (Sensor Space)
-                // Just for internal logic, logic below will print if needed.
             }
 
-            // Scaling Factor for Crop Zones
-            // The ROI determines the "Source" image size (w, h)
-            // If use_scaling is true, we map (w, h) -> (target_w, target_h)
             let final_scale_x = 1.0;
             let final_scale_y = 1.0;
 
@@ -899,19 +1941,15 @@
             lines.push(`globals:`);
             lines.push(`  - id: \${id_prefix}_crop_zones`);
             lines.push(`    type: std::string`);
-            // lines.push(`    # restore_value: true`);
             lines.push(`    max_restore_data_length: 254`);
 
             // Calculate Crop Zones first to populate initial_value
             let raw_crop_zones = [];
-            // Merge digits and dials -> ONLY DIGITS for global variable now
             let all_zones = [...state.digits];
 
             all_zones.forEach(z => {
-                // Calculate Scaled & Relativized Coordinates
                 let res = calculateZoneCoordinates(z, off_x, off_y, scale_x, scale_y, w, h);
 
-                // Apply Final Output Scaling
                 if (use_scaling) {
                     res.x = Math.round(res.x * final_scale_x);
                     res.y = Math.round(res.y * final_scale_y);
@@ -923,16 +1961,14 @@
             });
 
             lines.push(`    initial_value: '"[${raw_crop_zones.join(',')}]"'`);
-            lines.push(``); // Spacer
+            lines.push(``);
 
             lines.push(`esp32_camera_utils:`);
             lines.push(`  id: \${id_prefix}_camera_utils`);
             lines.push(`  camera_id: \${id_prefix}_espcam`);
             lines.push(`  # debug: true`);
-            lines.push(`  ### zoom availale for OV2640, OV3660, OV5640, SC101IOT, SC030IOT from crop zones (explicit)`);
 
             if (state.roi) {
-                // Explanatory Comments for Swapped Dims
                 let comment_w = "# multiple of 8";
                 let comment_h = "# multiple of 8";
                 if (state.rotation === 90 || state.rotation === 270) {
@@ -940,14 +1976,13 @@
                     comment_h += " (Visual Width)";
                 }
 
-                // Bounds Check (Sensor Space)
                 if (off_x + w > sensor_w) lines.push(`  # WARNING: ROI width exceeds sensor bounds!`);
                 if (off_y + h > sensor_h) lines.push(`  # WARNING: ROI height exceeds sensor bounds!`);
 
                 lines.push(`  camera_window:`);
                 lines.push(`    offset_x: ${off_x} # multiple of 4`);
                 lines.push(`    offset_y: ${off_y} # multiple of 4`);
-                lines.push(`    width: ${w} ${comment_w} #Enforcement: 4:3 Aspect Ratio (W/H = 160/120)`);
+                lines.push(`    width: ${w} ${comment_w}`);
                 lines.push(`    height: ${h} ${comment_h}`);
             } else {
                 lines.push(`  # No camera_window defined (Full Sensor or default)`);
@@ -955,7 +1990,7 @@
 
             lines.push(``);
             lines.push(`  enable_rotation: true`);
-            lines.push(`  rotation: ${state.rotation} # 0, 90, 180, 270 (special case built-in "accelerated" for 90, 180, 270 )`);
+            lines.push(`  rotation: ${state.rotation} # 0, 90, 180, 270`);
 
             // Add Debug Comments at bottom
             lines.push(``);
@@ -969,24 +2004,23 @@
             }
             if (anisotropic) lines.push(`# WARNING: Anisotropic scaling input detected!`);
 
+            // Read current debug settings for per-dial defaults
+            const globSettings = readDebugSettings();
+
             // Analog Dials Generation
             if (state.dials.length > 0) {
                 lines.push(``);
-                lines.push(`analog_reader: # DEV !`);
+                lines.push(`analog_reader:`);
                 lines.push(`  id: \${id_prefix}_analog_reader`);
                 lines.push(`  camera_id: \${id_prefix}_espcam`);
                 // lines.push(`  # validator: \${id_prefix}_analog_validator`);
                 lines.push(`  debug: true`);
-                lines.push(`  value_sensor:`);
-                lines.push(`    name: "Analog Total"`);
                 lines.push(`  update_interval: 60s`);
                 lines.push(`  dials:`);
 
                 state.dials.forEach((d, i) => {
-                    // Calculate Scaled & Relativized Coordinates (Same logic as digits)
                     let res = calculateZoneCoordinates(d, off_x, off_y, scale_x, scale_y, w, h);
 
-                    // Apply Final Output Scaling
                     if (use_scaling) {
                         res.x = Math.round(res.x * final_scale_x);
                         res.y = Math.round(res.y * final_scale_y);
@@ -994,16 +2028,35 @@
                         res.h = Math.round(res.h * final_scale_y);
                     }
 
+                    const dialCfg = d.cfg || {};
+
                     lines.push(`    - id: dial_${i + 1}`);
-                    lines.push(`      scale: 0.1`);
+                    lines.push(`      scale: ${dialCfg.scale !== undefined ? dialCfg.scale : '0.1'}`);
                     lines.push(`      crop_x: ${res.x}`);
                     lines.push(`      crop_y: ${res.y}`);
                     lines.push(`      crop_w: ${res.w}`);
                     lines.push(`      crop_h: ${res.h}`);
-                    lines.push(`      min_angle: 0`);
-                    lines.push(`      max_angle: 360`);
-                    lines.push(`      min_value: 0`);
-                    lines.push(`      max_value: 10`);
+                    
+                    const deadzone = dialCfg.deadzone_diameter !== undefined
+                        ? dialCfg.deadzone_diameter
+                        : globSettings.deadzoneDiameter;
+                    lines.push(`      deadzone_diameter: ${Number.isFinite(deadzone) ? deadzone : 0}`);
+                    
+                    lines.push(`      min_angle: ${dialCfg.min_angle !== undefined ? dialCfg.min_angle : globSettings.minAngle}`);
+                    lines.push(`      max_angle: ${dialCfg.max_angle !== undefined ? dialCfg.max_angle : globSettings.maxAngle}`);
+                    lines.push(`      min_value: ${dialCfg.min_value !== undefined ? dialCfg.min_value : globSettings.minValue}`);
+                    lines.push(`      max_value: ${dialCfg.max_value !== undefined ? dialCfg.max_value : globSettings.maxValue}`);
+                    lines.push(`      angle_offset: ${dialCfg.angle_offset !== undefined ? dialCfg.angle_offset : globSettings.angleOffset}`);
+                    
+                    const clockwise = dialCfg.clockwise !== undefined ? dialCfg.clockwise : globSettings.clockwise;
+                    lines.push(`      clockwise: ${clockwise}`);
+                    
+                    if (dialCfg.target_color !== undefined) {
+                        lines.push(`      target_color: ${dialCfg.target_color}`);
+                    }
+                    if (dialCfg.color_tolerance !== undefined) {
+                        lines.push(`      color_tolerance: ${dialCfg.color_tolerance}`);
+                    }
                 });
             }
 
@@ -1021,19 +2074,23 @@
 
         function startDrawing(e) {
             if (!state.image) return;
+            if (colorPickMode) {
+                handleCanvasPickColor(e);
+                return;
+            }
             state.isDrawing = true;
             state.startPos = getMousePos(e);
         }
 
         function draw(e) {
             if (!state.isDrawing) return;
+            if (colorPickMode) return;
             const pos = getMousePos(e);
             const w = pos.x - state.startPos.x;
             const h = pos.y - state.startPos.y;
 
             updateCanvas(); // Clear old partial rect
 
-            // Draw scratch rect
             let color = '#3498db'; // ROI
             if (state.mode === 'digits') color = '#2ecc71';
             if (state.mode === 'analog') color = '#f39c12';
@@ -1043,12 +2100,28 @@
             ctx.setLineDash([5, 5]);
 
             if (state.mode === 'analog') {
-                // ctx.strokeStyle = '#f39c12'; // Consolidate color logic removed
-                // Center-based Square
                 let dist = Math.max(Math.abs(pos.x - state.startPos.x), Math.abs(pos.y - state.startPos.y));
                 let cx = state.startPos.x;
                 let cy = state.startPos.y;
                 ctx.strokeRect(cx - dist, cy - dist, dist * 2, dist * 2);
+                ctx.beginPath();
+                ctx.arc(cx, cy, dist, 0, Math.PI * 2);
+                ctx.stroke();
+
+                const deadzoneDiameter = parseFloat(document.getElementById('debug_deadzone_diameter')?.value || '0');
+                const deadzoneRadius = Math.max(0, Math.min(dist - 1, deadzoneDiameter * 0.5));
+                if (deadzoneRadius >= 1) {
+                    ctx.save();
+                    ctx.strokeStyle = 'rgba(0, 255, 255, 0.95)';
+                    ctx.fillStyle = 'rgba(0, 255, 255, 0.12)';
+                    ctx.lineWidth = 1.5;
+                    ctx.setLineDash([4, 3]);
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, deadzoneRadius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                    ctx.restore();
+                }
             } else {
                 ctx.strokeRect(state.startPos.x, state.startPos.y, w, h);
             }
@@ -1056,16 +2129,27 @@
             ctx.setLineDash([]);
         }
 
+        function handleCanvasPickColor(e) {
+            if (!colorPickMode) return false;
+            const pos = getMousePos(e);
+            const color = sampleCanvasColor(pos.x, pos.y);
+            if (color) setDebugTargetColor(rgbToHex(color));
+            return true;
+        }
+
         function stopDrawing(e) {
+            if (colorPickMode) {
+                handleCanvasPickColor(e);
+                state.isDrawing = false;
+                return;
+            }
             if (!state.isDrawing) return;
             state.isDrawing = false;
             const pos = getMousePos(e);
 
-            // Normalize Rect
             let x, y, w, h;
 
             if (state.mode === 'analog') {
-                // Center-based Square
                 let dist = Math.max(Math.abs(pos.x - state.startPos.x), Math.abs(pos.y - state.startPos.y));
                 let cx = state.startPos.x;
                 let cy = state.startPos.y;
@@ -1080,19 +2164,18 @@
                 h = Math.abs(pos.y - state.startPos.y);
             }
 
-            // Snap/Min size
             if (w < 4 || h < 4) return;
 
             if (state.mode === 'roi') {
                 state.roi = { x, y, w, h };
-                state.digits = []; // Reset digits if ROI changes
+                state.digits = [];
                 state.dials = [];
             } else if (state.mode === 'digits') {
                 if (checkOutsideROI(x, y, w, h, 'Zone')) return;
                 state.digits.push({ x: x, y: y, w: w, h: h });
             } else if (state.mode === 'analog') {
                 if (checkOutsideROI(x, y, w, h, 'Dial')) return;
-                state.dials.push({ x: x, y: y, w: w, h: h });
+                state.dials.push({ x: x, y: y, w: w, h: h, cfg: {} });
             }
 
             updateCanvas();
@@ -1101,8 +2184,8 @@
 
         function resetCurrent() {
             if (state.mode === 'roi') state.roi = null;
-            if (state.mode === 'digits') state.digits.pop(); // Undo last
-            if (state.mode === 'analog') state.dials.pop(); // Undo last
+            if (state.mode === 'digits') state.digits.pop();
+            if (state.mode === 'analog') state.dials.pop();
             updateCanvas();
             generateOutput();
         }
@@ -1124,13 +2207,13 @@
                 console.error('Failed to copy text: ', err);
             });
         }
+
         // Coordinate Mapping: Original (Sensor) -> Rotated (Canvas) - INVERSE
         function mapFromOriginal(ox, oy, ow, oh) {
             const W = state.image.width;
             const H = state.image.height;
             let x, y, w, h;
 
-            // Rotated Dims (Canvas Dims)
             const RW = (state.rotation % 180 === 0) ? W : H;
             const RH = (state.rotation % 180 === 0) ? H : W;
 
@@ -1139,32 +2222,20 @@
                     x = ox; y = oy; w = ow; h = oh;
                     break;
                 case 90:
-                    // Inverse 90 CW
-                    // x = RW - oy - oh
-                    // y = ox
-                    // w = oh
-                    // h = ow
                     x = RW - oy - oh;
                     y = ox;
                     w = oh;
                     h = ow;
                     break;
                 case 180:
-                    // Inverse 180
-                    // x = RW - ox - ow
-                    // y = RH - oy - oh
                     x = RW - ox - ow;
                     y = RH - oy - oh;
                     w = ow;
                     h = oh;
                     break;
-                case 270: // 90 CCW
-                    // Inverse 270 (which is 90 CW from Rotated perspective)
-                    // x = oy
-                    // y = RH - ox - w (wait, h?)
-                    // From mapToOrignial 270: ox = RH - (y+h). -> ox = RH - y - h -> y = RH - ox - h. Correct.
+                case 270:
                     x = oy;
-                    y = RH - ox - ow; // FIXED: Visual Y depends on Visual Height (Sensor Width)
+                    y = RH - ox - ow;
                     w = oh;
                     h = ow;
                     break;
@@ -1175,13 +2246,11 @@
 
         function updateROIFromInput() {
             if (!state.image) return;
-            // Inputs are SENSOR coordinates
             const off_x = parseInt(document.getElementById('manual_x').value) || 0;
             const off_y = parseInt(document.getElementById('manual_y').value) || 0;
             const w_in = parseInt(document.getElementById('manual_w').value) || 100;
             const h_in = parseInt(document.getElementById('manual_h').value) || 100;
 
-            // 1. Unscale: Sensor -> Unrotated Image Space
             const img_w = state.image.width;
             const img_h = state.image.height;
             const sensor_w = state.sensorRes.w;
@@ -1195,10 +2264,8 @@
             let ow = w_in / scale_x;
             let oh = h_in / scale_y;
 
-            // 2. Unmap: Unrotated Image Space -> Rotated Visual Space
             const vis = mapFromOriginal(ox, oy, ow, oh);
 
-            // 3. Set State (Visual)
             state.roi = {
                 x: Math.round(vis.x),
                 y: Math.round(vis.y),
@@ -1206,12 +2273,11 @@
                 h: Math.round(vis.h)
             };
 
-            state.isManualUpdate = true; // prevent loop
+            state.isManualUpdate = true;
             updateCanvas();
-            generateOutput(); // This will snap values and update inputs again, but that's okay (auto-correction)
+            generateOutput();
             state.isManualUpdate = false;
         }
-
 
         setMode("roi");
     </script>

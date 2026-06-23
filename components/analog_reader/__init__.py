@@ -22,6 +22,7 @@ CONF_SCALE = "scale"
 CONF_MIN_ANGLE = "min_angle"
 CONF_MAX_ANGLE = "max_angle"
 CONF_ANGLE_OFFSET = "angle_offset"
+CONF_CLOCKWISE = "clockwise"
 CONF_MIN_VALUE = "min_value"
 CONF_MAX_VALUE = "max_value"
 CONF_CROP_X = "crop_x"
@@ -33,6 +34,7 @@ CONF_PAUSED = "paused"
 CONF_AUTO_CONTRAST = "auto_contrast"
 CONF_CONTRAST = "contrast"
 CONF_DEBUG = "debug"
+CONF_STACKED_DIGITS = "stacked_digits"
 
 CONF_NEEDLE_TYPE = "needle_type"
 CONF_TYPE_DARK = "DARK"
@@ -52,6 +54,7 @@ CONF_RAW = "raw"
 CONF_MAPPED = "mapped"
 CONF_MIN_SCAN_RADIUS = "min_scan_radius"
 CONF_MAX_SCAN_RADIUS = "max_scan_radius"
+CONF_DEADZONE_DIAMETER = "deadzone_diameter"
 CONF_PROCESS_CHANNEL = "process_channel"
 CONF_CHANNEL_GRAYSCALE = "GRAYSCALE"
 CONF_CHANNEL_RED = "RED"
@@ -81,13 +84,16 @@ DIAL_SCHEMA = cv.Schema({
     cv.Optional(CONF_MIN_ANGLE, default=0): cv.float_,
     cv.Optional(CONF_MAX_ANGLE, default=360): cv.float_,
     cv.Optional(CONF_ANGLE_OFFSET, default=0): cv.float_, 
+    cv.Optional(CONF_CLOCKWISE, default=True): cv.boolean,
     cv.Optional(CONF_MIN_VALUE, default=0): cv.float_,
     cv.Optional(CONF_MAX_VALUE, default=10): cv.float_,
     cv.Optional(CONF_MIN_SCAN_RADIUS, default=0.3): cv.float_,
     cv.Optional(CONF_MAX_SCAN_RADIUS, default=0.9): cv.float_,
+    cv.Optional(CONF_DEADZONE_DIAMETER, default=0.0): cv.float_,
     cv.Optional(CONF_AUTO_CONTRAST, default=True): cv.boolean,
     cv.Optional(CONF_CONTRAST, default=1.0): cv.float_,
     cv.Optional("target_color"): cv.hex_int, 
+    cv.Optional("color_tolerance", default=0.0): cv.float_,
     
     # Per-dial sensors
     cv.Optional(CONF_VALUE): sensor.sensor_schema(),
@@ -110,6 +116,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Required(CONF_DIALS): cv.ensure_list(DIAL_SCHEMA),
     cv.Optional(CONF_PAUSED, default=False): cv.boolean,
     cv.Optional(CONF_DEBUG, default=False): cv.boolean,
+    cv.Optional(CONF_STACKED_DIGITS, default=False): cv.boolean,
 }).extend(cv.polling_component_schema("60s"))
 
 
@@ -133,6 +140,9 @@ async def to_code(config):
         
     if config[CONF_DEBUG]:
         cg.add(var.set_debug(True))
+
+    if config[CONF_STACKED_DIGITS]:
+        cg.add(var.set_stacked_digits(True))
 
     if CONF_VALUE_SENSOR in config:
         sens = await sensor.new_sensor(config[CONF_VALUE_SENSOR])
@@ -160,15 +170,18 @@ async def to_code(config):
             ("min_angle", dial[CONF_MIN_ANGLE]),
             ("max_angle", dial[CONF_MAX_ANGLE]),
             ("angle_offset", dial[CONF_ANGLE_OFFSET]),
+            ("clockwise", dial[CONF_CLOCKWISE]),
             ("min_value", dial[CONF_MIN_VALUE]),
             ("max_value", dial[CONF_MAX_VALUE]),
             ("auto_contrast", dial[CONF_AUTO_CONTRAST]),
             ("contrast", dial[CONF_CONTRAST]),
             ("target_color", dial.get("target_color", 0)),
             ("use_color", "target_color" in dial),
+            ("color_tolerance", dial["color_tolerance"]),
             ("process_channel", dial[CONF_PROCESS_CHANNEL]),
             ("min_scan_radius", dial[CONF_MIN_SCAN_RADIUS]),
             ("max_scan_radius", dial[CONF_MAX_SCAN_RADIUS]),
+            ("deadzone_diameter", dial[CONF_DEADZONE_DIAMETER]),
             ("value_sensor", await sensor.new_sensor(dial[CONF_VALUE]) if CONF_VALUE in dial else None),
             ("confidence_sensor", await sensor.new_sensor(dial[CONF_CONFIDENCE]) if CONF_CONFIDENCE in dial else None),
             ("angle_sensor", await sensor.new_sensor(dial[CONF_ANGLE]) if CONF_ANGLE in dial else None),

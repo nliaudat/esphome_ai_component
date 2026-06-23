@@ -257,7 +257,8 @@ AnalogReader::DetectionResult AnalogReader::detect_radial_profile(const uint8_t*
     std::vector<float> edge_strength(360, 0.0f);
     
     // Connectivity Scan
-    int start_r = 5; // Start close to center (skip nut)
+    int deadzone_r = static_cast<int>(std::max(0.0f, dial.deadzone_diameter * 0.5f));
+    int start_r = std::max(5, deadzone_r); // Start after center deadzone
     int max_radius_scan = static_cast<int>(radius * dial.max_scan_radius);
     
     // Configurable gap threshold
