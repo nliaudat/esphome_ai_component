@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -492,31 +493,47 @@
                     onclick="state.digits=[]; updateCanvas(); generateOutput();">Clear All Digits</button>
             </div>
             <div id="card-actions-analog" class="card" style="display:none;">
-                <h3>Actions</h3>
+                <h3>Analog Dials</h3>
+                <!-- Dial Management Toolbar -->
+                <div id="dial-toolbar" style="display:flex; gap:6px; align-items:center; margin-bottom:12px; flex-wrap:wrap;">
+                    <label style="font-size:0.85em; font-weight:600; color:#4b5a69;">Dial:</label>
+                    <select id="selected_dial" onchange="onDialSelect(parseInt(this.value))" style="flex:1; min-width:80px; padding:6px 8px; border:1px solid #cfd8e3; border-radius:6px; font:inherit; background:#fff;">
+                        <option value="-1">(none)</option>
+                    </select>
+                    <button class="btn btn-secondary" title="Add default dial at center" onclick="addDefaultDial()" style="padding:6px 10px; font-size:1.1em;">➕</button>
+                    <button class="btn btn-secondary" title="Delete selected dial" onclick="deleteSelectedDial()" style="padding:6px 10px; font-size:1.1em;">🗑️</button>
+                    <button class="btn btn-danger" title="Clear all dials" onclick="state.dials=[]; state.selectedDial=-1; updateDialSelector(); updateCanvas(); generateOutput();" style="padding:6px 10px; font-size:1.1em;">♻️</button>
+                </div>
+
                 <div id="card-dial-debug-controls" style="display:none;">
-                    <h4>Dial Debug Controls</h4>
+                    <h4>Dial Parameters</h4>
                     <div class="dial-control-grid">
-                        <label class="dial-control"><span>Color detection</span><select id="debug_use_color"><option value="true">Enabled</option><option value="false">Disabled</option></select></label>
-                        <label class="dial-control"><span>Target color</span><div class="dial-control-inline"><input id="debug_target_color" type="text" value="0xFF0000"><button class="btn btn-secondary" type="button" id="debug_pick_color_btn" style="padding:7px 10px; white-space:nowrap;">Pick from image</button><span id="debug_color_swatch" class="dial-color-swatch" title="Selected color"></span></div></label>
-                        <label class="dial-control"><span>Color tolerance</span><input id="debug_color_tolerance" type="number" value="0" min="0" max="442" step="1"></label>
-                        <label class="dial-control"><span>Needle type</span><select id="debug_needle_type"><option value="DARK">DARK</option><option value="LIGHT">LIGHT</option></select></label>
-                        <label class="dial-control"><span>Top-hat</span><select id="debug_tophat"><option value="true">Enabled</option><option value="false">Disabled</option></select></label>
-                        <label class="dial-control"><span>Auto contrast</span><select id="debug_auto_contrast"><option value="true">Enabled</option><option value="false">Disabled</option></select></label>
-                        <label class="dial-control"><span>Contrast</span><input id="debug_contrast" type="number" value="1.0" step="0.1"></label>
-                        <label class="dial-control"><span>Max scan radius</span><input id="debug_max_scan" type="number" value="0.9" step="0.05" min="0" max="1"></label>
-                        <label class="dial-control"><span>Deadzone diameter (px)</span><input id="debug_deadzone_diameter" type="number" value="0" step="1" min="0"></label>
-                        <label class="dial-control"><span>Min angle</span><input id="debug_min_angle" type="number" value="0" step="1"></label>
-                        <label class="dial-control"><span>Max angle</span><input id="debug_max_angle" type="number" value="360" step="1"></label>
-                        <label class="dial-control"><span>Min value</span><input id="debug_min_value" type="number" value="0" step="0.01"></label>
-                        <label class="dial-control"><span>Max value</span><input id="debug_max_value" type="number" value="10" step="0.01"></label>
-                        <label class="dial-control"><span>Angle offset</span><input id="debug_angle_offset" type="number" value="0" step="1"></label>
-                        <label class="dial-control"><span>Clockwise</span><select id="debug_clockwise"><option value="true">Enabled</option><option value="false">Disabled</option></select></label>
+                        <label class="dial-control"><span>Algorithm</span><select id="debug_algorithm" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"><option value="radial_profile">radial_profile</option><option value="hough_transform">hough_transform</option><option value="template_match">template_match</option><option value="legacy" selected>legacy</option><option value="auto">auto</option></select></label>
+                        <label class="dial-control"><span>Needle type</span><select id="debug_needle_type" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"><option value="DARK">DARK</option><option value="LIGHT">LIGHT</option></select></label>
+                        <label class="dial-control"><span>Process channel</span><select id="debug_process_channel" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"><option value="GRAYSCALE">GRAYSCALE</option><option value="RED">RED</option><option value="GREEN">GREEN</option><option value="BLUE">BLUE</option></select></label>
+                        <label class="dial-control"><span>Color detection</span><select id="debug_use_color" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"><option value="true">Enabled</option><option value="false">Disabled</option></select></label>
+                        <label class="dial-control"><span>Target color</span><div class="dial-control-inline"><input id="debug_target_color" type="text" value="0xFF0000" onchange="saveUIToCfg(state.selectedDial); updateDebugColorSwatch(); updateCanvas(); generateOutput();"><button class="btn btn-secondary" type="button" id="debug_pick_color_btn" style="padding:7px 10px; white-space:nowrap;">Pick</button><span id="debug_color_swatch" class="dial-color-swatch" title="Selected color"></span></div></label>
+                        <label class="dial-control"><span>Color tolerance</span><input id="debug_color_tolerance" type="number" value="0" min="0" max="442" step="1" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();" oninput="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"></label>
+                        <label class="dial-control"><span>Top-hat</span><select id="debug_tophat" onchange="if(state.selectedDial>=0)saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"><option value="true">Enabled</option><option value="false" selected>Disabled</option></select></label>
+                        <label class="dial-control"><span>Auto contrast</span><select id="debug_auto_contrast" onchange="if(state.selectedDial>=0)saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"><option value="true">Enabled</option><option value="false">Disabled</option></select></label>
+                        <label class="dial-control"><span>Contrast</span><input id="debug_contrast" type="number" value="1.0" step="0.1" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();" oninput="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"></label>
+                        <label class="dial-control"><span>Min scan radius</span><input id="debug_min_scan_radius" type="number" value="0.3" step="0.05" min="0" max="1" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();" oninput="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"></label>
+                        <label class="dial-control"><span>Max scan radius</span><input id="debug_max_scan" type="number" value="0.9" step="0.05" min="0" max="1" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();" oninput="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"></label>
+                        <label class="dial-control"><span>Deadzone diameter (px)</span><input id="debug_deadzone_diameter" type="number" value="40" step="1" min="0" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();" oninput="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"></label>
+                        <label class="dial-control"><span>Min angle</span><input id="debug_min_angle" type="number" value="0" step="1" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();" oninput="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"></label>
+                        <label class="dial-control"><span>Max angle</span><input id="debug_max_angle" type="number" value="360" step="1" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();" oninput="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"></label>
+                        <label class="dial-control"><span>Min value</span><input id="debug_min_value" type="number" value="0" step="0.01" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();" oninput="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"></label>
+                        <label class="dial-control"><span>Max value</span><input id="debug_max_value" type="number" value="10" step="0.01" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();" oninput="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"></label>
+                        <label class="dial-control"><span>Scale</span><input id="debug_scale" type="number" value="0.1" step="0.1" min="0" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();" oninput="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"></label>
+                        <label class="dial-control"><span>Angle offset</span><input id="debug_angle_offset" type="number" value="0" step="1" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();" oninput="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"></label>
+                        <label class="dial-control"><span>Clockwise</span><select id="debug_clockwise" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"><option value="true">Enabled</option><option value="false">Disabled</option></select></label>
                     </div>
                 </div>
+
                 <button class="btn btn-secondary" style="width: 100%; margin-bottom: 10px;"
                     onclick="resetCurrent()">Undo Last Dial</button>
                 <button class="btn btn-danger" style="width: 100%;"
-                    onclick="state.dials=[]; updateCanvas(); generateOutput();">Clear All Dials</button>
+                    onclick="state.dials=[]; state.selectedDial=-1; updateDialSelector(); updateCanvas(); generateOutput();">Clear All Dials</button>
             </div>
         </div>
 
@@ -549,6 +566,7 @@
             roi: null, // {x, y, w, h} in ROTATED coordinates
             digits: [], // Array of {x, y, w, h} in ROTATED coordinates
             dials: [], // Array of {x, y, w, h, cfg} for analog dials
+            selectedDial: -1, // Index of currently selected dial (-1 = none)
             isDrawing: false,
             startPos: null,
             sensorRes: { w: 1600, h: 1200, name: "OV2640 UXGA (1600x1200)" },
@@ -852,15 +870,133 @@
             return params.minValue + fraction * (params.maxValue - params.minValue);
         }
 
+        const DIAL_CFG_IDS = [
+            { id: 'debug_algorithm', key: 'algorithm', fallback: 'legacy' },
+            { id: 'debug_needle_type', key: 'needle_type', fallback: 'DARK' },
+            { id: 'debug_process_channel', key: 'process_channel', fallback: 'GRAYSCALE' },
+            { id: 'debug_use_color', key: 'use_color', fallback: 'false' },
+            { id: 'debug_target_color', key: 'target_color', fallback: '0xFF0000' },
+            { id: 'debug_color_tolerance', key: 'color_tolerance', fallback: '0' },
+            { id: 'debug_tophat', key: 'tophat_on', fallback: 'false' },
+            { id: 'debug_auto_contrast', key: 'auto_contrast', fallback: 'true' },
+            { id: 'debug_contrast', key: 'contrast', fallback: '1.0' },
+            { id: 'debug_min_scan_radius', key: 'min_scan_radius', fallback: '0.3' },
+            { id: 'debug_max_scan', key: 'max_scan_radius', fallback: '0.9' },
+            { id: 'debug_deadzone_diameter', key: 'deadzone_diameter', fallback: '40' },
+            { id: 'debug_min_angle', key: 'min_angle', fallback: '0' },
+            { id: 'debug_max_angle', key: 'max_angle', fallback: '360' },
+            { id: 'debug_min_value', key: 'min_value', fallback: '0' },
+            { id: 'debug_max_value', key: 'max_value', fallback: '10' },
+            { id: 'debug_scale', key: 'scale', fallback: '0.1' },
+            { id: 'debug_angle_offset', key: 'angle_offset', fallback: '0' },
+            { id: 'debug_clockwise', key: 'clockwise', fallback: 'true' }
+        ];
+
+        function loadCfgToUI(index) {
+            const dial = (index >= 0 && index < state.dials.length) ? state.dials[index] : null;
+            const cfg = dial && dial.cfg ? dial.cfg : {};
+            DIAL_CFG_IDS.forEach(item => {
+                const el = document.getElementById(item.id);
+                if (!el) return;
+                if (cfg[item.key] !== undefined) {
+                    el.value = String(cfg[item.key]);
+                } else {
+                    el.value = item.fallback;
+                }
+            });
+            updateDebugColorSwatch();
+        }
+
+        function saveUIToCfg(index) {
+            if (index < 0 || index >= state.dials.length) return;
+            if (!state.dials[index].cfg) state.dials[index].cfg = {};
+            const cfg = state.dials[index].cfg;
+            DIAL_CFG_IDS.forEach(item => {
+                const el = document.getElementById(item.id);
+                if (!el) return;
+                let value = el.value;
+                if (item.key === 'target_color') {
+                    value = parseInt(value.replace(/^#/, '0x'), 16) || 0;
+                } else if (item.key === 'clockwise' || item.key === 'auto_contrast' || item.key === 'tophat_on' || item.key === 'use_color') {
+                    value = value === 'true';
+                } else if (item.key === 'scale' || item.key === 'contrast' || item.key === 'color_tolerance' || item.key === 'min_scan_radius' || item.key === 'max_scan_radius' || item.key === 'deadzone_diameter' || item.key === 'min_angle' || item.key === 'max_angle' || item.key === 'min_value' || item.key === 'max_value' || item.key === 'angle_offset') {
+                    value = parseFloat(value);
+                }
+                cfg[item.key] = value;
+            });
+        }
+
+        function updateDialSelector() {
+            const sel = document.getElementById('selected_dial');
+            if (!sel) return;
+            sel.innerHTML = '';
+            if (state.dials.length === 0) {
+                sel.innerHTML = '<option value="-1">(none)</option>';
+                state.selectedDial = -1;
+                loadCfgToUI(-1);
+                return;
+            }
+            for (let i = 0; i < state.dials.length; i++) {
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = `Dial ${i + 1}`;
+                sel.appendChild(opt);
+            }
+            if (state.selectedDial < 0 || state.selectedDial >= state.dials.length) {
+                state.selectedDial = 0;
+            }
+            sel.value = state.selectedDial;
+            loadCfgToUI(state.selectedDial);
+        }
+
+        function onDialSelect(index) {
+            if (index >= 0 && index < state.dials.length) {
+                saveUIToCfg(state.selectedDial);
+                state.selectedDial = index;
+                loadCfgToUI(index);
+            } else {
+                state.selectedDial = -1;
+                loadCfgToUI(-1);
+            }
+        }
+
+        function addDefaultDial() {
+            if (!state.image) { alert('Load an image first'); return; }
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            const size = 64;
+            state.dials.push({ x: cx - size / 2, y: cy - size / 2, w: size, h: size, cfg: {} });
+            state.selectedDial = state.dials.length - 1;
+            updateDialSelector();
+            loadCfgToUI(state.selectedDial);
+            updateCanvas();
+            generateOutput();
+        }
+
+        function deleteSelectedDial() {
+            if (state.selectedDial < 0 || state.selectedDial >= state.dials.length) return;
+            if (!confirm(`Delete Dial ${state.selectedDial + 1}?`)) return;
+            state.dials.splice(state.selectedDial, 1);
+            state.selectedDial = Math.min(state.selectedDial, state.dials.length - 1);
+            if (state.dials.length === 0) state.selectedDial = -1;
+            updateDialSelector();
+            updateCanvas();
+            generateOutput();
+        }
+
         function readDebugSettings() {
+            // Reads global (non-per-dial) view of all controls
             return {
                 useColor: document.getElementById('debug_use_color')?.value === 'true',
                 targetColor: parseInt((document.getElementById('debug_target_color')?.value || '0xFF0000').replace(/^#/, '0x'), 16) || 0,
                 colorTolerance: parseFloat(document.getElementById('debug_color_tolerance')?.value || '0'),
                 needleType: document.getElementById('debug_needle_type')?.value || 'DARK',
+                algorithm: document.getElementById('debug_algorithm')?.value || 'radial_profile',
+                processChannel: document.getElementById('debug_process_channel')?.value || 'GRAYSCALE',
                 tophatOn: document.getElementById('debug_tophat')?.value !== 'false',
                 autoContrast: document.getElementById('debug_auto_contrast')?.value !== 'false',
                 contrast: parseFloat(document.getElementById('debug_contrast')?.value || '1.0'),
+                minScan: parseFloat(document.getElementById('debug_min_scan_radius')?.value || '0.3'),
                 maxScan: parseFloat(document.getElementById('debug_max_scan')?.value || '0.9'),
                 deadzoneDiameter: parseFloat(document.getElementById('debug_deadzone_diameter')?.value || '0'),
                 minAngle: parseFloat(document.getElementById('debug_min_angle')?.value || '0'),
@@ -870,6 +1006,111 @@
                 angleOffset: parseFloat(document.getElementById('debug_angle_offset')?.value || '0'),
                 clockwise: document.getElementById('debug_clockwise')?.value !== 'false'
             };
+        }
+
+        function detectLegacy(buf, w, h, maxScan, deadzoneDiameter) {
+            // Simpler: just find min or max radial sum
+            const cx = w >> 1, cy = h >> 1;
+            const radius = Math.min(cx, cy) - 2;
+            const deadzoneR = Math.max(0, (deadzoneDiameter || 0) * 0.5);
+            const startR = Math.max(5, Math.floor(deadzoneR));
+            const maxR = Math.max(startR + 1, (radius * (maxScan || 0.9)) | 0);
+            const profile = new Float32Array(360);
+
+            for (let deg = 0; deg < 360; deg++) {
+                let sum = 0, n = 0;
+                for (let r = startR; r < maxR; r++) {
+                    const px = cx + Math.trunc(r * COS[deg]);
+                    const py = cy + Math.trunc(r * SIN[deg]);
+                    if (px >= 0 && px < w && py >= 0 && py < h) {
+                        sum += buf[py * w + px];
+                        n++;
+                    }
+                }
+                profile[deg] = n > 0 ? sum / n : 0;
+            }
+
+            let best = -Infinity, bestIndex = 0, min = Infinity;
+            for (let deg = 0; deg < 360; deg++) {
+                if (profile[deg] > best) { best = profile[deg]; bestIndex = deg; }
+                if (profile[deg] < min) min = profile[deg];
+            }
+
+            let angle = bestIndex;
+            const range = best - min;
+            const confidence = range > 50 ? Math.min(1, 0.8 + range / 200) : Math.min(1, range / 100);
+            return { angle, confidence, profile, range };
+        }
+
+        function detectHough(buf, w, h, maxScan, deadzoneDiameter) {
+            // Simple edge detection + hough voting for lines through center
+            const cx = w >> 1, cy = h >> 1;
+            const radius = Math.min(cx, cy) - 2;
+            const deadzoneR = Math.max(0, (deadzoneDiameter || 0) * 0.5);
+            const startR = Math.max(5, Math.floor(deadzoneR));
+            const maxR = Math.max(startR + 1, (radius * (maxScan || 0.9)) | 0);
+            const votes = new Float32Array(360);
+
+            for (let deg = 0; deg < 360; deg++) {
+                for (let r = startR; r < maxR; r++) {
+                    const px = cx + Math.trunc(r * COS[deg]);
+                    const py = cy + Math.trunc(r * SIN[deg]);
+                    if (px < 1 || px >= w - 1 || py < 1 || py >= h - 1) continue;
+                    // Sobel-like gradient magnitude at this point
+                    const gx = -buf[(py-1)*w+(px-1)] - 2*buf[py*w+(px-1)] - buf[(py+1)*w+(px-1)]
+                              + buf[(py-1)*w+(px+1)] + 2*buf[py*w+(px+1)] + buf[(py+1)*w+(px+1)];
+                    const gy = -buf[(py-1)*w+(px-1)] - 2*buf[(py-1)*w+px] - buf[(py-1)*w+(px+1)]
+                              + buf[(py+1)*w+(px-1)] + 2*buf[(py+1)*w+px] + buf[(py+1)*w+(px+1)];
+                    const mag = Math.sqrt(gx * gx + gy * gy);
+                    if (mag > 30) {
+                        votes[deg] += mag;
+                    }
+                }
+            }
+
+            let best = -Infinity, bestIndex = 0, min = Infinity;
+            for (let deg = 0; deg < 360; deg++) {
+                if (votes[deg] > best) { best = votes[deg]; bestIndex = deg; }
+                if (votes[deg] < min) min = votes[deg];
+            }
+            return { angle: bestIndex, confidence: 0.5, profile: votes, range: best - min };
+        }
+
+        function detectTemplateMatch(buf, w, h, maxScan, deadzoneDiameter) {
+            // Correlation with ideal radial needle template
+            const cx = w >> 1, cy = h >> 1;
+            const radius = Math.min(cx, cy) - 2;
+            const deadzoneR = Math.max(0, (deadzoneDiameter || 0) * 0.5);
+            const startR = Math.max(5, Math.floor(deadzoneR));
+            const maxR = Math.max(startR + 1, (radius * (maxScan || 0.9)) | 0);
+            const scores = new Float32Array(360);
+
+            // Precompute ideal needle profile (thin bright line)
+            const ideal = new Uint8Array(maxR - startR);
+            const mid = startR + (maxR - startR) / 2;
+            for (let ri = 0; ri < ideal.length; ri++) {
+                const dist = Math.abs(startR + ri - mid);
+                ideal[ri] = dist < 3 ? 255 : 0;
+            }
+
+            for (let deg = 0; deg < 360; deg++) {
+                let correlation = 0;
+                for (let r = startR; r < maxR; r++) {
+                    const px = cx + Math.trunc(r * COS[deg]);
+                    const py = cy + Math.trunc(r * SIN[deg]);
+                    if (px >= 0 && px < w && py >= 0 && py < h) {
+                        correlation += (buf[py * w + px] / 255) * (ideal[r - startR] / 255);
+                    }
+                }
+                scores[deg] = correlation;
+            }
+
+            let best = -Infinity, bestIndex = 0, min = Infinity;
+            for (let deg = 0; deg < 360; deg++) {
+                if (scores[deg] > best) { best = scores[deg]; bestIndex = deg; }
+                if (scores[deg] < min) min = scores[deg];
+            }
+            return { angle: bestIndex, confidence: Math.min(1, best / 100), profile: scores, range: best - min };
         }
 
         function runDialDebug(rect, dial) {
@@ -885,44 +1126,55 @@
             const stages = [];
             stages.push({ title: '1. Raw crop (RGB)', kind: 'rgb', rgb: { r: rgb.r.slice(), g: rgb.g.slice(), b: rgb.b.slice(), w, h } });
 
+            // Build processed stage based on settings (same preprocessing for all algorithms)
             let buf;
             if (settings.useColor) {
                 buf = colorDistanceMap(rgb, settings.targetColor, settings.colorTolerance);
-                stages.push({ title: `2. Color-distance (tol=${settings.colorTolerance})`, kind: 'gray', buf: buf.slice(), w, h });
             } else {
                 buf = grayscale(rgb);
-                stages.push({ title: '2. Grayscale (base)', kind: 'gray', buf: buf.slice(), w, h });
-                if (settings.autoContrast) {
-                    applyAutoContrast(buf);
-                    stages.push({ title: '2. Grayscale (+auto contrast)', kind: 'gray', buf: buf.slice(), w, h });
-                }
-                if (Math.abs(settings.contrast - 1) > 0.01) {
-                    applyContrast(buf, settings.contrast);
-                    stages.push({ title: `2. Grayscale (+contrast ${settings.contrast.toFixed(1)})`, kind: 'gray', buf: buf.slice(), w, h });
-                }
+                if (settings.autoContrast) applyAutoContrast(buf);
+                if (Math.abs(settings.contrast - 1) > 0.01) applyContrast(buf, settings.contrast);
             }
-
+            // Preprocessing pipeline (common to all algorithms)
             const radius = Math.min(w >> 1, h >> 1) - 2;
             let kernel = Math.max(3, (radius / 10) | 0);
             if (kernel % 2 === 0) kernel++;
-
             applyClahe(buf, w, h, 8);
-            stages.push({ title: '3. CLAHE', kind: 'gray', buf: buf.slice(), w, h });
-
             if (settings.tophatOn) {
                 applyTophat(buf, w, h, kernel, settings.needleType);
-                stages.push({ title: `4. Top-hat (k=${kernel}, ${settings.needleType})`, kind: 'gray', buf: buf.slice(), w, h });
             } else {
                 if (settings.needleType === 'DARK' || settings.useColor) {
                     for (let i = 0; i < buf.length; i++) buf[i] = 255 - buf[i];
                 }
-                stages.push({ title: '4. Top-hat (skipped, inverted)', kind: 'gray', buf: buf.slice(), w, h });
+            }
+            median3x3(buf, w, h);
+
+            // Algorithm-specific detection
+            const algo = settings.algorithm || 'radial_profile';
+            let det;
+            switch (algo) {
+                case 'legacy':
+                    det = detectLegacy(buf, w, h, settings.maxScan, settings.deadzoneDiameter);
+                    break;
+                case 'hough_transform':
+                    det = detectHough(buf, w, h, settings.maxScan, settings.deadzoneDiameter);
+                    break;
+                case 'template_match':
+                    det = detectTemplateMatch(buf, w, h, settings.maxScan, settings.deadzoneDiameter);
+                    break;
+                case 'auto':
+                    // auto: try all and pick best confidence
+                    const a1 = detectRadialProfile(buf, w, h, settings.maxScan, settings.deadzoneDiameter);
+                    const a2 = detectLegacy(buf, w, h, settings.maxScan, settings.deadzoneDiameter);
+                    const a3 = detectHough(buf, w, h, settings.maxScan, settings.deadzoneDiameter);
+                    det = (a2.confidence > a1.confidence) ? a2 : a1;
+                    if (a3.confidence > det.confidence) det = a3;
+                    break;
+                default:
+                    det = detectRadialProfile(buf, w, h, settings.maxScan, settings.deadzoneDiameter);
+                    break;
             }
 
-            median3x3(buf, w, h);
-            stages.push({ title: '5. Median 3×3 (final)', kind: 'gray', buf: buf.slice(), w, h });
-
-            const det = detectRadialProfile(buf, w, h, settings.maxScan, settings.deadzoneDiameter);
             const params = {
                 clockwise: settings.clockwise,
                 angleOffset: settings.angleOffset,
@@ -932,8 +1184,7 @@
                 maxValue: settings.maxValue
             };
 
-            stages.push({ title: '6. Detected needle', kind: 'needle', buf: buf.slice(), w, h, angle: det.angle, maxScan: settings.maxScan });
-            stages.push({ title: '7. Radial profile (0–360°, 0=East)', kind: 'profile', profile: det.profile, bestAngle: det.angle });
+            stages.push({ title: '2. Processed', kind: 'needle', buf: buf.slice(), w, h, angle: det.angle, maxScan: settings.maxScan });
 
             return {
                 value: angleToValue(det.angle, params),
@@ -1130,7 +1381,9 @@
 
                 const summary = document.createElement('p');
                 summary.className = 'dial-preview-summary';
-                summary.textContent = `Value ${debug.value.toFixed(2)} | angle ${debug.angle.toFixed(1)}° | confidence ${debug.confidence.toFixed(2)} | kernel ${debug.kernel}`;
+                const algo = debug.settings.algorithm || 'radial_profile';
+                const chan = debug.settings.processChannel || 'GRAYSCALE';
+                summary.textContent = `Value ${debug.value.toFixed(2)} | angle ${debug.angle.toFixed(1)}° | conf ${debug.confidence.toFixed(2)} | ${algo} | ${chan}`;
                 card.appendChild(summary);
 
                 const stages = document.createElement('div');
@@ -1270,9 +1523,13 @@
                         current.cfg[key] = parseBool(value);
                     } else if (key === 'target_color') {
                         current.cfg[key] = parseValue(value);
-                    } else if (key === 'color_tolerance' || key === 'contrast' || key === 'max_scan_radius' || key === 'deadzone_diameter' || key === 'min_angle' || key === 'max_angle' || key === 'angle_offset' || key === 'min_value' || key === 'max_value' || key === 'scale') {
+                    } else if (key === 'color_tolerance' || key === 'contrast' || key === 'max_scan_radius' || key === 'min_scan_radius' || key === 'deadzone_diameter' || key === 'min_angle' || key === 'max_angle' || key === 'angle_offset' || key === 'min_value' || key === 'max_value' || key === 'scale') {
                         current.cfg[key] = parseValue(value);
                     } else if (key === 'needle_type') {
+                        current.cfg[key] = String(value).trim().replace(/^['"]|['"]$/g, '');
+                    } else if (key === 'algorithm') {
+                        current.cfg[key] = String(value).trim().replace(/^['"]|['"]$/g, '');
+                    } else if (key === 'process_channel') {
                         current.cfg[key] = String(value).trim().replace(/^['"]|['"]$/g, '');
                     }
                 }
@@ -1321,6 +1578,10 @@
                 }));
             }
 
+            if (state.dials.length > 0) {
+                state.selectedDial = 0;
+            }
+
             const deadzoneInput = document.getElementById('debug_deadzone_diameter');
             if (deadzoneInput && state.dials.length > 0) {
                 const firstDeadzone = state.dials[0]?.cfg?.deadzone_diameter;
@@ -1329,6 +1590,7 @@
                 }
             }
 
+            updateDialSelector();
             updateCanvas();
             generateOutput();
         }
@@ -1347,27 +1609,22 @@
         }
 
         function bindDebugControlEvents() {
-            const ids = [
-                'debug_use_color', 'debug_target_color', 'debug_color_tolerance', 'debug_needle_type',
-                'debug_tophat', 'debug_auto_contrast', 'debug_contrast', 'debug_max_scan', 'debug_deadzone_diameter',
-                'debug_min_angle', 'debug_max_angle', 'debug_min_value', 'debug_max_value',
-                'debug_angle_offset', 'debug_clockwise'
-            ];
+            // All dial parameter control IDs
+            const ids = DIAL_CFG_IDS.map(item => item.id);
 
             ids.forEach((id) => {
                 const el = document.getElementById(id);
                 if (!el) return;
                 const rerun = () => {
+                    // Save current UI values to selected dial's cfg
+                    if (state.selectedDial >= 0 && state.selectedDial < state.dials.length) {
+                        saveUIToCfg(state.selectedDial);
+                    }
                     if (id === 'debug_target_color') updateDebugColorSwatch();
-                    if (id === 'debug_deadzone_diameter') {
-                        const value = Math.max(0, parseFloat(el.value || '0'));
-                        state.dials.forEach((dial) => {
-                            if (!dial.cfg) dial.cfg = {};
-                            dial.cfg.deadzone_diameter = Number.isFinite(value) ? value : 0;
-                        });
+                    if (state.image) {
+                        updateCanvas();
                         generateOutput();
                     }
-                    if (state.image) updateCanvas();
                 };
                 el.addEventListener('change', rerun);
                 el.addEventListener('input', rerun);
@@ -1386,25 +1643,28 @@
 
         function getDialDebugSettings(dial) {
             const cfg = dial && dial.cfg ? dial.cfg : {};
-            const useColor = cfg.target_color !== undefined || document.getElementById('debug_use_color')?.value === 'true';
+            const useColor = cfg.target_color !== undefined;
             return {
                 useColor,
                 targetColor: typeof cfg.target_color === 'number'
                     ? cfg.target_color
-                    : parseInt((document.getElementById('debug_target_color')?.value || '0xFF0000').replace(/^#/, '0x'), 16) || 0,
-                colorTolerance: cfg.color_tolerance !== undefined ? cfg.color_tolerance : parseFloat(document.getElementById('debug_color_tolerance')?.value || '0'),
-                needleType: cfg.needle_type || document.getElementById('debug_needle_type')?.value || 'DARK',
-                tophatOn: cfg.tophatOn !== undefined ? cfg.tophatOn : (document.getElementById('debug_tophat')?.value !== 'false'),
-                autoContrast: cfg.auto_contrast !== undefined ? cfg.auto_contrast : (document.getElementById('debug_auto_contrast')?.value !== 'false'),
-                contrast: cfg.contrast !== undefined ? cfg.contrast : parseFloat(document.getElementById('debug_contrast')?.value || '1.0'),
-                maxScan: cfg.max_scan_radius !== undefined ? cfg.max_scan_radius : parseFloat(document.getElementById('debug_max_scan')?.value || '0.9'),
-                deadzoneDiameter: cfg.deadzone_diameter !== undefined ? cfg.deadzone_diameter : parseFloat(document.getElementById('debug_deadzone_diameter')?.value || '0'),
-                minAngle: cfg.min_angle !== undefined ? cfg.min_angle : parseFloat(document.getElementById('debug_min_angle')?.value || '0'),
-                maxAngle: cfg.max_angle !== undefined ? cfg.max_angle : parseFloat(document.getElementById('debug_max_angle')?.value || '360'),
-                minValue: cfg.min_value !== undefined ? cfg.min_value : parseFloat(document.getElementById('debug_min_value')?.value || '0'),
-                maxValue: cfg.max_value !== undefined ? cfg.max_value : parseFloat(document.getElementById('debug_max_value')?.value || '10'),
-                angleOffset: cfg.angle_offset !== undefined ? cfg.angle_offset : parseFloat(document.getElementById('debug_angle_offset')?.value || '0'),
-                clockwise: cfg.clockwise !== undefined ? cfg.clockwise : (document.getElementById('debug_clockwise')?.value !== 'false')
+                    : 0xFF0000,
+                colorTolerance: cfg.color_tolerance !== undefined ? cfg.color_tolerance : 0,
+                needleType: cfg.needle_type || 'DARK',
+                algorithm: cfg.algorithm || 'legacy',
+                processChannel: cfg.process_channel || 'GRAYSCALE',
+                tophatOn: cfg.tophatOn !== undefined ? cfg.tophatOn : false,
+                autoContrast: cfg.auto_contrast !== undefined ? cfg.auto_contrast : true,
+                contrast: cfg.contrast !== undefined ? cfg.contrast : 1.0,
+                minScan: cfg.min_scan_radius !== undefined ? cfg.min_scan_radius : 0.3,
+                maxScan: cfg.max_scan_radius !== undefined ? cfg.max_scan_radius : 0.9,
+                deadzoneDiameter: cfg.deadzone_diameter !== undefined ? cfg.deadzone_diameter : 40,
+                minAngle: cfg.min_angle !== undefined ? cfg.min_angle : 0,
+                maxAngle: cfg.max_angle !== undefined ? cfg.max_angle : 360,
+                minValue: cfg.min_value !== undefined ? cfg.min_value : 0,
+                maxValue: cfg.max_value !== undefined ? cfg.max_value : 10,
+                angleOffset: cfg.angle_offset !== undefined ? cfg.angle_offset : 0,
+                clockwise: cfg.clockwise !== undefined ? cfg.clockwise : true
             };
         }
 
@@ -1521,6 +1781,7 @@
                         <li><strong>Draw ROI</strong>: Click and drag on the image to draw a BLUE rectangle. This is the only area that will be sent to the AI.</li>
                         <li><strong>Why?</strong>: A smaller ROI (Window) acts like a digital zoom and improves frame rate/perfomance.</li>
                         <li><strong>Tip</strong>: Use 'Force 4:3' if you want standard aspect ratio.</li>
+                        <li><strong>Apply</strong>: The board must be <strong>compiled</strong> with this ROI, or the crop zone can be set at runtime via a Home Assistant command. Once you have a valid cropped zone, proceed to <strong>2. Set Digit Zones</strong>.</li>
                     </ol>
                 `;
             } else if (mode === 'digits') {
@@ -1591,6 +1852,7 @@
                 show('card-target-res');
                 show('card-actions-analog');
                 show('card-dial-debug-controls');
+                updateDialSelector();
             }
 
             updateCanvas();
@@ -2030,32 +2292,41 @@
 
                     const dialCfg = d.cfg || {};
 
+                    function cfgVal(key, fallback) {
+                        return dialCfg[key] !== undefined ? dialCfg[key] : fallback;
+                    }
+
                     lines.push(`    - id: dial_${i + 1}`);
-                    lines.push(`      scale: ${dialCfg.scale !== undefined ? dialCfg.scale : '0.1'}`);
+                    lines.push(`      scale: ${cfgVal('scale', '0.1')}`);
                     lines.push(`      crop_x: ${res.x}`);
                     lines.push(`      crop_y: ${res.y}`);
                     lines.push(`      crop_w: ${res.w}`);
                     lines.push(`      crop_h: ${res.h}`);
-                    
-                    const deadzone = dialCfg.deadzone_diameter !== undefined
-                        ? dialCfg.deadzone_diameter
-                        : globSettings.deadzoneDiameter;
+                    lines.push(`      needle_type: ${cfgVal('needle_type', globSettings.needleType)}`);
+                    lines.push(`      algorithm: ${cfgVal('algorithm', globSettings.algorithm)}`);
+                    lines.push(`      process_channel: ${cfgVal('process_channel', globSettings.processChannel)}`);
+
+                    const deadzone = cfgVal('deadzone_diameter', globSettings.deadzoneDiameter);
                     lines.push(`      deadzone_diameter: ${Number.isFinite(deadzone) ? deadzone : 0}`);
-                    
-                    lines.push(`      min_angle: ${dialCfg.min_angle !== undefined ? dialCfg.min_angle : globSettings.minAngle}`);
-                    lines.push(`      max_angle: ${dialCfg.max_angle !== undefined ? dialCfg.max_angle : globSettings.maxAngle}`);
-                    lines.push(`      min_value: ${dialCfg.min_value !== undefined ? dialCfg.min_value : globSettings.minValue}`);
-                    lines.push(`      max_value: ${dialCfg.max_value !== undefined ? dialCfg.max_value : globSettings.maxValue}`);
-                    lines.push(`      angle_offset: ${dialCfg.angle_offset !== undefined ? dialCfg.angle_offset : globSettings.angleOffset}`);
-                    
-                    const clockwise = dialCfg.clockwise !== undefined ? dialCfg.clockwise : globSettings.clockwise;
-                    lines.push(`      clockwise: ${clockwise}`);
-                    
-                    if (dialCfg.target_color !== undefined) {
-                        lines.push(`      target_color: ${dialCfg.target_color}`);
+
+                    lines.push(`      min_angle: ${cfgVal('min_angle', globSettings.minAngle)}`);
+                    lines.push(`      max_angle: ${cfgVal('max_angle', globSettings.maxAngle)}`);
+                    lines.push(`      min_value: ${cfgVal('min_value', globSettings.minValue)}`);
+                    lines.push(`      max_value: ${cfgVal('max_value', globSettings.maxValue)}`);
+                    lines.push(`      angle_offset: ${cfgVal('angle_offset', globSettings.angleOffset)}`);
+                    lines.push(`      clockwise: ${cfgVal('clockwise', globSettings.clockwise)}`);
+                    lines.push(`      auto_contrast: ${cfgVal('auto_contrast', globSettings.autoContrast)}`);
+                    lines.push(`      contrast: ${cfgVal('contrast', globSettings.contrast)}`);
+                    lines.push(`      min_scan_radius: ${cfgVal('min_scan_radius', globSettings.minScan)}`);
+                    lines.push(`      max_scan_radius: ${cfgVal('max_scan_radius', globSettings.maxScan)}`);
+
+                    const tc = cfgVal('target_color', undefined);
+                    if (tc !== undefined) {
+                        lines.push(`      target_color: ${tc}`);
                     }
-                    if (dialCfg.color_tolerance !== undefined) {
-                        lines.push(`      color_tolerance: ${dialCfg.color_tolerance}`);
+                    const ct = cfgVal('color_tolerance', undefined);
+                    if (ct !== undefined) {
+                        lines.push(`      color_tolerance: ${ct}`);
                     }
                 });
             }
@@ -2176,6 +2447,8 @@
             } else if (state.mode === 'analog') {
                 if (checkOutsideROI(x, y, w, h, 'Dial')) return;
                 state.dials.push({ x: x, y: y, w: w, h: h, cfg: {} });
+                state.selectedDial = state.dials.length - 1;
+                updateDialSelector();
             }
 
             updateCanvas();
@@ -2185,7 +2458,12 @@
         function resetCurrent() {
             if (state.mode === 'roi') state.roi = null;
             if (state.mode === 'digits') state.digits.pop();
-            if (state.mode === 'analog') state.dials.pop();
+            if (state.mode === 'analog') {
+                state.dials.pop();
+                state.selectedDial = Math.min(state.selectedDial, state.dials.length - 1);
+                if (state.dials.length === 0) state.selectedDial = -1;
+                updateDialSelector();
+            }
             updateCanvas();
             generateOutput();
         }
@@ -2194,6 +2472,8 @@
             state.roi = null;
             state.digits = [];
             state.dials = [];
+            state.selectedDial = -1;
+            updateDialSelector();
             updateCanvas();
             generateOutput();
         }
