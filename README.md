@@ -3,6 +3,8 @@
 > General-purpose TensorFlow Lite Micro implementation with image processing support for ESPHome
 
 [![ESPHome](https://img.shields.io/badge/ESPHome-Compatible-brightgreen)](https://esphome.io/)
+[![Community Spotlight](https://img.shields.io/badge/ESPHome-Community%20Spotlight-blue)](https://esphome.io)
+[![License](https://img.shields.io/badge/License-Apache%202.0%20OR%20MIT-blue)](https://github.com/nliaudat/esphome_ai_component)
 
 ## 🚀 Overview
 

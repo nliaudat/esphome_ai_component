@@ -1,0 +1,16 @@
+# ESPHome build test: value_validator
+esphome:
+  name: test-value-validator
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+  level: DEBUG
+
+value_validator:
+  id: test_validator
+  allow_negative_rates: false
+  max_absolute_diff: 100

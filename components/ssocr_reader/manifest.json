@@ -1,0 +1,5 @@
+{
+  "name": "ssocr_reader",
+  "version": "2.0.0",
+  "build_system": "cmake"
+}

@@ -1,0 +1,43 @@
+# ESPHome build test: meter_reader_tflite (common)
+esphome:
+  name: test-meter-reader
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+  level: DEBUG
+
+esp32_camera:
+  name: Test Camera
+  external_clock:
+    pin: GPIO0
+    frequency: 20MHz
+  i2c_pins:
+    sda: GPIO26
+    scl: GPIO27
+  data_pins: [GPIO5, GPIO18, GPIO19, GPIO21, GPIO36, GPIO39, GPIO34, GPIO35]
+  vsync_pin: GPIO25
+  href_pin: GPIO23
+  pixel_clock_pin: GPIO22
+  power_down_pin: GPIO32
+  resolution: 640x480
+  pixel_format: JPEG
+
+value_validator:
+  id: test_validator
+
+tflite_micro_helper:
+  id: test_tflite
+
+esp32_camera_utils:
+  id: test_camera_utils
+
+meter_reader_tflite:
+  id: test_meter
+  model: "digit_recognizer_v3_quantized_integer_quant_uint8.tflite"
+  camera_id: test_camera
+  validator: test_validator
+  update_interval: 60s
