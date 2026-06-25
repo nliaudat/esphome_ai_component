@@ -120,47 +120,93 @@ esphome_ai_component/
 
 ---
 
-## 3. COMPONENT-SPECIFIC RULES
+## 3. COMPONENT RULES (Auto-Applied by Role)
 
-### 3.1 `meter_reader_tflite` - AI Digit Recognition
+Component rules are categorized by **role** — the functionality a component provides or consumes. To determine which roles apply to any given component, inspect its `__init__.py` (`DEPENDENCIES`, `import` statements) and its headers (includes). All matching role categories apply simultaneously. This ensures ALL components — existing and future — are automatically covered.
+
+### 3.1 Universal Rules (ALL Components)
 
 **✅ REQUIRED:**
-- `tensor_arena_size` MUST be user-configurable via YAML
-- Model CRC32 verification MUST run on every load
-- Support BOTH RGB and GRAYSCALE input models
-- Camera windowing MUST work with OV2640/OV3660 sensors
-- Rotation setting MUST apply to inference preprocessing
-- MUST expose confidence scores to Home Assistant
-- **Grayscale pipeline optimizations** (bypass JPEG decode + RGB→Gray conversion) MUST only activate when the model has 1-channel input detected at runtime via `TfLiteTensor::dims->data[3] == 1`. RGB models MUST be unaffected.
-- **Inference result processing** MUST NOT be duplicated across sync and async paths. Extract common logic into a single `publish_inference_result()` method called by both.
-
-**⚠️ WARNING:**
-- Rotation ONLY affects inference, not web stream (documented limitation)
-- Default tensor arena size: 512KB (ESP32), 768KB (ESP32-S3)
-- Large models (>1MB) may fail on classic ESP32
-- **Calibration timing constants** MUST NOT be duplicated in header and .cpp with different values. Define defaults in ONE place (prefer header struct defaults).
-- **Preview web handler** MUST NOT be guarded by `DEV_ENABLE_ROTATION` — it should be available whenever `USE_WEB_SERVER` is defined.
-- **Camera recovery** SHOULD implement automatic camera re-initialization after N consecutive frame timeouts (N ≥ 3), with `esp_restart()` as last resort after 5+ timeouts.
+- Every component MUST have a YAML test that compiles for both ESP32 and ESP32-S3 (§9.1)
+- All `cg.add_define()` calls MUST be mirrored in `esphome/core/defines.h` for static analysis
+- Configuration schemas MUST bounds-check all user-provided values (§12.8)
+- Configuration schemas MUST provide sensible defaults where applicable
+- Configuration errors MUST be reported with `cv.Invalid`
+- All code MUST compile on ESP-IDF (no Arduino-only APIs in shared code paths — `digitalWrite`, `delay`, `Serial`)
+- Camera consumers MUST check PSRAM availability (never assume it exists)
+- ESP-NN features MUST be guarded with `#ifdef ESP_NN` + ESP-IDF platform checks
 
 **❌ BLOCKER:**
-- No hardcoded model input dimensions - MUST derive from model
-- No synchronous HTTP in inference path
-- No memory allocation during loop() after setup
-- NO TOCTOU (CWE-367) with multiple atomic flags for frame state — MUST use a single atomic state machine (e.g. `std::atomic<FrameState>`) instead of three separate `std::atomic<bool>` flags.
+- No C-style casts — use `static_cast<>` instead
+- No `#define` for constants — use `constexpr` or `enum` instead
+- No `this->` missing on class member access
+- No `std::regex` on ESP32 — use string operations instead
+- No `delay()` in `loop()` — use `set_timeout()` or `defer()` instead
+- No `strcpy()`, `strcat()`, `sprintf()` — use `snprintf()` or `std::string`
+- No manual `new`/`delete` — use RAII (`unique_ptr`, `make_unique`) instead
+- No blocking network operations in main thread — use `defer()` or `set_timeout()`
+- No heap allocation during `loop()` — allocate in `setup()`
+- No large stack allocations (>1KB local arrays)
+- No integer overflow in pointer arithmetic — always check `field_length > (end - ptr)` before `ptr + field_length` (CVE-2026-23833 pattern)
+- No TOCTOU (CWE-367) with check-then-act across multiple atomic flags — use a single atomic state machine
+- No format string vulnerabilities — always use `ESP_LOGD("tag", "%s", user_input)` not `ESP_LOGD("tag", user_input)`
+- All `cg.add_define()` calls must be mirrored in `esphome/core/defines.h`
 
-### 3.2 `esp32_camera_utils` - Image Processing Core
+### 3.2 TFLite Consumer Rules
+
+**Applies to any component that** includes `tensorflow/lite/*` headers, depends on `tflite_micro_helper`, or uses `TfLiteTensor`/`MicroInterpreter`.
 
 **✅ REQUIRED:**
-- MUST implement `TrackedBuffer` pattern for JPEG memory management
+- **Tensor arena** MUST be user-configurable (YAML or codegen), with reasonable defaults per target: 512KB (ESP32), 768KB (ESP32-S3)
+- **PSRAM-aware arena allocation** — MUST use `MemoryManager::allocate_tensor_arena()` which calls `heap_caps_aligned_alloc()` with appropriate caps (`MALLOC_CAP_SPIRAM` when PSRAM present, `MALLOC_CAP_INTERNAL` otherwise). Supports build-override flags `TFLITE_FORCE_SRAM` / `TFLITE_FORCE_PSRAM` for debugging.
+- **RAII arena lifetime** — arena MUST be wrapped in `std::unique_ptr<uint8_t[], HeapCapsDeleter>` with `heap_caps_free()` deleter. Never manual `new`/`delete`/`free()`.
+- **Model CRC32 verification** — MUST call `verify_model_crc()` on every model load to detect corruption.
+- **Operator registration** MUST use the X-Macro pattern in `tflm_operators.h` via `OpResolverManager::RegisterOps()` (not hand-written resolver code)
+- **`MAX_OPERATORS`** MUST be build-time configurable (default 30, override via `-DMAX_OPERATORS=N`)
+- **`USE_TFLITE_MICRO_HELPER` guard** — ALL TFLite headers and source files MUST be wrapped in `#ifdef USE_TFLITE_MICRO_HELPER`
+- **Model dimension derivation** — dimensions MUST come from `TfLiteTensor::dims` at runtime. NEVER hardcode model input dimensions.
+- **Output processing** — `process_output()` must handle BOTH `const float*` and `TfLiteTensor*` overloads, supporting quantized (uint8/int8 dequantization) and float model types
+- **Support BOTH RGB and GRAYSCALE input models** — grayscale pipeline optimization (bypass JPEG decode + RGB→Gray) MUST only activate when the model has 1-channel input (`TfLiteTensor::dims->data[3] == 1`). RGB models MUST be unaffected.
+- **ESP-IDF dependency pinning** — `__init__.py` SHALL pin `esp-tflite-micro` and `esp-nn` versions, and set required build flags (`-DTF_LITE_STATIC_MEMORY`, `-DTF_LITE_DISABLE_X86_NEON`, `-DESP_NN`, `-DOPTIMIZED_KERNEL=esp_nn`)
+- **Debug gating** — ALL debug logging and diagnostic methods MUST be guarded by `#ifdef DEBUG_TFLITE_MICRO_HELPER` (set by YAML `debug: true` → `cg.add_define()`)
+- **MUST expose confidence scores** to Home Assistant when performing AI inference
+
+**⚠️ WARNING:**
+- **PSRAM path does NOT fall back to SRAM** — When PSRAM is detected, allocate PSRAM only. Use `TFLITE_FORCE_SRAM` build flag to override.
+- **`heap_caps_aligned_alloc(16, ...)`** alignment is required by TFLite Micro. Do not change.
+- Rotation ONLY affects inference, not web stream (documented limitation)
+- Large models (>1MB) may fail on classic ESP32
+- Default tensor arena size: 512KB (ESP32), 768KB (ESP32-S3)
+- **Calibration timing constants** MUST NOT be duplicated in header and .cpp — define in ONE place (prefer header struct defaults)
+- **Camera recovery** SHOULD implement automatic camera re-initialization after N consecutive frame timeouts (N ≥ 3), with `esp_restart()` as last resort after 5+ timeouts
+
+**❌ BLOCKER:**
+- No stack-allocated tensor arena (stack overflow risk with 512KB+ arenas)
+- No hardcoded model input dimensions — MUST derive from loaded model
+- No synchronous HTTP in inference path
+- No memory allocation during `loop()` after `setup()`
+- No ARDUINO-only APIs (`Serial`, `delay`, `digitalWrite`)
+- No `new`/`delete` — MUST use `heap_caps_aligned_alloc`/`heap_caps_free` wrapped in `unique_ptr` with custom deleter
+- No assumption that PSRAM exists — MUST check via `MemoryManager::has_psram()`
+- No DELEGATE operator in models — MUST export without XNNPACK delegate
+
+### 3.3 Camera Consumer Rules
+
+**Applies to any component that** depends on `esp32_camera_utils` or `esp32_camera`, or uses `esp_camera_fb_get()`/`TrackedBuffer`.
+
+**✅ REQUIRED:**
+- MUST implement `TrackedBuffer` pattern for JPEG memory management (never return raw framebuffers)
 - MUST support both JPEG and RAW (RGB565/GRAYSCALE) formats
 - Rotation MUST work correctly on both formats
 - Crop/scaling operations MUST be bounds-checked
 - Buffer lifetime MUST be clearly documented
+- Camera windowing MUST work with OV2640/OV3660 sensors
+- Preview web handler MUST be available whenever `USE_WEB_SERVER` is defined (not guarded by rotation-specific macros)
 
 **❌ BLOCKER:**
 - NO JPEG decoding in interrupt context
 - NO memory leaks in any code path
-- NO direct `esp_camera_fb_get()` exposure - ALWAYS wrap in TrackedBuffer
+- NO direct `esp_camera_fb_get()` exposure — ALWAYS wrap in `TrackedBuffer`
 - NO assumption that PSRAM is available
 
 **TrackedBuffer Pattern:**
@@ -178,66 +224,47 @@ if (buffer) {
 }
 ```
 
-### 3.3 `value_validator` - Reading Validation
+### 3.4 Network Consumer Rules
+
+**Applies to any component that** uses HTTP client, `defer()`, or `set_timeout()` for network operations.
 
 **✅ REQUIRED:**
-- Configurable `max_absolute_diff` and `max_rate_change`
+- HTTP upload MUST have timeout (default: 5 seconds)
+- Configurable API key/authentication
+- NON-BLOCKING operation — MUST use `defer()` or `set_timeout()`
+- Rate limiting on uploads (default: max 1 per minute)
+
+**❌ BLOCKER:**
+- NO infinite retry loops
+- NO blocking on network in main thread
+- NO silent failures — log upload errors
+
+### 3.5 Sensor/Output Consumer Rules
+
+**Applies to any component that** publishes readings, extends `sensor::Sensor`, or exposes state to Home Assistant.
+
+**✅ REQUIRED:**
+- Configurable validation parameters (`max_absolute_diff`, `max_rate_change`)
 - Maintain reading history for outlier detection
-- Expose validation state to Home Assistant entities
+- Expose validation state and confidence scores to Home Assistant entities
 - Support string-based readings for digital displays
 
 **⚠️ WARNING:**
 - History size MUST be bounded (default: 10 readings)
 - Rate limiting on invalid readings to prevent log spam
 
-### 3.4 `data_collector` - Active Learning
+### 3.6 Component-Specific Overrides
 
-**✅ REQUIRED:**
-- HTTP upload MUST have timeout (default: 5 seconds)
-- Configurable API key/authentication
-- NON-BLOCKING operation - MUST use `defer()` or `set_timeout()`
-- Rate limiting on uploads (default: max 1 per minute)
+The following rules apply **in addition to** the role-based rules above. They are specific to a single component and cannot be detected by role alone.
 
-**❌ BLOCKER:**
-- NO infinite retry loops
-- NO blocking on network in main thread
-- NO silent failures - log upload errors
+#### meter_reader_tflite
+- **Inference result processing** MUST NOT be duplicated across sync and async paths. Extract common logic into a single `publish_inference_result()` method called by both.
+- **Grayscale pipeline**: See TFLite Consumer Rules above (1-channel runtime detection). This is the only TFLite component that consumes camera + TFLite together.
+- **Camera recovery**: See TFLite Consumer Rules above.
 
-### 3.5 `legacy_meter_reader_tflite` - Frozen Component
-
-**❌ BLOCKER:**
-- NO new features
-- NO refactoring
-- NO API changes
-- ONLY critical security or crash bug fixes
-- Users MUST be directed to migrate to `meter_reader_tflite`
-
-### 3.6 `tflite_micro_helper` - TFLite Micro Runtime Wrapper
-
-**✅ REQUIRED:**
-- **PSRAM-aware tensor arena allocation** — MUST use `MemoryManager::allocate_tensor_arena()` which calls `heap_caps_aligned_alloc()` with appropriate caps (`MALLOC_CAP_SPIRAM` when PSRAM present, `MALLOC_CAP_INTERNAL` otherwise). Supports build-override flags `TFLITE_FORCE_SRAM` / `TFLITE_FORCE_PSRAM` for debugging.
-- **RAII arena lifetime** — arena MUST be wrapped in `std::unique_ptr<uint8_t[], HeapCapsDeleter>` with `heap_caps_free()` deleter. Never manual `new`/`delete`/`free()`.
-- **CRC32 model verification** — MUST call `ModelHandler::verify_model_crc()` on every model load to detect corruption.
-- **Operator registration via X-Macro pattern** — `OpResolverManager::RegisterOps()` uses `tflm_operators.h` with `TFLM_OP_AVAILABLE`/`TFLM_OP_UNAVAILABLE` macros. Adding a new operator requires updating that header, not the `op_resolver.h` logic.
-- **`MAX_OPERATORS` build-time configurability** — defaults to 30 via `#ifndef MAX_OPERATORS` / `#define MAX_OPERATORS 30`. Override via `-DMAX_OPERATORS=N` from consuming component's codegen (e.g., `meter_reader_tflite` reads the `.txt` model report).
-- **`USE_TFLITE_MICRO_HELPER` guard** — ALL headers and source files MUST be wrapped in `#ifdef USE_TFLITE_MICRO_HELPER` (set unconditionally by `__init__.py`).
-- **Model dimension derivation** — dimensions MUST come from `TfLiteTensor::dims` at runtime via `get_input_width()`, `get_input_height()`, `get_input_channels()`. NEVER hardcode model input dimensions.
-- **Model CRC32 verification** — MUST integrate on every model load.
-- **ESP-IDF dependency pinning** — `__init__.py` SHALL pin `esp-tflite-micro` (currently `1.3.4`) and `esp-nn` (currently `1.2.1`), and set build flags `-DTF_LITE_STATIC_MEMORY`, `-DTF_LITE_DISABLE_X86_NEON`, `-DESP_NN`, `-DOPTIMIZED_KERNEL=esp_nn`.
-- **Debug gating** — ALL debug logging and diagnostic methods MUST be guarded by `DEBUG_TFLITE_MICRO_HELPER` (set by YAML `debug: true` → `cg.add_define()` in `__init__.py`).
-
-**⚠️ WARNING:**
-- **PSRAM path does NOT fall back to SRAM** — When PSRAM is detected, the normal allocation path tries PSRAM only. This prevents silently exhausting scarce internal SRAM on ESP32-S3 boards. Use `TFLITE_FORCE_SRAM` build flag to override for debugging.
-- **`heap_caps_aligned_alloc(16, ...)` alignment** — the arena uses 16-byte alignment required by TFLite Micro. Do not change the alignment without verifying compatibility with TFLite Micro's internal alignment assumptions.
-- **Output processing** — `process_output()` must handle BOTH `const float*` and `TfLiteTensor*` overloads correctly based on model type (quantized vs float).
-- **Model config validation** — `validate_model_config()` and `debug_model_architecture()` SHOULD be called after loading to verify model compatibility.
-
-**❌ BLOCKER:**
-- No stack-allocated tensor arena (stack overflow risk with 512KB+ arenas on ESP32).
-- No ARDUINO-only APIs (`Serial`, `delay`, `digitalWrite`) in any code path.
-- No `new`/`delete` — MUST use `heap_caps_aligned_alloc` / `heap_caps_free` wrapped in `unique_ptr` with custom deleter.
-- No assumption that PSRAM exists — MUST check via `MemoryManager::has_psram()` (calls `heap_caps_get_total_size(MALLOC_CAP_SPIRAM)`).
-- No hardcoded model input dimensions — MUST derive from loaded model at runtime.
+#### esp32_camera_utils
+- Rotation setting MUST apply to inference preprocessing (not web stream — documented limitation)
+- No additional overrides beyond Camera Consumer Rules.
 
 ---
 
@@ -962,14 +989,21 @@ std::array<uint8_t, JPEG_BUFFER_SIZE> buffer;
 - **DO NOT** suggest "upgrading to C++17" or "avoiding C++20"
 - **DO NOT** flag `std::span`, `std::bit_cast`, `consteval` as "too modern"
 
-### 12.4 Component-Specific Rules
+### 12.4 Component Rules (Auto-Discovery)
 
-**BEFORE reviewing a file, IDENTIFY which component it belongs to:**
-- `meter_reader_tflite/` → Apply AI inference rules
-- `tflite_micro_helper/` → Apply TFLite Micro runtime rules (§3.6)
-- `esp32_camera_utils/` → Apply memory management rules
-- `data_collector/` → Apply non-blocking network rules
-- `legacy_meter_reader_tflite/` → **EXCLUDED** from AI review. Do not read, analyze, or suggest changes to this component. It is frozen and deprecated.
+**BEFORE reviewing any component, determine its role by reading:**
+1. Its `__init__.py` — check `DEPENDENCIES`, imports, and `to_code()` for build flags
+2. Its `.h` headers — check `#include` directives for TFLite, camera, or network APIs
+3. Then apply **ALL matching role categories** from §3:
+   - **§3.1 Universal Rules** — ALWAYS applies to EVERY component
+   - **§3.2 TFLite Consumer Rules** — if component includes `tensorflow/lite/*` or depends on `tflite_micro_helper`
+   - **§3.3 Camera Consumer Rules** — if component depends on `esp32_camera_utils` or uses `esp_camera_fb_get`
+   - **§3.4 Network Consumer Rules** — if component uses HTTP client, `defer()`, or `set_timeout()` for network
+   - **§3.5 Sensor/Output Consumer Rules** — if component publishes readings or extends `sensor::Sensor`
+   - **§3.6 Component-Specific Overrides** — additional rules for specific components
+
+**This applies to ALL components — existing, new, and future. No exceptions.**
+No component is excluded from review. All code must be compliant.
 
 ### 12.5 Performance Dual-Target Awareness
 
