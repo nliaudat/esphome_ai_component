@@ -1,0 +1,1754 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 AI Analog Dials Tool</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            background-color: #f0f2f5;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            gap: 20px;
+        }
+
+        .main-panel {
+            flex: 2;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .sidebar {
+            flex: 1;
+            min-width: 350px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        h1,
+        h2,
+        h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background-color: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #2980b9;
+        }
+
+        .btn-danger {
+            background-color: #e74c3c;
+            color: white;
+        }
+
+        .btn-secondary {
+            background-color: #95a5a6;
+            color: white;
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            overflow: auto;
+            max-height: 80vh;
+            border: 1px solid #ddd;
+            background-image: repeating-linear-gradient(45deg, #eee 25%, transparent 25%, transparent 75%, #eee 75%, #eee), repeating-linear-gradient(45deg, #eee 25%, #fff 25%, #fff 75%, #eee 75%, #eee);
+            background-position: 0 0, 10px 10px;
+            background-size: 20px 20px;
+        }
+
+        canvas {
+            display: block;
+            cursor: crosshair;
+        }
+
+        textarea {
+            width: 100%;
+            height: 200px;
+            font-family: monospace;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            resize: vertical;
+        }
+
+        .help-text {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .legend {
+            margin-top: 10px;
+            font-size: 0.85em;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 5px;
+        }
+
+        .color-box {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+
+        /* Help Sidebar CSS */
+        .help-sidebar {
+            flex: 1;
+            min-width: 300px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .step-list {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .step-list li {
+            margin-bottom: 10px;
+            color: #555;
+        }
+
+        .step-highlight {
+            background-color: #e8f6f3;
+            border-left: 4px solid #1abc9c;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+
+        /* Dial Preview CSS */
+        .dial-preview-section {
+            max-width: none;
+            margin: 20px 0 0;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .dial-preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+
+        .dial-preview-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+
+        .dial-preview-card {
+            border: 1px solid #d9e0e7;
+            border-radius: 10px;
+            padding: 12px;
+            background: #fdfefe;
+        }
+
+        .dial-preview-card h4 {
+            margin: 0 0 6px;
+            color: #2c3e50;
+        }
+
+        .dial-preview-summary {
+            margin: 0 0 10px;
+            font-size: 0.9em;
+            color: #5f6b7a;
+        }
+
+        .dial-preview-stages {
+            display: flex;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            gap: 10px;
+        }
+
+        .dial-stage {
+            flex: 0 0 180px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background: #fff;
+            padding: 8px;
+        }
+
+        .dial-stage h5 {
+            margin: 0 0 6px;
+            font-size: 0.78em;
+            color: #627085;
+        }
+
+        .dial-stage canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 4px;
+            background: #000;
+        }
+
+        .dial-controls-panel {
+            border: 1px solid #d9e0e7;
+            border-radius: 10px;
+            background: #f8fbfd;
+            padding: 14px;
+            margin-bottom: 16px;
+        }
+
+        .dial-controls-panel h4 {
+            margin: 0 0 10px;
+            color: #2c3e50;
+        }
+
+        .dial-control-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 10px;
+        }
+
+        .dial-control {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 0.85em;
+            color: #4b5a69;
+        }
+
+        .dial-control-inline {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .dial-color-swatch {
+            width: 22px;
+            height: 22px;
+            border-radius: 4px;
+            border: 1px solid #cfd8e3;
+            background: #ff0000;
+            flex: 0 0 22px;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+        }
+
+        .dial-control input,
+        .dial-control select {
+            width: 100%;
+            padding: 7px 8px;
+            border: 1px solid #cfd8e3;
+            border-radius: 6px;
+            font: inherit;
+            background: #fff;
+        }
+
+        .dial-control-wide {
+            grid-column: 1 / -1;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="main-panel">
+            <h1>ESP32 Analog Dials Tool</h1>
+
+            <div class="controls">
+                <input type="file" id="imageInput" accept="image/*" style="display: none;">
+                <button class="btn btn-primary" onclick="document.getElementById('imageInput').click()">📂 Load
+                    Image</button>
+                <input type="file" id="configInput" accept=".yaml,.yml,text/yaml,text/plain" style="display: none;">
+                <button class="btn btn-secondary" onclick="document.getElementById('configInput').click()">📄 Load
+                    config.yaml</button>
+                <span class="help-text" id="config-status" style="margin:0; align-self:center;">No config loaded</span>
+                <span id="image-info" style="margin-left:10px; font-weight:bold; color:#555;"></span>
+            </div>
+
+            <p class="help-text" id="status-text">Analog Dials (Orange) — click center and drag outwards</p>
+
+            <div class="canvas-wrapper">
+                <canvas id="canvas"></canvas>
+            </div>
+
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="color-box" style="background: rgba(243, 156, 18, 0.3); border: 2px solid #f39c12;">
+                    </div> Analog Dials (Orange) — cyan dashed circle = deadzone
+                </div>
+            </div>
+
+            <div class="card" style="margin-top: 20px;">
+                <h3>Configuration Output</h3>
+                <textarea id="output" readonly></textarea>
+                <button class="btn btn-primary" style="width: 100%; margin-top: 10px;" onclick="copyOutput()">📋 Copy to
+                    Clipboard</button>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <!-- Rotation Card -->
+            <div class="card">
+                <h3>Camera Config</h3>
+                <div style="margin-top: 10px;">
+                    <label style="display:block; margin-bottom:5px;">Rotation:</label>
+                    <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                        <button class="btn btn-secondary" style="flex:1; padding: 4px;"
+                            onclick="setRotation(0)">0°</button>
+                        <button class="btn btn-secondary" style="flex:1; padding: 4px;"
+                            onclick="setRotation(90)">90°</button>
+                        <button class="btn btn-secondary" style="flex:1; padding: 4px;"
+                            onclick="setRotation(180)">180°</button>
+                        <button class="btn btn-secondary" style="flex:1; padding: 4px;"
+                            onclick="setRotation(270)">270°</button>
+                    </div>
+                </div>
+                <div style="margin-top: 5px; display: flex; align-items: center; gap: 5px;">
+                    <label style="font-size: 0.9em;">Custom Angle:</label>
+                    <input type="number" id="custom_rot" placeholder="deg"
+                        onchange="setRotation(parseFloat(this.value))" style="width: 70px; padding: 4px;">
+                </div>
+                <div id="rot-warning"
+                    style="display:none; color: #e67e22; font-size: 0.85em; margin-top: 5px; background: #fdf2e9; padding: 5px; border-left: 3px solid #e67e22; border-radius: 2px;">
+                    <strong>Warning:</strong> Custom rotation is CPU intensive!
+                </div>
+            </div>
+
+            <!-- Dial Management -->
+            <div class="card">
+                <h3>Analog Dials</h3>
+                <div id="dial-toolbar" style="display:flex; gap:6px; align-items:center; margin-bottom:12px; flex-wrap:wrap;">
+                    <label style="font-size:0.85em; font-weight:600; color:#4b5a69;">Dial:</label>
+                    <select id="selected_dial" onchange="onDialSelect(parseInt(this.value))" style="flex:1; min-width:80px; padding:6px 8px; border:1px solid #cfd8e3; border-radius:6px; font:inherit; background:#fff;">
+                        <option value="-1">(none)</option>
+                    </select>
+                    <button class="btn btn-secondary" title="Add default dial at center" onclick="addDefaultDial()" style="padding:6px 10px; font-size:1.1em;">➕</button>
+                    <button class="btn btn-secondary" title="Delete selected dial" onclick="deleteSelectedDial()" style="padding:6px 10px; font-size:1.1em;">🗑️</button>
+                    <button class="btn btn-danger" title="Clear all dials" onclick="state.dials=[]; state.selectedDial=-1; updateDialSelector(); updateCanvas(); generateOutput();" style="padding:6px 10px; font-size:1.1em;">♻️</button>
+                </div>
+
+                <div id="card-dial-debug-controls" style="display:none;">
+                    <h4>Dial Parameters</h4>
+                    <div class="dial-control-grid">
+                        <label class="dial-control"><span>Algorithm</span><select id="debug_algorithm" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"><option value="radial_profile">radial_profile</option><option value="hough_transform">hough_transform</option><option value="template_match">template_match</option><option value="legacy" selected>legacy</option><option value="auto">auto</option></select></label>
+                        <label class="dial-control"><span>Needle type</span><select id="debug_needle_type" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"><option value="DARK">DARK</option><option value="LIGHT">LIGHT</option></select></label>
+                        <label class="dial-control"><span>Process channel</span><select id="debug_process_channel" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"><option value="GRAYSCALE">GRAYSCALE</option><option value="RED">RED</option><option value="GREEN">GREEN</option><option value="BLUE">BLUE</option></select></label>
+                        <label class="dial-control"><span>Color detection</span><select id="debug_use_color" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"><option value="true">Enabled</option><option value="false">Disabled</option></select></label>
+                        <label class="dial-control"><span>Target color</span><div class="dial-control-inline"><input id="debug_target_color" type="text" value="0xFF0000" onchange="saveUIToCfg(state.selectedDial); updateDebugColorSwatch(); updateCanvas(); generateOutput();"><button class="btn btn-secondary" type="button" id="debug_pick_color_btn" style="padding:7px 10px; white-space:nowrap;">Pick</button><span id="debug_color_swatch" class="dial-color-swatch" title="Selected color"></span></div></label>
+                        <label class="dial-control"><span>Color tolerance</span><input id="debug_color_tolerance" type="number" value="0" min="0" max="442" step="1" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();" oninput="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"></label>
+                        <label class="dial-control"><span>Top-hat</span><select id="debug_tophat" onchange="if(state.selectedDial>=0)saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"><option value="true">Enabled</option><option value="false" selected>Disabled</option></select></label>
+                        <label class="dial-control"><span>Auto contrast</span><select id="debug_auto_contrast" onchange="if(state.selectedDial>=0)saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"><option value="true">Enabled</option><option value="false">Disabled</option></select></label>
+                        <label class="dial-control"><span>Contrast</span><input id="debug_contrast" type="number" value="1.0" step="0.1" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();" oninput="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"></label>
+                        <label class="dial-control"><span>Min scan radius</span><input id="debug_min_scan_radius" type="number" value="0.3" step="0.05" min="0" max="1" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();" oninput="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"></label>
+                        <label class="dial-control"><span>Max scan radius</span><input id="debug_max_scan" type="number" value="0.9" step="0.05" min="0" max="1" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();" oninput="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"></label>
+                        <label class="dial-control"><span>Deadzone diameter (px)</span><input id="debug_deadzone_diameter" type="number" value="40" step="1" min="0" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();" oninput="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"></label>
+                        <label class="dial-control"><span>Min angle</span><input id="debug_min_angle" type="number" value="0" step="1" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();" oninput="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"></label>
+                        <label class="dial-control"><span>Max angle</span><input id="debug_max_angle" type="number" value="360" step="1" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();" oninput="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"></label>
+                        <label class="dial-control"><span>Min value</span><input id="debug_min_value" type="number" value="0" step="0.01" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();" oninput="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"></label>
+                        <label class="dial-control"><span>Max value</span><input id="debug_max_value" type="number" value="10" step="0.01" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();" oninput="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"></label>
+                        <label class="dial-control"><span>Scale</span><input id="debug_scale" type="number" value="0.1" step="0.1" min="0" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();" oninput="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"></label>
+                        <label class="dial-control"><span>Angle offset</span><input id="debug_angle_offset" type="number" value="0" step="1" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();" oninput="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"></label>
+                        <label class="dial-control"><span>Clockwise</span><select id="debug_clockwise" onchange="saveUIToCfg(state.selectedDial); updateCanvas(); generateOutput();"><option value="true">Enabled</option><option value="false">Disabled</option></select></label>
+                    </div>
+                </div>
+
+                <button class="btn btn-secondary" style="width: 100%; margin-bottom: 10px;"
+                    onclick="resetCurrent()">Undo Last Dial</button>
+                <button class="btn btn-danger" style="width: 100%;"
+                    onclick="state.dials=[]; state.selectedDial=-1; updateDialSelector(); updateCanvas(); generateOutput();">Clear All Dials</button>
+            </div>
+
+            <!-- Target Resolution -->
+            <div class="card">
+                <h3>Target Resolution</h3>
+                <p class="help-text" style="margin-bottom: 10px;">Match your model input size (optional).</p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 10px;">
+                    <div><label>Target W:</label> <input type="number" id="target_w" placeholder="e.g 640"
+                            onchange="generateOutput()" style="width: 70px;"></div>
+                    <div><label>Target H:</label> <input type="number" id="target_h" placeholder="e.g 480"
+                            onchange="generateOutput()" style="width: 70px;"></div>
+                </div>
+                <div style="margin-top: 5px;">
+                    <button class="btn btn-secondary" style="font-size: 0.8em; padding: 4px 8px;"
+                        onclick="setTargetRes(640, 480)">VGA (640x480)</button>
+                    <button class="btn btn-secondary" style="font-size: 0.8em; padding: 4px 8px;"
+                        onclick="setTargetRes(800, 600)">SVGA (800x600)</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- HELP SIDEBAR -->
+        <div class="help-sidebar" id="help-sidebar">
+            <h3>Instructions</h3>
+            <div id="help-content">
+                <div class="step-highlight">
+                    <strong>Goal:</strong> Mark analog clock-dials.
+                </div>
+                <ol class="step-list">
+                    <li><strong>Load Image</strong>: Click 'Load Image' to simulate your camera view.</li>
+                    <li><strong>Draw Dials</strong>: Click the CENTER of the dial and drag OUTWARDS.</li>
+                    <li><strong>Shape</strong>: This creates a perfect SQUARE box (Orange). Deadzone shown as cyan dashed circle.</li>
+                    <li><strong>Multiple Dials</strong>: Use the Dial selector / ➕ / 🗑️ to manage them.</li>
+                    <li><strong>Debug Panel</strong>: Tweak detection parameters live per dial.</li>
+                    <li><strong>Output</strong>: The generated YAML contains <code>analog_reader</code> config block.</li>
+                </ol>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="dial-preview-section" id="dial-preview-section">
+        <div class="dial-preview-header">
+            <h3 style="margin:0;">Dial Previews</h3>
+            <p class="help-text" style="margin:0;">Per-dial stage previews — the canvas stays readable.</p>
+        </div>
+        <div id="dial-preview-content">
+            <p class="help-text" style="margin:0;">Load an image and add at least one dial to see stage previews.</p>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let state = {
+            image: null,
+            rotation: 0,
+            dials: [],
+            selectedDial: -1,
+            isDrawing: false,
+            startPos: null,
+            sensorRes: { w: 1600, h: 1200, name: "OV2640 UXGA (1600x1200)" },
+            importedConfig: null
+        };
+
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const imageCanvas = document.createElement('canvas');
+        const imageCtx = imageCanvas.getContext('2d', { willReadFrequently: true });
+        const COS = new Float32Array(360);
+        const SIN = new Float32Array(360);
+
+        for (let i = 0; i < 360; i++) {
+            const radians = i * Math.PI / 180;
+            COS[i] = Math.cos(radians);
+            SIN[i] = Math.sin(radians);
+        }
+
+        let rotatedImageData = null;
+        let colorPickMode = false;
+
+        // --- Image processing utilities (extracted from original index.html) ---
+        function clamp(value, min, max) { return value < min ? min : (value > max ? max : value); }
+
+        function extractCropRGB(sourceImageData, rect) {
+            const { x, y, w, h } = rect;
+            const r = new Uint8Array(w * h);
+            const g = new Uint8Array(w * h);
+            const b = new Uint8Array(w * h);
+            const src = sourceImageData.data;
+            const sw = sourceImageData.width;
+            const sh = sourceImageData.height;
+
+            for (let row = 0; row < h; row++) {
+                for (let col = 0; col < w; col++) {
+                    const sx = Math.round(x + col);
+                    const sy = Math.round(y + row);
+                    const outIndex = row * w + col;
+                    if (sx >= 0 && sx < sw && sy >= 0 && sy < sh) {
+                        const srcIndex = (sy * sw + sx) * 4;
+                        r[outIndex] = src[srcIndex];
+                        g[outIndex] = src[srcIndex + 1];
+                        b[outIndex] = src[srcIndex + 2];
+                    }
+                }
+            }
+            return { r, g, b, w, h };
+        }
+
+        function grayscale(rgb) {
+            const out = new Uint8Array(rgb.w * rgb.h);
+            for (let i = 0; i < out.length; i++) {
+                out[i] = (0.299 * rgb.r[i] + 0.587 * rgb.g[i] + 0.114 * rgb.b[i]) | 0;
+            }
+            return out;
+        }
+
+        function colorDistanceMap(rgb, hex, tol) {
+            const tr = (hex >> 16) & 0xFF;
+            const tg = (hex >> 8) & 0xFF;
+            const tb = hex & 0xFF;
+            const out = new Uint8Array(rgb.w * rgb.h);
+            const useTol = tol > 0 && tol < 442;
+            for (let i = 0; i < out.length; i++) {
+                const dr = rgb.r[i] - tr;
+                const dg = rgb.g[i] - tg;
+                const db = rgb.b[i] - tb;
+                const dist = Math.sqrt(dr * dr + dg * dg + db * db);
+                let value;
+                if (useTol) {
+                    value = dist >= tol ? 255 : (dist * 255 / tol);
+                } else {
+                    value = dist * 255 / 442;
+                }
+                if (value > 255) value = 255;
+                out[i] = value | 0;
+            }
+            return out;
+        }
+
+        function applyAutoContrast(buf) {
+            let min = 255, max = 0;
+            for (let i = 0; i < buf.length; i++) {
+                if (buf[i] < min) min = buf[i];
+                if (buf[i] > max) max = buf[i];
+            }
+            const range = max - min;
+            if (range <= 0) return;
+            for (let i = 0; i < buf.length; i++) {
+                buf[i] = ((buf[i] - min) * 255 / range) | 0;
+            }
+        }
+
+        function applyContrast(buf, contrast) {
+            if (Math.abs(contrast - 1) < 0.01) return;
+            for (let i = 0; i < buf.length; i++) {
+                let val = (buf[i] - 128) * contrast + 128;
+                if (val < 0) val = 0;
+                if (val > 255) val = 255;
+                buf[i] = val | 0;
+            }
+        }
+
+        function applyClahe(buf, w, h, tile = 8) {
+            for (let ty = 0; ty < h; ty += tile) {
+                for (let tx = 0; tx < w; tx += tile) {
+                    const hist = new Int32Array(256);
+                    let n = 0;
+                    const yEnd = Math.min(ty + tile, h);
+                    const xEnd = Math.min(tx + tile, w);
+                    for (let y = ty; y < yEnd; y++) {
+                        for (let x = tx; x < xEnd; x++) {
+                            hist[buf[y * w + x]]++;
+                            n++;
+                        }
+                    }
+                    const cdf = new Int32Array(256);
+                    cdf[0] = hist[0];
+                    for (let i = 1; i < 256; i++) cdf[i] = cdf[i - 1] + hist[i];
+                    if (n > 0) {
+                        for (let y = ty; y < yEnd; y++) {
+                            for (let x = tx; x < xEnd; x++) {
+                                buf[y * w + x] = (cdf[buf[y * w + x]] * 255 / n) | 0;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function erode(src, dst, w, h, kernel) {
+            const radius = kernel >> 1;
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    let min = 255;
+                    for (let dy = -radius; dy <= radius; dy++) {
+                        for (let dx = -radius; dx <= radius; dx++) {
+                            const ny = y + dy, nx = x + dx;
+                            if (ny >= 0 && ny < h && nx >= 0 && nx < w) {
+                                const value = src[ny * w + nx];
+                                if (value < min) min = value;
+                            }
+                        }
+                    }
+                    dst[y * w + x] = min;
+                }
+            }
+        }
+
+        function dilate(src, dst, w, h, kernel) {
+            const radius = kernel >> 1;
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    let max = 0;
+                    for (let dy = -radius; dy <= radius; dy++) {
+                        for (let dx = -radius; dx <= radius; dx++) {
+                            const ny = y + dy, nx = x + dx;
+                            if (ny >= 0 && ny < h && nx >= 0 && nx < w) {
+                                const value = src[ny * w + nx];
+                                if (value > max) max = value;
+                            }
+                        }
+                    }
+                    dst[y * w + x] = max;
+                }
+            }
+        }
+
+        function applyTophat(buf, w, h, kernel, needleType) {
+            const a = new Uint8Array(w * h);
+            const b = new Uint8Array(w * h);
+            if (needleType === 'LIGHT') {
+                erode(buf, a, w, h, kernel);
+                dilate(a, b, w, h, kernel);
+                for (let i = 0; i < buf.length; i++) {
+                    const value = buf[i] - b[i];
+                    buf[i] = value < 0 ? 0 : value;
+                }
+            } else {
+                dilate(buf, a, w, h, kernel);
+                erode(a, b, w, h, kernel);
+                for (let i = 0; i < buf.length; i++) {
+                    const value = b[i] - buf[i];
+                    buf[i] = value < 0 ? 0 : value;
+                }
+            }
+        }
+
+        function median3x3(buf, w, h) {
+            const tmp = buf.slice();
+            const win = new Uint8Array(9);
+            for (let y = 1; y < h - 1; y++) {
+                for (let x = 1; x < w - 1; x++) {
+                    let index = 0;
+                    for (let dy = -1; dy <= 1; dy++) {
+                        for (let dx = -1; dx <= 1; dx++) {
+                            win[index++] = tmp[(y + dy) * w + (x + dx)];
+                        }
+                    }
+                    win.sort();
+                    buf[y * w + x] = win[4];
+                }
+            }
+        }
+
+        // --- Detection algorithms ---
+        function detectRadialProfile(buf, w, h, maxScan, deadzoneDiameter) {
+            const cx = w >> 1, cy = h >> 1;
+            const radius = Math.min(cx, cy) - 2;
+            const deadzoneRadius = Math.max(0, (deadzoneDiameter || 0) * 0.5);
+            const startR = Math.max(5, Math.floor(deadzoneRadius));
+            const maxR = Math.max(startR + 1, (radius * maxScan) | 0);
+            const maxGap = 5;
+            const profile = new Float32Array(360);
+
+            for (let deg = 0; deg < 360; deg++) {
+                let score = 0, gap = 0;
+                for (let r = startR; r < maxR; r++) {
+                    const px = cx + Math.trunc(r * COS[deg]);
+                    const py = cy + Math.trunc(r * SIN[deg]);
+                    if (px >= 0 && px < w && py >= 0 && py < h) {
+                        const value = buf[py * w + px];
+                        if (value > 20) { score += value; gap = 0; }
+                        else { gap++; if (gap > maxGap) break; }
+                    } else break;
+                }
+                profile[deg] = score;
+            }
+
+            let best = -Infinity, bestIndex = 0, min = Infinity;
+            for (let deg = 0; deg < 360; deg++) {
+                if (profile[deg] > best) { best = profile[deg]; bestIndex = deg; }
+                if (profile[deg] < min) min = profile[deg];
+            }
+
+            let angle = bestIndex;
+            const y1 = profile[(bestIndex - 1 + 360) % 360];
+            const y2 = profile[bestIndex];
+            const y3 = profile[(bestIndex + 1) % 360];
+            const denom = y1 - 2 * y2 + y3;
+            if (Math.abs(denom) > 0.0001) angle += (y1 - y3) / (2 * denom);
+            if (angle < 0) angle += 360;
+            if (angle >= 360) angle -= 360;
+
+            const range = best - min;
+            let confidence = range > 50 ? 0.8 + range / 200 : range / 100;
+            if (confidence > 1) confidence = 1;
+            return { angle, confidence, profile, range };
+        }
+
+        function detectLegacy(buf, w, h, maxScan, deadzoneDiameter) {
+            const cx = w >> 1, cy = h >> 1;
+            const radius = Math.min(cx, cy) - 2;
+            const deadzoneR = Math.max(0, (deadzoneDiameter || 0) * 0.5);
+            const startR = Math.max(5, Math.floor(deadzoneR));
+            const maxR = Math.max(startR + 1, (radius * (maxScan || 0.9)) | 0);
+            const maxGap = 5;
+            const profile = new Float32Array(360);
+
+            for (let deg = 0; deg < 360; deg++) {
+                let count = 0, sum = 0, gap = 0;
+                for (let r = startR; r < maxR; r++) {
+                    const px = cx + Math.trunc(r * COS[deg]);
+                    const py = cy + Math.trunc(r * SIN[deg]);
+                    if (px >= 0 && px < w && py >= 0 && py < h) {
+                        if (buf[py * w + px] > 20) { sum += buf[py * w + px]; count++; gap = 0; }
+                        else { gap++; if (gap > maxGap) break; }
+                    } else break;
+                }
+                profile[deg] = count > 0 ? sum / count : 0;
+            }
+
+            let best = -Infinity, bestIndex = 0, min = Infinity;
+            for (let deg = 0; deg < 360; deg++) {
+                if (profile[deg] > best) { best = profile[deg]; bestIndex = deg; }
+                if (profile[deg] < min) min = profile[deg];
+            }
+
+            let angle = bestIndex;
+            const y1 = profile[(bestIndex - 1 + 360) % 360];
+            const y2 = profile[bestIndex];
+            const y3 = profile[(bestIndex + 1) % 360];
+            const denom = y1 - 2 * y2 + y3;
+            if (Math.abs(denom) > 0.0001) angle += (y1 - y3) / (2 * denom);
+            if (angle < 0) angle += 360;
+            if (angle >= 360) angle -= 360;
+
+            const range = best - min;
+            const confidence = range > 50 ? Math.min(1, 0.8 + range / 200) : Math.min(1, range / 100);
+            return { angle, confidence, profile, range };
+        }
+
+        function detectHough(buf, w, h, maxScan, deadzoneDiameter) {
+            const cx = w >> 1, cy = h >> 1;
+            const radius = Math.min(cx, cy) - 2;
+            const deadzoneR = Math.max(0, (deadzoneDiameter || 0) * 0.5);
+            const startR = Math.max(5, Math.floor(deadzoneR));
+            const maxR = Math.max(startR + 1, (radius * (maxScan || 0.9)) | 0);
+            const votes = new Float32Array(360);
+
+            for (let deg = 0; deg < 360; deg++) {
+                for (let r = startR; r < maxR; r++) {
+                    const px = cx + Math.trunc(r * COS[deg]);
+                    const py = cy + Math.trunc(r * SIN[deg]);
+                    if (px < 1 || px >= w - 1 || py < 1 || py >= h - 1) continue;
+                    const gx = -buf[(py-1)*w+(px-1)] - 2*buf[py*w+(px-1)] - buf[(py+1)*w+(px-1)]
+                              + buf[(py-1)*w+(px+1)] + 2*buf[py*w+(px+1)] + buf[(py+1)*w+(px+1)];
+                    const gy = -buf[(py-1)*w+(px-1)] - 2*buf[(py-1)*w+px] - buf[(py-1)*w+(px+1)]
+                              + buf[(py+1)*w+(px-1)] + 2*buf[(py+1)*w+px] + buf[(py+1)*w+(px+1)];
+                    const mag = Math.sqrt(gx * gx + gy * gy);
+                    if (mag > 30) votes[deg] += mag;
+                }
+            }
+
+            let best = -Infinity, bestIndex = 0, min = Infinity;
+            for (let deg = 0; deg < 360; deg++) {
+                if (votes[deg] > best) { best = votes[deg]; bestIndex = deg; }
+                if (votes[deg] < min) min = votes[deg];
+            }
+            return { angle: bestIndex, confidence: 0.5, profile: votes, range: best - min };
+        }
+
+        function detectTemplateMatch(buf, w, h, maxScan, deadzoneDiameter) {
+            const cx = w >> 1, cy = h >> 1;
+            const radius = Math.min(cx, cy) - 2;
+            const deadzoneR = Math.max(0, (deadzoneDiameter || 0) * 0.5);
+            const startR = Math.max(5, Math.floor(deadzoneR));
+            const maxR = Math.max(startR + 1, (radius * (maxScan || 0.9)) | 0);
+            const scores = new Float32Array(360);
+
+            const ideal = new Uint8Array(maxR - startR);
+            const mid = startR + (maxR - startR) / 2;
+            for (let ri = 0; ri < ideal.length; ri++) {
+                const dist = Math.abs(startR + ri - mid);
+                ideal[ri] = dist < 3 ? 255 : 0;
+            }
+
+            for (let deg = 0; deg < 360; deg++) {
+                let correlation = 0;
+                for (let r = startR; r < maxR; r++) {
+                    const px = cx + Math.trunc(r * COS[deg]);
+                    const py = cy + Math.trunc(r * SIN[deg]);
+                    if (px >= 0 && px < w && py >= 0 && py < h) {
+                        correlation += (buf[py * w + px] / 255) * (ideal[r - startR] / 255);
+                    }
+                }
+                scores[deg] = correlation;
+            }
+
+            let best = -Infinity, bestIndex = 0, min = Infinity;
+            for (let deg = 0; deg < 360; deg++) {
+                if (scores[deg] > best) { best = scores[deg]; bestIndex = deg; }
+                if (scores[deg] < min) min = scores[deg];
+            }
+            return { angle: bestIndex, confidence: Math.min(1, best / 100), profile: scores, range: best - min };
+        }
+
+        // --- Dial debug / preview ---
+        const DIAL_CFG_IDS = [
+            { id: 'debug_algorithm', key: 'algorithm', fallback: 'radial_profile' },
+            { id: 'debug_needle_type', key: 'needle_type', fallback: 'DARK' },
+            { id: 'debug_process_channel', key: 'process_channel', fallback: 'GRAYSCALE' },
+            { id: 'debug_use_color', key: 'use_color', fallback: 'true' },
+            { id: 'debug_target_color', key: 'target_color', fallback: '0xFF0000' },
+            { id: 'debug_color_tolerance', key: 'color_tolerance', fallback: '0' },
+            { id: 'debug_tophat', key: 'tophat_on', fallback: 'false' },
+            { id: 'debug_auto_contrast', key: 'auto_contrast', fallback: 'true' },
+            { id: 'debug_contrast', key: 'contrast', fallback: '1.0' },
+            { id: 'debug_min_scan_radius', key: 'min_scan_radius', fallback: '0.3' },
+            { id: 'debug_max_scan', key: 'max_scan_radius', fallback: '0.9' },
+            { id: 'debug_deadzone_diameter', key: 'deadzone_diameter', fallback: '40' },
+            { id: 'debug_min_angle', key: 'min_angle', fallback: '0' },
+            { id: 'debug_max_angle', key: 'max_angle', fallback: '360' },
+            { id: 'debug_min_value', key: 'min_value', fallback: '0' },
+            { id: 'debug_max_value', key: 'max_value', fallback: '10' },
+            { id: 'debug_scale', key: 'scale', fallback: '0.1' },
+            { id: 'debug_angle_offset', key: 'angle_offset', fallback: '0' },
+            { id: 'debug_clockwise', key: 'clockwise', fallback: 'true' }
+        ];
+
+        function loadCfgToUI(index) {
+            const dial = (index >= 0 && index < state.dials.length) ? state.dials[index] : null;
+            const cfg = dial && dial.cfg ? dial.cfg : {};
+            DIAL_CFG_IDS.forEach(item => {
+                const el = document.getElementById(item.id);
+                if (!el) return;
+                let value = cfg[item.key] !== undefined ? cfg[item.key] : item.fallback;
+                if (item.key === 'target_color' && typeof value === 'number') {
+                    value = `0x${value.toString(16).toUpperCase().padStart(6, '0')}`;
+                }
+                el.value = String(value);
+            });
+            updateDebugColorSwatch();
+        }
+
+        function saveUIToCfg(index) {
+            if (index < 0 || index >= state.dials.length) return;
+            if (!state.dials[index].cfg) state.dials[index].cfg = {};
+            const cfg = state.dials[index].cfg;
+            DIAL_CFG_IDS.forEach(item => {
+                const el = document.getElementById(item.id);
+                if (!el) return;
+                let value = el.value;
+                if (item.key === 'target_color') {
+                    value = parseInt(value.replace(/^#/, '0x'), 16) || 0;
+                } else if (item.key === 'clockwise' || item.key === 'auto_contrast' || item.key === 'tophat_on' || item.key === 'use_color') {
+                    value = value === 'true';
+                } else if (item.key === 'scale' || item.key === 'contrast' || item.key === 'color_tolerance' || item.key === 'min_scan_radius' || item.key === 'max_scan_radius' || item.key === 'deadzone_diameter' || item.key === 'min_angle' || item.key === 'max_angle' || item.key === 'min_value' || item.key === 'max_value' || item.key === 'angle_offset') {
+                    value = parseFloat(value);
+                }
+                cfg[item.key] = value;
+            });
+        }
+
+        function updateDialSelector() {
+            const sel = document.getElementById('selected_dial');
+            if (!sel) return;
+            sel.innerHTML = '';
+            if (state.dials.length === 0) {
+                sel.innerHTML = '<option value="-1">(none)</option>';
+                state.selectedDial = -1;
+                loadCfgToUI(-1);
+                document.getElementById('card-dial-debug-controls').style.display = 'none';
+                return;
+            }
+            for (let i = 0; i < state.dials.length; i++) {
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = `Dial ${i + 1}`;
+                sel.appendChild(opt);
+            }
+            if (state.selectedDial < 0 || state.selectedDial >= state.dials.length) {
+                state.selectedDial = 0;
+            }
+            sel.value = state.selectedDial;
+            document.getElementById('card-dial-debug-controls').style.display = 'block';
+            loadCfgToUI(state.selectedDial);
+        }
+
+        function onDialSelect(index) {
+            if (index >= 0 && index < state.dials.length) {
+                saveUIToCfg(state.selectedDial);
+                state.selectedDial = index;
+                loadCfgToUI(index);
+            } else {
+                state.selectedDial = -1;
+                loadCfgToUI(-1);
+            }
+        }
+
+        function addDefaultDial() {
+            if (!state.image) { alert('Load an image first'); return; }
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            const size = 64;
+            state.dials.push({ x: cx - size / 2, y: cy - size / 2, w: size, h: size, cfg: {} });
+            state.selectedDial = state.dials.length - 1;
+            updateDialSelector();
+            saveUIToCfg(state.selectedDial);
+            updateCanvas();
+            generateOutput();
+        }
+
+        function deleteSelectedDial() {
+            if (state.selectedDial < 0 || state.selectedDial >= state.dials.length) return;
+            if (!confirm(`Delete Dial ${state.selectedDial + 1}?`)) return;
+            state.dials.splice(state.selectedDial, 1);
+            state.selectedDial = Math.min(state.selectedDial, state.dials.length - 1);
+            if (state.dials.length === 0) state.selectedDial = -1;
+            updateDialSelector();
+            updateCanvas();
+            generateOutput();
+        }
+
+        function getDialDebugSettings(dial) {
+            const cfg = dial && dial.cfg ? dial.cfg : {};
+            return {
+                useColor: cfg.use_color !== undefined ? cfg.use_color : cfg.target_color !== undefined,
+                targetColor: typeof cfg.target_color === 'number' ? cfg.target_color : 0xFF0000,
+                colorTolerance: cfg.color_tolerance !== undefined ? cfg.color_tolerance : 0,
+                needleType: cfg.needle_type || 'DARK',
+                algorithm: cfg.algorithm || 'radial_profile',
+                processChannel: cfg.process_channel || 'GRAYSCALE',
+                tophatOn: cfg.tophat_on !== undefined ? cfg.tophat_on : false,
+                autoContrast: cfg.auto_contrast !== undefined ? cfg.auto_contrast : true,
+                contrast: cfg.contrast !== undefined ? cfg.contrast : 1.0,
+                minScan: cfg.min_scan_radius !== undefined ? cfg.min_scan_radius : 0.3,
+                maxScan: cfg.max_scan_radius !== undefined ? cfg.max_scan_radius : 0.9,
+                deadzoneDiameter: cfg.deadzone_diameter !== undefined ? cfg.deadzone_diameter : 40,
+                minAngle: cfg.min_angle !== undefined ? cfg.min_angle : 0,
+                maxAngle: cfg.max_angle !== undefined ? cfg.max_angle : 360,
+                minValue: cfg.min_value !== undefined ? cfg.min_value : 0,
+                maxValue: cfg.max_value !== undefined ? cfg.max_value : 10,
+                angleOffset: cfg.angle_offset !== undefined ? cfg.angle_offset : 0,
+                clockwise: cfg.clockwise !== undefined ? cfg.clockwise : true
+            };
+        }
+
+        function sampleCanvasColor(x, y) {
+            if (!rotatedImageData) return null;
+            const px = Math.max(0, Math.min(rotatedImageData.width - 1, Math.round(x)));
+            const py = Math.max(0, Math.min(rotatedImageData.height - 1, Math.round(y)));
+            const index = (py * rotatedImageData.width + px) * 4;
+            const data = rotatedImageData.data;
+            return { r: data[index], g: data[index + 1], b: data[index + 2] };
+        }
+
+        function rgbToHex(color) {
+            return `0x${[color.r, color.g, color.b].map(v => v.toString(16).toUpperCase().padStart(2, '0')).join('')}`;
+        }
+
+        function normalizeHexColor(value) {
+            const raw = String(value || '').trim().toUpperCase();
+            const match = raw.match(/^(?:0X|#)?([0-9A-F]{6})$/);
+            if (!match) return null;
+            return `#${match[1]}`;
+        }
+
+        function updateDebugColorSwatch() {
+            const swatch = document.getElementById('debug_color_swatch');
+            const input = document.getElementById('debug_target_color');
+            if (!swatch || !input) return;
+            const hex = normalizeHexColor(input.value);
+            swatch.style.background = hex || '#ffffff';
+            swatch.style.opacity = hex ? '1' : '0.45';
+            swatch.title = hex ? `Selected color ${hex}` : 'Invalid color format';
+        }
+
+        function setColorPickMode(enabled) {
+            colorPickMode = !!enabled;
+            state.isDrawing = false;
+            const button = document.getElementById('debug_pick_color_btn');
+            if (button) button.textContent = colorPickMode ? 'Click image...' : 'Pick from image';
+            canvas.style.cursor = colorPickMode ? 'crosshair' : 'default';
+        }
+
+        function setDebugTargetColor(hexValue) {
+            const input = document.getElementById('debug_target_color');
+            if (input) input.value = hexValue;
+            updateDebugColorSwatch();
+            setColorPickMode(false);
+            if (state.image) updateCanvas();
+        }
+
+        function runDialDebug(rect, dial) {
+            if (!rotatedImageData || rect.w < 8 || rect.h < 8) return null;
+            const rgb = extractCropRGB(rotatedImageData, rect);
+            const w = rgb.w, h = rgb.h;
+            if (w < 8 || h < 8) return null;
+
+            const settings = getDialDebugSettings(dial || rect);
+            const stages = [];
+            stages.push({ title: '1. Raw crop (RGB)', kind: 'rgb', rgb: { r: rgb.r.slice(), g: rgb.g.slice(), b: rgb.b.slice(), w, h } });
+
+            let buf;
+            if (settings.useColor) {
+                buf = colorDistanceMap(rgb, settings.targetColor, settings.colorTolerance);
+                stages.push({ title: '2. Color-distance map', kind: 'gray', buf: buf.slice(), w, h });
+            } else {
+                buf = grayscale(rgb);
+                let stageLabel = '2. Grayscale';
+                if (settings.autoContrast) { applyAutoContrast(buf); stageLabel += ' + auto contrast'; }
+                if (Math.abs(settings.contrast - 1) > 0.01) { applyContrast(buf, settings.contrast); stageLabel += ` + contrast ${settings.contrast.toFixed(1)}`; }
+                stages.push({ title: stageLabel, kind: 'gray', buf: buf.slice(), w, h });
+            }
+
+            const radius = Math.min(w >> 1, h >> 1) - 2;
+            let kernel = Math.max(3, (radius / 10) | 0);
+            if (kernel % 2 === 0) kernel++;
+            applyClahe(buf, w, h, 8);
+            stages.push({ title: '3. CLAHE', kind: 'gray', buf: buf.slice(), w, h });
+
+            if (settings.tophatOn) {
+                applyTophat(buf, w, h, kernel, settings.needleType);
+                stages.push({ title: `4. Top-hat (k=${kernel}, ${settings.needleType})`, kind: 'gray', buf: buf.slice(), w, h });
+            } else {
+                if (settings.needleType === 'DARK' || settings.useColor) {
+                    for (let i = 0; i < buf.length; i++) buf[i] = 255 - buf[i];
+                }
+                stages.push({ title: '4. Top-hat (skipped, inverted)', kind: 'gray', buf: buf.slice(), w, h });
+            }
+
+            median3x3(buf, w, h);
+            stages.push({ title: '5. Median 3×3 (final)', kind: 'gray', buf: buf.slice(), w, h });
+
+            const algo = settings.algorithm || 'radial_profile';
+            let det;
+            switch (algo) {
+                case 'legacy': det = detectLegacy(buf, w, h, settings.maxScan, settings.deadzoneDiameter); break;
+                case 'hough_transform': det = detectHough(buf, w, h, settings.maxScan, settings.deadzoneDiameter); break;
+                case 'template_match': det = detectTemplateMatch(buf, w, h, settings.maxScan, settings.deadzoneDiameter); break;
+                case 'auto':
+                    const a1 = detectRadialProfile(buf, w, h, settings.maxScan, settings.deadzoneDiameter);
+                    const a2 = detectLegacy(buf, w, h, settings.maxScan, settings.deadzoneDiameter);
+                    const a3 = detectHough(buf, w, h, settings.maxScan, settings.deadzoneDiameter);
+                    det = (a2.confidence > a1.confidence) ? a2 : a1;
+                    if (a3.confidence > det.confidence) det = a3;
+                    break;
+                default: det = detectRadialProfile(buf, w, h, settings.maxScan, settings.deadzoneDiameter); break;
+            }
+
+            const params = {
+                clockwise: settings.clockwise, angleOffset: settings.angleOffset,
+                minAngle: settings.minAngle, maxAngle: settings.maxAngle,
+                minValue: settings.minValue, maxValue: settings.maxValue
+            };
+
+            stages.push({ title: '6. Processed (needle)', kind: 'needle', buf: buf.slice(), w, h, angle: det.angle, maxScan: settings.maxScan });
+
+            function angleToValue(imageAngle, params) {
+                let dialAngle = (imageAngle + 90) % 360;
+                if (!params.clockwise) dialAngle = (360 - dialAngle) % 360;
+                dialAngle = (dialAngle - params.angleOffset + 360) % 360;
+                let fraction = (dialAngle - params.minAngle) / (params.maxAngle - params.minAngle);
+                fraction = Math.max(0, Math.min(1, fraction));
+                return params.minValue + fraction * (params.maxValue - params.minValue);
+            }
+
+            return {
+                value: angleToValue(det.angle, params),
+                angle: det.angle,
+                confidence: det.confidence,
+                range: det.range,
+                kernel,
+                stages,
+                settings
+            };
+        }
+
+        function drawGrayStage(canvasEl, buf, w, h) {
+            const stageCtx = canvasEl.getContext('2d');
+            canvasEl.width = w;
+            canvasEl.height = h;
+            const id = stageCtx.createImageData(w, h);
+            for (let i = 0; i < buf.length; i++) {
+                const offset = i * 4;
+                id.data[offset] = buf[i];
+                id.data[offset + 1] = buf[i];
+                id.data[offset + 2] = buf[i];
+                id.data[offset + 3] = 255;
+            }
+            stageCtx.putImageData(id, 0, 0);
+        }
+
+        function drawRGBStage(canvasEl, rgb) {
+            const stageCtx = canvasEl.getContext('2d');
+            canvasEl.width = rgb.w;
+            canvasEl.height = rgb.h;
+            const id = stageCtx.createImageData(rgb.w, rgb.h);
+            for (let i = 0; i < rgb.w * rgb.h; i++) {
+                const offset = i * 4;
+                id.data[offset] = rgb.r[i];
+                id.data[offset + 1] = rgb.g[i];
+                id.data[offset + 2] = rgb.b[i];
+                id.data[offset + 3] = 255;
+            }
+            stageCtx.putImageData(id, 0, 0);
+        }
+
+        function drawNeedleStage(canvasEl, buf, w, h, angleDeg, maxScan) {
+            drawGrayStage(canvasEl, buf, w, h);
+            const stageCtx = canvasEl.getContext('2d');
+            const cx = w >> 1, cy = h >> 1;
+            const radius = Math.min(cx, cy) - 2;
+            const len = radius * maxScan;
+            const radians = angleDeg * Math.PI / 180;
+            stageCtx.strokeStyle = '#ff4d4d';
+            stageCtx.lineWidth = 1;
+            stageCtx.beginPath();
+            stageCtx.moveTo(cx + 0.5, cy + 0.5);
+            stageCtx.lineTo(cx + 0.5 + Math.cos(radians) * len, cy + 0.5 + Math.sin(radians) * len);
+            stageCtx.stroke();
+            stageCtx.fillStyle = '#4f9cff';
+            stageCtx.fillRect(cx, cy, 1, 1);
+        }
+
+        function drawDialDebugOverlay(d, index, debug) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(d.x, d.y, d.w, d.h);
+            ctx.clip();
+            const cx = d.x + d.w / 2, cy = d.y + d.h / 2;
+            const angle = debug.angle * Math.PI / 180;
+            const lineLength = Math.max(6, Math.min(d.w, d.h) * 0.38);
+            ctx.strokeStyle = 'rgba(255, 77, 77, 0.95)';
+            ctx.lineWidth = Math.max(2, Math.round(Math.min(d.w, d.h) / 40));
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + Math.cos(angle) * lineLength, cy + Math.sin(angle) * lineLength);
+            ctx.stroke();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(cx, cy, Math.max(4, Math.min(d.w, d.h) / 2 - 3), 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.fillStyle = 'rgba(79, 156, 255, 0.95)';
+            ctx.beginPath();
+            ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function renderDialPreviews(debugResults) {
+            const container = document.getElementById('dial-preview-content');
+            if (!container) return;
+            if (!state.image || !debugResults.length) {
+                container.innerHTML = '<p class="help-text" style="margin:0;">Load an image and add at least one dial to see the stage previews.</p>';
+                return;
+            }
+            container.innerHTML = '';
+            const grid = document.createElement('div');
+            grid.className = 'dial-preview-grid';
+
+            debugResults.forEach((debug, index) => {
+                const card = document.createElement('section');
+                card.className = 'dial-preview-card';
+                const title = document.createElement('h4');
+                title.textContent = `Dial ${index + 1}`;
+                card.appendChild(title);
+
+                const summary = document.createElement('p');
+                summary.className = 'dial-preview-summary';
+                const algo = debug.settings.algorithm || 'radial_profile';
+                summary.textContent = `Value ${debug.value.toFixed(2)} | angle ${debug.angle.toFixed(1)}° | conf ${debug.confidence.toFixed(2)} | ${algo}`;
+                card.appendChild(summary);
+
+                const stages = document.createElement('div');
+                stages.className = 'dial-preview-stages';
+
+                debug.stages.forEach((stage) => {
+                    const stageBox = document.createElement('div');
+                    stageBox.className = 'dial-stage';
+                    const stageTitle = document.createElement('h5');
+                    stageTitle.textContent = stage.title;
+                    stageBox.appendChild(stageTitle);
+                    const stageCanvas = document.createElement('canvas');
+                    if (stage.kind === 'rgb') drawRGBStage(stageCanvas, stage.rgb);
+                    else if (stage.kind === 'gray') drawGrayStage(stageCanvas, stage.buf, stage.w, stage.h);
+                    else if (stage.kind === 'needle') drawNeedleStage(stageCanvas, stage.buf, stage.w, stage.h, stage.angle, stage.maxScan);
+                    stageBox.appendChild(stageCanvas);
+                    stages.appendChild(stageBox);
+                });
+
+                card.appendChild(stages);
+                grid.appendChild(card);
+            });
+
+            container.appendChild(grid);
+        }
+
+        // --- Core canvas functions ---
+        function getTransformedDimensions() {
+            if (!state.image) return { w: 800, h: 600 };
+            const rad = state.rotation * Math.PI / 180;
+            const absCos = Math.abs(Math.cos(rad));
+            const absSin = Math.abs(Math.sin(rad));
+            const w = state.image.width * absCos + state.image.height * absSin;
+            const h = state.image.width * absSin + state.image.height * absCos;
+            return { w: Math.round(w), h: Math.round(h) };
+        }
+
+        function updateCanvas() {
+            const dims = getTransformedDimensions();
+            if (!dims || !Number.isFinite(dims.w) || !Number.isFinite(dims.h) || dims.w < 1 || dims.h < 1) {
+                canvas.width = 800; canvas.height = 600;
+                imageCanvas.width = 800; imageCanvas.height = 600;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                imageCtx.clearRect(0, 0, imageCanvas.width, imageCanvas.height);
+                rotatedImageData = null;
+                ctx.fillStyle = '#ccc';
+                ctx.textAlign = 'center';
+                ctx.fillText('No Image Loaded', canvas.width / 2, canvas.height / 2);
+                renderDialPreviews([]);
+                return;
+            }
+            canvas.width = dims.w; canvas.height = dims.h;
+            imageCanvas.width = dims.w; imageCanvas.height = dims.h;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            imageCtx.clearRect(0, 0, imageCanvas.width, imageCanvas.height);
+            rotatedImageData = null;
+
+            if (!state.image) {
+                ctx.fillStyle = '#ccc';
+                ctx.textAlign = 'center';
+                ctx.fillText('No Image Loaded', canvas.width / 2, canvas.height / 2);
+                renderDialPreviews([]);
+                return;
+            }
+
+            ctx.save();
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.rotate(state.rotation * Math.PI / 180);
+            ctx.drawImage(state.image, -state.image.width / 2, -state.image.height / 2);
+            ctx.restore();
+
+            imageCtx.save();
+            imageCtx.translate(imageCanvas.width / 2, imageCanvas.height / 2);
+            imageCtx.rotate(state.rotation * Math.PI / 180);
+            imageCtx.drawImage(state.image, -state.image.width / 2, -state.image.height / 2);
+            imageCtx.restore();
+            rotatedImageData = imageCtx.getImageData(0, 0, imageCanvas.width, imageCanvas.height);
+
+            // Draw dials
+            state.dials.forEach((d, i) => {
+                ctx.strokeStyle = '#f39c12';
+                ctx.lineWidth = 2;
+                ctx.fillStyle = 'rgba(243, 156, 18, 0.3)';
+                ctx.fillRect(d.x, d.y, d.w, d.h);
+                ctx.strokeRect(d.x, d.y, d.w, d.h);
+
+                const cx = d.x + d.w / 2, cy = d.y + d.h / 2;
+                const radius = Math.max(4, Math.min(d.w, d.h) / 2 - 3);
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                ctx.stroke();
+
+                const deadzoneDiameter = getDialDebugSettings(d).deadzoneDiameter || 0;
+                const deadzoneRadius = Math.max(0, Math.min(radius - 1, deadzoneDiameter * 0.5));
+                if (deadzoneRadius >= 1) {
+                    ctx.save();
+                    ctx.strokeStyle = 'rgba(0, 255, 255, 0.95)';
+                    ctx.fillStyle = 'rgba(0, 255, 255, 0.12)';
+                    ctx.lineWidth = 1.5;
+                    ctx.setLineDash([4, 3]);
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, deadzoneRadius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                    ctx.restore();
+                }
+
+                ctx.fillStyle = '#fff';
+                ctx.font = '12px sans-serif';
+                ctx.globalAlpha = 1.0;
+                ctx.fillText(`D${i + 1}`, d.x + 2, d.y + 12);
+            });
+
+            const dialDebugResults = [];
+            if (state.dials.length > 0 && rotatedImageData) {
+                state.dials.forEach((dial, index) => {
+                    const debug = runDialDebug(dial, dial);
+                    if (debug) {
+                        dialDebugResults.push(debug);
+                        drawDialDebugOverlay(dial, index, debug);
+                    }
+                });
+            }
+
+            renderDialPreviews(dialDebugResults);
+        }
+
+        // --- Coordinate mapping ---
+        function mapToOriginal(x, y, w, h) {
+            const W = state.image.width, H = state.image.height;
+            const dims = getTransformedDimensions();
+            const cx = dims.w / 2, cy = dims.h / 2;
+            const ocx = W / 2, ocy = H / 2;
+            const rad = -state.rotation * Math.PI / 180;
+            const cos = Math.cos(rad), sin = Math.sin(rad);
+            const points = [
+                { x, y }, { x: x + w, y }, { x, y: y + h }, { x: x + w, y: y + h }
+            ];
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            points.forEach(p => {
+                const dx = p.x - cx, dy = p.y - cy;
+                const ox = dx * cos - dy * sin + ocx;
+                const oy = dx * sin + dy * cos + ocy;
+                if (ox < minX) minX = ox;
+                if (ox > maxX) maxX = ox;
+                if (oy < minY) minY = oy;
+                if (oy > maxY) maxY = oy;
+            });
+            return {
+                x: Math.round(Math.max(0, minX)),
+                y: Math.round(Math.max(0, minY)),
+                w: Math.round(Math.min(W, maxX) - Math.max(0, minX)),
+                h: Math.round(Math.min(H, maxY) - Math.max(0, minY))
+            };
+        }
+
+        function calculateZoneCoordinates(vis_rect, off_x, off_y, scale_x, scale_y, w, h) {
+            const sensor_g = mapToOriginal(vis_rect.x, vis_rect.y, vis_rect.w, vis_rect.h);
+            const d_sensor_x = sensor_g.x * scale_x;
+            const d_sensor_y = sensor_g.y * scale_y;
+            const d_sensor_w = sensor_g.w * scale_x;
+            const d_sensor_h = sensor_g.h * scale_y;
+            let rel_x = d_sensor_x - off_x, rel_y = d_sensor_y - off_y;
+            let out_w = (state.rotation % 180 === 0) ? w : h;
+            let out_h = (state.rotation % 180 === 0) ? h : w;
+            let fin_x, fin_y, fin_w, fin_h;
+            switch (state.rotation) {
+                case 0: fin_x = rel_x; fin_y = rel_y; fin_w = d_sensor_w; fin_h = d_sensor_h; break;
+                case 90: fin_x = out_w - rel_y - d_sensor_h; fin_y = rel_x; fin_w = d_sensor_h; fin_h = d_sensor_w; break;
+                case 180: fin_x = out_w - rel_x - d_sensor_w; fin_y = out_h - rel_y - d_sensor_h; fin_w = d_sensor_w; fin_h = d_sensor_h; break;
+                case 270: fin_x = rel_y; fin_y = out_h - rel_x - d_sensor_w; fin_w = d_sensor_h; fin_h = d_sensor_w; break;
+            }
+            return { x: Math.round(fin_x), y: Math.round(fin_y), w: Math.round(fin_w), h: Math.round(fin_h) };
+        }
+
+        // --- YAML Parsing (for config upload) ---
+        function parseYamlText(text) {
+            const lines = text.replace(/\r/g, '').split('\n');
+            const result = {
+                rotation: null,
+                sensorW: null,
+                sensorH: null,
+                dials: []
+            };
+
+            function parseBool(value) {
+                return /^(true|yes|on)$/i.test(String(value).trim());
+            }
+
+            function parseValue(value) {
+                let trimmed = String(value).trim();
+                const commentIndex = trimmed.search(/\s+#/);
+                if (commentIndex !== -1) {
+                    trimmed = trimmed.slice(0, commentIndex).trim();
+                }
+                if (/^(true|false)$/i.test(trimmed)) return parseBool(trimmed);
+                if (/^0x[0-9a-f]+$/i.test(trimmed)) return parseInt(trimmed, 16);
+                if (/^-?\d+(?:\.\d+)?$/.test(trimmed)) return parseFloat(trimmed);
+                return trimmed.replace(/^['"]|['"]$/g, '');
+            }
+
+            let currentSection = null;
+            let inDials = false;
+            let currentDial = null;
+            const dialKeys = ['scale', 'crop_x', 'crop_y', 'crop_w', 'crop_h', 'needle_type', 'algorithm', 'process_channel',
+                'deadzone_diameter', 'min_angle', 'max_angle', 'min_value', 'max_value', 'angle_offset', 'clockwise',
+                'auto_contrast', 'contrast', 'min_scan_radius', 'max_scan_radius', 'target_color', 'color_tolerance',
+                'use_color', 'tophat_on'
+            ];
+
+            for (const rawLine of lines) {
+                const line = rawLine.replace(/\t/g, '  ');
+                const trimmed = line.trim();
+                if (!trimmed || trimmed.startsWith('#')) continue;
+
+                // Top-level section headers
+                const sectionMatch = trimmed.match(/^(\w[\w_]*):$/);
+                if (sectionMatch && !line.startsWith(' ')) {
+                    currentSection = sectionMatch[1];
+                    inDials = (currentSection === 'dials');
+                    if (currentSection !== 'dials') currentDial = null;
+                    continue;
+                }
+
+                // Inside dials list (lines starting with "  - ")
+                const dialEntryMatch = trimmed.match(/^-\s+id:\s*(.+)/);
+                if (inDials && dialEntryMatch && line.startsWith('  ')) {
+                    if (currentDial) result.dials.push(currentDial);
+                    currentDial = { cfg: {} };
+                    continue;
+                }
+
+                // Key: value pairs
+                const kvMatch = trimmed.match(/^(\w[\w_]*):\s*(.*)$/);
+                if (!kvMatch) continue;
+
+                const key = kvMatch[1];
+                const rawVal = kvMatch[2].trim();
+                const value = rawVal ? parseValue(rawVal) : null;
+
+                if (currentSection === 'esp32_camera_utils') {
+                    if (key === 'rotation') result.rotation = value;
+                    if (key === 'camera_resolution' && typeof rawVal === 'string') {
+                        const resMatch = rawVal.match(/(\d+)\s*x\s*(\d+)/);
+                        if (resMatch) {
+                            result.sensorW = parseFloat(resMatch[1]);
+                            result.sensorH = parseFloat(resMatch[2]);
+                        }
+                    }
+                }
+
+                if (inDials && currentDial) {
+                    if (key === 'crop_x' || key === 'crop_y' || key === 'crop_w' || key === 'crop_h') {
+                        if (typeof value === 'number') currentDial[key] = value;
+                    } else if (dialKeys.includes(key)) {
+                        currentDial.cfg[key] = value;
+                    }
+                }
+            }
+            if (currentDial) result.dials.push(currentDial);
+
+            return result;
+        }
+
+        function applyImportedConfig(parsed) {
+            state.importedConfig = parsed;
+
+            if (parsed.rotation !== null && parsed.rotation !== undefined) {
+                state.rotation = parsed.rotation;
+                const input = document.getElementById('custom_rot');
+                if (input) input.value = parsed.rotation;
+            }
+
+            if (parsed.sensorW && parsed.sensorH) {
+                state.sensorRes = { w: parsed.sensorW, h: parsed.sensorH, name: `${parsed.sensorW}x${parsed.sensorH}` };
+            }
+
+            // Restore dials from parsed config
+            if (parsed.dials && parsed.dials.length > 0) {
+                state.dials = parsed.dials.map(d => {
+                    // Draw dials centered at crop region center
+                    const cropW = d.crop_w || 64;
+                    const cropH = d.crop_h || 64;
+                    return {
+                        x: (d.crop_x || 0),
+                        y: (d.crop_y || 0),
+                        w: cropW,
+                        h: cropH,
+                        cfg: d.cfg || {}
+                    };
+                });
+                state.selectedDial = 0;
+            }
+
+            updateDialSelector();
+            if (state.dials.length > 0) {
+                saveUIToCfg(state.selectedDial);
+            }
+            updateCanvas();
+            generateOutput();
+        }
+
+        function handleConfigUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const parsed = parseYamlText(String(event.target.result || ''));
+                applyImportedConfig(parsed);
+                const status = document.getElementById('config-status');
+                if (status) status.textContent = `Loaded ${file.name}`;
+            };
+            reader.readAsText(file);
+        }
+
+        // --- Event handlers ---
+        function handleImageUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    state.image = img;
+                    const dims = getTransformedDimensions();
+                    document.getElementById('target_w').value = dims.w;
+                    document.getElementById('target_h').value = dims.h;
+                    document.getElementById('image-info').textContent = `Image Size: ${img.width} x ${img.height}`;
+                    state.dials = [];
+                    state.selectedDial = -1;
+                    updateDialSelector();
+                    updateCanvas();
+                    generateOutput();
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function setRotation(deg) {
+            if (isNaN(deg)) return;
+            state.rotation = deg;
+            const isCustom = [0, 90, 180, 270].indexOf(deg) === -1;
+            const input = document.getElementById('custom_rot');
+            if (input) input.value = deg;
+            const warning = document.getElementById('rot-warning');
+            if (warning) warning.style.display = isCustom ? 'block' : 'none';
+            state.dials = [];
+            state.selectedDial = -1;
+            updateDialSelector();
+            const dims = getTransformedDimensions();
+            document.getElementById('target_w').value = dims.w;
+            document.getElementById('target_h').value = dims.h;
+            updateCanvas();
+            generateOutput();
+        }
+
+        function setTargetRes(w, h) {
+            document.getElementById('target_w').value = w;
+            document.getElementById('target_h').value = h;
+            generateOutput();
+        }
+
+        // --- Output ---
+        function generateOutput() {
+            const ta = document.getElementById('output');
+            if (!state.image) { ta.value = ""; return; }
+
+            let lines = [];
+            const target_w_in = document.getElementById('target_w').value;
+            const target_h_in = document.getElementById('target_h').value;
+            let target_w = parseInt(target_w_in), target_h = parseInt(target_h_in);
+            let use_scaling = !isNaN(target_w) && !isNaN(target_h) && target_w > 0 && target_h > 0;
+
+            const img_w = state.image.width, img_h = state.image.height;
+            let sensor_w = state.sensorRes.w, sensor_h = state.sensorRes.h;
+            let scale_x = sensor_w / img_w, scale_y = sensor_h / img_h;
+
+            let off_x = 0, off_y = 0, w = sensor_w, h = sensor_h;
+
+            let final_scale_x = 1.0, final_scale_y = 1.0;
+            if (use_scaling) {
+                let unscaled_out_w = (state.rotation % 180 === 0) ? w : h;
+                let unscaled_out_h = (state.rotation % 180 === 0) ? h : w;
+                final_scale_x = target_w / unscaled_out_w;
+                final_scale_y = target_h / unscaled_out_h;
+            }
+
+            if (state.dials.length > 0) {
+                lines.push(`analog_reader:`);
+                lines.push(`  id: \${id_prefix}_analog_reader`);
+                lines.push(`  camera_id: \${id_prefix}_espcam`);
+                lines.push(`  debug: true`);
+                lines.push(`  update_interval: 60s`);
+                lines.push(`  dials:`);
+
+                state.dials.forEach((d, i) => {
+                    let res = calculateZoneCoordinates(d, off_x, off_y, scale_x, scale_y, w, h);
+                    if (use_scaling) {
+                        res.x = Math.round(res.x * final_scale_x);
+                        res.y = Math.round(res.y * final_scale_y);
+                        res.w = Math.round(res.w * final_scale_x);
+                        res.h = Math.round(res.h * final_scale_y);
+                    }
+                    const dialCfg = d.cfg || {};
+                    let dialScale = dialCfg.scale !== undefined ? dialCfg.scale : 0.1;
+                    if (use_scaling) {
+                        dialScale *= (final_scale_x + final_scale_y) / 2;
+                        dialScale = Math.round(dialScale * 1000) / 1000;
+                    }
+                    lines.push(`    - id: dial_${i + 1}`);
+                    lines.push(`      scale: ${dialScale}`);
+                    lines.push(`      crop_x: ${res.x}`);
+                    lines.push(`      crop_y: ${res.y}`);
+                    lines.push(`      crop_w: ${res.w}`);
+                    lines.push(`      crop_h: ${res.h}`);
+                    lines.push(`      needle_type: ${dialCfg.needle_type || 'DARK'}`);
+                    lines.push(`      algorithm: ${dialCfg.algorithm || 'radial_profile'}`);
+                    lines.push(`      process_channel: ${dialCfg.process_channel || 'GRAYSCALE'}`);
+                    const deadzone = dialCfg.deadzone_diameter !== undefined ? dialCfg.deadzone_diameter : 40;
+                    lines.push(`      deadzone_diameter: ${Number.isFinite(deadzone) ? deadzone : 0}`);
+                    lines.push(`      min_angle: ${dialCfg.min_angle !== undefined ? dialCfg.min_angle : 0}`);
+                    lines.push(`      max_angle: ${dialCfg.max_angle !== undefined ? dialCfg.max_angle : 360}`);
+                    lines.push(`      min_value: ${dialCfg.min_value !== undefined ? dialCfg.min_value : 0}`);
+                    lines.push(`      max_value: ${dialCfg.max_value !== undefined ? dialCfg.max_value : 10}`);
+                    lines.push(`      angle_offset: ${dialCfg.angle_offset !== undefined ? dialCfg.angle_offset : 0}`);
+                    lines.push(`      clockwise: ${dialCfg.clockwise !== undefined ? dialCfg.clockwise : true}`);
+                    lines.push(`      auto_contrast: ${dialCfg.auto_contrast !== undefined ? dialCfg.auto_contrast : true}`);
+                    lines.push(`      contrast: ${dialCfg.contrast !== undefined ? dialCfg.contrast : 1.0}`);
+                    lines.push(`      min_scan_radius: ${dialCfg.min_scan_radius !== undefined ? dialCfg.min_scan_radius : 0.3}`);
+                    lines.push(`      max_scan_radius: ${dialCfg.max_scan_radius !== undefined ? dialCfg.max_scan_radius : 0.9}`);
+                    if (dialCfg.target_color !== undefined) {
+                        const hexStr = typeof dialCfg.target_color === 'number'
+                            ? `0x${dialCfg.target_color.toString(16).toUpperCase().padStart(6, '0')}`
+                            : dialCfg.target_color;
+                        lines.push(`      target_color: ${hexStr}`);
+                    }
+                    if (dialCfg.color_tolerance !== undefined) {
+                        lines.push(`      color_tolerance: ${dialCfg.color_tolerance}`);
+                    }
+                });
+            } else {
+                lines.push(`# No dials defined. Draw dials on the canvas to generate configuration.`);
+            }
+
+            ta.value = lines.join('\n');
+        }
+
+        // --- Interaction ---
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            return { x: (e.clientX - rect.left), y: (e.clientY - rect.top) };
+        }
+
+        function startDrawing(e) {
+            if (!state.image) return;
+            if (colorPickMode) { handleCanvasPickColor(e); return; }
+            state.isDrawing = true;
+            state.startPos = getMousePos(e);
+        }
+
+        function draw(e) {
+            if (!state.isDrawing) return;
+            if (colorPickMode) return;
+            const pos = getMousePos(e);
+            updateCanvas();
+
+            ctx.strokeStyle = '#f39c12';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+
+            let dist = Math.max(Math.abs(pos.x - state.startPos.x), Math.abs(pos.y - state.startPos.y));
+            let cx = state.startPos.x, cy = state.startPos.y;
+            ctx.strokeRect(cx - dist, cy - dist, dist * 2, dist * 2);
+            ctx.beginPath();
+            ctx.arc(cx, cy, dist, 0, Math.PI * 2);
+            ctx.stroke();
+
+            const deadzoneDiameter = parseFloat(document.getElementById('debug_deadzone_diameter')?.value || '0');
+            const deadzoneRadius = Math.max(0, Math.min(dist - 1, deadzoneDiameter * 0.5));
+            if (deadzoneRadius >= 1) {
+                ctx.save();
+                ctx.strokeStyle = 'rgba(0, 255, 255, 0.95)';
+                ctx.fillStyle = 'rgba(0, 255, 255, 0.12)';
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([4, 3]);
+                ctx.beginPath();
+                ctx.arc(cx, cy, deadzoneRadius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            ctx.setLineDash([]);
+        }
+
+        function handleCanvasPickColor(e) {
+            if (!colorPickMode) return false;
+            const pos = getMousePos(e);
+            const color = sampleCanvasColor(pos.x, pos.y);
+            if (color) setDebugTargetColor(rgbToHex(color));
+            return true;
+        }
+
+        function stopDrawing(e) {
+            if (colorPickMode) { handleCanvasPickColor(e); state.isDrawing = false; return; }
+            if (!state.isDrawing) return;
+            state.isDrawing = false;
+            const pos = getMousePos(e);
+
+            let dist = Math.max(Math.abs(pos.x - state.startPos.x), Math.abs(pos.y - state.startPos.y));
+            let cx = state.startPos.x, cy = state.startPos.y;
+            let x = cx - dist, y = cy - dist, w = dist * 2, h = dist * 2;
+
+            if (w < 4 || h < 4) return;
+
+            state.dials.push({ x, y, w, h, cfg: {} });
+            state.selectedDial = state.dials.length - 1;
+            updateDialSelector();
+            saveUIToCfg(state.selectedDial);
+            updateCanvas();
+            generateOutput();
+        }
+
+        function resetCurrent() {
+            state.dials.pop();
+            state.selectedDial = Math.min(state.selectedDial, state.dials.length - 1);
+            if (state.dials.length === 0) state.selectedDial = -1;
+            updateDialSelector();
+            updateCanvas();
+            generateOutput();
+        }
+
+        function copyOutput() {
+            const copyText = document.getElementById("output");
+            navigator.clipboard.writeText(copyText.value).then(() => {
+                alert("Copied to clipboard");
+            }).catch(err => {
+                alert("Failed to copy. See console for details.");
+                console.error('Failed to copy text: ', err);
+            });
+        }
+
+        // --- Init ---
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseleave', stopDrawing);
+        document.getElementById('imageInput').addEventListener('change', handleImageUpload);
+        document.getElementById('configInput').addEventListener('change', handleConfigUpload);
+
+        const pickButton = document.getElementById('debug_pick_color_btn');
+        if (pickButton) {
+            pickButton.addEventListener('click', () => {
+                setColorPickMode(!colorPickMode);
+                if (!colorPickMode && state.image) updateCanvas();
+            });
+        }
+
+        updateDebugColorSwatch();
+        updateCanvas();
+    </script>
+</body>
+
+</html>

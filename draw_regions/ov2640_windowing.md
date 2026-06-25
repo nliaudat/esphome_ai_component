@@ -27,7 +27,7 @@ This means if you define a window of 800x600, the raw sensor output might be con
 
 ## How the ROI Tool Works
 
-The **ROI Tool** (`index_v3.html`) calculates the `offset_x`, `offset_y`, `width`, and `height` based on your selection on the full sensor canvas.
+The **ROI Tool** ([`roi.html`](roi.html)) calculates the `offset_x`, `offset_y`, `width`, and `height` based on your selection on the full sensor canvas.
 
 When you draw a rectangle:
 1.  **`offset_x` / `offset_y`**: Corresponds to `HREFST` and `VSTRT` (plus an offset depending on sensor centering).

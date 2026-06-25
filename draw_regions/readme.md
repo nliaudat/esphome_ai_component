@@ -1,6 +1,8 @@
-# ESP32 Camera ROI & Rotation Tool Logic
+# ESP32 Camera ROI Configuration Tool
 
 This tool addresses a specific challenge with ESP32 cameras: configuring a hardware `camera_window` (ROI) when the camera is mounted at a rotation (90°, 180°, 270°).
+
+**Live tool:** [`roi.html`](roi.html) — Open in browser to use.
 
 ## The Challenge
 
@@ -40,7 +42,18 @@ If the "Force 4:3" option is checked, the tool adds an extra constraint to prese
 *   **Constraint**: `Width = 16 * n`, `Height = 12 * n`
 *   This ensures the ratio is exactly 4:3 (16:12) while guaranteeing both dimensions are divisible by 4.
 
-## Output Explanation
+## Usage
+
+1. Open [`roi.html`](roi.html) in a browser.
+2. Click **📂 Load Image** to load a screenshot of your camera feed.
+3. Select the camera sensor model from the **Sensor Model** dropdown.
+4. Set **Rotation** if the camera is mounted at an angle (90°, 180°, 270°).
+5. **Click and drag** on the canvas to draw a BLUE ROI rectangle.
+6. Optionally enable **Force 4:3** to maintain aspect ratio.
+7. Optionally set **Target Resolution** if scaling the output (e.g. for AI model input).
+8. Copy the generated YAML config and paste into your ESPHome configuration.
+
+## Output
 
 ### `camera_window`
 Defines the hardware crop in **unrotated sensor space**.
@@ -52,8 +65,4 @@ camera_window:
   height: 600
 ```
 
-### `crop_zones` (Digit Regions)
-Defines sub-regions for post-processing.
-*   **Reference System**: Relative to the *resulting* output image.
-*   **Transform**: Because the `camera_window` generates a new image which is *then* rotated by the implementation, these coordinates must be transformed *again* into the final rotated visual space.
-*   **Format**: `[[x1, y1, x2, y2], ...]` stringified JSON.
+Also generates `rotation` and `enable_rotation` directives for the `esp32_camera_utils` configuration block.
