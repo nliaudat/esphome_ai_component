@@ -212,6 +212,33 @@ if (buffer) {
 - ONLY critical security or crash bug fixes
 - Users MUST be directed to migrate to `meter_reader_tflite`
 
+### 3.6 `tflite_micro_helper` - TFLite Micro Runtime Wrapper
+
+**✅ REQUIRED:**
+- **PSRAM-aware tensor arena allocation** — MUST use `MemoryManager::allocate_tensor_arena()` which calls `heap_caps_aligned_alloc()` with appropriate caps (`MALLOC_CAP_SPIRAM` when PSRAM present, `MALLOC_CAP_INTERNAL` otherwise). Supports build-override flags `TFLITE_FORCE_SRAM` / `TFLITE_FORCE_PSRAM` for debugging.
+- **RAII arena lifetime** — arena MUST be wrapped in `std::unique_ptr<uint8_t[], HeapCapsDeleter>` with `heap_caps_free()` deleter. Never manual `new`/`delete`/`free()`.
+- **CRC32 model verification** — MUST call `ModelHandler::verify_model_crc()` on every model load to detect corruption.
+- **Operator registration via X-Macro pattern** — `OpResolverManager::RegisterOps()` uses `tflm_operators.h` with `TFLM_OP_AVAILABLE`/`TFLM_OP_UNAVAILABLE` macros. Adding a new operator requires updating that header, not the `op_resolver.h` logic.
+- **`MAX_OPERATORS` build-time configurability** — defaults to 30 via `#ifndef MAX_OPERATORS` / `#define MAX_OPERATORS 30`. Override via `-DMAX_OPERATORS=N` from consuming component's codegen (e.g., `meter_reader_tflite` reads the `.txt` model report).
+- **`USE_TFLITE_MICRO_HELPER` guard** — ALL headers and source files MUST be wrapped in `#ifdef USE_TFLITE_MICRO_HELPER` (set unconditionally by `__init__.py`).
+- **Model dimension derivation** — dimensions MUST come from `TfLiteTensor::dims` at runtime via `get_input_width()`, `get_input_height()`, `get_input_channels()`. NEVER hardcode model input dimensions.
+- **Model CRC32 verification** — MUST integrate on every model load.
+- **ESP-IDF dependency pinning** — `__init__.py` SHALL pin `esp-tflite-micro` (currently `1.3.4`) and `esp-nn` (currently `1.2.1`), and set build flags `-DTF_LITE_STATIC_MEMORY`, `-DTF_LITE_DISABLE_X86_NEON`, `-DESP_NN`, `-DOPTIMIZED_KERNEL=esp_nn`.
+- **Debug gating** — ALL debug logging and diagnostic methods MUST be guarded by `DEBUG_TFLITE_MICRO_HELPER` (set by YAML `debug: true` → `cg.add_define()` in `__init__.py`).
+
+**⚠️ WARNING:**
+- **PSRAM path does NOT fall back to SRAM** — When PSRAM is detected, the normal allocation path tries PSRAM only. This prevents silently exhausting scarce internal SRAM on ESP32-S3 boards. Use `TFLITE_FORCE_SRAM` build flag to override for debugging.
+- **`heap_caps_aligned_alloc(16, ...)` alignment** — the arena uses 16-byte alignment required by TFLite Micro. Do not change the alignment without verifying compatibility with TFLite Micro's internal alignment assumptions.
+- **Output processing** — `process_output()` must handle BOTH `const float*` and `TfLiteTensor*` overloads correctly based on model type (quantized vs float).
+- **Model config validation** — `validate_model_config()` and `debug_model_architecture()` SHOULD be called after loading to verify model compatibility.
+
+**❌ BLOCKER:**
+- No stack-allocated tensor arena (stack overflow risk with 512KB+ arenas on ESP32).
+- No ARDUINO-only APIs (`Serial`, `delay`, `digitalWrite`) in any code path.
+- No `new`/`delete` — MUST use `heap_caps_aligned_alloc` / `heap_caps_free` wrapped in `unique_ptr` with custom deleter.
+- No assumption that PSRAM exists — MUST check via `MemoryManager::has_psram()` (calls `heap_caps_get_total_size(MALLOC_CAP_SPIRAM)`).
+- No hardcoded model input dimensions — MUST derive from loaded model at runtime.
+
 ---
 
 ## 4. PERFORMANCE REQUIREMENTS
@@ -939,6 +966,7 @@ std::array<uint8_t, JPEG_BUFFER_SIZE> buffer;
 
 **BEFORE reviewing a file, IDENTIFY which component it belongs to:**
 - `meter_reader_tflite/` → Apply AI inference rules
+- `tflite_micro_helper/` → Apply TFLite Micro runtime rules (§3.6)
 - `esp32_camera_utils/` → Apply memory management rules
 - `data_collector/` → Apply non-blocking network rules
 - `legacy_meter_reader_tflite/` → **EXCLUDED** from AI review. Do not read, analyze, or suggest changes to this component. It is frozen and deprecated.
