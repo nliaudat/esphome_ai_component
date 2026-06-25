@@ -88,10 +88,7 @@ void SSOCRReader::loop() {
     if (state == FrameState::REQUESTED && millis() - this->last_request_time_ > 5000) {
         ESP_LOGW(TAG, "Frame timeout");
         FrameState expected = FrameState::REQUESTED;
-        if (this->frame_state_.compare_exchange_strong(expected, FrameState::IDLE)) {
-            std::lock_guard<std::mutex> lock(this->frame_mutex_);
-            this->pending_frame_ = nullptr;
-        }
+        this->frame_state_.compare_exchange_strong(expected, FrameState::IDLE);
     }
 }
 

@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Camera ROI Tool</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            background-color: #f0f2f5;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            gap: 20px;
+        }
+
+        .main-panel {
+            flex: 2;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .sidebar {
+            flex: 1;
+            min-width: 350px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        h1,
+        h2,
+        h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background-color: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #2980b9;
+        }
+
+        .btn-danger {
+            background-color: #e74c3c;
+            color: white;
+        }
+
+        .btn-secondary {
+            background-color: #95a5a6;
+            color: white;
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            overflow: auto;
+            max-height: 80vh;
+            border: 1px solid #ddd;
+            background-image: repeating-linear-gradient(45deg, #eee 25%, transparent 25%, transparent 75%, #eee 75%, #eee), repeating-linear-gradient(45deg, #eee 25%, #fff 25%, #fff 75%, #eee 75%, #eee);
+            background-position: 0 0, 10px 10px;
+            background-size: 20px 20px;
+        }
+
+        canvas {
+            display: block;
+            cursor: crosshair;
+        }
+
+        textarea {
+            width: 100%;
+            height: 200px;
+            font-family: monospace;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            resize: vertical;
+        }
+
+        .help-text {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .legend {
+            margin-top: 10px;
+            font-size: 0.85em;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 5px;
+        }
+
+        .color-box {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+
+        /* Help Sidebar CSS */
+        .help-sidebar {
+            flex: 1;
+            min-width: 300px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .step-list {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .step-list li {
+            margin-bottom: 10px;
+            color: #555;
+        }
+
+        .step-highlight {
+            background-color: #e8f6f3;
+            border-left: 4px solid #1abc9c;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="main-panel">
+            <h1>ESP32 Camera ROI Tool</h1>
+
+            <div class="controls">
+                <input type="file" id="imageInput" accept="image/*" style="display: none;">
+                <button class="btn btn-primary" onclick="document.getElementById('imageInput').click()">📂 Load
+                    Image</button>
+                <input type="file" id="configInput" accept=".yaml,.yml,text/yaml,text/plain" style="display: none;">
+                <button class="btn btn-secondary" onclick="document.getElementById('configInput').click()">📄 Load
+                    config.yaml</button>
+                <span class="help-text" id="config-status" style="margin:0; align-self:center;">No config loaded</span>
+            </div>
+
+            <p class="help-text" id="status-text">Camera ROI Configuration (Blue)</p>
+
+            <div class="canvas-wrapper">
+                <canvas id="canvas"></canvas>
+            </div>
+
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="color-box" style="background: rgba(52, 152, 219, 0.3); border: 2px solid #3498db;">
+                    </div> Camera ROI (Blue)
+                </div>
+            </div>
+
+            <div class="card" style="margin-top: 20px;">
+                <h3>Configuration Output</h3>
+                <textarea id="output" readonly></textarea>
+                <button class="btn btn-primary" style="width: 100%; margin-top: 10px;" onclick="copyOutput()">📋 Copy to
+                    Clipboard</button>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <!-- Camera Config Card -->
+            <div class="card">
+                <h3>Camera Config</h3>
+                <div style="margin-bottom: 10px;">
+                    <label style="display:block; margin-bottom:5px;">Sensor Model:</label>
+                    <div class="dropdown" style="position: relative; display: inline-block; width: 100%;">
+                        <button class="btn btn-secondary" style="width: 100%; text-align: left;"
+                            onclick="document.getElementById('resDropdown').style.display = document.getElementById('resDropdown').style.display === 'block' ? 'none' : 'block'"
+                            id="sensor-res-label">Select Sensor</button>
+                        <div id="resDropdown"
+                            style="display: none; position: absolute; background-color: #f9f9f9; min-width: 100%; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 10;">
+                            <div style="padding: 5px 10px; font-weight: bold; background: #eee;">OV2640</div>
+                            <a href="#" style="color: black; padding: 8px 16px; display: block; text-decoration:none;"
+                                onclick="setSensorRes(1600, 1200, 'OV2640 (1600x1200)'); document.getElementById('resDropdown').style.display='none'; return false;">UXGA
+                                (1600x1200)</a>
+                            <div style="padding: 5px 10px; font-weight: bold; background: #eee;">OV3660</div>
+                            <a href="#" style="color: black; padding: 8px 16px; display: block; text-decoration:none;"
+                                onclick="setSensorRes(2048, 1536, 'OV3660 (2048x1536)'); document.getElementById('resDropdown').style.display='none'; return false;">QXGA
+                                (2048x1536)</a>
+                            <div style="padding: 5px 10px; font-weight: bold; background: #eee;">OV5640</div>
+                            <a href="#" style="color: black; padding: 8px 16px; display: block; text-decoration:none;"
+                                onclick="setSensorRes(2592, 1944, 'OV5640 (2592x1944)'); document.getElementById('resDropdown').style.display='none'; return false;">QSXGA
+                                (2592x1944)</a>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 5px; align-items: center; margin-bottom: 10px;">
+                    <input type="checkbox" id="force43" onchange="state.force43 = this.checked; generateOutput()">
+                    <label for="force43" style="cursor: pointer; user-select: none;">Force 4:3 (Div by 8)</label>
+                </div>
+
+                <div style="margin-top: 10px;">
+                    <label style="display:block; margin-bottom:5px;">Rotation:</label>
+                    <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                        <button class="btn btn-secondary" style="flex:1; padding: 4px;"
+                            onclick="setRotation(0)">0°</button>
+                        <button class="btn btn-secondary" style="flex:1; padding: 4px;"
+                            onclick="setRotation(90)">90°</button>
+                        <button class="btn btn-secondary" style="flex:1; padding: 4px;"
+                            onclick="setRotation(180)">180°</button>
+                        <button class="btn btn-secondary" style="flex:1; padding: 4px;"
+                            onclick="setRotation(270)">270°</button>
+                    </div>
+                </div>
+                <div style="margin-top: 5px; display: flex; align-items: center; gap: 5px;">
+                    <label style="font-size: 0.9em;">Custom Angle:</label>
+                    <input type="number" id="custom_rot" placeholder="deg"
+                        onchange="setRotation(parseFloat(this.value))" style="width: 70px; padding: 4px;">
+                </div>
+                <div id="rot-warning"
+                    style="display:none; color: #e67e22; font-size: 0.85em; margin-top: 5px; background: #fdf2e9; padding: 5px; border-left: 3px solid #e67e22; border-radius: 2px;">
+                    <strong>Warning:</strong> Custom rotation is CPU intensive!
+                </div>
+            </div>
+
+            <!-- Target Sensor ROI Card -->
+            <div class="card">
+                <h3>Target Sensor ROI</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+                    <div><label>Off_X:</label> <input type="number" id="manual_x" onchange="updateROIFromInput()"
+                            style="width: 50px;"></div>
+                    <div><label>Off_Y:</label> <input type="number" id="manual_y" onchange="updateROIFromInput()"
+                            style="width: 50px;"></div>
+                    <div><label>Width:</label> <input type="number" id="manual_w" onchange="updateROIFromInput()"
+                            style="width: 50px;"></div>
+                    <div><label>Height:</label> <input type="number" id="manual_h" onchange="updateROIFromInput()"
+                            style="width: 50px;"></div>
+                </div>
+            </div>
+
+            <!-- Target Resolution Card -->
+            <div class="card">
+                <h3>Target Resolution</h3>
+                <p class="help-text" style="margin-bottom: 10px;">Optional: maps ROI coordinates to a target output size.</p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 10px;">
+                    <div><label>Target W:</label> <input type="number" id="target_w" placeholder="e.g 640"
+                            onchange="generateOutput()" style="width: 70px;"></div>
+                    <div><label>Target H:</label> <input type="number" id="target_h" placeholder="e.g 480"
+                            onchange="generateOutput()" style="width: 70px;"></div>
+                </div>
+                <div style="margin-top: 5px;">
+                    <button class="btn btn-secondary" style="font-size: 0.8em; padding: 4px 8px;"
+                        onclick="setTargetRes(640, 480)">VGA (640x480)</button>
+                    <button class="btn btn-secondary" style="font-size: 0.8em; padding: 4px 8px;"
+                        onclick="setTargetRes(800, 600)">SVGA (800x600)</button>
+                </div>
+            </div>
+
+            <!-- Actions Card -->
+            <div class="card">
+                <h3>Actions</h3>
+                <button class="btn btn-danger" style="width: 100%; margin-bottom: 10px;" onclick="resetCurrent()">Clear
+                    ROI</button>
+                <button class="btn btn-danger" style="width: 100%;" onclick="resetAll()">Reset All</button>
+            </div>
+        </div>
+
+        <!-- HELP SIDEBAR -->
+        <div class="help-sidebar" id="help-sidebar">
+            <h3>Instructions</h3>
+            <div id="help-content">
+                <div class="step-highlight">
+                    <strong>Goal:</strong> Define the active area of the camera sensor.
+                </div>
+                <ol class="step-list">
+                    <li><strong>Load Image</strong>: Click 'Load Image' to simulate your camera view.</li>
+                    <li><strong>Set Rotation</strong>: If your camera is mounted at an angle (e.g. 270°), use the rotation buttons in 'Camera Config'.</li>
+                    <li><strong>Draw ROI</strong>: Click and drag on the image to draw a BLUE rectangle. This is the only area that will be sent to the AI.</li>
+                    <li><strong>Why?</strong>: A smaller ROI (Window) acts like a digital zoom and improves frame rate/performance.</li>
+                    <li><strong>Tip</strong>: Use 'Force 4:3' if you want standard aspect ratio.</li>
+                    <li><strong>Apply</strong>: The board must be <strong>compiled</strong> with this ROI, or the crop zone can be set at runtime via a Home Assistant command.</li>
+                </ol>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // State
+        let state = {
+            image: null,
+            rotation: 0,
+            roi: null,
+            isDrawing: false,
+            startPos: null,
+            sensorRes: { w: 1600, h: 1200, name: "OV2640 UXGA (1600x1200)" },
+            force43: false,
+            importedConfig: null,
+            isManualUpdate: false
+        };
+
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const imageCanvas = document.createElement('canvas');
+        const imageCtx = imageCanvas.getContext('2d', { willReadFrequently: true });
+
+        let rotatedImageData = null;
+
+        function clamp(value, min, max) {
+            return value < min ? min : (value > max ? max : value);
+        }
+
+        // --- YAML Parsing (for config upload) ---
+        function parseYamlText(text) {
+            const lines = text.replace(/\r/g, '').split('\n');
+            const sections = {
+                globals: [],
+                esp32_camera_utils: [],
+                analog_reader: []
+            };
+
+            function parseBool(value) {
+                return /^(true|yes|on)$/i.test(String(value).trim());
+            }
+
+            function parseValue(value) {
+                let trimmed = String(value).trim();
+                const commentIndex = trimmed.search(/\s+#/);
+                if (commentIndex !== -1) {
+                    trimmed = trimmed.slice(0, commentIndex).trim();
+                }
+                if (/^(true|false)$/i.test(trimmed)) return parseBool(trimmed);
+                if (/^0x[0-9a-f]+$/i.test(trimmed)) return parseInt(trimmed, 16);
+                if (/^-?\d+(?:\.\d+)?$/.test(trimmed)) return parseFloat(trimmed);
+                return trimmed.replace(/^['"]|['"]$/g, '');
+            }
+
+            let currentSection = null;
+            for (const rawLine of lines) {
+                const line = rawLine.replace(/\t/g, '  ');
+                const trimmed = line.trim();
+                if (!trimmed || trimmed.startsWith('#')) continue;
+
+                if (!line.startsWith(' ')) {
+                    currentSection = trimmed.replace(/:.*$/, '');
+                    if (sections[currentSection]) continue;
+                    currentSection = null;
+                    continue;
+                }
+
+                if (currentSection && sections[currentSection]) {
+                    sections[currentSection].push(line);
+                }
+            }
+
+            let rotation = null;
+            let sensorW = null;
+            let sensorH = null;
+
+            const cameraText = sections.esp32_camera_utils.join('\n');
+            const rotationMatch = cameraText.match(/(?:^|\n)\s*rotation:\s*(.+)/);
+            if (rotationMatch) rotation = parseValue(rotationMatch[1]);
+            const resolutionMatch = cameraText.match(/(?:^|\n)\s*camera_resolution:\s*(\d+)x(\d+)\s*/);
+            if (resolutionMatch) {
+                sensorW = parseFloat(resolutionMatch[1]);
+                sensorH = parseFloat(resolutionMatch[2]);
+            }
+
+            return { rotation, sensorW, sensorH };
+        }
+
+        function applyImportedConfig(parsed) {
+            state.importedConfig = parsed;
+
+            if (parsed.rotation !== null && parsed.rotation !== undefined) {
+                state.rotation = parsed.rotation;
+                const input = document.getElementById('custom_rot');
+                if (input) input.value = parsed.rotation;
+            }
+
+            if (parsed.sensorW && parsed.sensorH) {
+                state.sensorRes = { w: parsed.sensorW, h: parsed.sensorH, name: `${parsed.sensorW}x${parsed.sensorH}` };
+                const label = document.getElementById('sensor-res-label');
+                if (label) label.textContent = state.sensorRes.name;
+            }
+
+            updateCanvas();
+            generateOutput();
+        }
+
+        function handleConfigUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const parsed = parseYamlText(String(event.target.result || ''));
+                applyImportedConfig(parsed);
+                const status = document.getElementById('config-status');
+                if (status) status.textContent = `Loaded ${file.name}`;
+            };
+            reader.readAsText(file);
+        }
+
+        function handleImageUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    state.image = img;
+                    const dims = getTransformedDimensions();
+                    document.getElementById('target_w').value = dims.w;
+                    document.getElementById('target_h').value = dims.h;
+
+                    state.roi = null;
+                    updateImageInfo();
+
+                    if (state.importedConfig) {
+                        applyImportedConfig(state.importedConfig);
+                    } else {
+                        updateCanvas();
+                        generateOutput();
+                    }
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function updateImageInfo() {
+            const infoDiv = document.getElementById('image-info') || createImageInfoDiv();
+            if (state.image) {
+                infoDiv.textContent = `Image Size: ${state.image.width} x ${state.image.height}`;
+            } else {
+                infoDiv.textContent = '';
+            }
+        }
+
+        function createImageInfoDiv() {
+            const div = document.createElement('div');
+            div.id = 'image-info';
+            div.style.marginLeft = '10px';
+            div.style.fontWeight = 'bold';
+            div.style.color = '#555';
+            const controls = document.querySelector('.controls');
+            controls.appendChild(div);
+            return div;
+        }
+
+        function setSensorRes(w, h, name) {
+            state.sensorRes = { w, h, name };
+            document.getElementById('sensor-res-label').textContent = name;
+            generateOutput();
+        }
+
+        function setTargetRes(w, h) {
+            document.getElementById('target_w').value = w;
+            document.getElementById('target_h').value = h;
+            generateOutput();
+        }
+
+        function setRotation(deg) {
+            if (isNaN(deg)) return;
+            state.rotation = deg;
+
+            const isCustom = [0, 90, 180, 270].indexOf(deg) === -1;
+            const input = document.getElementById('custom_rot');
+            if (input) input.value = deg;
+            const warning = document.getElementById('rot-warning');
+            if (warning) warning.style.display = isCustom ? 'block' : 'none';
+
+            state.roi = null;
+
+            const dims = getTransformedDimensions();
+            document.getElementById('target_w').value = dims.w;
+            document.getElementById('target_h').value = dims.h;
+
+            updateCanvas();
+            generateOutput();
+        }
+
+        // --- Canvas / Drawing ---
+        function getTransformedDimensions() {
+            if (!state.image) return { w: 800, h: 600 };
+
+            const rad = state.rotation * Math.PI / 180;
+            const absCos = Math.abs(Math.cos(rad));
+            const absSin = Math.abs(Math.sin(rad));
+
+            const w = state.image.width * absCos + state.image.height * absSin;
+            const h = state.image.width * absSin + state.image.height * absCos;
+
+            return { w: Math.round(w), h: Math.round(h) };
+        }
+
+        function updateCanvas() {
+            const dims = getTransformedDimensions();
+            if (!dims || !Number.isFinite(dims.w) || !Number.isFinite(dims.h) || dims.w < 1 || dims.h < 1) {
+                canvas.width = 800;
+                canvas.height = 600;
+                imageCanvas.width = 800;
+                imageCanvas.height = 600;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                imageCtx.clearRect(0, 0, imageCanvas.width, imageCanvas.height);
+                rotatedImageData = null;
+                ctx.fillStyle = '#ccc';
+                ctx.textAlign = 'center';
+                ctx.fillText('No Image Loaded', canvas.width / 2, canvas.height / 2);
+                return;
+            }
+            canvas.width = dims.w;
+            canvas.height = dims.h;
+            imageCanvas.width = dims.w;
+            imageCanvas.height = dims.h;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            imageCtx.clearRect(0, 0, imageCanvas.width, imageCanvas.height);
+            rotatedImageData = null;
+
+            if (!state.image) {
+                ctx.fillStyle = '#ccc';
+                ctx.textAlign = 'center';
+                ctx.fillText('No Image Loaded', canvas.width / 2, canvas.height / 2);
+                return;
+            }
+
+            // Draw Rotated Image
+            ctx.save();
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.rotate(state.rotation * Math.PI / 180);
+            ctx.drawImage(state.image, -state.image.width / 2, -state.image.height / 2);
+            ctx.restore();
+
+            imageCtx.save();
+            imageCtx.translate(imageCanvas.width / 2, imageCanvas.height / 2);
+            imageCtx.rotate(state.rotation * Math.PI / 180);
+            imageCtx.drawImage(state.image, -state.image.width / 2, -state.image.height / 2);
+            imageCtx.restore();
+            rotatedImageData = imageCtx.getImageData(0, 0, imageCanvas.width, imageCanvas.height);
+
+            // Draw ROI
+            if (state.roi) {
+                ctx.strokeStyle = '#3498db';
+                ctx.lineWidth = 3;
+                ctx.fillStyle = 'rgba(52, 152, 219, 0.2)';
+                ctx.fillRect(state.roi.x, state.roi.y, state.roi.w, state.roi.h);
+                ctx.strokeRect(state.roi.x, state.roi.y, state.roi.w, state.roi.h);
+
+                // Sync Manual Inputs to Visual ROI
+                if (!state.isManualUpdate) {
+                    document.getElementById('manual_x').value = state.roi.x;
+                    document.getElementById('manual_y').value = state.roi.y;
+                    document.getElementById('manual_w').value = state.roi.w;
+                    document.getElementById('manual_h').value = state.roi.h;
+                }
+            } else {
+                if (!state.isManualUpdate) {
+                    document.getElementById('manual_x').value = "";
+                    document.getElementById('manual_y').value = "";
+                    document.getElementById('manual_w').value = "";
+                    document.getElementById('manual_h').value = "";
+                }
+            }
+        }
+
+        // --- Coordinate Mapping ---
+        function mapToOriginal(x, y, w, h) {
+            const W = state.image.width;
+            const H = state.image.height;
+
+            const dims = getTransformedDimensions();
+            const cx = dims.w / 2;
+            const cy = dims.h / 2;
+
+            const ocx = W / 2;
+            const ocy = H / 2;
+
+            const rad = -state.rotation * Math.PI / 180;
+            const cos = Math.cos(rad);
+            const sin = Math.sin(rad);
+
+            const points = [
+                { x: x, y: y },
+                { x: x + w, y: y },
+                { x: x, y: y + h },
+                { x: x + w, y: y + h }
+            ];
+
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+            points.forEach(p => {
+                const dx = p.x - cx;
+                const dy = p.y - cy;
+
+                const ox_rel = dx * cos - dy * sin;
+                const oy_rel = dx * sin + dy * cos;
+
+                const ox = ox_rel + ocx;
+                const oy = oy_rel + ocy;
+
+                if (ox < minX) minX = ox;
+                if (ox > maxX) maxX = ox;
+                if (oy < minY) minY = oy;
+                if (oy > maxY) maxY = oy;
+            });
+
+            minX = Math.max(0, minX);
+            minY = Math.max(0, minY);
+            maxX = Math.min(W, maxX);
+            maxY = Math.min(H, maxY);
+
+            return {
+                x: Math.round(minX),
+                y: Math.round(minY),
+                w: Math.round(maxX - minX),
+                h: Math.round(maxY - minY)
+            };
+        }
+
+        function mapFromOriginal(ox, oy, ow, oh) {
+            const W = state.image.width;
+            const H = state.image.height;
+            let x, y, w, h;
+
+            const RW = (state.rotation % 180 === 0) ? W : H;
+            const RH = (state.rotation % 180 === 0) ? H : W;
+
+            switch (state.rotation) {
+                case 0:
+                    x = ox; y = oy; w = ow; h = oh;
+                    break;
+                case 90:
+                    x = RW - oy - oh;
+                    y = ox;
+                    w = oh;
+                    h = ow;
+                    break;
+                case 180:
+                    x = RW - ox - ow;
+                    y = RH - oy - oh;
+                    w = ow;
+                    h = oh;
+                    break;
+                case 270:
+                    x = oy;
+                    y = RH - ox - ow;
+                    w = oh;
+                    h = ow;
+                    break;
+            }
+
+            return { x, y, w, h };
+        }
+
+        function snapTo8(val) {
+            return Math.round(val / 8) * 8;
+        }
+
+        // --- Output Generation ---
+        function generateOutput() {
+            const ta = document.getElementById('output');
+            if (!state.image) { ta.value = ""; return; }
+
+            let lines = [];
+
+            const target_w_in = document.getElementById('target_w').value;
+            const target_h_in = document.getElementById('target_h').value;
+            let target_w = parseInt(target_w_in);
+            let target_h = parseInt(target_h_in);
+            let use_scaling = !isNaN(target_w) && !isNaN(target_h) && target_w > 0 && target_h > 0;
+
+            const img_w = state.image.width;
+            const img_h = state.image.height;
+
+            let sensor_w = state.sensorRes.w;
+            let sensor_h = state.sensorRes.h;
+
+            let scale_x = sensor_w / img_w;
+            let scale_y = sensor_h / img_h;
+
+            let anisotropic = Math.abs(scale_x - scale_y) > 0.1;
+
+            let off_x = 0;
+            let off_y = 0;
+            let w = sensor_w;
+            let h = sensor_h;
+
+            if (state.roi) {
+                const visROI = mapToOriginal(state.roi.x, state.roi.y, state.roi.w, state.roi.h);
+
+                let raw_x = visROI.x * scale_x;
+                let raw_y = visROI.y * scale_y;
+                let raw_w = visROI.w * scale_x;
+                let raw_h = visROI.h * scale_y;
+
+                if (state.force43) {
+                    let nw = raw_w / 32;
+                    let nh = raw_h / 24;
+                    let n = Math.max(1, Math.round(Math.max(nw, nh)));
+
+                    let target_w_43 = n * 32;
+                    let target_h_43 = n * 24;
+
+                    let cx = raw_x + raw_w / 2;
+                    let cy = raw_y + raw_h / 2;
+
+                    let new_x = cx - target_w_43 / 2;
+                    let new_y = cy - target_h_43 / 2;
+
+                    off_x = snapTo8(Math.max(0, new_x));
+                    off_y = snapTo8(Math.max(0, new_y));
+                    w = target_w_43;
+                    h = target_h_43;
+                } else {
+                    off_x = snapTo8(Math.max(0, raw_x));
+                    off_y = snapTo8(Math.max(0, raw_y));
+                    w = snapTo8(Math.max(8, raw_w));
+                    h = snapTo8(Math.max(8, raw_h));
+                }
+            }
+
+            let final_scale_x = 1.0;
+            let final_scale_y = 1.0;
+
+            if (use_scaling) {
+                let unscaled_out_w = (state.rotation % 180 === 0) ? w : h;
+                let unscaled_out_h = (state.rotation % 180 === 0) ? h : w;
+
+                final_scale_x = target_w / unscaled_out_w;
+                final_scale_y = target_h / unscaled_out_h;
+            }
+
+            lines.push(`esp32_camera_utils:`);
+            lines.push(`  id: \${id_prefix}_camera_utils`);
+            lines.push(`  camera_id: \${id_prefix}_espcam`);
+            lines.push(`  # debug: true`);
+
+            if (state.roi) {
+                let comment_w = "# multiple of 8";
+                let comment_h = "# multiple of 8";
+                if (state.rotation === 90 || state.rotation === 270) {
+                    comment_w += " (Visual Height)";
+                    comment_h += " (Visual Width)";
+                }
+
+                if (off_x + w > sensor_w) lines.push(`  # WARNING: ROI width exceeds sensor bounds!`);
+                if (off_y + h > sensor_h) lines.push(`  # WARNING: ROI height exceeds sensor bounds!`);
+
+                lines.push(`  camera_window:`);
+                lines.push(`    offset_x: ${off_x} # multiple of 4`);
+                lines.push(`    offset_y: ${off_y} # multiple of 4`);
+                lines.push(`    width: ${w} ${comment_w}`);
+                lines.push(`    height: ${h} ${comment_h}`);
+            } else {
+                lines.push(`  # No camera_window defined (Full Sensor or default)`);
+            }
+
+            lines.push(``);
+            if (state.rotation === 0) {
+                lines.push(`  # enable_rotation: false`);
+                lines.push(`  # rotation: 0`);
+            } else {
+                lines.push(`  enable_rotation: true`);
+                lines.push(`  rotation: ${state.rotation} # 0, 90, 180, 270`);
+            }
+
+            lines.push(``);
+            lines.push(`# --- Debug Info ---`);
+            lines.push(`# Sensor: ${state.sensorRes.name}`);
+            lines.push(`# Original Image: ${img_w}x${img_h}`);
+            if (use_scaling) {
+                let unscaled_out_w = (state.rotation % 180 === 0) ? w : h;
+                let unscaled_out_h = (state.rotation % 180 === 0) ? h : w;
+                lines.push(`# Output Scaling: Mapping ${unscaled_out_w}x${unscaled_out_h} (ROI) -> ${target_w}x${target_h}`);
+            }
+            if (anisotropic) lines.push(`# WARNING: Anisotropic scaling input detected!`);
+
+            ta.value = lines.join('\n');
+        }
+
+        // --- Interaction ---
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: (e.clientX - rect.left),
+                y: (e.clientY - rect.top)
+            };
+        }
+
+        function startDrawing(e) {
+            if (!state.image) return;
+            state.isDrawing = true;
+            state.startPos = getMousePos(e);
+        }
+
+        function draw(e) {
+            if (!state.isDrawing) return;
+            const pos = getMousePos(e);
+
+            updateCanvas();
+
+            ctx.strokeStyle = '#3498db';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.strokeRect(state.startPos.x, state.startPos.y, pos.x - state.startPos.x, pos.y - state.startPos.y);
+            ctx.setLineDash([]);
+        }
+
+        function stopDrawing(e) {
+            if (!state.isDrawing) return;
+            state.isDrawing = false;
+            const pos = getMousePos(e);
+
+            const x = Math.min(state.startPos.x, pos.x);
+            const y = Math.min(state.startPos.y, pos.y);
+            const w = Math.abs(pos.x - state.startPos.x);
+            const h = Math.abs(pos.y - state.startPos.y);
+
+            if (w < 4 || h < 4) return;
+
+            state.roi = { x, y, w, h };
+
+            updateCanvas();
+            generateOutput();
+        }
+
+        function resetCurrent() {
+            state.roi = null;
+            updateCanvas();
+            generateOutput();
+        }
+
+        function resetAll() {
+            state.roi = null;
+            updateCanvas();
+            generateOutput();
+        }
+
+        function copyOutput() {
+            const copyText = document.getElementById("output");
+            navigator.clipboard.writeText(copyText.value).then(() => {
+                alert("Copied to clipboard");
+            }).catch(err => {
+                alert("Failed to copy. See console for details.");
+                console.error('Failed to copy text: ', err);
+            });
+        }
+
+        function updateROIFromInput() {
+            if (!state.image) return;
+            const off_x = parseInt(document.getElementById('manual_x').value) || 0;
+            const off_y = parseInt(document.getElementById('manual_y').value) || 0;
+            const w_in = parseInt(document.getElementById('manual_w').value) || 100;
+            const h_in = parseInt(document.getElementById('manual_h').value) || 100;
+
+            const img_w = state.image.width;
+            const img_h = state.image.height;
+            const sensor_w = state.sensorRes.w;
+            const sensor_h = state.sensorRes.h;
+
+            const scale_x = sensor_w / img_w;
+            const scale_y = sensor_h / img_h;
+
+            let ox = off_x / scale_x;
+            let oy = off_y / scale_y;
+            let ow = w_in / scale_x;
+            let oh = h_in / scale_y;
+
+            const vis = mapFromOriginal(ox, oy, ow, oh);
+
+            state.roi = {
+                x: Math.round(vis.x),
+                y: Math.round(vis.y),
+                w: Math.round(vis.w),
+                h: Math.round(vis.h)
+            };
+
+            state.isManualUpdate = true;
+            updateCanvas();
+            generateOutput();
+            state.isManualUpdate = false;
+        }
+
+        // --- Init ---
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseleave', stopDrawing);
+        document.getElementById('imageInput').addEventListener('change', handleImageUpload);
+        document.getElementById('configInput').addEventListener('change', handleConfigUpload);
+
+        // Initialize with placeholder
+        updateCanvas();
+    </script>
+</body>
+
+</html>

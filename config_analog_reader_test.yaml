@@ -228,9 +228,9 @@ meter_reader_tflite:
   # model: "models/v23_full_integer_quant.tflite" #new good !
   ################### 19.06.2026
   # model: "models/digit_recognizer_v23_quantized_integer_quant_uint8.tflite" # 97.87% acc | inference in 2300ms | 262.33 KB memory footprint
-  # model: "models/digit_recognizer_v24_quantized_integer_quant_uint8.tflite" # 98.86% acc | inference in 2600ms | 135.29 KB memory footprint
+  model: "models/digit_recognizer_v24_quantized_integer_quant_uint8.tflite" # 98.86% acc | inference in 2600ms | 135.29 KB memory footprint
   # model: "models/digit_recognizer_v16_quantized_integer_quant_uint8.tflite" # 99.46% acc | inference in 4150ms | 263.76 KB memory footprint
-  model: "models/digit_recognizer_v3_quantized_integer_quant_uint8.tflite" # 97.95% acc | inference in 1500ms | 153.83 KB memory footprint
+  # model: "models/digit_recognizer_v3_quantized_integer_quant_uint8.tflite" # 97.95% acc | inference in 1500ms | 153.83 KB memory footprint
 
 
 
@@ -310,18 +310,93 @@ analog_reader: # DEV !
   validator: ${id_prefix}_validator
   value_sensor:
     name: "Analog Total"
-  dials: 
+  debug: true
+  update_interval: 60s
+  dials:
     - id: dial_1
       scale: 0.1
-      crop_x: 0
-      crop_y: 0
-      crop_w: 100
-      crop_h: 100
+      crop_x: 450
+      crop_y: 191
+      crop_w: 162
+      crop_h: 162
+      needle_type: DARK
+      algorithm: radial_profile
+      process_channel: GRAYSCALE
+      deadzone_diameter: 40
       min_angle: 0
       max_angle: 360
-      angle_offset: 0 # 0=North, 90=East
       min_value: 0
       max_value: 10
+      angle_offset: 0
+      clockwise: true
+      auto_contrast: true
+      contrast: 1
+      min_scan_radius: 0.3
+      max_scan_radius: 0.9
+    - id: dial_2
+      scale: 0.1
+      crop_x: 324
+      crop_y: 312
+      crop_w: 180
+      crop_h: 168
+      needle_type: DARK
+      algorithm: radial_profile
+      process_channel: GRAYSCALE
+      deadzone_diameter: 40
+      min_angle: 0
+      max_angle: 360
+      min_value: 0
+      max_value: 10
+      angle_offset: 0
+      clockwise: true
+      auto_contrast: true
+      contrast: 1
+      min_scan_radius: 0.3
+      max_scan_radius: 0.9
+    - id: dial_3
+      scale: 0.1
+      crop_x: 187
+      crop_y: 350
+      crop_w: 134
+      crop_h: 130
+      needle_type: DARK
+      algorithm: radial_profile
+      process_channel: GRAYSCALE
+      deadzone_diameter: 40
+      min_angle: 0
+      max_angle: 360
+      min_value: 0
+      max_value: 10
+      angle_offset: 0
+      clockwise: true
+      auto_contrast: true
+      contrast: 1
+      min_scan_radius: 0.3
+      max_scan_radius: 0.9
+      target_color: 16711680
+      color_tolerance: 0
+    - id: dial_4
+      scale: 0.1
+      crop_x: 37
+      crop_y: 246
+      crop_w: 148
+      crop_h: 148
+      needle_type: DARK
+      algorithm: radial_profile
+      process_channel: GRAYSCALE
+      deadzone_diameter: 40
+      min_angle: 0
+      max_angle: 360
+      min_value: 0
+      max_value: 10
+      angle_offset: 0
+      clockwise: true
+      auto_contrast: true
+      contrast: 1
+      min_scan_radius: 0.3
+      max_scan_radius: 0.9
+      target_color: 16711680
+      color_tolerance: 0
       
       # New Per-Dial Sensors
       angle:

@@ -39,25 +39,32 @@ enum ProcessChannel {
 struct DialConfig {
   std::string id = "";
   NeedleType needle_type = NEEDLE_TYPE_DARK;
-  std::string algorithm = "radial_profile";
+  std::string algorithm = "radial_profile";  // Algorithm: radial_profile, hough_transform, template_match, auto
   float scale = 1.0f;
   int crop_x = 0;
   int crop_y = 0;
   int crop_w = 0;
   int crop_h = 0;
-  float min_angle = 0.0f;
-  float max_angle = 360.0f;
-  float angle_offset = 0.0f;
+  float min_angle = 0.0f;   // Degrees
+  float max_angle = 360.0f; // Degrees
+  float angle_offset = 0.0f; // 0 = North, 90 = East
+  bool clockwise = true;     // Needle sweep direction (false = counter-clockwise)
   float min_value = 0.0f;
   float max_value = 10.0f;
-  bool auto_contrast = true;
-  float contrast = 1.0f;
-  uint32_t target_color = 0;
+  bool auto_contrast = true; // Normalization (Min-Max Stretch)
+  float contrast = 1.0f;      // Multiplier (1.0 = original)
+  uint32_t target_color = 0;  // RGB hex
   bool use_color = false;
+  // Color match tolerance (0 = legacy 0-442 linear map). When >0, the colour-distance
+  // map is thresholded: pixels farther than this are pushed to flat background, which
+  // removes off-colour features (e.g. black digits) that otherwise compete with the needle.
+  float color_tolerance = 0.0f;
   ProcessChannel process_channel = PROCESS_CHANNEL_GRAYSCALE;
-  float min_scan_radius = 0.3f;
-  float max_scan_radius = 0.9f;
+  float min_scan_radius = 0.3f; // % of radius (0.0-1.0)
+  float max_scan_radius = 0.9f; // % of radius (0.0-1.0)
+  float deadzone_diameter = 0.0f; // Pixels (center circle ignored by detection)
   
+  // Sensors
   sensor::Sensor *value_sensor = nullptr;
   sensor::Sensor *confidence_sensor = nullptr;
   sensor::Sensor *angle_sensor = nullptr;
@@ -104,6 +111,10 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
       for (auto &dial : this->dials_) dial.algorithm = algorithm;
   }
   
+  // When enabled, dials are combined as positional digits (odometer-style) with
+  // neighbour carry-correction instead of a weighted sum of raw needle values.
+  void set_stacked_digits(bool enabled) { this->stacked_digits_ = enabled; }
+  
   void add_dial(DialConfig config) { this->dials_.push_back(config); }
   
   void set_dial_range(const std::string &dial_id, float min_val, float max_val);
@@ -128,6 +139,7 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   };
 
   bool paused_{false};
+  bool stacked_digits_{false};
   FlashlightCoordinator flashlight_coord_;
   ValueValidatorCoordinator validation_coord_;
 
