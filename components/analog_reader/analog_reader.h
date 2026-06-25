@@ -72,6 +72,9 @@ struct DialConfig {
   std::vector<std::pair<float, float>> calibration_mapping; 
 };
 
+// Per-dial measured value — used for stacked-digit combination
+struct DialReading { const DialConfig* dial; float value; };
+
 class AnalogReader : public PollingComponent, public esphome::camera::CameraListener {
  public:
   ~AnalogReader();
@@ -161,6 +164,9 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   std::vector<uint8_t> working_buffer_;
   std::vector<uint8_t> scratch_buffer_;
   std::vector<uint8_t> scratch_buffer_2_;
+
+  // Pre-allocated per-frame readings vector — avoids heap alloc in loop()
+  std::vector<DialReading> readings_;
   
   // Persistent Buffer (RAII managed)
   struct FreeDeleter {

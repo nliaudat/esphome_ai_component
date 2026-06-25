@@ -264,7 +264,10 @@ void AnalogReader::loop() {
     if (state == FrameState::REQUESTED && millis() - this->last_request_time_ > 5000) {
         ESP_LOGW(TAG, "Frame timeout");
         FrameState expected = FrameState::REQUESTED;
-        this->frame_state_.compare_exchange_strong(expected, FrameState::IDLE);
+        if (this->frame_state_.compare_exchange_strong(expected, FrameState::IDLE)) {
+            std::lock_guard<std::mutex> lock(this->frame_mutex_);
+            this->pending_frame_ = nullptr;
+        }
     }
     PollingComponent::loop();
 }
@@ -406,9 +409,8 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
   
   // Collect per-dial measured values so they can be combined after every dial is read.
   // Positional/odometer combination needs each dial's less-significant neighbour.
-  struct DialReading { const DialConfig* dial; float value; };
-  std::vector<DialReading> readings;
-  readings.reserve(this->dials_.size());
+  this->readings_.clear();
+  this->readings_.reserve(this->dials_.size());
   
   for (const auto& dial : this->dials_) {
       int check_w = (processing_w > 0) ? processing_w : this->img_width_;
@@ -511,7 +513,10 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
               uint8_t g = raw[i*3 + 1];
               uint8_t b = raw[i*3 + 2];
               
-              float dist = sqrtf(powf(static_cast<float>(r - tr), 2) + powf(static_cast<float>(g - tg), 2) + powf(static_cast<float>(b - tb), 2));
+              float dr = static_cast<float>(r - tr);
+              float dg = static_cast<float>(g - tg);
+              float db = static_cast<float>(b - tb);
+              float dist = sqrtf(dr * dr + dg * dg + db * db);
               float val;
               if (use_tol) {
                   val = (dist >= tol) ? 255.0f : (dist * 255.0f / tol);
@@ -554,11 +559,15 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
       if (dial.angle_sensor) dial.angle_sensor->publish_state(display_angle);
       if (dial.confidence_sensor) dial.confidence_sensor->publish_state(confidence);
       
-      readings.push_back({&dial, val});
+      this->readings_.push_back({&dial, val});
   }
 
   if (this->stacked_digits_) {
-    const int n = static_cast<int>(readings.size());
+    const int n = static_cast<int>(this->readings_.size());
+    if (n == 0) {
+        ESP_LOGW(TAG, "No valid dial readings available for stacked digit calculation");
+        return;
+    }
 
     auto wrap10 = [](float x) -> float {
         x = fmodf(x, 10.0f);
@@ -586,14 +595,25 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
     std::vector<int> order(n);
     std::iota(order.begin(), order.end(), 0);
 
+    // Validate all dial scales before proceeding — zero or non-finite scales cause
+    // division-by-zero / NaN downstream and must be caught early.
+    for (int i = 0; i < n; ++i) {
+        float s = this->readings_[i].dial->scale;
+        if (s <= 0.0f || !std::isfinite(s)) {
+            ESP_LOGE(TAG, "Dial '%s' has invalid scale (%.3f); cannot compute stacked digits",
+                     this->readings_[i].dial->id.c_str(), s);
+            return;
+        }
+    }
+
     std::stable_sort(order.begin(), order.end(), [&](int a, int b) {
-        return readings[a].dial->scale < readings[b].dial->scale;
+        return this->readings_[a].dial->scale < this->readings_[b].dial->scale;
     });
 
     for (int p = 0; p < n; ++p) {
         const int i = order[p];
 
-        const float raw = wrap10(readings[i].value);
+        const float raw = wrap10(this->readings_[i].value);
 
         float lower_fraction = 0.0f;
         if (p > 0) {
@@ -620,7 +640,7 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
             ESP_LOGD(
                 TAG,
                 "Stacked dial %s: raw=%.3f lower_frac=%.3f corrected=%.3f local_digit=%d phase=%.3f",
-                readings[i].dial->id.c_str(),
+                this->readings_[i].dial->id.c_str(),
                 raw,
                 lower_fraction,
                 corrected,
@@ -633,27 +653,33 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
     // Build the continuous value first.
     // Do not sum the rounded finest digit directly, otherwise 9.9 -> 0 loses the carry.
     const int finest_i = order[0];
-    const float finest_scale = readings[finest_i].dial->scale;
+    const float finest_scale = this->readings_[finest_i].dial->scale;
+    if (finest_scale <= 0.0f) {
+        ESP_LOGE(TAG, "Finest dial scale must be greater than 0");
+        return;
+    }
 
     float continuous_total = phase[finest_i] * finest_scale;
 
     for (int p = 1; p < n; ++p) {
         const int i = order[p];
-        continuous_total += static_cast<float>(digits[i]) * readings[i].dial->scale;
+        continuous_total += static_cast<float>(digits[i]) * this->readings_[i].dial->scale;
     }
 
     // Preserve old behaviour: final value rounded to the finest dial step.
     // For conservative meter-style reading, replace llroundf() with floorf().
-    const long long rounded_steps = llroundf(continuous_total / finest_scale);
+    // Manual rounding — avoids llroundf() which may not be available on all ESP-IDF targets
+    const long long rounded_steps = static_cast<long long>(
+        continuous_total / finest_scale + (continuous_total >= 0.0f ? 0.5f : -0.5f));
     total_value = static_cast<float>(rounded_steps) * finest_scale;
 
     // Publish/debug digits derived from the final rounded total,
     // so carry is consistent across all dials.
     for (int i = 0; i < n; ++i) {
-        const DialConfig* dial = readings[i].dial;
+        const DialConfig* dial = this->readings_[i].dial;
 
         const float ratio_f = dial->scale / finest_scale;
-        long long place = llroundf(ratio_f);
+        long long place = static_cast<long long>(ratio_f + (ratio_f >= 0.0f ? 0.5f : -0.5f));
         if (place <= 0) place = 1;
 
         int published_digit = static_cast<int>((rounded_steps / place) % 10);
@@ -681,7 +707,7 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
     }
   } else {
     // Legacy behaviour: weighted sum of the raw needle values.
-    for (const auto& r : readings) {
+    for (const auto& r : this->readings_) {
         total_value += r.value * r.dial->scale;
         if (r.dial->value_sensor) r.dial->value_sensor->publish_state(r.value);
 
