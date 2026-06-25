@@ -260,6 +260,10 @@ AnalogReader::DetectionResult AnalogReader::detect_radial_profile(const uint8_t*
     int deadzone_r = static_cast<int>(std::max(0.0f, dial.deadzone_diameter * 0.5f));
     int start_r = std::max(5, deadzone_r); // Start after center deadzone
     int max_radius_scan = static_cast<int>(radius * dial.max_scan_radius);
+    if (start_r >= max_radius_scan) {
+        ESP_LOGW(TAG, "Deadzone (%dpx radius) exceeds scan radius (%dpx); no pixels can be sampled", deadzone_r, max_radius_scan);
+        return {0.0f, 0.0f, "radial_profile"};
+    }
     
     // Configurable gap threshold
     const int MAX_GAP = 5;

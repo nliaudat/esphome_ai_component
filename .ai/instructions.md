@@ -2,7 +2,7 @@
 
 **Repository:** https://github.com/nliaudat/esphome_ai_component  
 **Primary Goal:** Run TensorFlow Lite Micro models and computer vision algorithms on ESP32 devices within the ESPHome ecosystem  
-**License:** 🚨 **CC-BY-NC-SA (NO COMMERCIAL USE)** - This is NON-NEGOTIABLE  
+**License:** Apache 2.0 OR MIT (dual license)  
 **Target Boards:** ESP32, ESP32-S2, ESP32-S3 (optimized), ESP32-C3, ESP8266 (limited)  
 **ESPHome Version:** 2026.1.0+ (C++20, ESP-IDF 5.5.2)  
 
@@ -879,7 +879,7 @@ std::array<uint8_t, JPEG_BUFFER_SIZE> buffer;
 
 ### 🔴 BLOCKER (Must fix, reject PR)
 
-1.  **License violations** (CC-BY-NC-SA - no commercial use)
+1.  **License violations** (Apache 2.0 OR MIT)
 2.  **Memory leaks** (any unfreed allocation)
 3.  **Buffer overflows** (unbounded memcpy, strcpy)
 4.  **Integer overflow** in pointer arithmetic (CVE-2026-23833)
@@ -922,11 +922,12 @@ std::array<uint8_t, JPEG_BUFFER_SIZE> buffer;
 
 ### 12.2 License Enforcement
 
-**🚨 THIS PROJECT IS CC-BY-NC-SA - NO COMMERCIAL USE 🚨**
+**License: Apache 2.0 OR MIT (dual license)**
 
-- **NEVER** suggest using this code in commercial products
-- **NEVER** suggest incorporating code with incompatible licenses (MIT, Apache, GPL) without explicit review
-- **ALWAYS** flag PRs that appear to enable commercial redistribution
+- This project is dual-licensed under Apache 2.0 and MIT. Users may choose either license.
+- Contributions are accepted under the same dual-license terms.
+- Always verify that third-party dependencies have compatible licenses (Apache 2.0, MIT, BSD, or similar permissive licenses).
+- Flag any PRs that would change the license or introduce copyleft-licensed dependencies without explicit discussion.
 
 ### 12.3 C++ Version Awareness
 
@@ -1039,7 +1040,7 @@ Lazy means efficient, not careless. The best code is the code never written.
 | **Camera buffers** | `TrackedBuffer` | Never direct `fb_get` |
 | **Blocking** | `defer()` / `set_timeout()` | Never `delay()` in `loop()` |
 | **Regex** | String operations | Never `std::regex` |
-| **License** | CC-BY-NC-SA | Never commercial use |
+| **License** | Apache 2.0 OR MIT | Copyleft dependencies require review |
 
 ---
 
