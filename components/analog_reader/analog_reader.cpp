@@ -198,6 +198,9 @@ void AnalogReader::setup() {
       this->scratch_buffer_2_.reserve(max_crop_area);
       ESP_LOGD(TAG, "Reserved scratch buffers for max area: %d pixels", max_crop_area);
   }
+
+  // Pre-allocate per-frame readings vector to avoid heap alloc in loop()
+  this->readings_.reserve(this->dials_.size());
 }
 
 void AnalogReader::dump_config() {
@@ -410,7 +413,6 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
   // Collect per-dial measured values so they can be combined after every dial is read.
   // Positional/odometer combination needs each dial's less-significant neighbour.
   this->readings_.clear();
-  this->readings_.reserve(this->dials_.size());
   
   for (const auto& dial : this->dials_) {
       int check_w = (processing_w > 0) ? processing_w : this->img_width_;
@@ -669,8 +671,13 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
     // Preserve old behaviour: final value rounded to the finest dial step.
     // For conservative meter-style reading, replace llroundf() with floorf().
     // Manual rounding — avoids llroundf() which may not be available on all ESP-IDF targets
+    const float steps = continuous_total / finest_scale;
+    if (!std::isfinite(steps)) {
+        ESP_LOGE(TAG, "Continuous total is non-finite; cannot compute rounded steps");
+        return;
+    }
     const long long rounded_steps = static_cast<long long>(
-        continuous_total / finest_scale + (continuous_total >= 0.0f ? 0.5f : -0.5f));
+        steps + (steps >= 0.0f ? 0.5f : -0.5f));
     total_value = static_cast<float>(rounded_steps) * finest_scale;
 
     // Publish/debug digits derived from the final rounded total,
@@ -679,6 +686,10 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
         const DialConfig* dial = this->readings_[i].dial;
 
         const float ratio_f = dial->scale / finest_scale;
+        if (!std::isfinite(ratio_f)) {
+            ESP_LOGW(TAG, "Scale ratio for dial '%s' is non-finite; skipping", dial->id.c_str());
+            continue;
+        }
         long long place = static_cast<long long>(ratio_f + (ratio_f >= 0.0f ? 0.5f : -0.5f));
         if (place <= 0) place = 1;
 
