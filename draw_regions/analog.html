@@ -958,13 +958,27 @@
             };
         }
 
-        function sampleCanvasColor(x, y) {
+        function averageZoneColor(x, y, w, h) {
             if (!rotatedImageData) return null;
-            const px = Math.max(0, Math.min(rotatedImageData.width - 1, Math.round(x)));
-            const py = Math.max(0, Math.min(rotatedImageData.height - 1, Math.round(y)));
-            const index = (py * rotatedImageData.width + px) * 4;
             const data = rotatedImageData.data;
-            return { r: data[index], g: data[index + 1], b: data[index + 2] };
+            const iw = rotatedImageData.width;
+            const ih = rotatedImageData.height;
+            let rSum = 0, gSum = 0, bSum = 0, count = 0;
+            const x1 = Math.max(0, Math.round(x));
+            const y1 = Math.max(0, Math.round(y));
+            const x2 = Math.min(iw - 1, Math.round(x + w));
+            const y2 = Math.min(ih - 1, Math.round(y + h));
+            for (let py = y1; py <= y2; py++) {
+                for (let px = x1; px <= x2; px++) {
+                    const idx = (py * iw + px) * 4;
+                    rSum += data[idx];
+                    gSum += data[idx + 1];
+                    bSum += data[idx + 2];
+                    count++;
+                }
+            }
+            if (count === 0) return null;
+            return { r: Math.round(rSum / count), g: Math.round(gSum / count), b: Math.round(bSum / count) };
         }
 
         function rgbToHex(color) {
@@ -992,7 +1006,7 @@
             colorPickMode = !!enabled;
             state.isDrawing = false;
             const button = document.getElementById('debug_pick_color_btn');
-            if (button) button.textContent = colorPickMode ? 'Click image...' : 'Pick from image';
+            if (button) button.textContent = colorPickMode ? 'Draw zone...' : 'Pick from image';
             canvas.style.cursor = colorPickMode ? 'crosshair' : 'default';
         }
 
@@ -1643,15 +1657,31 @@
 
         function startDrawing(e) {
             if (!state.image) return;
-            if (colorPickMode) { handleCanvasPickColor(e); return; }
+            if (colorPickMode) {
+                state.isDrawing = true;
+                state.startPos = getMousePos(e);
+                return;
+            }
             state.isDrawing = true;
             state.startPos = getMousePos(e);
         }
 
         function draw(e) {
             if (!state.isDrawing) return;
-            if (colorPickMode) return;
             const pos = getMousePos(e);
+            if (colorPickMode) {
+                updateCanvas();
+                ctx.strokeStyle = '#ff00ff';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                const x = Math.min(state.startPos.x, pos.x);
+                const y = Math.min(state.startPos.y, pos.y);
+                const w = Math.abs(pos.x - state.startPos.x);
+                const h = Math.abs(pos.y - state.startPos.y);
+                ctx.strokeRect(x, y, w, h);
+                ctx.setLineDash([]);
+                return;
+            }
             updateCanvas();
 
             ctx.strokeStyle = '#f39c12';
@@ -1683,19 +1713,21 @@
             ctx.setLineDash([]);
         }
 
-        function handleCanvasPickColor(e) {
-            if (!colorPickMode) return false;
-            const pos = getMousePos(e);
-            const color = sampleCanvasColor(pos.x, pos.y);
-            if (color) setDebugTargetColor(rgbToHex(color));
-            return true;
-        }
-
         function stopDrawing(e) {
-            if (colorPickMode) { handleCanvasPickColor(e); state.isDrawing = false; return; }
             if (!state.isDrawing) return;
             state.isDrawing = false;
             const pos = getMousePos(e);
+
+            if (colorPickMode) {
+                const x = Math.min(state.startPos.x, pos.x);
+                const y = Math.min(state.startPos.y, pos.y);
+                const w = Math.abs(pos.x - state.startPos.x);
+                const h = Math.abs(pos.y - state.startPos.y);
+                if (w < 4 || h < 4) return;
+                const color = averageZoneColor(x, y, w, h);
+                if (color) setDebugTargetColor(rgbToHex(color));
+                return;
+            }
 
             let dist = Math.max(Math.abs(pos.x - state.startPos.x), Math.abs(pos.y - state.startPos.y));
             let cx = state.startPos.x, cy = state.startPos.y;
