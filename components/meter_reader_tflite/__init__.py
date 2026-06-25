@@ -27,13 +27,13 @@ except ImportError:
 
 CODEOWNERS = ["@nl"]
 if CORE.target_platform == "esp32":
-    DEPENDENCIES = ['esp32', 'tflite_micro_helper', 'esp32_camera_utils']
+    DEPENDENCIES = ['esp32', 'tflite_micro_helper']
+    AUTO_LOAD = ['esp32_camera_utils', 'sensor']
     # flash_light_controller and data_collector are optional; not added to DEPENDENCIES here
 else:
     # On host, we mock utils and remove esp32 check
     DEPENDENCIES = ['tflite_micro_helper']
-
-AUTO_LOAD = ['sensor']
+    AUTO_LOAD = ['sensor']
 
 CONF_CAMERA_ID = 'camera_id'
 CONF_TENSOR_ARENA_SIZE = 'tensor_arena_size'
