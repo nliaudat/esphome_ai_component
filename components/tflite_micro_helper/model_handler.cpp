@@ -413,7 +413,8 @@ ProcessedOutput ModelHandler::process_output(const float *output_data) const {
     ESP_LOGD(TAG, "Output range: min=%.6f, max=%.6f", min_val, max_val);
   }
 
-  if (this->config_.output_processing == "direct_class") {
+  if (this->config_.output_processing == "direct_class" ||
+      this->config_.output_processing == "argmax") {
     result.value = static_cast<float>(max_idx);
     result.confidence = max_val_output;
     ESP_LOGD(TAG,

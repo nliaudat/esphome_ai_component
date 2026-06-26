@@ -27,6 +27,12 @@ bool TFLiteMicroHelper::load_model(const uint8_t *model_data, size_t model_size,
         ESP_LOGW(TAG, "Using default tensor arena size: 100KB");
     }
 
+    // Defensive check: validate model data before CRC verification
+    if (model_data == nullptr || model_size == 0) {
+        ESP_LOGE(TAG, "Model data is NULL or empty");
+        return false;
+    }
+
     // Verify CRC32 checksum BEFORE allocating tensor arena or parsing model data.
     // This prevents wasted memory allocation and potential UB from parsing corrupt data.
     if (!this->model_handler_.verify_model_crc(model_data, model_size)) {

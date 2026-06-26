@@ -91,6 +91,13 @@ bool TFLiteCoordinator::load_model() {
     }
     #endif
 
+    // Defensive check: validate model data before CRC verification
+    if (this->model_ == nullptr || this->model_length_ == 0) {
+        ESP_LOGE(TAG, "Model data is NULL or empty");
+        ESP_LOGE(TAG, "  Model type: %s", model_type_.c_str());
+        return false;
+    }
+
     // Verify CRC32 checksum BEFORE allocating tensor arena or parsing model data.
     // This prevents wasted memory allocation and potential UB from parsing corrupt data.
     if (!this->model_handler_.verify_model_crc(this->model_, this->model_length_)) {
@@ -194,13 +201,8 @@ bool TFLiteCoordinator::process_model_result(const esp32_camera_utils::ImageProc
     // Write input data using the correct tensor type (uint8, int8, or float32).
     // Always copying via data.uint8 would corrupt signed int8 or float32 inputs.
     if (input->type == kTfLiteFloat32) {
-        // Float32 input: copy element-by-element to account for endianness/alignment
-        const size_t num_elements = result.size / sizeof(float);
-        for (size_t i = 0; i < num_elements; ++i) {
-            float val;
-            memcpy(&val, src_data + i * sizeof(float), sizeof(float));
-            input->data.f[i] = val;
-        }
+        // Float32 input: single memcpy of the entire buffer (safe for unaligned source)
+        memcpy(input->data.f, src_data, result.size);
     } else if (input->type == kTfLiteInt8) {
         memcpy(input->data.int8, src_data, result.size);
     } else {

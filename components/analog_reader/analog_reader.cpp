@@ -686,7 +686,7 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
         const DialConfig* dial = this->readings_[i].dial;
 
         const float ratio_f = dial->scale / finest_scale;
-        if (!std::isfinite(ratio_f) || ratio_f > 1e15f) {
+        if (!std::isfinite(ratio_f) || std::abs(ratio_f) > 1e15f) {
             ESP_LOGW(TAG, "Scale ratio for dial '%s' is non-finite or too large; skipping", dial->id.c_str());
             continue;
         }

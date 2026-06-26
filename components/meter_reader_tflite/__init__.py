@@ -289,6 +289,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_OUTPUT_PROCESSING): cv.enum({
         'direct_class': 'direct_class',
         'softmax': 'softmax',
+        'argmax': 'argmax',
         'logits': 'logits',
         'qat_quantized': 'qat_quantized',
         'experimental_scale': 'experimental_scale',
@@ -513,6 +514,7 @@ async def to_code(config):
         
     if config.get(CONF_DEBUG, False):
         cg.add_define("DEBUG_METER_READER_TFLITE")
+        cg.add_define("DEBUG_TFLITE_MICRO_HELPER")  # Enable helper debug so debug_test_parameters() compiles in
         cg.add(var.set_debug_mode(True))
         cg.add(var.set_debug(True))
         
