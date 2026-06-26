@@ -154,7 +154,7 @@ bool ModelHandler::load_model_with_arena(const uint8_t *model_data, size_t model
       ESP_LOGD(TAG, "Operator codes found in model:");
       for (size_t i = 0; i < this->tflite_model_->operator_codes()->size(); ++i) {
         const auto *op_code = this->tflite_model_->operator_codes()->Get(i);
-        ESP_LOGD(TAG, "  [%d]: %d (%s)", (int)i, op_code->builtin_code(),
+        ESP_LOGD(TAG, "  [%d]: %d (%s)", static_cast<int>(i), op_code->builtin_code(),
                  tflite::EnumNameBuiltinOperator(op_code->builtin_code()));
       }
   }
@@ -413,7 +413,8 @@ ProcessedOutput ModelHandler::process_output(const float *output_data) const {
     ESP_LOGD(TAG, "Output range: min=%.6f, max=%.6f", min_val, max_val);
   }
 
-  if (this->config_.output_processing == "direct_class") {
+  if (this->config_.output_processing == "direct_class" ||
+      this->config_.output_processing == "argmax") {
     result.value = static_cast<float>(max_idx);
     result.confidence = max_val_output;
     ESP_LOGD(TAG,

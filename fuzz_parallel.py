@@ -178,6 +178,7 @@ def randomize_config(lines, worker_id):
     modified_lines = []
     in_external_components = False
     in_components_list = False
+    components_indent = 0  # Indent level of the components: key
     
     for line in new_lines:
         stripped = line.strip()
@@ -189,23 +190,23 @@ def randomize_config(lines, worker_id):
         
         if in_external_components and 'components:' in line:
             in_components_list = True
+            # Track the indent level to detect end of block sequence
+            components_indent = len(line) - len(line.lstrip())
             # Replace with randomized component list
             indent = line[:line.index('components:')]
             components_str = ', '.join(sorted(enabled_components))
             modified_lines.append(f"{indent}components: [{components_str}]\n")
             change_log.append(f"[Components] Enabled: {components_str}")
-            # Single-line format [...] means no continuation lines to skip
-            if ']' in line:
-                in_components_list = False
             continue
-        
-        # Skip original components list
-        if in_components_list and ']' in line:
-            in_components_list = False
-            continue
-        
+
+        # Skip block sequence continuation lines (more indented than components:)
         if in_components_list:
-            continue
+            line_indent = len(line) - len(line.lstrip())
+            if line_indent > components_indent:
+                continue  # Still a child of components: — skip it
+            else:
+                in_components_list = False  # Back to same level — stop skipping
+                # Fall through to copy this line
         
         # Exit external_components section when we hit a new top-level key
         if in_external_components and not line.startswith(' ') and stripped and not stripped.startswith('#'):

@@ -1,0 +1,33 @@
+# ESPHome build test: flash_light_controller on ESP32-S3
+esphome:
+  name: test-flash-s3
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESP32S3_DATA_CACHE_64KB: y
+
+external_components:
+  - source:
+      type: local
+      path: ../../../components
+    components: [flash_light_controller]
+
+output:
+  - platform: gpio
+    id: test_light_output
+    pin: GPIO2
+
+light:
+  - platform: binary
+    id: test_light
+    output: test_light_output
+
+logger:
+  level: DEBUG
+
+flash_light_controller:
+  id: test_flash
+  flash_light: test_light

@@ -1,0 +1,40 @@
+# ESPHome build test: value_validator on ESP32-S3
+esphome:
+  name: test-value-validator-s3
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESP32S3_DATA_CACHE_64KB: y
+
+external_components:
+  - source:
+      type: local
+      path: ../../../components
+    components: [value_validator]
+
+logger:
+  level: DEBUG
+
+value_validator:
+  id: test_validator
+  allow_negative_rates: false
+  max_absolute_diff: 100
+  strict_confidence_check: true
+  per_digit_confidence_threshold: 0.90
+  high_confidence_threshold: 0.95
+  max_consecutive_rejections: 10
+  small_negative_tolerance: 5
+  persist_state: true
+  debug: true
+  # Diagnostic sensors
+  rejection_count_sensor:
+    name: "Test Rejection Count"
+  raw_reading_sensor:
+    name: "Test Raw Reading"
+  validator_state_sensor:
+    name: "Test Validator State"
+  validated_value_sensor:
+    name: "Test Validated Value"

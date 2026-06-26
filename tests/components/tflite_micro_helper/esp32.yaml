@@ -1,0 +1,25 @@
+# ESPHome build test: tflite_micro_helper on ESP32
+esphome:
+  name: test-tflite-micro
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESP32_SPIRAM_SUPPORT: y
+
+psram:
+
+external_components:
+  - source:
+      type: local
+      path: ../../../components
+    components: [tflite_micro_helper]
+
+logger:
+  level: DEBUG
+
+tflite_micro_helper:
+  id: test_tflite
+  debug: true

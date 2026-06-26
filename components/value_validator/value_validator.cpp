@@ -285,8 +285,8 @@ bool ValueValidator::validate_reading(int new_reading, float confidence, int& va
 #ifdef USE_ANALOG_READER
 
 /**
- * @brief Subtract 1 from an integer, handling borrow across all digits.
- * Example: 210600 -> 210599, 100000 -> 99999
+ * @brief Subtract 1 from an integer.
+ * Example: 210600 -> 210599
  */
 static int dial_correct_decrement(int value) {
   if (value <= 0) return value;  // Can't decrement below 0
@@ -318,18 +318,26 @@ bool ValueValidator::validate_reading(std::span<const float> digits, std::span<c
   for (float d : digits) {
       int digit = static_cast<int>(std::round(d));
       if (digit >= 10) digit = 0;
+      if (digit < 0) digit = 0; // Clamp negatives to 0 too
       current_digits.push_back(digit);
   }
   
   // --- Per-Digit History & Stability Filter ---
   this->ensure_digit_history_size(current_digits.size());
   
-  int raw_val = 0;
+  long long raw_val_ll = 0;
   for (size_t i = 0; i < current_digits.size(); i++) {
       int stable_d = this->get_stable_digit(i, current_digits[i]);
       current_digits[i] = stable_d;
-      raw_val = raw_val * 10 + stable_d;
+      long long next_val = raw_val_ll * 10 + stable_d;
+      if (next_val > std::numeric_limits<int>::max()) {
+        ESP_LOGW(TAG, "Digit accumulation overflow at digit %d, clamping to INT_MAX", static_cast<int>(i));
+        raw_val_ll = std::numeric_limits<int>::max();
+        break;
+      }
+      raw_val_ll = next_val;
   }
+  int raw_val = static_cast<int>(raw_val_ll);
   
   // Calculate average confidence for the legacy validator call
   float avg_conf = 0.0f;
@@ -386,7 +394,12 @@ bool ValueValidator::validate_reading(std::span<const float> digits, std::span<c
           char *end;
           long val = strtol(filtered_digit_string.c_str(), &end, 10);
           if (end == filtered_digit_string.c_str() + filtered_digit_string.length()) {
-             filtered_val = static_cast<int>(val);
+             if (val > std::numeric_limits<int>::max() || val < std::numeric_limits<int>::min()) {
+               ESP_LOGW(TAG, "strtol result out of int range, using raw value");
+               filtered_val = raw_val;
+             } else {
+               filtered_val = static_cast<int>(val);
+             }
              ESP_LOGD(TAG, "Per-digit filter modified reading: %d -> %d", raw_val, filtered_val);
           } else {
              filtered_val = raw_val;
@@ -516,6 +529,19 @@ bool ValueValidator::is_digit_plausible(int new_reading, int last_reading) const
 
 int ValueValidator::apply_smart_validation(int new_reading, float confidence, float last_confidence) {
   // Basic digit plausibility check
+  if (!this->config_.enable_smart_validation) {
+    // When smart validation is disabled, accept plausible readings and reject outliers outright
+    if (this->is_digit_plausible(new_reading, this->last_valid_reading_)) {
+      this->consecutive_rejections_ = 0;
+      this->rejection_confidence_sum_ = 0.0f;
+      return new_reading;
+    }
+    ESP_LOGW(TAG, "Smart validation disabled, rejecting %d (last: %d)", new_reading, this->last_valid_reading_);
+    this->consecutive_rejections_++;
+    this->rejection_confidence_sum_ += confidence;
+    return this->last_valid_reading_;
+  }
+
   if (this->is_digit_plausible(new_reading, this->last_valid_reading_)) {
     if (this->debug_) {
         ESP_LOGD(TAG, "SmartValidation: Reading %d is plausible (Last: %d). Accepted.", new_reading, this->last_valid_reading_);
@@ -763,8 +789,12 @@ void ValueValidator::set_last_valid_reading(int value) {
   
   std::string val_str = std::to_string(value);
   this->ensure_last_valid_digits_size(val_str.length());
-  for (size_t i = 0; i < val_str.length(); i++) {
-        this->last_valid_digits_data_[i] = val_str[i] - '0';
+  if (this->last_valid_digits_data_) {
+    for (size_t i = 0; i < val_str.length(); i++) {
+          this->last_valid_digits_data_[i] = val_str[i] - '0';
+    }
+  } else {
+    ESP_LOGE(TAG, "Cannot store last valid digits: allocation failed");
   }
   
   this->last_good_values_count_ = 0;
@@ -809,8 +839,12 @@ void ValueValidator::set_last_valid_reading(const std::string &value) {
   this->first_reading_ = false;
 
   this->ensure_last_valid_digits_size(value.length());
-  for (size_t i = 0; i < value.length(); i++) {
-    this->last_valid_digits_data_[i] = value[i] - '0';
+  if (this->last_valid_digits_data_) {
+    for (size_t i = 0; i < value.length(); i++) {
+      this->last_valid_digits_data_[i] = value[i] - '0';
+    }
+  } else {
+    ESP_LOGE(TAG, "Cannot store last valid digits: allocation failed");
   }
   
   this->last_good_values_count_ = 0;
@@ -822,6 +856,12 @@ void ValueValidator::set_last_valid_reading(const std::string &value) {
   this->consecutive_rejections_ = 0;
   this->rejection_confidence_sum_ = 0.0f;
   ESP_LOGW(TAG, "Manually set last valid reading to: %d (Digits: %d, Str: %s)", int_val, static_cast<int>(value.length()), value.c_str());
+}
+
+void ValueValidator::set_smart_validation_window(int v) {
+  this->config_.smart_validation_window = v;
+  // Ensure the good-values buffer is large enough for runtime changes
+  this->ensure_last_good_values_capacity(static_cast<size_t>(v));
 }
 
 void ValueValidator::free_resources() {
@@ -963,7 +1003,7 @@ bool ValueValidator::is_hallucination_pattern(std::span<const float> digits) con
 
   int first = static_cast<int>(std::round(digits[0]));
   bool all_identical = true;
-  int val = first;
+  long long val = first;
   
   for (size_t i = 1; i < digits.size(); i++) {
       int d = static_cast<int>(std::round(digits[i]));
@@ -973,7 +1013,7 @@ bool ValueValidator::is_hallucination_pattern(std::span<const float> digits) con
   
   if (!all_identical) return false;
   
-  if (!this->first_reading_ && val == this->last_valid_reading_) {
+  if (!this->first_reading_ && static_cast<int>(val) == this->last_valid_reading_) {
       return false;
   }
 
