@@ -7,142 +7,77 @@
 #include "esphome/core/component.h"
 #include "esphome/components/esp32_camera/esp32_camera.h"
 #include "esphome/components/esp32_camera_utils/image_processor.h"
-#include "esphome/components/tflite_micro_helper/model_handler.h"
-#include "esphome/components/tflite_micro_helper/memory_manager.h"
+#include "esphome/components/tflite_micro_helper/tflite_micro_helper.h"
 #include <memory>
 #include <string>
 #include <vector>
 #include <mutex>
-#include <atomic>
 #include <span>
 
 namespace esphome {
 namespace meter_reader_tflite {
 
+/**
+ * @brief Domain-specific TFLite coordinator for image zone inference.
+ *
+ * Delegates all generic TFLite operations (loading, arena, config, invoke)
+ * to the reusable tflite_micro_helper component. This layer handles only
+ * the zone-based image inference pattern specific to meter reading.
+ */
 class TFLiteCoordinator {
  public:
-  struct ModelSpec {
-      int input_width;
-      int input_height;
-      int input_channels;
-      bool normalize;
-      std::string input_order;
-      int input_type; // 0=UINT8, 1=FLOAT
-  };
-
   struct InferenceResult {
       float value;
       float confidence;
       bool success;
   };
 
-  void set_model_type(const std::string& model_type) { this->model_type_ = model_type; }
-  void set_tensor_arena_size(size_t size);
-  void set_debug(bool debug) { 
-      this->debug_ = debug; 
-      this->model_handler_.set_debug(debug);
-  }
-  
-  // Dynamic model config setters (set from __init__.py at build time)
-  void set_input_type(const std::string& t) { this->input_type_ = t; }
-  void set_input_channels(int c) { this->input_channels_ = c; }
-  void set_input_width(int w) { this->input_width_ = w; }
-  void set_input_height(int h) { this->input_height_ = h; }
-  void set_output_processing(const std::string& p) { this->output_processing_ = p; }
-  void set_scale_factor(float f) { this->scale_factor_ = f; }
-  void set_input_order(const std::string& o) { this->input_order_ = o; }
-  void set_normalize(bool n) { this->normalize_ = n; }
-  void set_invert(bool i) { this->invert_ = i; }
-  
-  void setup(const std::string& model_type, size_t tensor_arena_size);
-  
-  // Model management
-  void set_model(const uint8_t *model, size_t length);
-  [[nodiscard]] bool load_model();
-  void unload_model();
-  [[nodiscard]] bool is_model_loaded() const { return model_loaded_; }
-  
-  // Inference
-  using ProcessResult = esphome::esp32_camera_utils::ImageProcessor::ProcessResult;
-  std::vector<InferenceResult> run_inference(std::span<const ProcessResult> processed_zones);
+  // ── Config Setters (delegate to TFLiteMicroHelper) ────────────────
+  void set_model_type(const std::string& t) { this->tflite_.set_model_type(t); }
+  void set_tensor_arena_size(size_t size) { this->tflite_.set_tensor_arena_size(size); }
+  void set_debug(bool debug) { this->tflite_.set_debug(debug); }
+  void set_input_type(const std::string& t) { this->tflite_.set_input_type(t); }
+  void set_input_channels(int c) { this->tflite_.set_input_channels(c); }
+  void set_input_width(int w) { this->tflite_.set_input_width(w); }
+  void set_input_height(int h) { this->tflite_.set_input_height(h); }
+  void set_output_processing(const std::string& p) { this->tflite_.set_output_processing(p); }
+  void set_scale_factor(float f) { this->tflite_.set_scale_factor(f); }
+  void set_input_order(const std::string& o) { this->tflite_.set_input_order(o); }
+  void set_normalize(bool n) { this->tflite_.set_normalize(n); }
+  void set_invert(bool i) { this->tflite_.set_invert(i); }
 
-  // Getters (const correctness with nodiscard)
-  [[nodiscard]] ModelSpec get_model_spec() const;
-  [[nodiscard]] int get_input_width() const { return model_handler_.get_input_width(); }
-  [[nodiscard]] int get_input_height() const { return model_handler_.get_input_height(); }
-  [[nodiscard]] int get_input_channels() const { return model_handler_.get_input_channels(); }
+  // ── Model management (delegate to TFLiteMicroHelper) ──────────────
+  void set_model(const uint8_t *model, size_t length) { this->tflite_.set_model(model, length); }
+  [[nodiscard]] bool load_model() { return this->tflite_.load_model(); }
+  void unload_model() { this->tflite_.unload_model(); }
+  [[nodiscard]] bool is_model_loaded() const { return this->tflite_.is_model_loaded(); }
+  tflite_micro_helper::ModelSpec get_model_spec() const { return this->tflite_.get_model_spec(); }
 
-
-  // Arena Statistics for monitoring fragmentation
-  struct ArenaStats {
-      size_t total_size;        // Total arena size allocated
-      size_t used_bytes;        // Peak bytes used during inference
-      size_t wasted_bytes;      // Unused portion (total - used)
-      float efficiency;         // Percentage efficiency (used / total)
-  };
-
-  size_t get_arena_peak_bytes() const { 
-      std::lock_guard<std::mutex> lock(arena_stats_mutex_);
-      return cached_arena_stats_.used_bytes; 
-  }
-  // Aliases for consistency (thread-safe cached values)
-  size_t get_arena_used_bytes() const { 
-      std::lock_guard<std::mutex> lock(arena_stats_mutex_);
-      return cached_arena_stats_.used_bytes; 
-  }
-  size_t get_tensor_arena_size() const { return tensor_arena_size_requested_; }
-  size_t get_tensor_arena_size_actual() const { return tensor_arena_allocation_.actual_size; }
-  size_t get_model_size_bytes() const { return model_length_; }
-  
-  // Get cached arena statistics (thread-safe for dual-core access)
-  ArenaStats get_arena_stats() const;
-  
-  // Update arena stats cache (call after inference on Core 0)
-  void update_arena_stats_cache();
-
-  
-  // Debug
-  void report_memory_status();
+  // ── Accessors (delegate to TFLiteMicroHelper) ─────────────────────
+  int get_input_width() const { return this->tflite_.get_input_width(); }
+  int get_input_height() const { return this->tflite_.get_input_height(); }
+  int get_input_channels() const { return this->tflite_.get_input_channels(); }
+  size_t get_tensor_arena_size() const { return this->tflite_.get_tensor_arena_size(); }
+  size_t get_tensor_arena_size_actual() const { return this->tflite_.get_tensor_arena_size_actual(); }
+  size_t get_model_size_bytes() const { return this->tflite_.get_model_size_bytes(); }
+  size_t get_arena_used_bytes() const { return this->tflite_.get_arena_used_bytes(); }
+  size_t get_arena_peak_bytes() const { return this->tflite_.get_arena_stats().used_bytes; }
+  tflite_micro_helper::ArenaStats get_arena_stats() const { return this->tflite_.get_arena_stats(); }
+  void report_memory_status() { this->tflite_.report_memory_status(); }
 #ifdef DEBUG_TFLITE_MICRO_HELPER
   void debug_test_parameters(const std::vector<std::vector<uint8_t>>& zone_data);
 #endif
 
+  // ── Domain-specific: Zone-based inference ─────────────────────────
+  using ProcessResult = esphome::esp32_camera_utils::ImageProcessor::ProcessResult;
+  std::vector<InferenceResult> run_inference(std::span<const ProcessResult> processed_zones);
+
  private:
-  // Model Config
-  std::string model_type_{"default"};
-  size_t tensor_arena_size_requested_{50 * 1024};
-  const uint8_t *model_{nullptr};
-  size_t model_length_{0};
-  
-  // Dynamic model config (set from __init__.py at build time)
-  std::string input_type_{"uint8"};
-  int input_channels_{3};
-  int input_width_{32};
-  int input_height_{20};
-  std::string output_processing_{"direct_class"};
-  float scale_factor_{1.0f};
-  std::string input_order_{"RGB"};
-  bool normalize_{false};
-  bool invert_{false};
-  
-  // State
-  std::atomic<bool> model_loaded_{false};
-  bool debug_{false};
-  bool arena_bumped_{false};  // ESP32-S3: bump applied once per instance
-  
-  // Arena stats cache for thread-safe dual-core access (Core 0 inference, Core 1 main loop)
-  mutable std::mutex arena_stats_mutex_;
-  ArenaStats cached_arena_stats_{};
-  
-  // Components
-  tflite_micro_helper::MemoryManager memory_manager_;
-  tflite_micro_helper::MemoryManager::AllocationResult tensor_arena_allocation_;
-  tflite_micro_helper::ModelHandler model_handler_;
+  // Reusable TFLite helper — handles loading, arena, config, buffer inference
+  tflite_micro_helper::TFLiteMicroHelper tflite_;
+  mutable std::mutex model_mutex_;
 
-  bool allocate_tensor_arena();
   bool process_model_result(const esp32_camera_utils::ImageProcessor::ProcessResult& result, float* value, float* confidence);
-
-  mutable std::mutex model_mutex_; // Protects model_handler_ access
 };
 
 }  // namespace meter_reader_tflite
