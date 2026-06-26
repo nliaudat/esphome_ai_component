@@ -15,62 +15,8 @@ namespace analog_reader {
 
 static const char *const TAG = "analog_reader";
 
-// Deleter for JPEG decoder handle
-struct JpegDecoderDeleter {
-    void operator()(jpeg_dec_handle_t handle) const {
-        if (handle) jpeg_dec_close(handle);
-    }
-};
-
-// Local helper to decode JPEG directly into a buffer
-static bool local_decode_jpeg(
-    const uint8_t* data, size_t len, 
-    jpeg_pixel_format_t output_format,
-    uint8_t* output_buffer, size_t output_size, 
-    int* width, int* height) {
-    
-    jpeg_dec_io_t io = {0};
-    jpeg_dec_header_info_t header_info;
-    jpeg_dec_handle_t decoder_handle = nullptr;
-    jpeg_dec_config_t decode_config = {
-        .output_type = output_format,
-        .rotate = JPEG_ROTATE_0D,
-    };
-
-    if (jpeg_dec_open(&decode_config, &decoder_handle) != JPEG_ERR_OK) {
-        return false;
-    }
-    // RAII for decoder
-    std::unique_ptr<void, JpegDecoderDeleter> decoder(decoder_handle);
-
-    io.inbuf = const_cast<uint8_t*>(data);
-    io.inbuf_len = len;
-    io.inbuf_remain = len;
-    
-    // Parse header to check dimensions
-    if (jpeg_dec_parse_header(decoder_handle, &io, &header_info) != JPEG_ERR_OK) {
-        return false;
-    }
-    
-    *width = header_info.width;
-    *height = header_info.height;
-    
-    size_t bpp = (output_format == JPEG_PIXEL_FORMAT_GRAY) ? 1 : 3;
-    size_t required_size = header_info.width * header_info.height * bpp;
-    if (output_size < required_size) {
-        ESP_LOGE(TAG, "Buffer too small for decoding: %u < %u", output_size, required_size);
-        return false;
-    }
-    
-    io.outbuf = output_buffer;
-    io.out_size = output_size;
-
-    if (jpeg_dec_process(decoder_handle, &io) != JPEG_ERR_OK) {
-        return false;
-    }
-
-    return true;
-}
+// Use shared JPEG decoder from esp32_camera_utils component
+// (analog_reader.h includes esphome/components/esp32_camera_utils/image_processor.h)
 
 // Wrapper for Persistent RGB Buffer to implement CameraImage interface
 class PersistentDecodedImage : public esphome::camera::CameraImage {
@@ -361,11 +307,25 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
                                         ? JPEG_PIXEL_FORMAT_GRAY 
                                         : JPEG_PIXEL_FORMAT_RGB888;
 
-          bool ok = local_decode_jpeg(
-              data, len, 
-              out_fmt,
-              this->persistent_buffer_.get(), this->persistent_buffer_size_, 
-              &out_w, &out_h);
+          // Decode JPEG directly into pre-allocated persistent buffer
+          int dec_w = 0, dec_h = 0;
+          auto decoded = esphome::esp32_camera_utils::ImageProcessor::decode_jpeg(
+              data, len, &dec_w, &dec_h,
+              out_fmt, JPEG_ROTATE_0D);
+          bool ok = static_cast<bool>(decoded);
+          if (ok) {
+              // Copy decoded data into persistent buffer (we own the buffer lifetime)
+              size_t bpp = (out_fmt == JPEG_PIXEL_FORMAT_GRAY) ? 1 : 3;
+              size_t required = dec_w * dec_h * bpp;
+              if (required <= this->persistent_buffer_size_) {
+                  memcpy(this->persistent_buffer_.get(), decoded.get(), required);
+              } else {
+                  ESP_LOGW(TAG, "Persistent buffer too small: need %zu, have %zu", required, this->persistent_buffer_size_);
+                  ok = false;
+              }
+              out_w = dec_w;
+              out_h = dec_h;
+          }
           
           if (ok) {
               if (out_w != this->img_width_ || out_h != this->img_height_) {
