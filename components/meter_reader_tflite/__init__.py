@@ -169,6 +169,17 @@ def parse_model_txt_file(model_path):
         config['output_processing'] = 'softmax'
         print(f"  Auto-detected output_processing: softmax (model has raw logits, will apply softmax in C++)")
 
+    # Detect quantization family: QAT vs TQT vs hybrid
+    # - QAT: first conv after QUANTIZE has kernel shape [1 1 1 3] (learned grayscale weights)
+    # - TQT: uses explicit formula (STRIDED_SLICE+MUL+ADD) or depthwise conv for grayscale
+    # Pattern: shape=[1 1 1 3] in a CONV_2D input tensor = QAT 1×1 learned grayscale
+    if re.search(r'shape=\[1 1 1 3\]', content):
+        config['quantization_family'] = 'qat'
+        print(f"  Auto-detected quantization: QAT (learned 1x1 RGB→gray conv)")
+    else:
+        config['quantization_family'] = 'tqt'
+        print(f"  Auto-detected quantization: TQT (standard post-training quantization)")
+
     # Detect hybrid quantization (float32 I/O + int8 weights) — incompatible with TFLite Micro
     # Pattern: float32 input but int8 weight/bias tensors present (pseudo_qconst / int8 weight tensors)
     input_dtype = config.get('input_type', '')

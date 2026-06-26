@@ -127,15 +127,6 @@ bool TFLiteCoordinator::load_model() {
     }
 
     model_loaded_ = true;
-    ESP_LOGI(TAG, "Model loaded successfully. Input: %dx%dx%d", 
-             model_handler_.get_input_width(),
-             model_handler_.get_input_height(),
-             model_handler_.get_input_channels());
-
-    #ifdef DEBUG_TFLITE_MICRO_HELPER
-    model_handler_.debug_model_architecture();
-    #endif
-
 
 
     return true;
@@ -200,7 +191,22 @@ bool TFLiteCoordinator::process_model_result(const esp32_camera_utils::ImageProc
          return false;
     }
     
-    memcpy(input->data.uint8, src_data, result.size);
+    // Write input data using the correct tensor type (uint8, int8, or float32).
+    // Always copying via data.uint8 would corrupt signed int8 or float32 inputs.
+    if (input->type == kTfLiteFloat32) {
+        // Float32 input: copy element-by-element to account for endianness/alignment
+        const size_t num_elements = result.size / sizeof(float);
+        for (size_t i = 0; i < num_elements; ++i) {
+            float val;
+            memcpy(&val, src_data + i * sizeof(float), sizeof(float));
+            input->data.f[i] = val;
+        }
+    } else if (input->type == kTfLiteInt8) {
+        memcpy(input->data.int8, src_data, result.size);
+    } else {
+        // kTfLiteUInt8 (default fallback)
+        memcpy(input->data.uint8, src_data, result.size);
+    }
     
     if (model_handler_.invoke() != kTfLiteOk) {
         ESP_LOGE(TAG, "Model invocation failed");

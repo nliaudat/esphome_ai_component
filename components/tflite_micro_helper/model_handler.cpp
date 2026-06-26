@@ -362,7 +362,7 @@ ProcessedOutput ModelHandler::process_output(TfLiteTensor* output_tensor) const 
         
         if (scale == 0.0f) { 
              scale = 1.0f; 
-             // ESP_LOGW(TAG, "Output tensor has scale 0.0, assuming 1.0");
+             ESP_LOGW(TAG, "Output tensor has scale 0.0, assuming 1.0 — probabilities may be garbage");
         }
 
         if (output_tensor->type == kTfLiteUInt8) {

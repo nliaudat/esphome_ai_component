@@ -43,3 +43,4 @@ components/data_collector/data_extractor/meter_reading.log
 CLINE_RULES.md
 validate_all_configs.bat
 dropbox_ignore.ps
+.clinerules/rules.yaml
