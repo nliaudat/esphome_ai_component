@@ -172,7 +172,16 @@ ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t* data, s
         channels = 2; // Actually 2 bytes, but distinct format
     }
     
-    size_t out_size = w * h * channels;
+    // Check for overflow: w * h * channels must fit in size_t
+    // ESP32 is 32-bit, so size_t is up to 4GB, but practical limit is much smaller
+    uint64_t out_size_64 = static_cast<uint64_t>(w) * h * channels;
+    static constexpr uint64_t MAX_JPEG_OUTPUT = 10ULL * 1024 * 1024; // 10MB
+    if (out_size_64 > MAX_JPEG_OUTPUT || out_size_64 > SIZE_MAX) {
+        ESP_LOGE(TAG, "JPEG output size too large: %llu bytes (dimensions: %dx%dx%d)", 
+                 out_size_64, w, h, channels);
+        return nullptr;
+    }
+    size_t out_size = static_cast<size_t>(out_size_64);
     uint8_t* raw_buf = static_cast<uint8_t*>(jpeg_calloc_align(out_size, 16));
     if (!raw_buf) {
         ESP_LOGE(TAG, "CRITICAL: Failed to allocate JPEG output buffer (aligned) of size %zu", out_size);
@@ -582,8 +591,8 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
   size_t free_spiram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
   size_t free_internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
   
-  // Log memory state for debugging invisible failures
-  ESP_LOGI(TAG, "Image Processing Start. PSRAM Free: %zu KB (Threshold: %zu KB). Format: %s", 
+  // Log memory state for debugging invisible failures (rate limited)
+  ESP_LOGD(TAG, "Image Processing Start. PSRAM Free: %zu KB (Threshold: %zu KB). Format: %s", 
            free_spiram/1024, SPIRAM_RESERVE_THRESHOLD/1024, this->config_.pixel_format.c_str());
 
   bool low_memory = false;
@@ -672,7 +681,13 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
            int rot_w = static_cast<int>(master_width * abs_cos + master_height * abs_sin);
            int rot_h = static_cast<int>(master_width * abs_sin + master_height * abs_cos);
            
-           size_t rot_size = rot_w * rot_h * master_channels;
+           uint64_t rot_size_64 = static_cast<uint64_t>(rot_w) * rot_h * master_channels;
+           static constexpr uint64_t MAX_ROT_SIZE = 10ULL * 1024 * 1024; // 10MB
+           if (rot_size_64 > MAX_ROT_SIZE || rot_size_64 > SIZE_MAX) {
+               ESP_LOGE(TAG, "Rotation buffer too large: %llu bytes", rot_size_64);
+               return results;
+           }
+           size_t rot_size = static_cast<size_t>(rot_size_64);
            
            // We use jpeg_calloc_align for consistency since master_decoded_buffer is JpegBufferPtr (uptr with free_align)
            // Actually decode_jpeg returns a smart pointer compatible with jpeg_free_align.
@@ -749,8 +764,8 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
                 // Replace master buffer with grayscale version
                 master_decoded_buffer = std::move(gray_master_buffer);
                 master_channels = 1;
-                ESP_LOGI(TAG, "Converted master buffer to grayscale: %dx%d (%zu bytes)",
-                         master_width, master_height, gray_size);
+            ESP_LOGD(TAG, "Converted master buffer to grayscale: %dx%d (%zu bytes)",
+                     master_width, master_height, gray_size);
             } else {
                 ESP_LOGW(TAG, "Failed to allocate grayscale master buffer, using RGB888");
             }
@@ -1129,7 +1144,7 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
             full_image_buf.reset();
             decode_channels = 1;
             
-            ESP_LOGI(TAG, "Converted zone buffer to grayscale: %dx%d (%zu bytes)", 
+            ESP_LOGD(TAG, "Converted zone buffer to grayscale: %dx%d (%zu bytes)", 
                      jpeg_width, jpeg_height, gray_size);
         } else {
             ESP_LOGW(TAG, "Failed to allocate grayscale buffer, using RGB888");
@@ -1161,7 +1176,13 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
         out_w = static_cast<int>(jpeg_width * abs_cos + jpeg_height * abs_sin);
         out_h = static_cast<int>(jpeg_width * abs_sin + jpeg_height * abs_cos);
         
-        size_t rotated_size = out_w * out_h * decode_channels;
+        uint64_t rotated_size_64 = static_cast<uint64_t>(out_w) * out_h * decode_channels;
+        static constexpr uint64_t MAX_ROT_SIZE = 10ULL * 1024 * 1024; // 10MB
+        if (rotated_size_64 > MAX_ROT_SIZE || rotated_size_64 > SIZE_MAX) {
+            ESP_LOGE(TAG, "Rotated buffer size too large: %llu bytes", rotated_size_64);
+            return false;
+        }
+        size_t rotated_size = static_cast<size_t>(rotated_size_64);
         rotated_buffer_storage = this->allocate_image_buffer(rotated_size);
         
         if (!rotated_buffer_storage) {

@@ -90,14 +90,14 @@ async def to_code(config):
     if config.get("enable_rotation", False) or config[CONF_ROTATION] != 0:
          cg.add_define("USE_CAMERA_ROTATOR")
 
-    if config.get("enable_scaler", True) or CONF_SCALER in config:
+    if config.get("enable_scaler", True):
         cg.add_define("USE_CAMERA_SCALER")
         if CONF_SCALER in config:
             conf = config[CONF_SCALER]
             if CONF_WIDTH in conf and CONF_HEIGHT in conf:
                 cg.add(var.set_scaler_config(conf[CONF_WIDTH], conf[CONF_HEIGHT]))
         
-    if config.get("enable_cropper", True) or CONF_CROPPER in config:
+    if config.get("enable_cropper", True):
         cg.add_define("USE_CAMERA_CROPPER")
         if CONF_CROPPER in config:
             conf = config[CONF_CROPPER]
