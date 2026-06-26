@@ -36,15 +36,30 @@ BufferPool ImageProcessor::buffer_pool_;
 // Initialize static member
 std::atomic<int32_t> ImageProcessor::TrackedBuffer::active_instances{0};
 
-// Duration logging macros for performance profiling
-#ifdef DURATION_START
-#undef DURATION_START
-#endif
-#define DURATION_START() uint32_t duration_start_ = millis()
-#ifdef DURATION_END
-#undef DURATION_END
-#endif
-#define DURATION_END(func) ESP_LOGD(TAG, "%s duration: %lums", func, millis() - duration_start_)
+// RAII ScopedTimer — replaces DURATION_START/DURATION_END macros
+class ScopedTimer {
+ public:
+  ScopedTimer(const char* func) : name_(func), start_(millis()) {}
+  ~ScopedTimer() { ESP_LOGD(TAG, "%s duration: %lums", this->name_, millis() - this->start_); }
+ private:
+  const char* name_;
+  uint32_t start_;
+};
+
+// Consolidate rotation normalization logic (replaces 5 copies of identical code)
+// Returns the best hardware-supported JPEG rotation and sets needs_software=true for fine angles.
+static jpeg_rotate_t normalize_rotation(float rotation, bool& needs_software) {
+  float rot = rotation;
+  while (rot < 0) rot += 360.0f;
+  while (rot >= 360.0f) rot -= 360.0f;
+  needs_software = false;
+  if (std::abs(rot) < 0.1f) return JPEG_ROTATE_0D;
+  if (std::abs(rot - 90.0f) < 0.1f) return JPEG_ROTATE_90D;
+  if (std::abs(rot - 180.0f) < 0.1f) return JPEG_ROTATE_180D;
+  if (std::abs(rot - 270.0f) < 0.1f) return JPEG_ROTATE_270D;
+  needs_software = true;
+  return JPEG_ROTATE_0D;
+}
 
 // Debug macros for image processing analysis (restored from legacy code)
 #if defined(DEBUG_ESP32_CAMERA_UTILS) || defined(DEBUG_METER_READER_TFLITE) || defined(DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL)
@@ -265,26 +280,9 @@ std::shared_ptr<camera::CameraImage> ImageProcessor::generate_rotated_preview(
         src_h = jpeg_h;
     } 
 
-    // 2. Determine Rotation Optimization
-    // Check for standard angles to use decoder rotation (Hardware/Optimized)
-    jpeg_rotate_t hw_rotation = JPEG_ROTATE_0D;
+    // 2. Determine Rotation Optimization (consolidated helper)
     bool software_rotation_needed = false;
-    
-    float rot = rotation;
-    while (rot < 0) rot += 360.0f;
-    while (rot >= 360.0f) rot -= 360.0f;
-    
-    if (std::abs(rot) < 0.1f) {
-         hw_rotation = JPEG_ROTATE_0D;
-    } else if (std::abs(rot - 90.0f) < 0.1f) {
-         hw_rotation = JPEG_ROTATE_90D;
-    } else if (std::abs(rot - 180.0f) < 0.1f) {
-         hw_rotation = JPEG_ROTATE_180D;
-    } else if (std::abs(rot - 270.0f) < 0.1f) {
-         hw_rotation = JPEG_ROTATE_270D;
-    } else {
-         software_rotation_needed = true;
-    }
+    jpeg_rotate_t hw_rotation = normalize_rotation(rotation, software_rotation_needed);
 
     // 3. Decode with optimization
     int dec_w = 0, dec_h = 0;
@@ -635,27 +633,9 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
       jpeg_pixel_format_t decode_format = JPEG_PIXEL_FORMAT_RGB888;
       int decode_channels = 3;
       
-      // Check for standard angles to use decoder rotation (Hardware/Optimized)
-      jpeg_rotate_t hw_rotation = JPEG_ROTATE_0D;
+      // Determine Rotation Optimization (consolidated helper)
       bool software_rotation_needed = false;
-      
-      // Normalize rotation for check
-      float rot = this->config_.rotation;
-      while (rot < 0) rot += 360.0f;
-      while (rot >= 360.0f) rot -= 360.0f;
-      
-      if (std::abs(rot) < 0.1f) {
-           hw_rotation = JPEG_ROTATE_0D;
-      } else if (std::abs(rot - 90.0f) < 0.1f) {
-           hw_rotation = JPEG_ROTATE_90D;
-      } else if (std::abs(rot - 180.0f) < 0.1f) {
-           hw_rotation = JPEG_ROTATE_180D;
-      } else if (std::abs(rot - 270.0f) < 0.1f) {
-           hw_rotation = JPEG_ROTATE_270D;
-      } else {
-           // arbitrary angle, use software rotation
-           software_rotation_needed = true;
-      }
+      jpeg_rotate_t hw_rotation = normalize_rotation(this->config_.rotation, software_rotation_needed);
       
       // 2. Decode (with optional rotation)
       int dec_w = 0, dec_h = 0;
@@ -945,7 +925,7 @@ bool ImageProcessor::process_zone_to_buffer(
     size_t output_buffer_size) {
     
     std::lock_guard<std::mutex> lock(this->processing_mutex_);
-    DURATION_START();
+    ScopedTimer timer("process_zone_to_buffer");
     
     if (!this->validate_input_image(image)) {
         return false;
@@ -1000,7 +980,6 @@ bool ImageProcessor::process_zone_to_buffer(
         success = this->process_raw_zone_to_buffer(image, zone, output_buffer, output_buffer_size);
     }
     
-    DURATION_END("process_zone_to_buffer");
     return success;
 }
 
@@ -1080,27 +1059,9 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
 
     int dec_w = 0, dec_h = 0;
     
-    // Determine Rotation Optimization
-    // Check for standard angles to use decoder rotation (Hardware/Optimized)
-    jpeg_rotate_t hw_rotation = JPEG_ROTATE_0D;
+    // Determine Rotation Optimization (consolidated helper)
     bool software_rotation_needed = false;
-    
-    // Normalize rotation for check
-    float rot = this->config_.rotation;
-    while (rot < 0) rot += 360.0f;
-    while (rot >= 360.0f) rot -= 360.0f;
-    
-    if (std::abs(rot) < 0.1f) {
-         hw_rotation = JPEG_ROTATE_0D;
-    } else if (std::abs(rot - 90.0f) < 0.1f) {
-         hw_rotation = JPEG_ROTATE_90D;
-    } else if (std::abs(rot - 180.0f) < 0.1f) {
-         hw_rotation = JPEG_ROTATE_180D;
-    } else if (std::abs(rot - 270.0f) < 0.1f) {
-         hw_rotation = JPEG_ROTATE_270D;
-    } else {
-         software_rotation_needed = true;
-    }
+    jpeg_rotate_t hw_rotation = normalize_rotation(this->config_.rotation, software_rotation_needed);
 
     JpegBufferPtr full_image_buf = decode_jpeg(jpeg_data, jpeg_size, &dec_w, &dec_h, decode_format, hw_rotation);
     
@@ -1309,7 +1270,6 @@ ImageProcessor::ProcessResult ImageProcessor::process_zone(
     std::shared_ptr<camera::CameraImage> image,
     const CropZone &zone) {
     
-    DURATION_START();
     ProcessResult result;
     
     if (!this->validate_input_image(image)) return result;
@@ -1349,7 +1309,6 @@ ImageProcessor::ProcessResult ImageProcessor::process_zone(
         result.size = required_size;
     }
     
-    DURATION_END("process_zone");
     return result;
 }
 
