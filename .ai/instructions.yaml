@@ -439,38 +439,6 @@ esp32_suppress:
     reason: "32-bit ESP32 overflow risk; correct 3-line guard pattern"
 
 # =============================================================================
-# §12.14 CODE REVIEW LESSONS (from PR#147–#152 fix commits)
-# =============================================================================
-# These rules were derived from recurring bug patterns found across 8 fix commits.
-# Each bug appeared in at least 2 PRs before being caught.
-# =============================================================================
-code_review_lessons:
-  cross_component_types:
-    - "Single conversion function for cross-component enum mappings"
-    - "NEVER duplicate inverted mapping across call sites (found in 3 places in meter_reader_tflite.cpp)"
-    - "Use named enum constants (kTfLiteFloat32) over raw integers (0/1) where both enums are accessible"
-  freertos_cpp_impedance:
-    - "Structs passed through xQueueReceive: mark with '// ESP32: xQueueReceive raw memcpy — manual free before next receive'"
-    - "vTaskDelete(nullptr) does NOT unwind stack — drain all queues before task deletion"
-    - "When declaring a struct outside a while loop, manual free + nullify is required between iterations"
-    - "Destructor of queue-drain variable only fires for the LAST item received"
-  python_import_safety:
-    - "Directory paths at module level: resolve relative to __file__, NOT cwd"
-    - "NEVER filter dir lists by exists() at import time — directories may be created after import"
-    - "Defer existence checks to runtime discover_models() function, not module load"
-  dead_code_hygiene:
-    - "When deleting a source file, search and remove ALL #include references across all files"
-    - "Pure-comment header files (model_config.h) must be deleted, not left as placeholders"
-  hot_path_optimization:
-    - "Prefer integer arithmetic over std::to_string() + strtol() round-trips in loop()-called paths"
-    - "Use pre-allocated scratch buffers (std::vector reserved in setup()) instead of per-frame resize()"
-    - "Pre-allocate all column-sum and digit-bounds vectors in SSOCR setup()"
-  jpeg_decoder:
-    - "jpeg_dec_handle_t is void* in ESP-IDF — use custom deleter struct with using pointer = jpeg_dec_handle_t"
-    - "When decoding JPEG to pre-allocated buffer, pass output_buffer directly — avoid temp allocation + memcpy"
-    - "Add uint64_t overflow check or guarded multiplication for w*h*bpp from JPEG header"
-
-# =============================================================================
 # §12.13 PONYTAIL — Lazy Senior Developer Mode
 # =============================================================================
 ponytail:
@@ -494,3 +462,36 @@ ponytail:
     - "Calibration real hardware needs"
     - "Anything explicitly requested"
   testing: "Non-trivial logic: one assert-based demo or one small test file. No frameworks, no fixtures."
+
+# =============================================================================
+# §12.14 CODE REVIEW LESSONS (from PR#147–#152 fix commits)
+# =============================================================================
+# These rules were derived from recurring bug patterns found across 8 fix commits.
+# Each bug appeared in at least 2 PRs before being caught.
+# =============================================================================
+code_review_lessons:
+  cross_component_types:
+    - "Single conversion function for cross-component enum mappings"
+    - "NEVER duplicate inverted mapping across call sites (found in 3 places in meter_reader_tflite.cpp)"
+    - "Use named enum constants (kTfLiteFloat32) over raw integers (0/1) where both enums are accessible"
+  freertos_cpp_impedance:
+    - "Structs passed through xQueueReceive: mark with '// ESP32: xQueueReceive raw memcpy — manual free before next receive'"
+    - "Tasks MUST exit their loop naturally to unwind the stack (destructors fire on scope exit); vTaskDelete(nullptr) only at end of task function"
+    - "NEVER pass or receive non-TriviallyCopyable types directly via xQueueReceive/xQueueSend (raw memcpy bypasses C++ assignment operators)"
+    - "When declaring a struct outside a while loop, manual free + nullify is required between iterations"
+    - "Destructor of queue-drain variable only fires for the LAST item received"
+  python_import_safety:
+    - "Directory paths at module level: resolve relative to __file__, NOT cwd"
+    - "NEVER filter dir lists by exists() at import time — directories may be created after import"
+    - "Defer existence checks to runtime discover_models() function, not module load"
+  dead_code_hygiene:
+    - "When deleting a source file, search and remove ALL #include references across all files"
+    - "Pure-comment header files (model_config.h) must be deleted, not left as placeholders"
+  hot_path_optimization:
+    - "Prefer integer arithmetic over std::to_string() + strtol() round-trips in loop()-called paths"
+    - "Use pre-allocated scratch buffers (std::vector reserved in setup()) instead of per-frame resize()"
+    - "Pre-allocate all column-sum and digit-bounds vectors in SSOCR setup()"
+  jpeg_decoder:
+    - "jpeg_dec_handle_t is void* in ESP-IDF — use custom deleter struct with using pointer = jpeg_dec_handle_t"
+    - "When decoding JPEG to pre-allocated buffer, pass output_buffer directly — avoid temp allocation + memcpy"
+    - "Add guarded multiplication (using SIZE_MAX check) for w*h*bpp from JPEG header to prevent 32-bit overflow"
