@@ -43,8 +43,6 @@ class ReadingHistory {
   
   int get_last_reading() const;
   float get_last_confidence() const;
-  int get_hour_median() const;
-  int get_day_median() const;
   int get_median_within_ms(uint32_t max_elapsed_ms) const;
   std::vector<int> get_recent_readings(size_t count) const;
   std::vector<std::pair<int, float>> get_recent_readings_with_confidence(size_t count) const;
@@ -197,8 +195,6 @@ class ValueValidator : public Component {
   bool is_digit_plausible(int new_reading, int last_reading) const;
   int apply_smart_validation(int new_reading, float confidence, float last_confidence);
   int find_most_plausible_reading(int new_reading, const std::vector<int>& recent_readings);
-  bool is_small_increment(int new_reading, int last_reading) const;
-  int calculate_digit_difference(int reading1, int reading2) const;
   int get_stable_digit(size_t digit_index, int new_digit);
   void ensure_digit_history_size(size_t num_digits);
   void ensure_last_valid_digits_size(size_t num_digits);

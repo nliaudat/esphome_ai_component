@@ -81,9 +81,6 @@ float ReadingHistory::get_last_confidence() const {
   return this->buffer_[idx].confidence;
 }
 
-int ReadingHistory::get_hour_median() const { return this->get_median_within_ms(3600000UL); }
-int ReadingHistory::get_day_median() const { return this->get_median_within_ms(86400000UL); }
-
 int ReadingHistory::get_median_within_ms(uint32_t max_elapsed_ms) const {
   if (this->count_ == 0 || !this->buffer_) return 0;
   
@@ -754,27 +751,6 @@ int ValueValidator::find_most_plausible_reading(int new_reading, const std::vect
   return new_reading;
 }
 
-bool ValueValidator::is_small_increment(int new_reading, int last_reading) const {
-  int diff = new_reading - last_reading;
-  return (diff > 0 && diff <= 10);
-}
-
-int ValueValidator::calculate_digit_difference(int reading1, int reading2) const {
-  std::string str1 = std::to_string(reading1);
-  std::string str2 = std::to_string(reading2);
-  
-  size_t max_len = std::max(str1.length(), str2.length());
-  str1 = std::string(max_len - str1.length(), '0') + str1;
-  str2 = std::string(max_len - str2.length(), '0') + str2;
-  
-  int digit_diff = 0;
-  for (size_t i = 0; i < max_len; i++) {
-    digit_diff += std::abs((str1[i] - '0') - (str2[i] - '0'));
-  }
-  
-  return digit_diff;
-}
-
 void ValueValidator::reset() {
   this->history_.clear();
   this->last_valid_reading_ = 0;
@@ -1048,6 +1024,8 @@ void ValueValidator::dump_config() {
   ESP_LOGCONFIG(TAG, "  Max Absolute Diff: %d", this->config_.max_absolute_diff);
   ESP_LOGCONFIG(TAG, "  Max Rate Change: %.0f%%", this->config_.max_rate_change * 100.0f);
   ESP_LOGCONFIG(TAG, "  Allow Negative Rates: %s", YESNO(this->config_.allow_negative_rates));
+  ESP_LOGCONFIG(TAG, "  Smart Validation: %s", YESNO(this->config_.enable_smart_validation));
+  ESP_LOGCONFIG(TAG, "  Smart Validation Window: %d", this->config_.smart_validation_window);
   ESP_LOGCONFIG(TAG, "  Strict Confidence Check: %s", YESNO(this->config_.strict_confidence_check));
   ESP_LOGCONFIG(TAG, "  Per Digit Conf Threshold: %.2f", this->config_.per_digit_confidence_threshold);
   ESP_LOGCONFIG(TAG, "  Max Consecutive Rejections: %d", this->config_.max_consecutive_rejections);
