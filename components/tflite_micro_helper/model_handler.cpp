@@ -154,7 +154,7 @@ bool ModelHandler::load_model_with_arena(const uint8_t *model_data, size_t model
       ESP_LOGD(TAG, "Operator codes found in model:");
       for (size_t i = 0; i < this->tflite_model_->operator_codes()->size(); ++i) {
         const auto *op_code = this->tflite_model_->operator_codes()->Get(i);
-        ESP_LOGD(TAG, "  [%d]: %d (%s)", (int)i, op_code->builtin_code(),
+        ESP_LOGD(TAG, "  [%d]: %d (%s)", static_cast<int>(i), op_code->builtin_code(),
                  tflite::EnumNameBuiltinOperator(op_code->builtin_code()));
       }
   }

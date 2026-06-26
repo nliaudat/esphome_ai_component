@@ -14,7 +14,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("debug", default=False): cv.boolean,
 })
 
-def to_code(config):
+async def to_code(config):
     cg.add_define("USE_TFLITE_MICRO_HELPER")
     
     if CORE.target_platform == "esp32":
