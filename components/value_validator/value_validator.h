@@ -110,7 +110,7 @@ class ValueValidator : public Component {
   void set_max_absolute_diff(int v) { this->config_.max_absolute_diff = v; }
   void set_max_rate_change(float v) { this->config_.max_rate_change = v; }
   void set_enable_smart_validation(bool v) { this->config_.enable_smart_validation = v; }
-  void set_smart_validation_window(int v) { this->config_.smart_validation_window = v; }
+  void set_smart_validation_window(int v);
   void set_high_confidence_threshold(float v) { this->config_.high_confidence_threshold = v; }
   void set_max_history_size_bytes(size_t v) { this->config_.max_history_size_bytes = v; }
   void set_per_digit_confidence_threshold(float v) { this->config_.per_digit_confidence_threshold = v; }
