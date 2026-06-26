@@ -27,6 +27,13 @@ bool TFLiteMicroHelper::load_model(const uint8_t *model_data, size_t model_size,
         ESP_LOGW(TAG, "Using default tensor arena size: 100KB");
     }
 
+    // Verify CRC32 checksum BEFORE allocating tensor arena or parsing model data.
+    // This prevents wasted memory allocation and potential UB from parsing corrupt data.
+    if (!this->model_handler_.verify_model_crc(model_data, model_size)) {
+        ESP_LOGE(TAG, "Model CRC32 verification failed");
+        return false;
+    }
+
     // Allocate tensor arena
     this->tensor_arena_allocation_ = MemoryManager::allocate_tensor_arena(this->tensor_arena_size_requested_);
     if (!this->tensor_arena_allocation_) {
@@ -40,11 +47,6 @@ bool TFLiteMicroHelper::load_model(const uint8_t *model_data, size_t model_size,
                                  this->tensor_arena_allocation_.actual_size,
                                  config)) {
         ESP_LOGE(TAG, "Failed to load model into interpreter");
-        return false;
-    }
-
-    if (!this->model_handler_.verify_model_crc(model_data, model_size)) {
-        ESP_LOGE(TAG, "Model CRC32 verification failed");
         return false;
     }
 

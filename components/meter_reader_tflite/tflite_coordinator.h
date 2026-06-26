@@ -105,7 +105,9 @@ class TFLiteCoordinator {
   
   // Debug
   void report_memory_status();
+#ifdef DEBUG_TFLITE_MICRO_HELPER
   void debug_test_parameters(const std::vector<std::vector<uint8_t>>& zone_data);
+#endif
 
  private:
   // Model Config

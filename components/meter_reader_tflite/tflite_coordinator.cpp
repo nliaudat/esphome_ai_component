@@ -91,6 +91,15 @@ bool TFLiteCoordinator::load_model() {
     }
     #endif
 
+    // Verify CRC32 checksum BEFORE allocating tensor arena or parsing model data.
+    // This prevents wasted memory allocation and potential UB from parsing corrupt data.
+    if (!this->model_handler_.verify_model_crc(this->model_, this->model_length_)) {
+        ESP_LOGE(TAG, "Model CRC32 verification failed");
+        ESP_LOGE(TAG, "  Model type: %s", model_type_.c_str());
+        ESP_LOGE(TAG, "  Model size: %zu bytes", model_length_);
+        return false;
+    }
+
     if (!allocate_tensor_arena()) {
         return false;
     }
@@ -123,7 +132,7 @@ bool TFLiteCoordinator::load_model() {
              model_handler_.get_input_height(),
              model_handler_.get_input_channels());
 
-    #ifdef DEBUG_METER_READER_TFLITE
+    #ifdef DEBUG_TFLITE_MICRO_HELPER
     model_handler_.debug_model_architecture();
     #endif
 
@@ -287,9 +296,11 @@ void TFLiteCoordinator::update_arena_stats_cache() {
     cached_arena_stats_ = stats;
 }
 
+#ifdef DEBUG_TFLITE_MICRO_HELPER
 void TFLiteCoordinator::debug_test_parameters(const std::vector<std::vector<uint8_t>>& zone_data) {
     model_handler_.debug_test_parameters(zone_data);
 }
+#endif
 
 } // namespace meter_reader_tflite
 } // namespace esphome

@@ -3,9 +3,8 @@ import os
 import re
 import random
 import subprocess
-import shutil
-import time
 import threading
+import time
 import sys
 
 SOURCE_CONFIG = "config_test.yaml"
@@ -195,6 +194,9 @@ def randomize_config(lines, worker_id):
             components_str = ', '.join(sorted(enabled_components))
             modified_lines.append(f"{indent}components: [{components_str}]\n")
             change_log.append(f"[Components] Enabled: {components_str}")
+            # Single-line format [...] means no continuation lines to skip
+            if ']' in line:
+                in_components_list = False
             continue
         
         # Skip original components list
@@ -208,6 +210,7 @@ def randomize_config(lines, worker_id):
         # Exit external_components section when we hit a new top-level key
         if in_external_components and not line.startswith(' ') and stripped and not stripped.startswith('#'):
             in_external_components = False
+            in_components_list = False  # Reset list flag when leaving section
         
         # Copy all other lines
         modified_lines.append(line)
