@@ -227,65 +227,23 @@ void MeterReaderTFLite::setup() {
              this->mark_failed(); return;
          }
          
-         // After model loaded, we have input specs. Update CameraCoord.
-         auto spec = this->tflite_coord_.get_model_spec();
-         
-         // Map input type: 
-         // spec.input_type: 1=Float, 0=Uint8 (from TFLiteCoord)
-         // camera/image_processor: 0=Float, 1=Uint8 (ImageProcessorInputType)
-         int processor_input_type = (spec.input_type == 1) ? 0 : 1;
-         
-         // [MOVED] Sync Rotation FIRST
-         if (this->esp32_camera_utils_) {
-              // Sync rotation from Utils (Centralized Configuration)
-              this->rotation_ = this->esp32_camera_utils_->get_rotation();
-              ESP_LOGI(TAG, "Synced rotation from esp32_camera_utils: %.1f", this->rotation_);
-              
-              // Pass rotation to coordinator BEFORE updating processor config
-              this->camera_coord_.set_rotation(this->rotation_);
-         }
-         
-         // Pass preview setting to coordinator to enable caching if needed
-         this->camera_coord_.set_enable_preview(this->generate_preview_);
-         
-         this->camera_coord_.update_image_processor_config(
-             spec.input_width, 
-             spec.input_height, 
-             spec.input_channels,
-             processor_input_type,
-             spec.normalize,
-             spec.input_order
-         );
-         
-         if (this->esp32_camera_utils_) {
-              this->esp32_camera_utils_->set_camera_image_format(
-                  this->camera_coord_.get_width(),
-                  this->camera_coord_.get_height(),
-                  this->camera_coord_.get_format()
-              );
-              
-              esp32_camera_utils::ImageProcessorConfig config;
-              config.camera_width = this->camera_coord_.get_width();
-              config.camera_height = this->camera_coord_.get_height();
-              // Determine format based on model input channels (Coordinator logic)
-              if (spec.input_channels == 1) {
-                  config.pixel_format = "GRAYSCALE";
-              } else {
-                  config.pixel_format = this->camera_coord_.get_format();
-              }
-              config.model_width = spec.input_width;
-              config.model_height = spec.input_height;
-              config.model_channels = spec.input_channels;
-              
-              // Fix: Pass rotation as-is to support "fine rotation" (software)
-              config.rotation = this->rotation_;
-              
-              config.input_type = static_cast<esp32_camera_utils::ImageProcessorInputType>(processor_input_type);
-              config.normalize = spec.normalize;
-              config.input_order = spec.input_order;
-              
-              this->esp32_camera_utils_->reinitialize_image_processor(config);
-         }
+          // After model loaded, we have input specs. Update CameraCoord.
+          auto spec = this->tflite_coord_.get_model_spec();
+          
+          // [MOVED] Sync Rotation FIRST
+          if (this->esp32_camera_utils_) {
+               this->rotation_ = this->esp32_camera_utils_->get_rotation();
+               ESP_LOGI(TAG, "Synced rotation from esp32_camera_utils: %.1f", this->rotation_);
+               this->camera_coord_.set_rotation(this->rotation_);
+          }
+          
+          // Pass preview setting to coordinator to enable caching if needed
+          this->camera_coord_.set_enable_preview(this->generate_preview_);
+          
+          // Use consolidated helper (replaces 4 copies of ImageProcessorConfig construction)
+          int processor_input_type = 1; // Float
+          if (spec.input_type == 0 || spec.input_type == kTfLiteUInt8) processor_input_type = 0;
+          this->refresh_image_processor_config(processor_input_type);
          
           // Setup Web Server Preview
           #ifdef USE_WEB_SERVER
@@ -1079,15 +1037,11 @@ void MeterReaderTFLite::set_generate_preview(bool generate) {
         ESP_LOGI(TAG, "Freed preview fallback buffer");
     }
     
-    // Refresh ImageProcessor config if model is loaded
+    // Refresh ImageProcessor config if model is loaded (uses consolidated helper)
     if (this->tflite_coord_.is_model_loaded()) {
          auto spec = this->tflite_coord_.get_model_spec();
-         // Recalculate input type
          int processor_input_type = (spec.input_type == 1) ? 0 : 1;
-         
-         this->camera_coord_.update_image_processor_config(
-             spec.input_width, spec.input_height, spec.input_channels,
-             processor_input_type, spec.normalize, spec.input_order);
+         this->refresh_image_processor_config(processor_input_type);
     }
 
     // Setup Mode Logic: Force light ON when preview is enabled
@@ -1305,6 +1259,44 @@ void MeterReaderTFLite::dump_config() {
 
 
 
+
+// Consolidated ImageProcessorConfig refresh — replaces 4+ copies of the same logic
+void MeterReaderTFLite::refresh_image_processor_config(int processor_input_type) {
+    auto spec = this->tflite_coord_.get_model_spec();
+    
+    // Update Camera Coordinator first
+    this->camera_coord_.update_image_processor_config(
+        spec.input_width, spec.input_height, spec.input_channels,
+        processor_input_type, spec.normalize, spec.input_order
+    );
+    
+    // Sync Utils if present
+    if (this->esp32_camera_utils_) {
+        this->esp32_camera_utils_->set_camera_image_format(
+            this->camera_coord_.get_width(),
+            this->camera_coord_.get_height(),
+            this->camera_coord_.get_format()
+        );
+        
+        esp32_camera_utils::ImageProcessorConfig config;
+        config.camera_width = this->camera_coord_.get_width();
+        config.camera_height = this->camera_coord_.get_height();
+        if (spec.input_channels == 1) {
+            config.pixel_format = "GRAYSCALE";
+        } else {
+            config.pixel_format = this->camera_coord_.get_format();
+        }
+        config.model_width = spec.input_width;
+        config.model_height = spec.input_height;
+        config.model_channels = spec.input_channels;
+        config.rotation = this->rotation_;
+        config.input_type = static_cast<esp32_camera_utils::ImageProcessorInputType>(processor_input_type);
+        config.normalize = spec.normalize;
+        config.input_order = spec.input_order;
+        
+        this->esp32_camera_utils_->reinitialize_image_processor(config);
+    }
+}
 
 } // namespace meter_reader_tflite
 } // namespace esphome
@@ -1622,43 +1614,10 @@ void MeterReaderTFLite::reload_resources() {
              return;
          }
          
-         // Update Camera Processor
+         // Use consolidated helper (replaces duplicated ImageProcessorConfig construction)
          auto spec = this->tflite_coord_.get_model_spec();
          int processor_input_type = (spec.input_type == 1) ? 0 : 1;
-         
-         // Update Camera Coordinator
-         this->camera_coord_.update_image_processor_config(
-             spec.input_width, 
-             spec.input_height, 
-             spec.input_channels,
-             processor_input_type,
-             spec.normalize,
-             spec.input_order
-         );
-         
-         // Sync Utils if present
-         if (this->esp32_camera_utils_) {
-              esp32_camera_utils::ImageProcessorConfig config;
-              config.camera_width = this->camera_coord_.get_width();
-              config.camera_height = this->camera_coord_.get_height();
-              
-              if (spec.input_channels == 1) {
-                  config.pixel_format = "GRAYSCALE";
-              } else {
-                  config.pixel_format = this->camera_coord_.get_format();
-              }
-              config.model_width = spec.input_width;
-              config.model_height = spec.input_height;
-              config.model_channels = spec.input_channels;
-              
-              config.rotation = this->esp32_camera_utils_->get_rotation();
-              
-              config.input_type = static_cast<esp32_camera_utils::ImageProcessorInputType>(processor_input_type);
-              config.normalize = spec.normalize;
-              config.input_order = spec.input_order;
-              
-              this->esp32_camera_utils_->reinitialize_image_processor(config);
-         }
+         this->refresh_image_processor_config(processor_input_type);
          
          // Resume processing
          this->pause_processing_.store(false);

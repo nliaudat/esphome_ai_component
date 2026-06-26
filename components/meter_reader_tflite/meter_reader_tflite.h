@@ -351,7 +351,12 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   // Helper
   void process_available_frame();
   void process_full_image(std::shared_ptr<camera::CameraImage> frame);
+  
+  // Refactored: Integer-based combination (avoids heap alloc from std::string)
   float combine_readings(const esphome::StaticVector<float, 16>& readings, std::string &out_str);
+  
+  // Consolidated: Replaces 4 copies of ImageProcessorConfig construction
+  void refresh_image_processor_config(int processor_input_type);
   bool validate_and_update_reading(float raw, float conf, float& val);
   bool validate_and_update_reading(const esphome::StaticVector<float, 16>& digits, const esphome::StaticVector<float, 16>& confidences, float& val);
 

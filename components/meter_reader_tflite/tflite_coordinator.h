@@ -9,8 +9,6 @@
 #include "esphome/components/esp32_camera_utils/image_processor.h"
 #include "esphome/components/tflite_micro_helper/model_handler.h"
 #include "esphome/components/tflite_micro_helper/memory_manager.h"
-#include "model_config.h"
-
 #include <memory>
 #include <string>
 #include <vector>
