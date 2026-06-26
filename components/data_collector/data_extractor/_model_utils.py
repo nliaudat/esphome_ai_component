@@ -17,14 +17,13 @@ from typing import Dict, List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 # Configuration Constants
-# Look for models/ in multiple locations (project root first, then local)
+# Look for models in multiple locations (project root and local data_extractor)
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent  # esphome_ai_component/
-_LOCAL_MODELS = Path("models").resolve()
-_MODELS_CANDIDATES = [
-    _PROJECT_ROOT / "models",          # esphome_ai_component/models/
-    _LOCAL_MODELS,                      # CWD/models/ (when run from data_extractor/)
-]
-MODELS_DIR = _MODELS_CANDIDATES[0] if _MODELS_CANDIDATES[0].exists() else _MODELS_CANDIDATES[1]
+MODELS_DIRS = [d for d in [
+    _PROJECT_ROOT / "models",                                      # main models/
+    Path(__file__).resolve().parent / "models",                    # data_extractor/models/
+] if d.exists()]
+MODELS_DIR = MODELS_DIRS[0] if MODELS_DIRS else _PROJECT_ROOT / "models"
 DEFAULT_REGIONS_FILE = Path("regions.json")
 DEFAULT_MODEL = "digit_recognizer_v23_10cls_RGB"
 DEFAULT_RESULT_IMAGE = Path("result.jpg")
@@ -152,22 +151,22 @@ def parse_model_txt_file(txt_path: Path) -> Optional[ModelConfig]:
     )
 
 
-def discover_models(models_dir: Path = MODELS_DIR) -> Dict[str, ModelConfig]:
-    """Discover all models by scanning for .txt files in models_dir."""
+def discover_models(models_dirs: Optional[List[Path]] = None) -> Dict[str, ModelConfig]:
+    """Discover all models by scanning for .txt files in models_dirs."""
+    if models_dirs is None:
+        models_dirs = MODELS_DIRS
     models: Dict[str, ModelConfig] = {}
-    if not models_dir.exists():
-        logger.warning(f"Models directory not found: {models_dir}")
-        return models
-
-    for txt_file in sorted(models_dir.glob("*.txt")):
-        name = txt_file.stem
-        config = parse_model_txt_file(txt_file)
-        if config:
-            models[name] = config
-            logger.info(f"Discovered model '{name}': {config.input_channels}ch {config.input_size} {config.input_type}")
-
+    for models_dir in models_dirs:
+        if not models_dir.exists():
+            continue
+        for txt_file in sorted(models_dir.glob("*.txt")):
+            name = txt_file.stem
+            config = parse_model_txt_file(txt_file)
+            if config:
+                models[name] = config
+                logger.info(f"Discovered model '{name}': {config.input_channels}ch {config.input_size} {config.input_type}")
     if not models:
-        logger.warning(f"No models discovered from .txt files in {models_dir}")
+        logger.warning(f"No models discovered from any directory")
     return models
 
 

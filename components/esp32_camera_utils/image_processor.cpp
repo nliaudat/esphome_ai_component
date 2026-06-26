@@ -49,9 +49,9 @@ class ScopedTimer {
 // Consolidate rotation normalization logic (replaces 5 copies of identical code)
 // Returns the best hardware-supported JPEG rotation and sets needs_software=true for fine angles.
 static jpeg_rotate_t normalize_rotation(float rotation, bool& needs_software) {
-  float rot = rotation;
-  while (rot < 0) rot += 360.0f;
-  while (rot >= 360.0f) rot -= 360.0f;
+  // fmodf is O(1) — safe even for extreme rotation values (while loops could iterate indefinitely)
+  float rot = fmodf(rotation, 360.0f);
+  if (rot < 0.0f) rot += 360.0f;
   needs_software = false;
   if (std::abs(rot) < 0.1f) return JPEG_ROTATE_0D;
   if (std::abs(rot - 90.0f) < 0.1f) return JPEG_ROTATE_90D;

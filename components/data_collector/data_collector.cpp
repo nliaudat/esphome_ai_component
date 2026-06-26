@@ -169,7 +169,15 @@ void DataCollector::upload_task(void *arg) {
             // Process upload
             collector->process_upload_sync(job.data, job.len, std::string(job.value), job.confidence, job.metadata);
             
-            // RAII destructor handles free(data) and free(metadata) when job goes out of scope
+            // Manual free required: xQueueReceive uses raw memcpy to overwrite job struct,
+            // bypassing C++ assignment operators and RAII. Previous iteration's pointers
+            // would be overwritten without freeing.
+            free(job.data);
+            job.data = nullptr;
+            if (job.metadata) {
+                free(job.metadata);
+                job.metadata = nullptr;
+            }
         }
     }
     vTaskDelete(nullptr);
@@ -190,11 +198,12 @@ DataCollector::~DataCollector() {
         this->upload_task_handle_ = nullptr;
     }
     
-    // Drain remaining queue items — RAII destructor frees data and metadata
+    // Drain remaining queue items — manual free required (xQueueReceive raw memcpy)
     if (this->upload_queue_) {
         UploadJob job;
         while (xQueueReceive(this->upload_queue_, &job, 0) == pdTRUE) {
-            // job destructor runs at end of scope
+            free(job.data);
+            if (job.metadata) free(job.metadata);
         }
         vQueueDelete(this->upload_queue_);
         this->upload_queue_ = nullptr;
