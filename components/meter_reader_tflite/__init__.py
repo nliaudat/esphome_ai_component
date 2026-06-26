@@ -157,6 +157,18 @@ def parse_model_txt_file(model_path):
         print(f"    Re-export the model with delegates disabled:")
         print(f"      converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS]")
     
+    # Detect output processing mode from SOFTMAX operator presence
+    # If the model has a built-in SOFTMAX → use 'direct_class' (output is already probabilities)
+    # If no SOFTMAX → apply C++ softmax on raw logits
+    # Pattern matches "SOFTMAX: N" in the Unique operator types section
+    has_softmax = bool(re.search(r'^\s+SOFTMAX:\s+\d+', content, re.MULTILINE))
+    if has_softmax:
+        config['output_processing'] = 'direct_class'
+        print(f"  Auto-detected output_processing: direct_class (model has built-in SOFTMAX)")
+    else:
+        config['output_processing'] = 'softmax'
+        print(f"  Auto-detected output_processing: softmax (model has raw logits, will apply softmax in C++)")
+
     # Detect hybrid quantization (float32 I/O + int8 weights) — incompatible with TFLite Micro
     # Pattern: float32 input but int8 weight/bias tensors present (pseudo_qconst / int8 weight tensors)
     input_dtype = config.get('input_type', '')
@@ -263,7 +275,16 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_INPUT_CHANNELS): cv.int_range(min=1, max=4),
     cv.Optional(CONF_INPUT_WIDTH): cv.int_range(min=8, max=512),
     cv.Optional(CONF_INPUT_HEIGHT): cv.int_range(min=8, max=512),
-    cv.Optional(CONF_OUTPUT_PROCESSING): cv.enum({'direct_class': 'direct_class', 'softmax': 'softmax', 'argmax': 'argmax'}, lower=True),
+    cv.Optional(CONF_OUTPUT_PROCESSING): cv.enum({
+        'direct_class': 'direct_class',
+        'softmax': 'softmax',
+        'logits': 'logits',
+        'qat_quantized': 'qat_quantized',
+        'experimental_scale': 'experimental_scale',
+        'logits_jomjol': 'logits_jomjol',
+        'softmax_jomjol': 'softmax_jomjol',
+        'auto_detect': 'auto_detect',
+    }, lower=True),
     cv.Optional(CONF_SCALE_FACTOR): cv.float_range(min=0.1, max=100.0),
     cv.Optional(CONF_INPUT_ORDER): cv.enum({'RGB': 'RGB', 'BGR': 'BGR', 'GRAY': 'GRAY'}, upper=True),
     cv.Optional(CONF_NORMALIZE): cv.boolean,
@@ -372,6 +393,13 @@ async def to_code(config):
     if CONF_INVERT in config:
         yaml_overrides['invert'] = config[CONF_INVERT]
     
+    # Detect double-softmax risk: user explicitly set output_processing='softmax'
+    # but the model already has a built-in SOFTMAX operator.
+    if yaml_overrides.get('output_processing') == 'softmax' and auto_config.get('output_processing') == 'direct_class':
+        print(f"  ⚠️  WARNING: output_processing overridden to 'softmax' but model has built-in SOFTMAX.")
+        print(f"      This will apply softmax TWICE (model + C++), producing incorrect confidence scores.")
+        print(f"      Recommended: remove output_processing from YAML, or set to 'direct_class'.")
+
     if yaml_overrides:
         print(f"  YAML overrides applied:")
         for k, v in yaml_overrides.items():
