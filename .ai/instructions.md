@@ -1093,6 +1093,53 @@ while (xQueueReceive(queue, &job, 0) == pdTRUE) {
 - **DO NOT** add "open questions" sections in code comments.
 - Keep review output focused on findings, fixes, and actionable recommendations only.
 
+### 12.14 Code Review Lessons (from PR#147–#152 fixes)
+
+These rules were derived from recurring bug patterns found across 8 fix commits. Each bug appeared in at least 2 PRs before being caught.
+
+#### Cross-Component Type Mappings
+- Use a **single conversion function** for cross-component enum mappings
+- **NEVER duplicate inverted mapping** across call sites (found in 3 places in `meter_reader_tflite.cpp`)
+- Use **named enum constants** (`kTfLiteFloat32`, `kInputTypeFloat32`) over raw integers (`0`/`1`) where both enums are accessible
+
+#### FreeRTOS / C++ Impedance
+- `xQueueReceive` uses **raw memcpy** — it bypasses C++ assignment operators and destructors
+- Struct passed through queues: mark with comment `// ESP32: xQueueReceive raw memcpy — manual free before next receive`
+- `vTaskDelete(nullptr)` does **NOT** unwind the stack — no destructors run
+- When a struct is declared **outside** a while loop, `free()` + nullify pointers between iterations
+- Destructor of queue-drain variable only fires for the **LAST** item received
+
+**Correct pattern:**
+```cpp
+UploadJob job;
+while (xQueueReceive(this->upload_queue_, &job, 0) == pdTRUE) {
+    collector->process_upload_sync(job.data, ...);
+    free(job.data); job.data = nullptr;
+    free(job.metadata); job.metadata = nullptr;
+}
+```
+
+#### Python Import Safety
+- **Directory paths at module level**: resolve relative to `__file__`, NOT `cwd`
+- **NEVER** filter directory lists by `exists()` at import time — directories may be created after import
+- Defer existence checks to a runtime `discover_models()` function, not to module load
+
+#### Dead Code Hygiene
+- When deleting a source file, search and remove ALL `#include` references across all files (not just the deleted file)
+- Pure-comment header files (like `model_config.h`) must be fully deleted, not left as placeholders
+
+#### Hot Path Optimization
+- **Prefer integer arithmetic** over `std::to_string()` + `strtol()` round-trips in `loop()`-called paths
+- Use pre-allocated scratch buffers (`std::vector` reserved in `setup()`) instead of per-frame `resize()`
+- Pre-allocate all column-sum and digit-bounds vectors in SSOCR `setup()`
+
+#### JPEG Decoder
+- `jpeg_dec_handle_t` is `void*` in ESP-IDF — use a custom deleter struct with `using pointer = jpeg_dec_handle_t;`
+- When decoding JPEG to a pre-allocated buffer, pass `output_buffer` directly — avoid temporary allocation + `memcpy`
+- Add `uint64_t` overflow check or guarded multiplication for `w * h * bpp` from JPEG header
+
+---
+
 ### 12.12 ESP32 Patterns vs Static Analysis Tools
 
 Automated code review tools (Gemini Code Assist, Greptile) regularly flag the
