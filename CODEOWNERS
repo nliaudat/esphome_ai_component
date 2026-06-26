@@ -1,0 +1,30 @@
+# ESPHome AI Component - Code Owners
+#
+# Each line defines a file pattern followed by one or more owners.
+# For more details see: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Primary components (Active)
+/components/meter_reader_tflite/   @nliaudat
+/components/value_validator/       @nliaudat
+/components/esp32_camera_utils/    @nliaudat
+/components/tflite_micro_helper/   @nliaudat
+/components/flash_light_controller/ @nliaudat
+/components/data_collector/        @nliaudat
+
+# Alpha components
+/components/ssocr_reader/          @nliaudat
+/components/analog_reader/         @nliaudat
+
+# Frozen/legacy (no new features)
+/components/legacy_meter_reader_tflite/ @nliaudat
+
+# Top-level configuration files
+/config*.yaml                      @nliaudat
+/*.yaml                            @nliaudat
+
+# Documentation
+/wiki/                             @nliaudat
+/README.md                         @nliaudat
+
+# Board configurations
+/boards/                           @nliaudat

@@ -43,6 +43,11 @@ bool TFLiteMicroHelper::load_model(const uint8_t *model_data, size_t model_size,
         return false;
     }
 
+    if (!this->model_handler_.verify_model_crc(model_data, model_size)) {
+        ESP_LOGE(TAG, "Model CRC32 verification failed");
+        return false;
+    }
+
     if (this->debug_) {
         ESP_LOGD(TAG, "Model loaded successfully. Arena used: %zu / %zu bytes", 
                  this->model_handler_.get_arena_used_bytes(), this->tensor_arena_allocation_.actual_size);

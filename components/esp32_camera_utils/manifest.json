@@ -1,0 +1,5 @@
+{
+  "name": "esp32_camera_utils",
+  "version": "2.0.0",
+  "build_system": "cmake"
+}
