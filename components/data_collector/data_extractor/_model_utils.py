@@ -24,7 +24,8 @@ MODELS_DIRS = [
     Path(__file__).resolve().parent / "models",                    # data_extractor/models/
 ]
 # discover_models() checks existence before scanning, so no static exists() filter here
-MODELS_DIR = MODELS_DIRS[0] if MODELS_DIRS[0].exists() else MODELS_DIRS[1]
+# Use next() with fallback to project root if neither dir exists
+MODELS_DIR = next((d for d in MODELS_DIRS if d.exists()), _PROJECT_ROOT / "models")
 DEFAULT_REGIONS_FILE = Path("regions.json")
 DEFAULT_MODEL = "digit_recognizer_v23_10cls_RGB"
 DEFAULT_RESULT_IMAGE = Path("result.jpg")
@@ -162,6 +163,10 @@ def discover_models(models_dirs: Optional[List[Path]] = None) -> Dict[str, Model
             continue
         for txt_file in sorted(models_dir.glob("*.txt")):
             name = txt_file.stem
+            # Skip duplicate names — project-root model wins (first dir has priority)
+            if name in models:
+                logger.info(f"Skipping duplicate model '{name}' in {models_dir} (already from earlier directory)")
+                continue
             config = parse_model_txt_file(txt_file)
             if config:
                 models[name] = config

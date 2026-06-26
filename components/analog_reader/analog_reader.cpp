@@ -15,11 +15,8 @@ namespace analog_reader {
 
 static const char *const TAG = "analog_reader";
 
-// Custom deleter for JPEG decoder handle (avoids void* to struct* conversion issues)
-struct JpegBufferDeleter {
-    using pointer = jpeg_dec_handle_t;
-    void operator()(jpeg_dec_handle_t h) const { if (h) jpeg_dec_close(h); }
-};
+// Use existing JpegDecoderDeleter from image_processor.h (avoids redundant local struct)
+using JpegDecoderDeleter = esphome::esp32_camera_utils::ImageProcessor::JpegDecoderDeleter;
 
 // Thin wrapper: decode JPEG directly into a pre-allocated buffer
 // Avoids the double allocation of ImageProcessor::decode_jpeg() + memcpy to persistent buffer.
@@ -36,8 +33,8 @@ static bool decode_jpeg_to_buffer(
     jpeg_dec_handle_t decoder_handle = nullptr;
     if (jpeg_dec_open(&decode_config, &decoder_handle) != JPEG_ERR_OK) return false;
 
-    // RAII: close decoder on scope exit (custom deleter handles void* handle type)
-    std::unique_ptr<struct jpeg_dec_s, JpegBufferDeleter> decoder(decoder_handle);
+    // RAII: close decoder on scope exit (deleter from shared image_processor.h)
+    std::unique_ptr<struct jpeg_dec_s, JpegDecoderDeleter> decoder(decoder_handle);
 
     jpeg_dec_io_t io = {};
     io.inbuf = const_cast<uint8_t*>(data);
@@ -54,7 +51,8 @@ static bool decode_jpeg_to_buffer(
 
     const size_t bpp = (output_format == JPEG_PIXEL_FORMAT_GRAY) ? 1 : 3;
     // Guarded multiplication to prevent overflow on 32-bit ESP32
-    if (header_info.width == 0 || static_cast<size_t>(header_info.height) > SIZE_MAX / static_cast<size_t>(header_info.width))
+    if (header_info.width == 0 || header_info.height == 0 ||
+        static_cast<size_t>(header_info.height) > SIZE_MAX / static_cast<size_t>(header_info.width))
         return false;
     const size_t pixels = static_cast<size_t>(header_info.width) * static_cast<size_t>(header_info.height);
     if (pixels > SIZE_MAX / bpp) return false;
