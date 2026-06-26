@@ -241,8 +241,8 @@ void MeterReaderTFLite::setup() {
           this->camera_coord_.set_enable_preview(this->generate_preview_);
           
           // Use consolidated helper (replaces 4 copies of ImageProcessorConfig construction)
-          int processor_input_type = 1; // Float
-          if (spec.input_type == 0 || spec.input_type == kTfLiteUInt8) processor_input_type = 0;
+          // Map: spec.input_type 1=FLOAT → 0=FLOAT, 0=UINT8 → 1=UINT8 (ImageProcessorInputType)
+          int processor_input_type = (spec.input_type == 1) ? 0 : 1;
           this->refresh_image_processor_config(processor_input_type);
          
           // Setup Web Server Preview
