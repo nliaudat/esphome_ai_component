@@ -29,12 +29,15 @@ void SSOCRReader::setup() {
   int effective_crop_w = (this->crop_w_ > 0) ? this->crop_w_ : this->img_width_ - this->crop_x_;
   int effective_crop_h = (this->crop_h_ > 0) ? this->crop_h_ : this->img_height_ - this->crop_y_;
   
-  this->camera_coord_.update_image_processor_config(
-      effective_crop_w, effective_crop_h, 1, 
-      1, // Input Type: Uint8
-      true, // Normalize
-      "NHWC"
-  );
+   this->camera_coord_.update_image_processor_config(
+       effective_crop_w, effective_crop_h, 1, 
+       1, // Input Type: Uint8
+       true, // Normalize
+       "NHWC"
+   );
+   
+   // Pre-allocate column sums to max possible width (avoids heap alloc in loop())
+   this->col_sums_.resize(this->img_width_);
 }
 
 void SSOCRReader::dump_config() {
@@ -209,14 +212,14 @@ void SSOCRReader::process_image(std::shared_ptr<esphome::camera::CameraImage> im
 
 int SSOCRReader::recognize_digit(const uint8_t* img, int w, int h, int stride) {
     struct Pt { float x; float y; };
-    Pt segments[7] = {
-        {0.50, 0.15}, // A: Top
-        {0.80, 0.30}, // B: Top Right
-        {0.80, 0.70}, // C: Bot Right
-        {0.50, 0.85}, // D: Bot
-        {0.20, 0.70}, // E: Bot Left
-        {0.20, 0.30}, // F: Top Left
-        {0.50, 0.50}  // G: Middle
+    static const Pt segments[7] = {
+        {0.50f, 0.15f}, // A: Top
+        {0.80f, 0.30f}, // B: Top Right
+        {0.80f, 0.70f}, // C: Bot Right
+        {0.50f, 0.85f}, // D: Bot
+        {0.20f, 0.70f}, // E: Bot Left
+        {0.20f, 0.30f}, // F: Top Left
+        {0.50f, 0.50f}  // G: Middle
     };
     
     const uint8_t digit_map[10] = {63, 6, 91, 79, 102, 109, 125, 7, 127, 111};
