@@ -1,0 +1,464 @@
+# =============================================================================
+# ESPHome AI Component — Token-Optimized Rule Database (v1.1)
+# =============================================================================
+# Source: .ai/instructions.md (SINGLE SOURCE OF TRUTH — full text)
+# This file is a DERIVED ARTIFACT — regenerate when .ai/instructions.md changes.
+# It enables token-efficient AI queries and automated rule checking.
+# For context/examples, fall back to .ai/instructions.md.
+# =============================================================================
+
+version: "1.1"
+source: ".ai/instructions.md"
+
+# =============================================================================
+# §1 PROJECT OVERVIEW
+# =============================================================================
+project:
+  repo: "https://github.com/nliaudat/esphome_ai_component"
+  license: "Apache 2.0 OR MIT (dual license)"
+  target_boards: ["ESP32", "ESP32-S2", "ESP32-S3", "ESP32-C3"]
+  esphome_version: "2026.1.0+ (C++20, ESP-IDF 5.5.2)"
+  note: "SINGLE SOURCE OF TRUTH for all code reviews. Generic C++ advice OVERRIDDEN."
+
+# =============================================================================
+# §2 COMPONENT ARCHITECTURE
+# =============================================================================
+components:
+  meter_reader_tflite:
+    status: active
+    version: "2.0+"
+    description: "AI PRIMARY — Digit recognition with TFLite"
+    depends: [tflite_micro_helper, esp32_camera_utils]
+    optional: [value_validator, flash_light_controller, data_collector]
+  ssocr_reader:
+    status: alpha
+    description: "NO AI — Seven-segment OCR"
+    depends: [esp32_camera_utils]
+    optional: [value_validator]
+  analog_reader:
+    status: alpha
+    description: "NO AI — Analog dial/gauge"
+    depends: [esp32_camera_utils]
+    optional: [value_validator]
+  value_validator:
+    status: active
+    description: "SHARED — Reading validation engine"
+    used_by: [meter_reader_tflite, ssocr_reader, analog_reader]
+  esp32_camera_utils:
+    status: active
+    description: "SHARED — Image processing core"
+    used_by: [All reader components]
+  tflite_micro_helper:
+    status: active
+    description: "SHARED — TFLite runtime wrapper"
+    used_by: [meter_reader_tflite]
+  flash_light_controller:
+    status: active
+    description: "SHARED — Illumination timing"
+  data_collector:
+    status: active
+    description: "OPTIONAL — Active learning uploader"
+    depends: [HTTP client]
+  legacy_meter_reader_tflite:
+    status: frozen
+    description: "FROZEN — No new features, EXCLUDED from review per §12.4"
+    note: "Use meter_reader_tflite instead"
+
+# =============================================================================
+# §3.1 UNIVERSAL RULES (ALL Components)
+# =============================================================================
+universal:
+  required:
+    - "Every component MUST have YAML test for ESP32 + ESP32-S3"
+    - "All cg.add_define() mirrored in esphome/core/defines.h"
+    - "Config schemas MUST bounds-check user values"
+    - "Config schemas MUST provide sensible defaults"
+    - "Config errors MUST use cv.Invalid"
+    - "All code MUST compile on ESP-IDF (no Arduino-only APIs)"
+    - "Camera consumers MUST check PSRAM availability"
+    - "ESP-NN features guarded with #ifdef ESP_NN"
+  blockers:
+    - "No C-style casts — use static_cast<>"
+    - "No #define for constants — use constexpr/enum"
+    - "No missing this-> on class member access"
+    - "No std::regex on ESP32"
+    - "No delay() in loop() — use set_timeout()/defer()"
+    - "No strcpy/strcat/sprintf — use snprintf/string"
+    - "No manual new/delete — use RAII (unique_ptr)"
+    - "No blocking network in main thread"
+    - "No heap allocation during loop()"
+    - "No stack allocations >1KB"
+    - "No integer overflow in pointer arithmetic — check field_length > (end - ptr)"
+    - "No TOCTOU — use single atomic state machine"
+    - "No format string — ESP_LOGD('tag', '%s', input)"
+
+# =============================================================================
+# §3.2 TFLITE CONSUMER RULES
+# =============================================================================
+tflite_consumer:
+  detection: ["includes tensorflow/lite/* headers", "depends on tflite_micro_helper", "uses TfLiteTensor or MicroInterpreter"]
+  required:
+    - "Tensor arena user-configurable: 512KB (ESP32), 768KB (ESP32-S3)"
+    - "PSRAM-aware arena via MemoryManager::allocate_tensor_arena() using heap_caps_aligned_alloc()"
+    - "RAII arena: std::unique_ptr<uint8_t[], HeapCapsDeleter> with heap_caps_free() deleter"
+    - "Model CRC32 verification on every model load"
+    - "Operator registration via X-Macro pattern in tflm_operators.h"
+    - "MAX_OPERATORS configurable (default 30, override -DMAX_OPERATORS=N)"
+    - "ALL TFLite headers guarded by #ifdef USE_TFLITE_MICRO_HELPER"
+    - "Model dimensions from TfLiteTensor::dims at runtime — NEVER hardcode"
+    - "process_output() handles BOTH const float* and TfLiteTensor* overloads"
+    - "Grayscale optimization only when dims->data[3] == 1"
+    - "__init__.py pins esp-tflite-micro + esp-nn versions + build flags"
+    - "Debug logging guarded by #ifdef DEBUG_TFLITE_MICRO_HELPER"
+    - "Confidence scores exposed to Home Assistant"
+  warnings:
+    - "PSRAM path does NOT fall back to SRAM"
+    - "heap_caps_aligned_alloc(16, ...) required — do not change"
+    - "Rotation affects inference only, not web stream"
+    - "Large models (>1MB) may fail on classic ESP32"
+    - "Calibration timing constants in ONE place — not duplicated"
+    - "Camera recovery after N≥3 frame timeouts, esp_restart() after 5+"
+  blockers:
+    - "No stack-allocated tensor arena"
+    - "No hardcoded model input dimensions"
+    - "No synchronous HTTP in inference path"
+    - "No memory allocation during loop() after setup()"
+    - "No Arduino-only APIs"
+    - "No new/delete — use heap_caps_aligned_alloc/unique_ptr"
+    - "No assumption PSRAM exists — check has_psram()"
+    - "No DELEGATE operator in models"
+
+# =============================================================================
+# §3.3 CAMERA CONSUMER RULES
+# =============================================================================
+camera_consumer:
+  detection: ["depends on esp32_camera_utils", "depends on esp32_camera", "uses esp_camera_fb_get() or TrackedBuffer"]
+  required:
+    - "TrackedBuffer pattern for JPEG memory management"
+    - "Support JPEG and RAW (RGB565/GRAYSCALE) formats"
+    - "Rotation works on both JPEG and RAW"
+    - "Crop/scaling operations bounds-checked"
+    - "Buffer lifetime documented"
+    - "Camera windowing works with OV2640/OV3660"
+    - "Preview web handler available when USE_WEB_SERVER defined"
+  blockers:
+    - "NO JPEG decoding in interrupt context"
+    - "NO memory leaks in any code path"
+    - "NO direct esp_camera_fb_get() — ALWAYS wrap in TrackedBuffer"
+    - "NO assumption PSRAM available"
+
+# =============================================================================
+# §3.4 NETWORK CONSUMER RULES
+# =============================================================================
+network_consumer:
+  detection: ["uses HTTP client", "uses defer() for network", "uses set_timeout() for network"]
+  required:
+    - "HTTP upload MUST have timeout (default 5s)"
+    - "Configurable API key/authentication"
+    - "NON-BLOCKING operation — defer() or set_timeout()"
+    - "Rate limiting (max 1 per minute)"
+  blockers:
+    - "NO infinite retry loops"
+    - "NO blocking on network in main thread"
+    - "NO silent failures — log upload errors"
+
+# =============================================================================
+# §3.5 SENSOR CONSUMER RULES
+# =============================================================================
+sensor_consumer:
+  detection: ["publishes readings", "extends sensor::Sensor", "exposes state to Home Assistant"]
+  required:
+    - "Configurable validation parameters (max_absolute_diff, max_rate_change)"
+    - "Maintain reading history for outlier detection"
+    - "Expose validation state + confidence to HA entities"
+    - "String-based readings for digital displays"
+  warnings:
+    - "History size bounded (default: 10)"
+    - "Rate limiting on invalid readings"
+
+# =============================================================================
+# §3.6 COMPONENT-SPECIFIC OVERRIDES
+# =============================================================================
+overrides:
+  meter_reader_tflite:
+    - "Inference result processing NOT duplicated across sync/async — single publish_inference_result()"
+    - "Grayscale via runtime 1-channel detection"
+    - "Camera recovery — see TFLite Consumer Rules"
+  esp32_camera_utils:
+    - "Rotation applies to inference only, not web stream"
+
+# =============================================================================
+# §4 PERFORMANCE TARGETS
+# =============================================================================
+performance:
+  targets:
+    - board: esp32-s3
+      pipeline_ms: 270
+      arena_max_kb: 1024
+      flash_budget_mb: 2
+    - board: esp32
+      pipeline_ms: 2700
+      arena_max_kb: 512
+      flash_budget_mb: 1.5
+    - board: esp32-c3
+      pipeline_ms: 500
+      arena_max_kb: 512
+      flash_budget_mb: 1.5
+    - board: esp8266
+      pipeline_ms: null
+      note: "Not recommended"
+  optimization:
+    always:
+      - "Use int8 quantized models (NOT float32)"
+      - "Enable ESP-NN (-DESP_NN=1)"
+      - "Calculate tensor_arena_size from model metadata"
+      - "Profile on BOTH ESP32 and ESP32-S3 before merging"
+    avoid:
+      - "Dynamic allocations in loop()"
+      - "Large stack allocations (>1KB)"
+      - "Virtual functions in hot paths"
+      - "Floating point in pixel loops"
+    never:
+      - "std::regex on ESP32"
+      - "Full JSON parsing in hot path"
+      - "Synchronous network during inference"
+
+# =============================================================================
+# §5 MEMORY MANAGEMENT
+# =============================================================================
+memory:
+  camera_pipeline:
+    stages: ["Camera Framebuffer (PSRAM)", "JPEG Buffer (TrackedBuffer)", "Decoding Buffer (heap)", "Preprocessed Image (arena)"]
+    rules:
+      - "Camera framebuffer managed by esp32_camera component"
+      - "JPEG buffers MUST use TrackedBuffer"
+      - "NEVER hold camera framebuffer longer than necessary"
+      - "PSRAM may be absent — always check"
+  arena:
+    ok: "auto arena = std::make_unique<uint8_t[]>(size);"
+    bad: "uint8_t* arena = new uint8_t[size];"
+    bad_stack: "uint8_t arena[512*1024];  // stack overflow risk"
+    rules:
+      - "Configurable via YAML/codegen, RAII via unique_ptr"
+      - "Sized from model metadata"
+  heap_fragmentation:
+    do: ["Allocate everything in setup()", "Use std::array or StaticVector for fixed-size collections"]
+    do_not: ["new/delete in loop()", "std::string for temporary paths in hot loops"]
+
+# =============================================================================
+# §6 CONFIGURATION SCHEMA PATTERNS
+# =============================================================================
+schema:
+  good:
+    - "cv.Optional(CONF_THRESHOLD, default=0.85): cv.percentage"
+    - "cv.Optional(CONF_DIGITS, default=8): cv.int_range(min=1, max=12)"
+    - "cv.Optional(CONF_ROTATION, default='0'): cv.one_of('0','90','180','270')"
+  bad:
+    - "cv.Optional(CONF_THRESHOLD, default=85): cv.int_  # 85 what?"
+  available: ["cv.string_strict", "cv.Length", "cv.Range", "cv.int_range", "cv.float_range", "cv.boolean", "cv.one_of", "cv.enum", "cv.file_", "cv.percentage"]
+  not_available: ["cv.Regex (does NOT exist)"]
+  notes:
+    - "Raise cv.Invalid: (_ for _ in ()).throw(cv.Invalid('...'))"
+    - "Do NOT return cv.Invalid — it must be raised"
+    - "Prefer cv.All() over custom lambdas"
+
+# =============================================================================
+# §7 C++ STANDARDS & STYLE
+# =============================================================================
+cpp:
+  version: "C++20 (gnu++20) allowed and expected"
+  allowed_features: ["std::span", "std::bit_cast", "consteval", "constinit", "designated initializers", "[[likely]]/[[unlikely]]"]
+  this_ref: "MANDATORY — Prefix ALL class member access with this->"
+  visibility: "Prefer protected (extensibility first). Private only for pointer lifetime safety, invariant coupling, resource management."
+  constexpr:
+    rule: "constexpr/enum over #define for constants"
+    ok: "static constexpr int MAX_RETRIES = 5;"
+    bad: "#define MAX_RETRIES 5"
+    exceptions: ["Conditional compilation (#ifdef)", "Compile-time sizes from Python codegen"]
+  macro_guarding:
+    - "Define macro in __init__.py to_code(), conditioned on YAML option"
+    - "Guard C++ code with #ifdef MACRO_NAME"
+    - "Macro naming: USE_ for features, DEBUG_ for debug, CONFIG_ for sdkconfig"
+    - "Never hardcode #define in header that bypasses YAML control"
+    - "Never use #if 0 / #if 1 for feature toggles"
+  naming:
+    class: "UpperCamelCase"
+    function: "lower_snake_case"
+    variable: "lower_snake_case"
+    constant: "UPPER_SNAKE_CASE"
+    field: "lower_snake_case_ (trailing underscore)"
+  formatting: "2-space indent, 120 char max, Google-style braces"
+
+# =============================================================================
+# §8 SECURITY & THREAD SAFETY
+# =============================================================================
+security:
+  overflow:
+    bad: "if (ptr + field_length > end) { return; }  // can overflow"
+    ok: "if (field_length > (end - ptr) || ptr + field_length > end) { return; }"
+    buf_mul:
+      ok: "if (h > SIZE_MAX/w) return; pixels = w*h; if (pixels > SIZE_MAX/bpp) return;"
+      bad: "size_t size = w * h * bpp;  // 32-bit overflow"
+    note: "AUDIT pointer arithmetic AND size multiplication from external data"
+  buffer:
+    never: ["strcpy()", "strcat()", "sprintf()", "memcpy() without bounds check"]
+    ok: ["snprintf()", "std::string"]
+  format_string:
+    bad: "ESP_LOGD('tag', user_input);"
+    ok: "ESP_LOGD('tag', '%s', user_input);"
+  thread_safety:
+    - "Shared state MUST use std::mutex + std::lock_guard"
+    - "No TOCTOU — single atomic state machine"
+    - "No double-checked locking without proper barriers"
+
+# =============================================================================
+# §9 TESTING REQUIREMENTS
+# =============================================================================
+testing:
+  yaml_tests:
+    - "Every component: tests/components/<name>/esp32.yaml + esp32-s3.yaml"
+    - "Test minimal + full-feature configs"
+    - "Test with and without optional dependencies"
+  static_analysis:
+    - "clang-tidy for C++"
+    - "ruff + black for Python"
+  runtime:
+    - "Profile heap usage before/after changes"
+    - "Monitor fragmentation over 24+ hours"
+    - "Measure inference time; regression >10% requires justification"
+
+# =============================================================================
+# §10 ANTI-PATTERNS (ok/bad examples)
+# =============================================================================
+anti_patterns:
+  - id: AP-DIRECT-CAMERA
+    bad: "framebuffer_t* fb = esp_camera_fb_get(); process(fb->buf, fb->len); esp_camera_fb_return(fb);"
+    ok: "auto buffer = this->camera_utils_->get_jpeg_buffer(); if (buffer) { process(buffer->data, buffer->len); }  // auto-freed"
+  - id: AP-BLOCKING
+    bad: "void loop() { http_client.POST(url, data); }"
+    ok: "void loop() { if (this->should_upload_) { this->defer([this]() { http_client.POST(...); }); } }"
+  - id: AP-MEMORY
+    bad: "uint8_t* arena = new uint8_t[512*1024]; delete[] arena;"
+    ok: "auto arena = std::make_unique<uint8_t[]>(512*1024);"
+  - id: AP-CAST
+    bad: "int x = (int)float_value;"
+    ok: "int x = static_cast<int>(float_value);"
+  - id: AP-DEFINE
+    bad: "#define TENSOR_ARENA_SIZE (512 * 1024)"
+    ok: "static constexpr size_t TENSOR_ARENA_SIZE = 512 * 1024;"
+  - id: AP-THIS
+    bad: "void set_value(int val) { value_ = val; update(); }"
+    ok: "void set_value(int val) { this->value_ = val; this->update(); }"
+  - id: AP-REGEX
+    bad: "std::regex re('^[0-9]+$');"
+    ok: "str.find_first_not_of('0123456789') == std::string::npos"
+  - id: AP-MAGIC
+    bad: "if (confidence > 0.85) { ... }  // why 0.85?"
+    ok: "static constexpr float CONFIDENCE_THRESHOLD = 0.85;"
+  - id: AP-QUEUE-FREE
+    bad: "UploadJob job; while(xQueueReceive(q,&job,0)) { }  // RAII skipped by memcpy"
+    ok: "UploadJob job; while(xQueueReceive(q,&job,0)) { process(job.data); free(job.data); job.data=nullptr; }"
+
+# =============================================================================
+# §11 REVIEW PRIORITIES
+# =============================================================================
+review:
+  blocker:
+    - "Memory leaks / buffer overflows"
+    - "C-style casts / #define constants / missing this->"
+    - "TOCTOU / blocking in loop / format string"
+    - "Camera: bypassing TrackedBuffer"
+    - "Integer overflow (CVE-2026-23833)"
+  warning:
+    - "Performance regression >10% on S3"
+    - "Missing config validation bounds"
+    - "Heap alloc in loop() / large stack allocs"
+    - "Magic numbers (should be named constants)"
+  info:
+    - "Const correctness / naming / dead code / include-what-you-use"
+
+# =============================================================================
+# §12 AI-SPECIFIC INSTRUCTIONS
+# =============================================================================
+ai_instructions:
+  mandatory_pre_read:
+    - "BEFORE any analysis: read this entire YAML"
+    - "BEFORE any suggestion: check no rule violation"
+  license: "Apache 2.0 OR MIT — no copyleft dependencies without discussion"
+  cpp_version: "C++20 allowed — do NOT flag as 'too modern'"
+  component_roles:
+    - "Determine role by reading __init__.py + .h includes"
+    - "Apply ALL matching role categories from §3.1-3.6"
+    - "This applies to ALL components — no exceptions"
+  dual_target:
+    - "ESP32-S3: optimize for SPEED (<270ms)"
+    - "ESP32: optimize for MEMORY (512KB arena)"
+  anti_pattern_detection:
+    - "C-style casts → static_cast<>"
+    - "#define → constexpr"
+    - "Missing this-> → add it"
+    - "delay() in loop → set_timeout()"
+    - "std::regex → string operations"
+  config_validation:
+    - "Values MUST be bounds-checked with sensible defaults"
+    - "Errors via cv.Invalid (must be RAISED, not returned)"
+    - "Use cv.All() over custom lambdas where possible"
+  when_uncertain:
+    - "STATE the specific rule being considered"
+    - "ASK user to confirm"
+    - "REFERENCE section number"
+  no_unauthorized_commits:
+    - "NEVER commit without explicit human approval"
+    - "Present as proposals first"
+  communication: "No 'open questions' in code comments. Output only findings and fixes."
+
+# =============================================================================
+# §12.12 ESP32 PATTERNS (static analysis false positives — do NOT flag)
+# =============================================================================
+esp32_suppress:
+  - id: SUP-QUEUE-FREE
+    pattern: "xQueueReceive + owned pointers: manual free+nullify outside while()"
+    reason: "xQueueReceive raw memcpy bypasses C++ RAII"
+  - id: SUP-JPEG-DELETER
+    pattern: "jpeg_dec_handle_t custom deleter with using pointer ="
+    reason: "ESP-IDF handle type is void*, requires custom deleter struct"
+  - id: SUP-FMODF
+    pattern: "fmodf(angle, 360.0f) for angle normalization"
+    reason: "while(rot<0) rot+=360 loops O(n), watchdog risk"
+  - id: SUP-MODEL-DIRS
+    pattern: "Static MODELS_DIRS list without exists() filter"
+    reason: "discover_models() checks existence per-scan; dirs may be created late"
+  - id: SUP-TYPE-CAST
+    pattern: "Raw int (0/1) for type mapping where enum values unavailable"
+    reason: "Named constants preferred but raw int valid when enums differ across components"
+  - id: SUP-VALIDATE-GATE
+    pattern: "max_consecutive_rejections gating when smart_validation disabled"
+    reason: "Allows rollovers 99999→00001 while rejecting single glitches"
+  - id: SUP-BUF-MULTIPLY
+    pattern: "Guarded multiplication: if (h > SIZE_MAX/w) return"
+    reason: "32-bit ESP32 overflow risk; correct 3-line guard pattern"
+
+# =============================================================================
+# §12.13 PONYTAIL — Lazy Senior Developer Mode
+# =============================================================================
+ponytail:
+  decision_ladder:
+    - "1. YAGNI — Does this need to be built at all?"
+    - "2. std lib — Does the standard library already do this?"
+    - "3. Platform — Does a native platform feature cover it?"
+    - "4. Existing dep — Does an already-installed dependency solve it?"
+    - "5. One line — Can this be one line? Make it one line."
+    - "6. Write the minimum code that works."
+  rules:
+    - "No abstractions not explicitly requested"
+    - "No new dependency if avoidable"
+    - "No boilerplate nobody asked for"
+    - "Deletion over addition. Boring over clever. Fewest files."
+    - "Mark intentional simplifications with ponytail: comment"
+  not_lazy_about:
+    - "Input validation at trust boundaries"
+    - "Error handling that prevents data loss"
+    - "Security, accessibility"
+    - "Calibration real hardware needs"
+    - "Anything explicitly requested"
+  testing: "Non-trivial logic: one assert-based demo or one small test file. No frameworks, no fixtures."

@@ -6,6 +6,9 @@
 **Target Boards:** ESP32, ESP32-S2, ESP32-S3 (optimized), ESP32-C3, ESP8266 (limited)  
 **ESPHome Version:** 2026.1.0+ (C++20, ESP-IDF 5.5.2)  
 
+**⚠️ When this file changes, `.ai/instructions.yaml` MUST be regenerated.**  
+The YAML file is the token-optimized machine-readable derivative used by `.clinerules/` and `.greptile/`.  
+
 ---
 
 ## 📋 TABLE OF CONTENTS
@@ -646,7 +649,7 @@ if (ptr + field_length > end) {  // Can overflow!
 }
 ```
 
-**✅ SAFE:**
+**✅ SAFE — pointer arithmetic:**
 ```cpp
 // Check overflow first, then bounds
 if (field_length > (end - ptr) || ptr + field_length > end) {
@@ -654,7 +657,19 @@ if (field_length > (end - ptr) || ptr + field_length > end) {
 }
 ```
 
-**AUDIT EVERY INSTANCE of pointer arithmetic in bounds checks.**
+**✅ SAFE — buffer size calculations (JPEG headers, camera frames):**
+```cpp
+// Guarded multiplication on 32-bit ESP32 (SIZE_MAX = 4GB)
+if (w == 0 || h > SIZE_MAX / static_cast<size_t>(w)) return false;
+const size_t pixels = static_cast<size_t>(w) * static_cast<size_t>(h);
+if (pixels > SIZE_MAX / bpp) return false;
+const size_t required = pixels * bpp;
+```
+
+Use this pattern for ALL buffer size calculations derived from external data
+(JPEG headers, user config, camera frame dimensions).
+
+**AUDIT EVERY INSTANCE of pointer arithmetic and size multiplication in bounds checks.**
 
 ### 8.2 Buffer Overflows
 
@@ -1021,6 +1036,22 @@ No component is excluded from review. All code must be compliant.
 - No `new` without matching `delete` (RAII instead)
 - No `memcpy` without bounds checking
 
+**⚠️ ESP32/FreeRTOS exception — `xQueueReceive` + owned pointers:**
+`xQueueReceive` performs raw `memcpy` into the destination, bypassing C++
+assignment operators and RAII destructors. The job struct MUST be declared
+OUTSIDE the while loop, and pointers MUST be manually freed + nullified
+BEFORE the next receive. This is CORRECT on ESP32 — do NOT change it.
+
+```cpp
+// CORRECT on ESP32: job outside loop, manual free + nullify
+UploadJob job;
+while (xQueueReceive(queue, &job, 0) == pdTRUE) {
+    process(job.data);
+    free(job.data);  job.data = nullptr;
+    free(job.metadata);  job.metadata = nullptr;
+}
+```
+
 ### 12.7 Anti-Pattern Detection
 
 **Immediately flag:**
@@ -1062,7 +1093,27 @@ No component is excluded from review. All code must be compliant.
 - **DO NOT** add "open questions" sections in code comments.
 - Keep review output focused on findings, fixes, and actionable recommendations only.
 
-### 12.12 PonyTail — Lazy Senior Developer Mode
+### 12.12 ESP32 Patterns vs Static Analysis Tools
+
+Automated code review tools (Gemini Code Assist, Greptile) regularly flag the
+following ESP32/FreeRTOS patterns as defects. They are CORRECT on this platform.
+
+**Do NOT change these patterns when flagged by static analysis:**
+
+1. **`xQueueReceive` + owned pointers** — See §12.6. Manual free + nullify is correct.
+2. **JPEG decoder handle deleter** — Use a custom deleter struct with
+   `using pointer = jpeg_dec_handle_t;` — NOT a raw function pointer type.
+   (In ESP-IDF, `jpeg_dec_handle_t` is `void*`.)
+3. **Angle normalization** — Use `fmodf(angle, 360.0f); if (rot < 0) rot += 360.0f;`
+   Never use `while` loops for angle wrapping (O(n), watchdog risk with extreme).
+4. **Python model discovery at module load** — Use a static list of directory
+   paths (without `exists()` filter). `discover_models()` checks per-scan.
+5. **Type mapping constants** — Use named enum values where available
+   (`kTfLiteFloat32`, `kInputTypeFloat32`) instead of raw integers.
+6. **Disabled validation gate** — When `enable_smart_validation` is `false`,
+   use `max_consecutive_rejections` gating, NOT unconditional acceptance.
+
+### 12.13 PonyTail — Lazy Senior Developer Mode
 
 Lazy means efficient, not careless. The best code is the code never written.
 
@@ -1109,5 +1160,8 @@ Lazy means efficient, not careless. The best code is the code never written.
 **END OF AI COLLABORATION GUIDE**
 
 *This document is the authoritative standard for the esphome_ai_component repository.*
-*Last updated: April 2026*
+*Last updated: June 2026*
+
+**⚠️ Maintenance:** When editing this file, also sync `.ai/instructions.yaml` 
+(token-optimized derivative for `.clinerules/` and `.greptile/` consumption).
 ```
