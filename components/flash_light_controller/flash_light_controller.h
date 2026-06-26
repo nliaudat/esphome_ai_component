@@ -15,7 +15,7 @@ namespace flash_light_controller {
 class FlashLightController : public Component {
  public:
   void setup() override;
-  void set_flash_light(light::LightState *flash_light);
+  void set_flash_light(light::LightState *flash_light) { this->flash_light_ = flash_light; }
   void set_flash_pre_time(uint32_t pre_time) { this->flash_pre_time_ = pre_time; }
   void set_flash_post_time(uint32_t post_time) { this->flash_post_time_ = post_time; }
   uint32_t get_flash_pre_time() const { return this->flash_pre_time_; }

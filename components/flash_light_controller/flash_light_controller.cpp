@@ -7,6 +7,7 @@ namespace flash_light_controller {
 static const char *const TAG = "flash_light_controller";
 
 void FlashLightController::setup() {
+    this->is_active_ = false;
     ESP_LOGCONFIG(TAG, "Setting up Flash Light Controller...");
     if (this->flash_light_) {
         ESP_LOGCONFIG(TAG, "  Flash Light: Configured");
@@ -15,10 +16,6 @@ void FlashLightController::setup() {
     } else {
         ESP_LOGCONFIG(TAG, "  Flash Light: Not configured");
     }
-}
-
-void FlashLightController::set_flash_light(light::LightState *flash_light) {
-    this->flash_light_ = flash_light;
 }
 
 void FlashLightController::initiate_capture_sequence(CaptureCallback callback) {
@@ -34,32 +31,20 @@ void FlashLightController::initiate_capture_sequence(CaptureCallback callback) {
     }
 
     this->is_active_ = true;
-    if (this->debug_) {
-        ESP_LOGD(TAG, "Starting flash sequence (Pre: %u ms, Post: %u ms)", this->flash_pre_time_, this->flash_post_time_);
-    } else {
-        ESP_LOGD(TAG, "Starting flash sequence");
-    }
+    ESP_LOGD(TAG, "Starting flash sequence (Pre: %u ms, Post: %u ms)", this->flash_pre_time_, this->flash_post_time_);
 
     this->enable_flash();
 
     // Schedule callback after pre-time
     this->set_timeout(this->flash_pre_time_, [this, callback]() {
-        if (this->debug_) {
-            ESP_LOGD(TAG, "Flash warmup complete (%u ms elapsed), executing capture callback", this->flash_pre_time_);
-        } else {
-            ESP_LOGD(TAG, "Flash warmup complete, executing capture callback");
-        }
+        ESP_LOGD(TAG, "Flash warmup complete (%u ms elapsed), executing capture callback", this->flash_pre_time_);
         if (callback) callback();
 
         // Schedule flash off after post-time (relative to now)
         this->set_timeout(this->flash_post_time_, [this]() {
             this->disable_flash();
             this->is_active_ = false;
-            if (this->debug_) {
-                ESP_LOGD(TAG, "Flash sequence complete (Post-time %u ms finished)", this->flash_post_time_);
-            } else {
-                ESP_LOGD(TAG, "Flash sequence complete");
-            }
+            ESP_LOGD(TAG, "Flash sequence complete (Post-time %u ms finished)", this->flash_post_time_);
         });
     });
 }
