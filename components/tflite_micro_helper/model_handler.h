@@ -122,7 +122,8 @@ class ModelHandler {
   bool verify_model_crc(const uint8_t *model_data, size_t length);
   void debug_model_architecture() const;
   bool validate_model_config() const;
-  
+
+#ifdef DEBUG_TFLITE_MICRO_HELPER
   // Advanced Debugging
   // Note: debug methods that need tensor access are non-const to avoid const_cast
   void debug_input_quantization_analysis(const uint8_t* input_data, size_t input_size, const std::string& stage);
@@ -145,6 +146,8 @@ class ModelHandler {
   bool invoke_model(const uint8_t* data, size_t len); // Helper for tests
   
   static void feed_watchdog();
+#endif  // DEBUG_TFLITE_MICRO_HELPER
+
   void set_debug(bool debug) { this->debug_ = debug; }
 
  private:

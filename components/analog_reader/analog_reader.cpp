@@ -672,8 +672,8 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
     // For conservative meter-style reading, replace llroundf() with floorf().
     // Manual rounding — avoids llroundf() which may not be available on all ESP-IDF targets
     const float steps = continuous_total / finest_scale;
-    if (!std::isfinite(steps)) {
-        ESP_LOGE(TAG, "Continuous total is non-finite; cannot compute rounded steps");
+    if (!std::isfinite(steps) || std::abs(steps) > 1e15f) {
+        ESP_LOGE(TAG, "Continuous total steps are non-finite or too large; cannot compute rounded steps");
         return;
     }
     const long long rounded_steps = static_cast<long long>(
@@ -686,8 +686,8 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
         const DialConfig* dial = this->readings_[i].dial;
 
         const float ratio_f = dial->scale / finest_scale;
-        if (!std::isfinite(ratio_f)) {
-            ESP_LOGW(TAG, "Scale ratio for dial '%s' is non-finite; skipping", dial->id.c_str());
+        if (!std::isfinite(ratio_f) || ratio_f > 1e15f) {
+            ESP_LOGW(TAG, "Scale ratio for dial '%s' is non-finite or too large; skipping", dial->id.c_str());
             continue;
         }
         long long place = static_cast<long long>(ratio_f + (ratio_f >= 0.0f ? 0.5f : -0.5f));

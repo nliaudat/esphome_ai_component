@@ -51,7 +51,11 @@ void DebugCoordinator::test_with_pattern(TFLiteCoordinator& tflite_coord) {
     for(int i=0; i<pattern.size(); ++i) pattern[i] = i % 255;
     
     std::vector<std::vector<uint8_t>> batch = {pattern};
+#ifdef DEBUG_TFLITE_MICRO_HELPER
     tflite_coord.debug_test_parameters(batch);
+#else
+    ESP_LOGW(TAG, "debug_test_parameters not available: tflite_micro_helper debug is disabled");
+#endif
 }
 
 void DebugCoordinator::print_info(const TFLiteCoordinator& tflite_coord, int cam_w, int cam_h, const std::string& fmt) {
