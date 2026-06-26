@@ -1,4 +1,8 @@
 #include "model_handler.h"
+#include "esphome/core/defines.h"
+
+#ifdef DEBUG_TFLITE_MICRO_HELPER
+
 #include "esp_log.h"
 #include "debug_utils.h"
 #include <cmath>
@@ -326,3 +330,5 @@ void ModelHandler::feed_watchdog() {
 
 }  // namespace tflite_micro_helper
 }  // namespace esphome
+
+#endif  // DEBUG_TFLITE_MICRO_HELPER
