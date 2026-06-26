@@ -203,7 +203,11 @@ DataCollector::~DataCollector() {
         UploadJob job;
         while (xQueueReceive(this->upload_queue_, &job, 0) == pdTRUE) {
             free(job.data);
-            if (job.metadata) free(job.metadata);
+            job.data = nullptr;
+            if (job.metadata) {
+                free(job.metadata);
+                job.metadata = nullptr;
+            }
         }
         vQueueDelete(this->upload_queue_);
         this->upload_queue_ = nullptr;

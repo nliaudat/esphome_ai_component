@@ -19,11 +19,12 @@ logger = logging.getLogger(__name__)
 # Configuration Constants
 # Look for models in multiple locations (project root and local data_extractor)
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent  # esphome_ai_component/
-MODELS_DIRS = [d for d in [
+MODELS_DIRS = [
     _PROJECT_ROOT / "models",                                      # main models/
     Path(__file__).resolve().parent / "models",                    # data_extractor/models/
-] if d.exists()]
-MODELS_DIR = MODELS_DIRS[0] if MODELS_DIRS else _PROJECT_ROOT / "models"
+]
+# discover_models() checks existence before scanning, so no static exists() filter here
+MODELS_DIR = MODELS_DIRS[0] if MODELS_DIRS[0].exists() else MODELS_DIRS[1]
 DEFAULT_REGIONS_FILE = Path("regions.json")
 DEFAULT_MODEL = "digit_recognizer_v23_10cls_RGB"
 DEFAULT_RESULT_IMAGE = Path("result.jpg")
