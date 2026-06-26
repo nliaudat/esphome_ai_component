@@ -240,7 +240,7 @@ def infer_model_config_from_filename(model_filename):
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(MeterReaderTFLite),
     cv.Required(CONF_MODEL): cv.file_,
-    cv.Optional(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator) if value_validator else cv.string,
+    cv.Optional(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator) if value_validator else cv.invalid("value_validator component is not installed. Install esphome-ai-component to use this feature."),
     cv.Optional(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera) if CORE.target_platform == "esp32" else cv.string,
 
     cv.Optional(CONF_CONFIDENCE_THRESHOLD, default=0.85): cv.float_range(
@@ -267,8 +267,8 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("arena_efficiency_sensor"): cv.use_id(sensor.Sensor),
     cv.Optional("heap_fragmentation_sensor"): cv.use_id(sensor.Sensor),
 
-    cv.Optional(CONF_FLASH_LIGHT_CONTROLLER): cv.use_id(flash_light_controller.FlashLightController) if flash_light_controller else cv.string,
-    cv.Optional(CONF_DATA_COLLECTOR): cv.use_id(data_collector.DataCollector) if data_collector else cv.string,
+    cv.Optional(CONF_FLASH_LIGHT_CONTROLLER): cv.use_id(flash_light_controller.FlashLightController) if flash_light_controller else cv.invalid("flash_light_controller component is not installed. Install esphome-ai-component to use this feature."),
+    cv.Optional(CONF_DATA_COLLECTOR): cv.use_id(data_collector.DataCollector) if data_collector else cv.invalid("data_collector component is not installed. Install esphome-ai-component to use this feature."),
     cv.Optional(CONF_COLLECT_LOW_CONFIDENCE, default=True): cv.boolean,
     cv.Optional(CONF_COLLECT_MIN_GLOBAL_CONFIDENCE, default=0.90): cv.float_range(min=0.0, max=1.0),
     cv.Optional(CONF_COLLECT_MIN_DIGIT_CONFIDENCE, default=0.90): cv.float_range(min=0.0, max=1.0),
