@@ -169,14 +169,7 @@ void DataCollector::upload_task(void *arg) {
             // Process upload
             collector->process_upload_sync(job.data, job.len, std::string(job.value), job.confidence, job.metadata);
             
-            // Null out pointers so RAII destructor doesn't double-free
-            // (job goes out of scope at end of while iteration)
-            free(job.data);
-            job.data = nullptr;
-            if (job.metadata) {
-                free(job.metadata);
-                job.metadata = nullptr;
-            }
+            // RAII destructor handles free(data) and free(metadata) when job goes out of scope
         }
     }
     vTaskDelete(nullptr);
@@ -197,17 +190,11 @@ DataCollector::~DataCollector() {
         this->upload_task_handle_ = nullptr;
     }
     
-    // Drain remaining queue items to free memory
+    // Drain remaining queue items — RAII destructor frees data and metadata
     if (this->upload_queue_) {
         UploadJob job;
         while (xQueueReceive(this->upload_queue_, &job, 0) == pdTRUE) {
-            // Null out pointers before RAII destructor runs
-            free(job.data);
-            job.data = nullptr;
-            if (job.metadata) {
-                free(job.metadata);
-                job.metadata = nullptr;
-            }
+            // job destructor runs at end of scope
         }
         vQueueDelete(this->upload_queue_);
         this->upload_queue_ = nullptr;
