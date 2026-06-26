@@ -682,9 +682,22 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(
            int rot_h = static_cast<int>(master_width * abs_sin + master_height * abs_cos);
            
            uint64_t rot_size_64 = static_cast<uint64_t>(rot_w) * rot_h * master_channels;
-           static constexpr uint64_t MAX_ROT_SIZE = 10ULL * 1024 * 1024; // 10MB
-           if (rot_size_64 > MAX_ROT_SIZE || rot_size_64 > SIZE_MAX) {
-               ESP_LOGE(TAG, "Rotation buffer too large: %llu bytes", rot_size_64);
+           // Dynamic cap: use a fraction of available memory to avoid OOM
+           // PSRAM boards: cap at free PSRAM (up to 50MB)
+           // No-PSRAM boards: cap at 80% of free internal RAM (typical ~50-200KB)
+           size_t free_psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+           size_t free_internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+           uint64_t max_rot;
+           if (free_psram > 0) {
+               // PSRAM available: use free PSRAM, cap at 50MB
+               max_rot = std::min<uint64_t>(static_cast<uint64_t>(free_psram), 50ULL * 1024 * 1024);
+           } else {
+               // No PSRAM: use 80% of free internal heap (safe for ESP32 with ~100-200KB free)
+               max_rot = (static_cast<uint64_t>(free_internal) * 8) / 10;
+               if (max_rot < 1 * 1024) max_rot = 0; // Below 1KB — too small for any rotation
+           }
+           if (rot_size_64 > max_rot || rot_size_64 > SIZE_MAX) {
+               ESP_LOGE(TAG, "Rotation buffer too large: %llu bytes (max: %llu)", rot_size_64, max_rot);
                return results;
            }
            size_t rot_size = static_cast<size_t>(rot_size_64);
@@ -1177,9 +1190,18 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(
         out_h = static_cast<int>(jpeg_width * abs_sin + jpeg_height * abs_cos);
         
         uint64_t rotated_size_64 = static_cast<uint64_t>(out_w) * out_h * decode_channels;
-        static constexpr uint64_t MAX_ROT_SIZE = 10ULL * 1024 * 1024; // 10MB
-        if (rotated_size_64 > MAX_ROT_SIZE || rotated_size_64 > SIZE_MAX) {
-            ESP_LOGE(TAG, "Rotated buffer size too large: %llu bytes", rotated_size_64);
+        // Dynamic cap: use a fraction of available memory to avoid OOM
+        size_t free_psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+        size_t free_internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+        uint64_t max_rot;
+        if (free_psram > 0) {
+            max_rot = std::min<uint64_t>(static_cast<uint64_t>(free_psram), 50ULL * 1024 * 1024);
+        } else {
+            max_rot = (static_cast<uint64_t>(free_internal) * 8) / 10;
+            if (max_rot < 1 * 1024) max_rot = 0;
+        }
+        if (rotated_size_64 > max_rot || rotated_size_64 > SIZE_MAX) {
+            ESP_LOGE(TAG, "Rotated buffer size too large: %llu bytes (max: %llu)", rotated_size_64, max_rot);
             return false;
         }
         size_t rotated_size = static_cast<size_t>(rotated_size_64);
