@@ -22,6 +22,7 @@ from datetime import datetime
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.normpath(os.path.join(SCRIPT_DIR, ".."))
 MODELS_DIR = os.path.join(PROJECT_ROOT, "models")
+DATA_EXTRACTOR_MODELS_DIR = os.path.join(PROJECT_ROOT, "components", "data_collector", "data_extractor", "models")
 CHECK_SCRIPT = os.path.join(SCRIPT_DIR, "check_tflite_model.py")
 
 
@@ -118,14 +119,25 @@ def main():
         default=None,
         help="Only regenerate a specific model (filename without path, e.g. 'digit_recognizer_v27_10cls_RGB.tflite')",
     )
+    parser.add_argument(
+        "--data-extractor",
+        action="store_true",
+        help="Also process models in components/data_collector/data_extractor/models/",
+    )
 
     args = parser.parse_args()
 
-    # Find all .tflite files
+    # Find .tflite files from main models/
     tflite_files = find_tflite_files(MODELS_DIR)
+    
+    # Also find from data_extractor/models if requested
+    data_extractor_files = []
+    if args.data_extractor or not tflite_files:
+        data_extractor_files = find_tflite_files(DATA_EXTRACTOR_MODELS_DIR)
+        tflite_files.extend(data_extractor_files)
 
     if not tflite_files:
-        print("[ERROR] No .tflite files found in models/")
+        print("[ERROR] No .tflite files found in models/ or data_extractor/models/")
         sys.exit(1)
 
     # Filter by specific model if requested

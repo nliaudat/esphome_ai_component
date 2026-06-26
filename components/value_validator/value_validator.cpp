@@ -81,9 +81,6 @@ float ReadingHistory::get_last_confidence() const {
   return this->buffer_[idx].confidence;
 }
 
-int ReadingHistory::get_hour_median() const { return this->get_median_within_ms(3600000UL); }
-int ReadingHistory::get_day_median() const { return this->get_median_within_ms(86400000UL); }
-
 int ReadingHistory::get_median_within_ms(uint32_t max_elapsed_ms) const {
   if (this->count_ == 0 || !this->buffer_) return 0;
   
@@ -326,18 +323,22 @@ bool ValueValidator::validate_reading(std::span<const float> digits, std::span<c
   this->ensure_digit_history_size(current_digits.size());
   
   long long raw_val_ll = 0;
+  bool overflowed = false;
   for (size_t i = 0; i < current_digits.size(); i++) {
       int stable_d = this->get_stable_digit(i, current_digits[i]);
       current_digits[i] = stable_d;
-      long long next_val = raw_val_ll * 10 + stable_d;
-      if (next_val > std::numeric_limits<int>::max()) {
-        ESP_LOGW(TAG, "Digit accumulation overflow at digit %d, clamping to INT_MAX", static_cast<int>(i));
-        raw_val_ll = std::numeric_limits<int>::max();
-        break;
+      if (!overflowed) {
+          long long next_val = raw_val_ll * 10 + stable_d;
+          if (next_val > std::numeric_limits<int>::max()) {
+              ESP_LOGW(TAG, "Digit accumulation overflow at digit %d, clamping to INT_MAX", static_cast<int>(i));
+              overflowed = true;
+              raw_val_ll = 0;
+          } else {
+              raw_val_ll = next_val;
+          }
       }
-      raw_val_ll = next_val;
   }
-  int raw_val = static_cast<int>(raw_val_ll);
+  int raw_val = overflowed ? 0 : static_cast<int>(raw_val_ll);
   
   // Calculate average confidence for the legacy validator call
   float avg_conf = 0.0f;
@@ -392,10 +393,11 @@ bool ValueValidator::validate_reading(std::span<const float> digits, std::span<c
       
       if (modified) {
           char *end;
+          errno = 0;
           long val = strtol(filtered_digit_string.c_str(), &end, 10);
           if (end == filtered_digit_string.c_str() + filtered_digit_string.length()) {
-             if (val > std::numeric_limits<int>::max() || val < std::numeric_limits<int>::min()) {
-               ESP_LOGW(TAG, "strtol result out of int range, using raw value");
+             if (errno == ERANGE || val > std::numeric_limits<int>::max() || val < std::numeric_limits<int>::min()) {
+               ESP_LOGW(TAG, "strtol result out of int range or overflowed, using raw value");
                filtered_val = raw_val;
              } else {
                filtered_val = static_cast<int>(val);
@@ -530,16 +532,19 @@ bool ValueValidator::is_digit_plausible(int new_reading, int last_reading) const
 int ValueValidator::apply_smart_validation(int new_reading, float confidence, float last_confidence) {
   // Basic digit plausibility check
   if (!this->config_.enable_smart_validation) {
-    // When smart validation is disabled, accept plausible readings and reject outliers outright
+    // When smart validation is disabled, accept plausible readings directly
     if (this->is_digit_plausible(new_reading, this->last_valid_reading_)) {
       this->consecutive_rejections_ = 0;
       this->rejection_confidence_sum_ = 0.0f;
       return new_reading;
     }
-    ESP_LOGW(TAG, "Smart validation disabled, rejecting %d (last: %d)", new_reading, this->last_valid_reading_);
-    this->consecutive_rejections_++;
-    this->rejection_confidence_sum_ += confidence;
-    return this->last_valid_reading_;
+    // Not plausible without smart validation — accept anyway to prevent stuck state.
+    // Without consistency checks, fallback strategies, or self-correction, the only
+    // option is to accept the reading or get permanently stuck. Accepting lets the
+    // rest of the pipeline (validator, confidence threshold) decide.
+    this->consecutive_rejections_ = 0;
+    this->rejection_confidence_sum_ = 0.0f;
+    return new_reading;
   }
 
   if (this->is_digit_plausible(new_reading, this->last_valid_reading_)) {
@@ -744,27 +749,6 @@ int ValueValidator::find_most_plausible_reading(int new_reading, const std::vect
   }
   
   return new_reading;
-}
-
-bool ValueValidator::is_small_increment(int new_reading, int last_reading) const {
-  int diff = new_reading - last_reading;
-  return (diff > 0 && diff <= 10);
-}
-
-int ValueValidator::calculate_digit_difference(int reading1, int reading2) const {
-  std::string str1 = std::to_string(reading1);
-  std::string str2 = std::to_string(reading2);
-  
-  size_t max_len = std::max(str1.length(), str2.length());
-  str1 = std::string(max_len - str1.length(), '0') + str1;
-  str2 = std::string(max_len - str2.length(), '0') + str2;
-  
-  int digit_diff = 0;
-  for (size_t i = 0; i < max_len; i++) {
-    digit_diff += std::abs((str1[i] - '0') - (str2[i] - '0'));
-  }
-  
-  return digit_diff;
 }
 
 void ValueValidator::reset() {
@@ -1040,6 +1024,8 @@ void ValueValidator::dump_config() {
   ESP_LOGCONFIG(TAG, "  Max Absolute Diff: %d", this->config_.max_absolute_diff);
   ESP_LOGCONFIG(TAG, "  Max Rate Change: %.0f%%", this->config_.max_rate_change * 100.0f);
   ESP_LOGCONFIG(TAG, "  Allow Negative Rates: %s", YESNO(this->config_.allow_negative_rates));
+  ESP_LOGCONFIG(TAG, "  Smart Validation: %s", YESNO(this->config_.enable_smart_validation));
+  ESP_LOGCONFIG(TAG, "  Smart Validation Window: %d", this->config_.smart_validation_window);
   ESP_LOGCONFIG(TAG, "  Strict Confidence Check: %s", YESNO(this->config_.strict_confidence_check));
   ESP_LOGCONFIG(TAG, "  Per Digit Conf Threshold: %.2f", this->config_.per_digit_confidence_threshold);
   ESP_LOGCONFIG(TAG, "  Max Consecutive Rejections: %d", this->config_.max_consecutive_rejections);
