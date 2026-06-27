@@ -66,7 +66,7 @@ async def to_code(config):
     
     esp32.add_idf_component(
         name="espressif/esp_new_jpeg",
-        ref="1.0.0"
+        ref="1.0.2"
     )
 
     cg.add_build_flag("-DUSE_ESP32_CAMERA_CONV")

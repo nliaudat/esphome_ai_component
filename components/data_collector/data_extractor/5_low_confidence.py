@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 # Import shared model configuration from _model_utils
 from _model_utils import (
-    MODELS_DIR, DEFAULT_REGIONS_FILE, DEFAULT_MODEL,
+    get_models_dir, DEFAULT_REGIONS_FILE, DEFAULT_MODEL,
     DEFAULT_RESULT_IMAGE, MAX_IMAGE_SIZE, ModelConfig, MODELS
 )
 
@@ -57,7 +57,7 @@ class MeterReader:
             self.model_type = Path(model_type).stem
         elif model_type not in MODELS:
             # Check if model.tflite exists as default
-            default_model_path = MODELS_DIR / "model.tflite"
+            default_model_path = get_models_dir() / "model.tflite"
             if default_model_path.exists():
                 logger.info(f"Using default model: {default_model_path}")
                 # Create a temporary model config for the default model
@@ -450,7 +450,7 @@ def validate_arguments(args: argparse.Namespace) -> bool:
     """Validate command line arguments."""
     # NEW: Allow default model.tflite if no specific model is specified
     if args.model not in MODELS and not Path(args.model).is_file():
-        default_model_path = MODELS_DIR / "model.tflite"
+        default_model_path = get_models_dir() / "model.tflite"
         if not default_model_path.exists():
             logger.error(f"Invalid model type: {args.model}. Available models: {list(MODELS.keys())}")
             return False
