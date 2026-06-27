@@ -24,12 +24,21 @@ MODELS_DIRS = [
     Path(__file__).resolve().parent / "models",                    # data_extractor/models/
 ]
 # discover_models() checks existence before scanning, so no static exists() filter here
-# Use next() with fallback to project root if neither dir exists
-MODELS_DIR = next((d for d in MODELS_DIRS if d.exists()), _PROJECT_ROOT / "models")
 DEFAULT_REGIONS_FILE = Path("regions.json")
 DEFAULT_MODEL = "digit_recognizer_v23_10cls_RGB"
 DEFAULT_RESULT_IMAGE = Path("result.jpg")
 MAX_IMAGE_SIZE = (1920, 1080)  # For memory safety
+
+
+def get_models_dir() -> Path:
+    """Return the first existing models directory, resolving dynamically at call time.
+
+    Unlike a frozen module-level constant, this performs the exists() check
+    on every call, so newly mounted or created model directories are picked up
+    immediately.  Falls back to the default project-root ``models/`` path if
+    none of the configured directories exist.
+    """
+    return next((d for d in MODELS_DIRS if d.exists()), _PROJECT_ROOT / "models")
 
 
 @dataclass
