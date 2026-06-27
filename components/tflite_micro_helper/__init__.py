@@ -21,14 +21,15 @@ async def to_code(config):
         esp32.add_idf_component(
             name="espressif/esp-tflite-micro",
             # ref="~1.3.4" #https://github.com/espressif/esp-tflite-micro/issues/120
-            ref="1.3.4" # fix to 1.3.4 cause 1.3.5 has bug
-            # ref="1.3.5"
+            # ref="1.3.4" # fix to 1.3.4 cause 1.3.5 has bug
+            ref="1.3.7"
         )
         
         esp32.add_idf_component(
             name="espressif/esp-nn",
             # ref="~1.1.2"
-            ref="1.2.1"
+            # ref="1.2.1"
+            ref="1.2.3"
         )
 
         # Force remove default -std flags and apply correct ones
