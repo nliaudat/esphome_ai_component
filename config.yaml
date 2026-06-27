@@ -177,6 +177,7 @@ meter_reader_tflite:
   model: "models/digit_recognizer_v24_quantized_integer_quant_uint8.tflite" # 98.86% acc | inference in 2600ms | 135.29 KB memory footprint
   # model: "models/digit_recognizer_v16_quantized_integer_quant_uint8.tflite" # 99.46% acc | inference in 4150ms | 263.76 KB memory footprint
   # model: "models/digit_recognizer_v3_quantized_integer_quant_uint8.tflite" # 97.95% acc | inference in 1500ms | 153.83 KB memory footprint
+  # model: "models/digit_recognizer_v23_quantized_integer_quant_uint8.tflite" # 97.87% acc | inference in 2300ms | 262.33 KB memory footprint | good with very bad images
 
   update_interval: 60s
 
