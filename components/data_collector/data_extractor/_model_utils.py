@@ -139,13 +139,13 @@ def parse_model_txt_file(txt_path: Path) -> ModelConfig | None:
     has_int8_weights = bool(re.search(r"<class 'numpy\.(int8|uint8)'>", content))
     if has_float32_io and has_int8_weights:
         logger.warning(
-            f"  ⚠ Model '{txt_path.name}' has hybrid quantization (not TFLite Micro compatible)"
+            f"  WARNING: Model '{txt_path.name}' has hybrid quantization (not TFLite Micro compatible)"
         )
 
     # DELEGATE ops warning
     if re.search(r"Found \d+ DELEGATE operation", content):
         logger.warning(
-            f"  ⚠ Model '{txt_path.name}' contains DELEGATE ops (incompatible)"
+            f"  WARNING: Model '{txt_path.name}' contains DELEGATE ops (incompatible)"
         )
 
     # Description
@@ -181,7 +181,7 @@ def discover_models(models_dirs: list[Path] | None = None) -> dict[str, ModelCon
             continue
         for txt_file in sorted(models_dir.glob("*.txt")):
             name = txt_file.stem
-            # Skip duplicate names — project-root model wins (first dir has priority)
+            # Skip duplicate names -- project-root model wins (first dir has priority)
             if name in models:
                 logger.info(
                     f"Skipping duplicate model '{name}' in {models_dir} (already from earlier directory)"

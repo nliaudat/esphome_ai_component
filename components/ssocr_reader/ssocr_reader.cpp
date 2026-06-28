@@ -207,7 +207,7 @@ void SSOCRReader::process_image(std::shared_ptr<esphome::camera::CameraImage> im
       }
     } else {
       ESP_LOGW(TAG, "SSOCR Failed to read all digits");
-      // Skip publishing on failure — don't publish NaN
+      // Skip publishing on failure -- don't publish NaN
     }
   }
 }

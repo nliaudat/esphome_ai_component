@@ -7,7 +7,7 @@
 namespace esphome {
 namespace tflite_micro_helper {
 
-// RAII ScopedDuration — replaces DURATION_START/END/LOG macros
+// RAII ScopedDuration -- replaces DURATION_START/END/LOG macros
 class ScopedDuration {
  public:
   explicit ScopedDuration(const char *tag) : tag_(tag), start_(esphome::millis()) {}

@@ -128,3 +128,4 @@ static const std::unordered_map<std::string, ModelConfig> MODEL_CONFIGS = {
 
 }  // namespace meter_reader_tflite
 }  // namespace esphome
+

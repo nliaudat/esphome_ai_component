@@ -36,7 +36,7 @@ BufferPool ImageProcessor::buffer_pool_;
 // Initialize static member
 std::atomic<int32_t> ImageProcessor::TrackedBuffer::active_instances{0};
 
-// RAII ScopedTimer — replaces DURATION_START/DURATION_END macros
+// RAII ScopedTimer -- replaces DURATION_START/DURATION_END macros
 class ScopedTimer {
  public:
   ScopedTimer(const char *func) : name_(func), start_(millis()) {}
@@ -50,7 +50,7 @@ class ScopedTimer {
 // Consolidate rotation normalization logic (replaces 5 copies of identical code)
 // Returns the best hardware-supported JPEG rotation and sets needs_software=true for fine angles.
 static jpeg_rotate_t normalize_rotation(float rotation, bool &needs_software) {
-  // fmodf is O(1) — safe even for extreme rotation values (while loops could iterate indefinitely)
+  // fmodf is O(1) -- safe even for extreme rotation values (while loops could iterate indefinitely)
   float rot = fmodf(rotation, 360.0f);
   if (rot < 0.0f)
     rot += 360.0f;
@@ -685,7 +685,7 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(s
         // No PSRAM: use 80% of free internal heap (safe for ESP32 with ~100-200KB free)
         max_rot = (static_cast<uint64_t>(free_internal) * 8) / 10;
         if (max_rot < 1 * 1024)
-          max_rot = 0;  // Below 1KB — too small for any rotation
+          max_rot = 0;  // Below 1KB -- too small for any rotation
       }
       if (rot_size_64 > max_rot || rot_size_64 > SIZE_MAX) {
         ESP_LOGE(TAG, "Rotation buffer too large: %llu bytes (max: %llu)", rot_size_64, max_rot);
@@ -1104,7 +1104,7 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(std::shared_ptr<camera::CameraI
 
     if (gray_buffer_storage) {
       uint8_t *gray_buf = gray_buffer_storage->get();
-      // Convert BGR888 → grayscale
+      // Convert BGR888 -> grayscale
       for (size_t i = 0; i < pixel_count; i++) {
         size_t idx = i * 3;
         // ESP32 JPEG decoder outputs BGR888 by default

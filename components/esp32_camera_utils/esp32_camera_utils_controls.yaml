@@ -103,7 +103,7 @@ number:
   #   name: "Camera Rotation"
   #   id: ${id_prefix}_camera_rotation
   #   icon: "mdi:rotate-3d-variant"
-  #   unit_of_measurement: "°"
+  #   unit_of_measurement: " deg"
   #   min_value: 0
   #   max_value: 270
   #   step: 90
@@ -270,3 +270,4 @@ api:
         - lambda: |-
             int width, height;
             id(${id_prefix}_camera_utils)->reset_window(width, height);
+

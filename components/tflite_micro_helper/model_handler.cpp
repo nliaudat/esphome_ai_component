@@ -107,7 +107,7 @@ bool ModelHandler::load_model_with_arena(const uint8_t *model_data, size_t model
   this->tflite_model_ = tflite::GetModel(model_data);
 
   // Note: If GetModel fails with PROGMEM data, the model may need to be
-  // copied to RAM first. This is rare — most PROGMEM data works with GetModel.
+  // copied to RAM first. This is rare -- most PROGMEM data works with GetModel.
   // If you encounter issues, ensure the model data is properly aligned.
 
   if (this->tflite_model_ == nullptr) {
@@ -349,7 +349,7 @@ ProcessedOutput ModelHandler::process_output(TfLiteTensor *output_tensor) const 
 
     if (scale == 0.0f) {
       scale = 1.0f;
-      ESP_LOGW(TAG, "Output tensor has scale 0.0, assuming 1.0 — probabilities may be garbage");
+      ESP_LOGW(TAG, "Output tensor has scale 0.0, assuming 1.0 -- probabilities may be garbage");
     }
 
     if (output_tensor->type == kTfLiteUInt8) {
@@ -634,7 +634,7 @@ bool ModelHandler::verify_model_crc(const uint8_t *model_data, size_t length) {
   ESP_LOGI(TAG, "Model CRC32 verification passed");
   return true;
 #else
-  ESP_LOGW(TAG, "MODEL_CRC32 not defined — skipping verification");
+  ESP_LOGW(TAG, "MODEL_CRC32 not defined -- skipping verification");
   return true;
 #endif
 }

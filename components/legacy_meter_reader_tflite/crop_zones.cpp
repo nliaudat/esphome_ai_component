@@ -138,3 +138,4 @@ void CropZoneHandler::set_debug_zones() {
 
 }  // namespace meter_reader_tflite
 }  // namespace esphome
+

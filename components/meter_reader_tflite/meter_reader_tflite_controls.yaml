@@ -296,3 +296,4 @@ text_sensor:
     name: "Crop Zones"
     id: ${id_prefix}_crop_zones_sensor
     icon: "mdi:crop"
+

@@ -1055,7 +1055,7 @@ void MeterReaderTFLite::force_flash_inference() {
   // Turn the flash on immediately
   // -----------------------------------------------------------------------
   ESP_LOGI(TAG, "Force inference: enabling flash");
-  enable_flash_light();  // protected → we are inside the class
+  enable_flash_light();  // protected -> we are inside the class
 
   // -----------------------------------------------------------------------
   // After 3 seconds request a fresh frame
@@ -1077,7 +1077,7 @@ void MeterReaderTFLite::force_flash_inference() {
     // -------------------------------------------------------------------
     const uint32_t SAFETY_TIMEOUT_MS = 500;
     this->set_timeout(SAFETY_TIMEOUT_MS, [this]() {
-      // If the AI is still busy we simply turn the flash off – the
+      // If the AI is still busy we simply turn the flash off -- the
       // next normal update will re enable it if needed.
       ESP_LOGI(TAG, "Force inference: disabling flash");
       disable_flash_light();

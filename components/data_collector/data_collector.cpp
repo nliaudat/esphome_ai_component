@@ -90,7 +90,7 @@ void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, in
 
   this->upload_image(jpeg_buf, jpeg_len, raw_value, confidence, metadata.c_str());
 
-  // fmt2jpg allocates jpeg_buf on success — free it
+  // fmt2jpg allocates jpeg_buf on success -- free it
   free(jpeg_buf);
 }
 
@@ -148,7 +148,7 @@ bool DataCollector::upload_image(const uint8_t *data, size_t len, const std::str
     return false;
   }
 
-  // Queued successfully — release ownership so destructor doesn't free
+  // Queued successfully -- release ownership so destructor doesn't free
   job.data = nullptr;
   job.metadata = nullptr;
   return true;
@@ -207,7 +207,7 @@ DataCollector::~DataCollector() {
     this->upload_task_handle_ = nullptr;
   }
 
-  // Drain remaining queue items — manual free required (xQueueReceive raw memcpy)
+  // Drain remaining queue items -- manual free required (xQueueReceive raw memcpy)
   if (this->upload_queue_) {
     UploadJob job;
     while (xQueueReceive(this->upload_queue_, &job, 0) == pdTRUE) {

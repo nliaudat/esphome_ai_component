@@ -141,7 +141,7 @@ def parse_model_txt_file(model_path):
     output_match = re.search(r"Output\s+0:\s+\[\s*\d+\s+(\d+)\]", content)
     if output_match:
         num_classes = int(output_match.group(1))
-        # 10 classes → scale_factor=1.0, 100 classes → scale_factor=10.0
+        # 10 classes -> scale_factor=1.0, 100 classes -> scale_factor=10.0
         if num_classes == 10:
             config["scale_factor"] = 1.0
         elif num_classes == 100:
@@ -179,8 +179,8 @@ def parse_model_txt_file(model_path):
         )
 
     # Detect output processing mode from SOFTMAX operator presence
-    # If the model has a built-in SOFTMAX → use 'direct_class' (output is already probabilities)
-    # If no SOFTMAX → apply C++ softmax on raw logits
+    # If the model has a built-in SOFTMAX -> use 'direct_class' (output is already probabilities)
+    # If no SOFTMAX -> apply C++ softmax on raw logits
     # Pattern matches "SOFTMAX: N" in the Unique operator types section
     has_softmax = bool(re.search(r"^\s+SOFTMAX:\s+\d+", content, re.MULTILINE))
     if has_softmax:
@@ -197,15 +197,15 @@ def parse_model_txt_file(model_path):
     # Detect quantization family: QAT vs TQT vs hybrid
     # - QAT: first conv after QUANTIZE has kernel shape [1 1 1 3] (learned grayscale weights)
     # - TQT: uses explicit formula (STRIDED_SLICE+MUL+ADD) or depthwise conv for grayscale
-    # Pattern: shape=[1 1 1 3] in a CONV_2D input tensor = QAT 1×1 learned grayscale
+    # Pattern: shape=[1 1 1 3] in a CONV_2D input tensor = QAT 1x1 learned grayscale
     if re.search(r"shape=\[1 1 1 3\]", content):
         config["quantization_family"] = "qat"
-        print("  Auto-detected quantization: QAT (learned 1x1 RGB→gray conv)")
+        print("  Auto-detected quantization: QAT (learned 1x1 RGB->gray conv)")
     else:
         config["quantization_family"] = "tqt"
         print("  Auto-detected quantization: TQT (standard post-training quantization)")
 
-    # Detect hybrid quantization (float32 I/O + int8 weights) — incompatible with TFLite Micro
+    # Detect hybrid quantization (float32 I/O + int8 weights) -- incompatible with TFLite Micro
     # Pattern: float32 input but int8 weight/bias tensors present (pseudo_qconst / int8 weight tensors)
     input_dtype = config.get("input_type", "")
     has_float32_io = input_dtype == "float32"
@@ -477,7 +477,7 @@ async def to_code(config):
         and auto_config.get("output_processing") == "direct_class"
     ):
         print(
-            "  ⚠️  WARNING: output_processing overridden to 'softmax' but model has built-in SOFTMAX."
+            "  WARNING:  WARNING: output_processing overridden to 'softmax' but model has built-in SOFTMAX."
         )
         print(
             "      This will apply softmax TWICE (model + C++), producing incorrect confidence scores."

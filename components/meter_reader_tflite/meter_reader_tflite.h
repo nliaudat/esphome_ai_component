@@ -237,7 +237,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   // Refactor: Use coordinator instead of local object
   ValueValidatorCoordinator validation_coord_;
 
-  // State — Single atomic state machine
+  // State -- Single atomic state machine
   enum class FrameState : uint8_t { IDLE, REQUESTED, AVAILABLE, PROCESSING, TIMEOUT };
   std::atomic<FrameState> frame_state_{FrameState::IDLE};
   std::atomic<bool> pause_processing_{false};
@@ -258,7 +258,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   bool window_active_{false};
   bool enable_flash_calibration_{false};
 
-  // Preview fallback buffer — pre-allocated in PSRAM (preferred) to avoid heap alloc in loop()
+  // Preview fallback buffer -- pre-allocated in PSRAM (preferred) to avoid heap alloc in loop()
   std::unique_ptr<uint8_t[], FreeDeleter> preview_fallback_buffer_;
   size_t preview_fallback_buffer_size_{0};
 
@@ -298,7 +298,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
     float best_confidence{0.0f};
     uint32_t step_start_time{0};
 
-    // Configuration — initialised by start_flash_calibration() from .cpp constexpr values
+    // Configuration -- initialised by start_flash_calibration() from .cpp constexpr values
     uint32_t start_pre;
     uint32_t end_pre;
     uint32_t step_pre;

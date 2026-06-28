@@ -35,7 +35,7 @@ class MemoryManager {
 
   /**
    * @brief Parse an arena size string (e.g. "110KB", "2MB", "51200") to bytes.
-   * Shared utility — replaces duplicated logic in ModelHandler and TFLiteMicroHelper.
+   * Shared utility -- replaces duplicated logic in ModelHandler and TFLiteMicroHelper.
    * @param size_str The size string to parse.
    * @return The size in bytes, or 0 if parsing fails.
    */

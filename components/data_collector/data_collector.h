@@ -51,7 +51,7 @@ class DataCollector : public Component {
   bool process_upload_sync(const uint8_t *data, size_t len, const std::string &raw_value, float confidence,
                            const char *metadata = nullptr);
 
-  // RAII-enabled upload job — frees resources on destruction if not processed
+  // RAII-enabled upload job -- frees resources on destruction if not processed
   struct UploadJob {
     uint8_t *data{nullptr};
     size_t len{0};
@@ -66,7 +66,7 @@ class DataCollector : public Component {
       if (this->metadata)
         free(this->metadata);
     }
-    // Prevent copy — queue passes by pointer
+    // Prevent copy -- queue passes by pointer
     UploadJob(const UploadJob &) = delete;
     UploadJob &operator=(const UploadJob &) = delete;
     // Allow move

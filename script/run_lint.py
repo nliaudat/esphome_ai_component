@@ -255,6 +255,9 @@ def main():
             files = []
             for g in check["glob"]:
                 files.extend(sorted(ROOT.glob(g)))
+            # Exclude legacy/frozen directories from clang-format checks
+            exclude_dirs = {"legacy_meter_reader_tflite"}
+            files = [f for f in files if not any(p in exclude_dirs for p in f.parts)]
             if not files:
                 print(f"[{name}] {color('SKIP', 'SKIPPED')} (no files match)")
                 skipped += 1

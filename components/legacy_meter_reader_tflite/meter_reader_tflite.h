@@ -265,3 +265,4 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
 }  // namespace meter_reader_tflite
 }  // namespace esphome
+

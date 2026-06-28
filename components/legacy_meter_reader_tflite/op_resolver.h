@@ -56,3 +56,4 @@ class OpResolverManager {
 
 }  // namespace meter_reader_tflite
 }  // namespace esphome
+

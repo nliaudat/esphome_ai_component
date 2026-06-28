@@ -32,7 +32,7 @@ class TFLiteCoordinator {
     bool success;
   };
 
-  // ── Config Setters (delegate to TFLiteMicroHelper) ────────────────
+  // -- Config Setters (delegate to TFLiteMicroHelper) ----------------
   void set_model_type(const std::string &t) { this->tflite_.set_model_type(t); }
   void set_tensor_arena_size(size_t size) { this->tflite_.set_tensor_arena_size(size); }
   void set_debug(bool debug) { this->tflite_.set_debug(debug); }
@@ -46,14 +46,14 @@ class TFLiteCoordinator {
   void set_normalize(bool n) { this->tflite_.set_normalize(n); }
   void set_invert(bool i) { this->tflite_.set_invert(i); }
 
-  // ── Model management (delegate to TFLiteMicroHelper) ──────────────
+  // -- Model management (delegate to TFLiteMicroHelper) --------------
   void set_model(const uint8_t *model, size_t length) { this->tflite_.set_model(model, length); }
   [[nodiscard]] bool load_model() { return this->tflite_.load_model(); }
   void unload_model() { this->tflite_.unload_model(); }
   [[nodiscard]] bool is_model_loaded() const { return this->tflite_.is_model_loaded(); }
   tflite_micro_helper::ModelSpec get_model_spec() const { return this->tflite_.get_model_spec(); }
 
-  // ── Accessors (delegate to TFLiteMicroHelper) ─────────────────────
+  // -- Accessors (delegate to TFLiteMicroHelper) ---------------------
   int get_input_width() const { return this->tflite_.get_input_width(); }
   int get_input_height() const { return this->tflite_.get_input_height(); }
   int get_input_channels() const { return this->tflite_.get_input_channels(); }
@@ -68,12 +68,12 @@ class TFLiteCoordinator {
   void debug_test_parameters(const std::vector<std::vector<uint8_t>> &zone_data);
 #endif
 
-  // ── Domain-specific: Zone-based inference ─────────────────────────
+  // -- Domain-specific: Zone-based inference -------------------------
   using ProcessResult = esphome::esp32_camera_utils::ImageProcessor::ProcessResult;
   std::vector<InferenceResult> run_inference(std::span<const ProcessResult> processed_zones);
 
  private:
-  // Reusable TFLite helper — handles loading, arena, config, buffer inference
+  // Reusable TFLite helper -- handles loading, arena, config, buffer inference
   tflite_micro_helper::TFLiteMicroHelper tflite_;
   mutable std::mutex model_mutex_;
 

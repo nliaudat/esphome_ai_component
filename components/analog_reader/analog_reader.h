@@ -72,7 +72,7 @@ struct DialConfig {
   std::vector<std::pair<float, float>> calibration_mapping;
 };
 
-// Per-dial measured value — used for stacked-digit combination
+// Per-dial measured value -- used for stacked-digit combination
 struct DialReading {
   const DialConfig *dial;
   float value;
@@ -130,7 +130,7 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   void set_dial_angle(const std::string &dial_id, float min_deg, float max_deg);
 
  protected:
-  // Single atomic state machine — replaces separate processing_frame_ and frame_requested_ bools
+  // Single atomic state machine -- replaces separate processing_frame_ and frame_requested_ bools
   enum class FrameState : uint8_t { IDLE, REQUESTED, AVAILABLE, PROCESSING, TIMEOUT };
   std::atomic<FrameState> frame_state_{FrameState::IDLE};
   uint32_t last_request_time_{0};
@@ -165,7 +165,7 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   std::vector<uint8_t> scratch_buffer_;
   std::vector<uint8_t> scratch_buffer_2_;
 
-  // Pre-allocated per-frame readings vector — avoids heap alloc in loop()
+  // Pre-allocated per-frame readings vector -- avoids heap alloc in loop()
   std::vector<DialReading> readings_;
 
   // Persistent Buffer (RAII managed)

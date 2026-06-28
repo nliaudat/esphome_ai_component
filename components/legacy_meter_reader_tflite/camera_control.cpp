@@ -743,3 +743,4 @@ bool CameraWindowControl::reset_to_full_frame_with_reset(esp32_camera::ESP32Came
 }  // namespace camera_control
 }  // namespace meter_reader_tflite
 }  // namespace esphome
+

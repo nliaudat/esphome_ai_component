@@ -60,9 +60,9 @@ void ModelHandler::debug_input_quantization_analysis(const uint8_t *input_data, 
     bool zp_match = (input->params.zero_point == expected_zp);
 
     if (scale_match && zp_match) {
-      ESP_LOGI(TAG, "✓ Quantization matches expected (scale=1/255, zp=0)");
+      ESP_LOGI(TAG, "OK Quantization matches expected (scale=1/255, zp=0)");
     } else {
-      ESP_LOGW(TAG, "⚠️ Quantization differs from expected");
+      ESP_LOGW(TAG, "WARNING: Quantization differs from expected");
       ESP_LOGW(TAG, "  Expected: scale=%.6f, zp=%d", expected_scale, expected_zp);
       ESP_LOGW(TAG, "  Actual: scale=%.6f, zp=%d", input->params.scale, input->params.zero_point);
     }
