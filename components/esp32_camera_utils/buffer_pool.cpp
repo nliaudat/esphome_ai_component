@@ -11,7 +11,7 @@ BufferPool::Buffer BufferPool::acquire(size_t size) {
   std::lock_guard<std::mutex> lock(this->mutex_);
 
   // Strategy 1: Search for exact size match
-  for (auto& slot : this->pool_) {
+  for (auto &slot : this->pool_) {
     if (!slot.in_use && slot.size == size) {
       slot.in_use = true;
       this->hits_++;
@@ -21,7 +21,7 @@ BufferPool::Buffer BufferPool::acquire(size_t size) {
   }
 
   // Strategy 2: Try to reuse oversized slot (within 20% overhead)
-  for (auto& slot : this->pool_) {
+  for (auto &slot : this->pool_) {
     if (!slot.in_use && slot.size >= size && slot.size <= size * OVERSIZE_THRESHOLD_FACTOR) {
       slot.in_use = true;
       this->hits_++;
@@ -34,7 +34,7 @@ BufferPool::Buffer BufferPool::acquire(size_t size) {
   this->misses_++;
 
   // Prefer SPIRAM for buffers >1KB
-  uint8_t* data = nullptr;
+  uint8_t *data = nullptr;
   if (size > 1024) {
     data = static_cast<uint8_t *>(heap_caps_aligned_alloc(64, size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
   }
@@ -62,13 +62,14 @@ BufferPool::Buffer BufferPool::acquire(size_t size) {
   return {data, size, false};
 }
 
-void BufferPool::release(Buffer& buffer) {
-  if (!buffer.data) return;
+void BufferPool::release(Buffer &buffer) {
+  if (!buffer.data)
+    return;
 
   std::lock_guard<std::mutex> lock(this->mutex_);
 
   // Find in pool and mark available
-  for (auto& slot : this->pool_) {
+  for (auto &slot : this->pool_) {
     if (slot.data == buffer.data) {
       slot.in_use = false;
       buffer.data = nullptr;
@@ -89,18 +90,14 @@ size_t BufferPool::get_hit_rate() const {
   return total > 0 ? (100 * h / total) : 0;
 }
 
-size_t BufferPool::get_total_allocations() const {
-  return this->hits_.load() + this->misses_.load();
-}
+size_t BufferPool::get_total_allocations() const { return this->hits_.load() + this->misses_.load(); }
 
 size_t BufferPool::get_pool_size() const {
   std::lock_guard<std::mutex> lock(this->mutex_);
   return this->pool_.size();
 }
 
-size_t BufferPool::get_saturation_misses() const {
-  return this->saturation_misses_.load();
-}
+size_t BufferPool::get_saturation_misses() const { return this->saturation_misses_.load(); }
 
 }  // namespace esp32_camera_utils
 }  // namespace esphome

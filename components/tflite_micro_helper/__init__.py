@@ -1,18 +1,21 @@
 import esphome.codegen as cg
-import esphome.config_validation as cv
 from esphome.components import esp32
-
+import esphome.config_validation as cv
 from esphome.core import CORE
+
 if CORE.target_platform == "esp32":
-    DEPENDENCIES = ['esp32']
+    DEPENDENCIES = ["esp32"]
 else:
     DEPENDENCIES = []
 
-tflite_micro_helper_ns = cg.esphome_ns.namespace('tflite_micro_helper')
+tflite_micro_helper_ns = cg.esphome_ns.namespace("tflite_micro_helper")
 
-CONFIG_SCHEMA = cv.Schema({
-    cv.Optional("debug", default=False): cv.boolean,
-})
+CONFIG_SCHEMA = cv.Schema(
+    {
+        cv.Optional("debug", default=False): cv.boolean,
+    }
+)
+
 
 async def to_code(config):
     cg.add_define("USE_TFLITE_MICRO_HELPER")
@@ -22,14 +25,14 @@ async def to_code(config):
             name="espressif/esp-tflite-micro",
             # ref="~1.3.4" #https://github.com/espressif/esp-tflite-micro/issues/120
             # ref="1.3.4" # fix to 1.3.4 cause 1.3.5 has bug
-            ref="1.3.7"
+            ref="1.3.7",
         )
 
         esp32.add_idf_component(
             name="espressif/esp-nn",
             # ref="~1.1.2"
             # ref="1.2.1"
-            ref="1.2.3"
+            ref="1.2.3",
         )
 
         # Force remove default -std flags and apply correct ones

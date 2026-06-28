@@ -1,7 +1,10 @@
 """Analyze peak memory usage of a TFLite model using tensor lifetime analysis."""
-import tensorflow as tf
-import numpy as np
+
 import sys
+
+import numpy as np
+import tensorflow as tf
+
 
 def analyze_peak_memory(model_path):
     interpreter = tf.lite.Interpreter(model_path=model_path)
@@ -14,14 +17,14 @@ def analyze_peak_memory(model_path):
     tensor_first = {}
     tensor_last = {}
     for op in ops_details:
-        for t_idx in op['inputs']:
+        for t_idx in op["inputs"]:
             if t_idx not in tensor_first:
-                tensor_first[t_idx] = op['index']
-            tensor_last[t_idx] = op['index']
-        for t_idx in op['outputs']:
+                tensor_first[t_idx] = op["index"]
+            tensor_last[t_idx] = op["index"]
+        for t_idx in op["outputs"]:
             if t_idx not in tensor_first:
-                tensor_first[t_idx] = op['index']
-            tensor_last[t_idx] = op['index']
+                tensor_first[t_idx] = op["index"]
+            tensor_last[t_idx] = op["index"]
 
     # Calculate peak memory at each op boundary
     peak_memory = 0
@@ -33,9 +36,9 @@ def analyze_peak_memory(model_path):
         for t_idx, tensor in enumerate(tensor_details):
             if t_idx in tensor_first and t_idx in tensor_last:
                 if tensor_first[t_idx] <= op_idx <= tensor_last[t_idx]:
-                    dtype_size = tf.dtypes.as_dtype(tensor['dtype']).size
+                    dtype_size = tf.dtypes.as_dtype(tensor["dtype"]).size
                     num_elements = 1
-                    for dim in tensor['shape']:
+                    for dim in tensor["shape"]:
                         if dim is not None:
                             num_elements *= dim
                     active_memory += dtype_size * num_elements
@@ -56,34 +59,43 @@ def analyze_peak_memory(model_path):
     print(f"Number of ops: {len(ops_details)}")
 
     # Check for DELEGATE operations (not supported by TFLite Micro)
-    delegate_ops = [op for op in ops_details if op['op_name'] == 'DELEGATE']
+    delegate_ops = [op for op in ops_details if op["op_name"] == "DELEGATE"]
     if delegate_ops:
         print(f"\n[WARN] Found {len(delegate_ops)} DELEGATE operation(s)!")
-        print(f"   TFLite Micro does NOT support delegate operations.")
-        print(f"   This model will FAIL to load on microcontrollers.")
-        print(f"   Re-export with delegates disabled.")
-    print(f"")
-    print(f"Total memory (sum of all tensors): {sum(tf.dtypes.as_dtype(t['dtype']).size * np.prod([d for d in t['shape'] if d is not None]) for t in tensor_details) / 1024:.2f} KB")
-    print(f"Peak active memory (lifetime analysis): {peak_memory / 1024:.2f} KB at op index {peak_op}")
+        print("   TFLite Micro does NOT support delegate operations.")
+        print("   This model will FAIL to load on microcontrollers.")
+        print("   Re-export with delegates disabled.")
+    print()
+    print(
+        f"Total memory (sum of all tensors): {sum(tf.dtypes.as_dtype(t['dtype']).size * np.prod([d for d in t['shape'] if d is not None]) for t in tensor_details) / 1024:.2f} KB"
+    )
+    print(
+        f"Peak active memory (lifetime analysis): {peak_memory / 1024:.2f} KB at op index {peak_op}"
+    )
     print(f"TFLite Micro arena estimate (1.5x peak): {tflm_estimate / 1024:.2f} KB")
-    print(f"")
+    print()
     print(f"Recommended tensor_arena_size: {int(np.ceil(tflm_estimate / 1024)) + 1}KB")
 
     # Show top memory tensors
-    print(f"\nTop tensors by memory:")
+    print("\nTop tensors by memory:")
     tensor_mem = []
     for t_idx, tensor in enumerate(tensor_details):
-        dtype_size = tf.dtypes.as_dtype(tensor['dtype']).size
+        dtype_size = tf.dtypes.as_dtype(tensor["dtype"]).size
         num_elements = 1
-        for dim in tensor['shape']:
+        for dim in tensor["shape"]:
             if dim is not None:
                 num_elements *= dim
         mem = dtype_size * num_elements
-        tensor_mem.append((mem, t_idx, tensor['name'], tensor['shape'], tensor['dtype']))
+        tensor_mem.append(
+            (mem, t_idx, tensor["name"], tensor["shape"], tensor["dtype"])
+        )
 
     tensor_mem.sort(reverse=True)
     for mem, t_idx, name, shape, dtype in tensor_mem[:15]:
-        print(f"  [{t_idx:2d}] {mem/1024:8.2f} KB  {str(shape):20s}  {str(dtype):20s}  {name}")
+        print(
+            f"  [{t_idx:2d}] {mem / 1024:8.2f} KB  {str(shape):20s}  {str(dtype):20s}  {name}"
+        )
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

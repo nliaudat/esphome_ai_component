@@ -27,22 +27,22 @@ namespace meter_reader_tflite {
 class TFLiteCoordinator {
  public:
   struct InferenceResult {
-      float value;
-      float confidence;
-      bool success;
+    float value;
+    float confidence;
+    bool success;
   };
 
   // ── Config Setters (delegate to TFLiteMicroHelper) ────────────────
-  void set_model_type(const std::string& t) { this->tflite_.set_model_type(t); }
+  void set_model_type(const std::string &t) { this->tflite_.set_model_type(t); }
   void set_tensor_arena_size(size_t size) { this->tflite_.set_tensor_arena_size(size); }
   void set_debug(bool debug) { this->tflite_.set_debug(debug); }
-  void set_input_type(const std::string& t) { this->tflite_.set_input_type(t); }
+  void set_input_type(const std::string &t) { this->tflite_.set_input_type(t); }
   void set_input_channels(int c) { this->tflite_.set_input_channels(c); }
   void set_input_width(int w) { this->tflite_.set_input_width(w); }
   void set_input_height(int h) { this->tflite_.set_input_height(h); }
-  void set_output_processing(const std::string& p) { this->tflite_.set_output_processing(p); }
+  void set_output_processing(const std::string &p) { this->tflite_.set_output_processing(p); }
   void set_scale_factor(float f) { this->tflite_.set_scale_factor(f); }
-  void set_input_order(const std::string& o) { this->tflite_.set_input_order(o); }
+  void set_input_order(const std::string &o) { this->tflite_.set_input_order(o); }
   void set_normalize(bool n) { this->tflite_.set_normalize(n); }
   void set_invert(bool i) { this->tflite_.set_invert(i); }
 
@@ -65,7 +65,7 @@ class TFLiteCoordinator {
   tflite_micro_helper::ArenaStats get_arena_stats() const { return this->tflite_.get_arena_stats(); }
   void report_memory_status() { this->tflite_.report_memory_status(); }
 #ifdef DEBUG_TFLITE_MICRO_HELPER
-  void debug_test_parameters(const std::vector<std::vector<uint8_t>>& zone_data);
+  void debug_test_parameters(const std::vector<std::vector<uint8_t>> &zone_data);
 #endif
 
   // ── Domain-specific: Zone-based inference ─────────────────────────
@@ -77,10 +77,11 @@ class TFLiteCoordinator {
   tflite_micro_helper::TFLiteMicroHelper tflite_;
   mutable std::mutex model_mutex_;
 
-  bool process_model_result(const esp32_camera_utils::ImageProcessor::ProcessResult& result, float* value, float* confidence);
+  bool process_model_result(const esp32_camera_utils::ImageProcessor::ProcessResult &result, float *value,
+                            float *confidence);
 };
 
 }  // namespace meter_reader_tflite
 }  // namespace esphome
 
-#endif // USE_METER_READER_TFLITE
+#endif  // USE_METER_READER_TFLITE

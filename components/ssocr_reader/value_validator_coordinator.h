@@ -21,15 +21,15 @@ class ValueValidatorCoordinator {
   bool validate_reading(int raw_value, float confidence, int &validated_value) {
     if (this->validator_ == nullptr) {
       validated_value = raw_value;
-      return true; // Assume valid if no validator set, or handle as policy
+      return true;  // Assume valid if no validator set, or handle as policy
     }
     return this->validator_->validate_reading(raw_value, confidence, validated_value);
   }
 
   bool validate_reading(const std::vector<float> &digits, const std::vector<float> &confidences, int &validated_value) {
     if (this->validator_ == nullptr) {
-        // Fallback or error? defaulting to false safely
-        return false;
+      // Fallback or error? defaulting to false safely
+      return false;
     }
     return this->validator_->validate_reading(digits, confidences, validated_value);
   }
@@ -52,7 +52,7 @@ class ValueValidatorCoordinator {
   }
 
   bool validate_reading(const std::vector<float> &digits, const std::vector<float> &confidences, int &validated_value) {
-      return false;
+    return false;
   }
 
   void set_last_valid_reading(int value) {}
@@ -62,4 +62,4 @@ class ValueValidatorCoordinator {
 }  // namespace ssocr_reader
 }  // namespace esphome
 
-#endif // USE_SSOCR_READER
+#endif  // USE_SSOCR_READER

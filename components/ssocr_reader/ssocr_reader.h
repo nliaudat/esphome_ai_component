@@ -34,23 +34,23 @@ class SSOCRReader : public PollingComponent, public esphome::camera::CameraListe
 
   void set_threshold_config(int level) { this->threshold_level_ = level; }
   void set_crop_config(int x, int y, int w, int h) {
-      this->crop_x_ = x; this->crop_y_ = y; this->crop_w_ = w; this->crop_h_ = h;
+    this->crop_x_ = x;
+    this->crop_y_ = y;
+    this->crop_w_ = w;
+    this->crop_h_ = h;
   }
   void set_digit_config(int count) { this->digit_count_ = count; }
   void set_camera(esphome::camera::Camera *camera) { this->camera_ = camera; }
-  void set_resolution(int w, int h) { this->img_width_ = w; this->img_height_ = h; }
+  void set_resolution(int w, int h) {
+    this->img_width_ = w;
+    this->img_height_ = h;
+  }
   void set_pixel_format_str(const std::string &fmt) { this->pixel_format_str_ = fmt; }
   void set_debug(bool debug) { this->debug_ = debug; }
 
  protected:
   // Single atomic state machine — eliminates TOCTOU CWE-367
-  enum class FrameState : uint8_t {
-    IDLE,
-    REQUESTED,
-    AVAILABLE,
-    PROCESSING,
-    TIMEOUT
-  };
+  enum class FrameState : uint8_t { IDLE, REQUESTED, AVAILABLE, PROCESSING, TIMEOUT };
   std::atomic<FrameState> frame_state_{FrameState::IDLE};
   uint32_t last_request_time_{0};
 
@@ -83,7 +83,7 @@ class SSOCRReader : public PollingComponent, public esphome::camera::CameraListe
   std::vector<std::pair<int, int>> digit_bounds_;
 
   void process_image(std::shared_ptr<esphome::camera::CameraImage> image);
-  int recognize_digit(const uint8_t* img, int width, int height, int stride);
+  int recognize_digit(const uint8_t *img, int width, int height, int stride);
 };
 
 }  // namespace ssocr_reader

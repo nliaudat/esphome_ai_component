@@ -5,7 +5,7 @@ This is the default and most versatile algorithm for analyzing analog dials. It 
 
 ## How It Works
 
-1.  **Preprocessing**: 
+1.  **Preprocessing**:
     *   The image crop is enhanced using CLAHE (Contrast Limited Adaptive Histogram Equalization) to handle uneven lighting.
     *   If enabled, a **Top-Hat Filter** is applied to isolate the needle structure from shadows and reflections.
     *   If **Color Detection** is configured, the image is converted to a "Color Distance Map". Pixels matching the target color become **dark** (low value), while non-matching pixels become **light**. This allows the standard detection logic (which searches for dark needles) to work instantly.

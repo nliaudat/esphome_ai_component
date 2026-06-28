@@ -7,7 +7,7 @@ This allows you to generate robust training datasets to improve your edge AI mod
 ## Workflow Scripts
 
 ### 1. `1_extractor.py`
-This script processes the raw images saved by your server. It reads the custom EXIF JSON payload injected by the `app.py` server to understand what the ESP32 inferred at the time of capture. 
+This script processes the raw images saved by your server. It reads the custom EXIF JSON payload injected by the `app.py` server to understand what the ESP32 inferred at the time of capture.
 - **Rotates** the image based on EXIF orientation.
 - **Crops** out individual digit zones using the bounding boxes in the metadata.
 - **Saves** the cropped digit zones to an `extracted/` directory.
@@ -16,7 +16,7 @@ This script processes the raw images saved by your server. It reads the custom E
 `[inference_detection]_[confidence]_[timestamp]_[random_string].jpg`
 
 ### 2. `2_deduplicate.py`
-Training datasets often become bloated with visually identical or extremely similar images (e.g., a dial hovering between two digits for an hour). 
+Training datasets often become bloated with visually identical or extremely similar images (e.g., a dial hovering between two digits for an hour).
 - Recursively scans the `extracted/` folder.
 - Uses **MD5 hashing** to remove exact duplicate files.
 - Uses **Perceptual Hashing (pHash)** to group visually similar images that have the *exact same* inferred value.

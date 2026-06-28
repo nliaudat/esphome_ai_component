@@ -5,13 +5,13 @@ namespace esp32_camera_utils {
 
 const char *const CameraWindowControl::TAG = "CameraWindowControl";
 
-bool CameraWindowControl::set_window(esp32_camera::ESP32Camera* camera, const WindowConfig& config) {
+bool CameraWindowControl::set_window(esp32_camera::ESP32Camera *camera, const WindowConfig &config) {
   if (!camera || !config.validate()) {
     ESP_LOGE(TAG, "Invalid camera or window configuration");
     return false;
   }
 
-  sensor_t* sensor = esp_camera_sensor_get();
+  sensor_t *sensor = esp_camera_sensor_get();
   if (!sensor) {
     ESP_LOGE(TAG, "Failed to get camera sensor");
     return false;
@@ -34,24 +34,21 @@ bool CameraWindowControl::set_window(esp32_camera::ESP32Camera* camera, const Wi
   return success;
 }
 
-bool CameraWindowControl::set_window(esp32_camera::ESP32Camera* camera,
-                                    int offset_x, int offset_y,
-                                    int width, int height) {
+bool CameraWindowControl::set_window(esp32_camera::ESP32Camera *camera, int offset_x, int offset_y, int width,
+                                     int height) {
   WindowConfig config{offset_x, offset_y, width, height, true};
   return set_window(camera, config);
 }
 
-bool CameraWindowControl::set_ROI(esp32_camera::ESP32Camera* camera,
-                                 int offset_x, int offset_y,
-                                 int width, int height) {
-    WindowConfig config{offset_x, offset_y, width, height, true};
-    return set_window(camera, config);
+bool CameraWindowControl::set_ROI(esp32_camera::ESP32Camera *camera, int offset_x, int offset_y, int width,
+                                  int height) {
+  WindowConfig config{offset_x, offset_y, width, height, true};
+  return set_window(camera, config);
 }
 
-bool CameraWindowControl::set_window_from_crop_zones(esp32_camera::ESP32Camera* camera,
-                                                    const std::vector<CropZone>& zones,
-                                                    int full_width, int full_height,
-                                                    float padding_ratio) {
+bool CameraWindowControl::set_window_from_crop_zones(esp32_camera::ESP32Camera *camera,
+                                                     const std::vector<CropZone> &zones, int full_width,
+                                                     int full_height, float padding_ratio) {
   if (!camera || !supports_window(camera)) {
     ESP_LOGE(TAG, "Camera doesn't support window setting");
     return false;
@@ -69,17 +66,19 @@ bool CameraWindowControl::set_window_from_crop_zones(esp32_camera::ESP32Camera* 
     return false;
   }
 
-  ESP_LOGI(TAG, "Setting camera window from %d crop zones: %s",
-           static_cast<int>(zones.size()), config.to_string().c_str());
+  ESP_LOGI(TAG, "Setting camera window from %d crop zones: %s", static_cast<int>(zones.size()),
+           config.to_string().c_str());
 
   return set_window(camera, config);
 }
 
-bool CameraWindowControl::reset_to_full_frame(esp32_camera::ESP32Camera* camera) {
-  if (!camera) return false;
+bool CameraWindowControl::reset_to_full_frame(esp32_camera::ESP32Camera *camera) {
+  if (!camera)
+    return false;
 
-  sensor_t* sensor = esp_camera_sensor_get();
-  if (!sensor) return false;
+  sensor_t *sensor = esp_camera_sensor_get();
+  if (!sensor)
+    return false;
 
   std::string sensor_name = get_sensor_name(sensor);
   ESP_LOGI(TAG, "Resetting %s to full frame", sensor_name.c_str());
@@ -98,11 +97,12 @@ bool CameraWindowControl::reset_to_full_frame(esp32_camera::ESP32Camera* camera)
   return success;
 }
 
-std::string CameraWindowControl::get_sensor_name(sensor_t* sensor) const {
-  if (!sensor) return "Unknown";
+std::string CameraWindowControl::get_sensor_name(sensor_t *sensor) const {
+  if (!sensor)
+    return "Unknown";
 
   // Use the esp32-camera function to get sensor info
-  camera_sensor_info_t* sensor_info = esp_camera_sensor_get_info(&sensor->id);
+  camera_sensor_info_t *sensor_info = esp_camera_sensor_get_info(&sensor->id);
   if (sensor_info && sensor_info->name) {
     return std::string(sensor_info->name);
   }
@@ -110,27 +110,44 @@ std::string CameraWindowControl::get_sensor_name(sensor_t* sensor) const {
   // Fallback: try to detect from PID if the function fails
   if (sensor->id.PID != 0) {
     switch (sensor->id.PID) {
-      case 0x26: return "OV2640";
+      case 0x26:
+        return "OV2640";
       case 0x36:
-      case 0x3660: return "OV3660";
+      case 0x3660:
+        return "OV3660";
       case 0x56:
-      case 0x5640: return "OV5640";
+      case 0x5640:
+        return "OV5640";
       case 0x77:
-      case 0x7725: return "OV7725";
+      case 0x7725:
+        return "OV7725";
       case 0x76:
-      case 0x7670: return "OV7670";
-      case 0x1410: return "NT99141";
-      case 0x2145: return "GC2145";
-      case 0x232a: return "GC032A";
-      case 0x9b: return "GC0308";
-      case 0x30: return "BF3005";
-      case 0x20a6: return "BF20A6";
-      case 0xda4a: return "SC101IOT";
-      case 0x9a46: return "SC030IOT";
-      case 0x0031: return "SC031GS";
-      case 0x039E: return "MEGA_CCM";
-      case 0x0955: return "HM1055";
-      case 0x0360: return "HM0360";
+      case 0x7670:
+        return "OV7670";
+      case 0x1410:
+        return "NT99141";
+      case 0x2145:
+        return "GC2145";
+      case 0x232a:
+        return "GC032A";
+      case 0x9b:
+        return "GC0308";
+      case 0x30:
+        return "BF3005";
+      case 0x20a6:
+        return "BF20A6";
+      case 0xda4a:
+        return "SC101IOT";
+      case 0x9a46:
+        return "SC030IOT";
+      case 0x0031:
+        return "SC031GS";
+      case 0x039E:
+        return "MEGA_CCM";
+      case 0x0955:
+        return "HM1055";
+      case 0x0360:
+        return "HM0360";
       default:
         char buffer[32];
         snprintf(buffer, sizeof(buffer), "Unknown(0x%04X)", sensor->id.PID);
@@ -141,14 +158,15 @@ std::string CameraWindowControl::get_sensor_name(sensor_t* sensor) const {
   return "Unknown Sensor";
 }
 
-bool CameraWindowControl::is_sensor_supported(sensor_t* sensor) const {
-  if (!sensor) return false;
+bool CameraWindowControl::is_sensor_supported(sensor_t *sensor) const {
+  if (!sensor)
+    return false;
 
   // Use esp32-camera function first
-  camera_sensor_info_t* sensor_info = esp_camera_sensor_get_info(&sensor->id);
+  camera_sensor_info_t *sensor_info = esp_camera_sensor_get_info(&sensor->id);
   if (sensor_info && sensor_info->name) {
     std::string sensor_name = sensor_info->name;
-    for (const auto& supported_sensor : get_supported_sensors()) {
+    for (const auto &supported_sensor : get_supported_sensors()) {
       if (sensor_name.find(supported_sensor) != std::string::npos) {
         return true;
       }
@@ -157,7 +175,7 @@ bool CameraWindowControl::is_sensor_supported(sensor_t* sensor) const {
 
   // Fallback to manual detection
   std::string sensor_name = get_sensor_name(sensor);
-  for (const auto& supported_sensor : get_supported_sensors()) {
+  for (const auto &supported_sensor : get_supported_sensors()) {
     if (sensor_name.find(supported_sensor) != std::string::npos) {
       return true;
     }
@@ -166,8 +184,9 @@ bool CameraWindowControl::is_sensor_supported(sensor_t* sensor) const {
   return false;
 }
 
-bool CameraWindowControl::set_sensor_window(sensor_t* sensor, const WindowConfig& config) {
-  if (!sensor) return false;
+bool CameraWindowControl::set_sensor_window(sensor_t *sensor, const WindowConfig &config) {
+  if (!sensor)
+    return false;
 
   int ret = 0;
   uint16_t sensor_pid = sensor->id.PID;
@@ -183,15 +202,15 @@ bool CameraWindowControl::set_sensor_window(sensor_t* sensor, const WindowConfig
 
   // Determine full sensor resolution based on sensor type
   switch (sensor_pid) {
-    case 0x5640: // OV5640
+    case 0x5640:  // OV5640
       full_sensor_width = 2592;
       full_sensor_height = 1944;
       break;
-    case 0x3660: // OV3660
+    case 0x3660:  // OV3660
       full_sensor_width = 2048;
       full_sensor_height = 1536;
       break;
-    case 0x26:   // OV2640
+    case 0x26:  // OV2640
     default:
       full_sensor_width = 1600;
       full_sensor_height = 1200;
@@ -199,8 +218,8 @@ bool CameraWindowControl::set_sensor_window(sensor_t* sensor, const WindowConfig
   }
 
   ESP_LOGI(TAG, "Full sensor resolution: %dx%d", full_sensor_width, full_sensor_height);
-  ESP_LOGI(TAG, "Target window: offset(%d,%d), size(%dx%d), output(%dx%d)",
-           config.offset_x, config.offset_y, config.width, config.height, output_width, output_height);
+  ESP_LOGI(TAG, "Target window: offset(%d,%d), size(%dx%d), output(%dx%d)", config.offset_x, config.offset_y,
+           config.width, config.height, output_width, output_height);
 
   // Calculate the actual window parameters
   int window_width = config.width;
@@ -221,56 +240,56 @@ bool CameraWindowControl::set_sensor_window(sensor_t* sensor, const WindowConfig
     window_offset_y = (window_offset_y / 4) * 4;
   }
 
-  ESP_LOGI(TAG, "Adjusted window: offset(%d,%d), size(%dx%d)",
-           window_offset_x, window_offset_y, window_width, window_height);
+  ESP_LOGI(TAG, "Adjusted window: offset(%d,%d), size(%dx%d)", window_offset_x, window_offset_y, window_width,
+           window_height);
 
   // First, set the output framesize
   framesize_t target_size = get_framesize_from_dimensions(output_width, output_height);
   ret |= sensor->set_framesize(sensor, target_size);
-  vTaskDelay(10 / portTICK_PERIOD_MS); // Small delay between commands
+  vTaskDelay(10 / portTICK_PERIOD_MS);  // Small delay between commands
 
   // Then set the window using set_res_raw
-  if (sensor_pid == 0x26) { // OV2640
+  if (sensor_pid == 0x26) {  // OV2640
     // OV2640: set_res_raw(s, 0, 0, 0, 0, xOffset, yOffset, xTotal, yTotal, xOutput, yOutput, false, false)
-    ret |= sensor->set_res_raw(sensor,
-                              0, 0,                    // startX, startY
-                              0, 0,                    // endX, endY
-                              window_offset_x, window_offset_y, // offsetX, offsetY
-                              window_width, window_height, // totalX, totalY
-                              output_width, output_height, // outputX, outputY
-                              false, false);           // scale, binning
-  }
-  else { // OV3660 or OV5640
-    // OV3660/OV5640: set_res_raw(s, xOffset, yOffset, xOffset + xTotal, yOffset + yTotal, 0, 0, frameSizeX, frameSizeY, xOutput, yOutput, scale, binning)
+    ret |= sensor->set_res_raw(sensor, 0, 0,                      // startX, startY
+                               0, 0,                              // endX, endY
+                               window_offset_x, window_offset_y,  // offsetX, offsetY
+                               window_width, window_height,       // totalX, totalY
+                               output_width, output_height,       // outputX, outputY
+                               false, false);                     // scale, binning
+  } else {                                                        // OV3660 or OV5640
+    // OV3660/OV5640: set_res_raw(s, xOffset, yOffset, xOffset + xTotal, yOffset + yTotal, 0, 0, frameSizeX, frameSizeY,
+    // xOutput, yOutput, scale, binning)
     bool scale = !(output_width == window_width && output_height == window_height);
     bool binning = (window_width >= (full_sensor_width >> 1));
 
-    ret |= sensor->set_res_raw(sensor,
-                              window_offset_x, window_offset_y, // startX, startY
-                              window_offset_x + window_width, window_offset_y + window_height, // endX, endY
-                              0, 0,                    // offsetX, offsetY
-                              full_sensor_width, full_sensor_height, // totalX, totalY
-                              output_width, output_height, // outputX, outputY
-                              scale, binning);         // scale, binning
+    ret |= sensor->set_res_raw(sensor, window_offset_x, window_offset_y,                         // startX, startY
+                               window_offset_x + window_width, window_offset_y + window_height,  // endX, endY
+                               0, 0,                                                             // offsetX, offsetY
+                               full_sensor_width, full_sensor_height,                            // totalX, totalY
+                               output_width, output_height,                                      // outputX, outputY
+                               scale, binning);                                                  // scale, binning
   }
 
-  vTaskDelay(50 / portTICK_PERIOD_MS); // Allow time for sensor to apply changes
+  vTaskDelay(50 / portTICK_PERIOD_MS);  // Allow time for sensor to apply changes
 
-  ESP_LOGI(TAG, "Window setting result: %d (offset: %d,%d, window: %dx%d, output: %dx%d)",
-           ret, window_offset_x, window_offset_y, window_width, window_height, output_width, output_height);
+  ESP_LOGI(TAG, "Window setting result: %d (offset: %d,%d, window: %dx%d, output: %dx%d)", ret, window_offset_x,
+           window_offset_y, window_width, window_height, output_width, output_height);
   return (ret == 0);
 }
 
-bool CameraWindowControl::test_window_stability(esp32_camera::ESP32Camera* camera) {
-  if (!camera) return false;
+bool CameraWindowControl::test_window_stability(esp32_camera::ESP32Camera *camera) {
+  if (!camera)
+    return false;
 
   ESP_LOGI(TAG, "Testing window stability with direct sensor commands...");
 
-  sensor_t* sensor = esp_camera_sensor_get();
-  if (!sensor) return false;
+  sensor_t *sensor = esp_camera_sensor_get();
+  if (!sensor)
+    return false;
 
   // Test with a simple direct command instead of using set_window
-  int ret = sensor->set_framesize(sensor, FRAMESIZE_VGA); // 640x480
+  int ret = sensor->set_framesize(sensor, FRAMESIZE_VGA);  // 640x480
   vTaskDelay(100 / portTICK_PERIOD_MS);
 
   if (ret == 0) {
@@ -283,43 +302,61 @@ bool CameraWindowControl::test_window_stability(esp32_camera::ESP32Camera* camer
 }
 
 framesize_t CameraWindowControl::get_framesize_from_dimensions(int width, int height) {
-  if (width <= 96 && height <= 96) return FRAMESIZE_96X96;
-  if (width <= 160 && height <= 120) return FRAMESIZE_QQVGA;
-  if (width <= 176 && height <= 144) return FRAMESIZE_QCIF;
-  if (width <= 240 && height <= 176) return FRAMESIZE_HQVGA;
-  if (width <= 240 && height <= 240) return FRAMESIZE_240X240;
-  if (width <= 320 && height <= 240) return FRAMESIZE_QVGA;
-  if (width <= 320 && height <= 320) return FRAMESIZE_320X320;
-  if (width <= 400 && height <= 296) return FRAMESIZE_CIF;
-  if (width <= 480 && height <= 320) return FRAMESIZE_HVGA;
-  if (width <= 640 && height <= 480) return FRAMESIZE_VGA;
-  if (width <= 800 && height <= 600) return FRAMESIZE_SVGA;
-  if (width <= 1024 && height <= 768) return FRAMESIZE_XGA;
-  if (width <= 1280 && height <= 720) return FRAMESIZE_HD;
-  if (width <= 1280 && height <= 1024) return FRAMESIZE_SXGA;
-  if (width <= 1600 && height <= 1200) return FRAMESIZE_UXGA;
-  if (width <= 1920 && height <= 1080) return FRAMESIZE_FHD;
+  if (width <= 96 && height <= 96)
+    return FRAMESIZE_96X96;
+  if (width <= 160 && height <= 120)
+    return FRAMESIZE_QQVGA;
+  if (width <= 176 && height <= 144)
+    return FRAMESIZE_QCIF;
+  if (width <= 240 && height <= 176)
+    return FRAMESIZE_HQVGA;
+  if (width <= 240 && height <= 240)
+    return FRAMESIZE_240X240;
+  if (width <= 320 && height <= 240)
+    return FRAMESIZE_QVGA;
+  if (width <= 320 && height <= 320)
+    return FRAMESIZE_320X320;
+  if (width <= 400 && height <= 296)
+    return FRAMESIZE_CIF;
+  if (width <= 480 && height <= 320)
+    return FRAMESIZE_HVGA;
+  if (width <= 640 && height <= 480)
+    return FRAMESIZE_VGA;
+  if (width <= 800 && height <= 600)
+    return FRAMESIZE_SVGA;
+  if (width <= 1024 && height <= 768)
+    return FRAMESIZE_XGA;
+  if (width <= 1280 && height <= 720)
+    return FRAMESIZE_HD;
+  if (width <= 1280 && height <= 1024)
+    return FRAMESIZE_SXGA;
+  if (width <= 1600 && height <= 1200)
+    return FRAMESIZE_UXGA;
+  if (width <= 1920 && height <= 1080)
+    return FRAMESIZE_FHD;
 
-  return FRAMESIZE_UXGA; // default fallback
+  return FRAMESIZE_UXGA;  // default fallback
 }
 
-bool CameraWindowControl::set_ov2640_window(sensor_t* sensor, const WindowConfig& config) {
+bool CameraWindowControl::set_ov2640_window(sensor_t *sensor, const WindowConfig &config) {
   return set_sensor_window(sensor, config);
 }
 
-bool CameraWindowControl::set_ov3660_window(sensor_t* sensor, const WindowConfig& config) {
+bool CameraWindowControl::set_ov3660_window(sensor_t *sensor, const WindowConfig &config) {
   return set_sensor_window(sensor, config);
 }
 
-bool CameraWindowControl::set_ov5640_window(sensor_t* sensor, const WindowConfig& config) {
+bool CameraWindowControl::set_ov5640_window(sensor_t *sensor, const WindowConfig &config) {
   return set_sensor_window(sensor, config);
 }
 
-std::string CameraWindowControl::get_sensor_info(esp32_camera::ESP32Camera* camera) const {
-  if (!camera) return "No camera";
+std::string CameraWindowControl::get_sensor_info(esp32_camera::ESP32Camera *camera) const {
+  if (!camera)
+    return "No camera";
 
-  sensor_t* sensor = esp_camera_sensor_get();
-  if (!sensor) return "No sensor";
+  sensor_t *sensor = esp_camera_sensor_get();
+  if (!sensor)
+    return "No sensor";
 
   std::string sensor_name = get_sensor_name(sensor);
   char buffer[64];
@@ -327,19 +364,15 @@ std::string CameraWindowControl::get_sensor_info(esp32_camera::ESP32Camera* came
   return std::string(buffer);
 }
 
-const std::vector<std::string>& CameraWindowControl::get_supported_sensors() {
-  static const std::vector<std::string> supported_sensors = {
-    "OV2640", "OV3660", "OV5640", "OV7725",
-    "SC101IOT", "SC030IOT", "SC031GS"
-  };
+const std::vector<std::string> &CameraWindowControl::get_supported_sensors() {
+  static const std::vector<std::string> supported_sensors = {"OV2640",   "OV3660",   "OV5640", "OV7725",
+                                                             "SC101IOT", "SC030IOT", "SC031GS"};
   return supported_sensors;
 }
 
-CameraWindowControl::WindowConfig CameraWindowControl::calculate_window_from_zones(
-    const std::vector<CropZone>& zones,
-    int full_width, int full_height,
-    float padding_ratio) {
-
+CameraWindowControl::WindowConfig CameraWindowControl::calculate_window_from_zones(const std::vector<CropZone> &zones,
+                                                                                   int full_width, int full_height,
+                                                                                   float padding_ratio) {
   WindowConfig config;
 
   if (zones.empty()) {
@@ -353,7 +386,7 @@ CameraWindowControl::WindowConfig CameraWindowControl::calculate_window_from_zon
   int max_x = 0;
   int max_y = 0;
 
-  for (const auto& zone : zones) {
+  for (const auto &zone : zones) {
     min_x = std::min(min_x, zone.x1);
     min_y = std::min(min_y, zone.y1);
     max_x = std::max(max_x, zone.x2);
@@ -379,17 +412,14 @@ CameraWindowControl::WindowConfig CameraWindowControl::calculate_window_from_zon
   config.width = (config.width / 4) * 4;
   config.height = (config.height / 4) * 4;
 
-  ESP_LOGD(TAG, "Calculated window from %d zones: %s",
-           static_cast<int>(zones.size()), config.to_string().c_str());
+  ESP_LOGD(TAG, "Calculated window from %d zones: %s", static_cast<int>(zones.size()), config.to_string().c_str());
 
   return config;
 }
 
-std::pair<int, int> CameraWindowControl::update_dimensions_after_window(
-    esp32_camera::ESP32Camera* camera,
-    const WindowConfig& config,
-    int original_width, int original_height) const {
-
+std::pair<int, int> CameraWindowControl::update_dimensions_after_window(esp32_camera::ESP32Camera *camera,
+                                                                        const WindowConfig &config, int original_width,
+                                                                        int original_height) const {
   if (config.enabled && config.validate()) {
     // Return window dimensions
     return {config.width, config.height};
@@ -401,92 +431,105 @@ std::pair<int, int> CameraWindowControl::update_dimensions_after_window(
 
 std::string CameraWindowControl::framesize_to_string(framesize_t framesize) {
   switch (framesize) {
-    case FRAMESIZE_96X96: return "96x96";
-    case FRAMESIZE_QQVGA: return "160x120";
-    case FRAMESIZE_QCIF: return "176x144";
-    case FRAMESIZE_QVGA: return "320x240";
-    case FRAMESIZE_CIF: return "400x296";
-    case FRAMESIZE_VGA: return "640x480";
-    case FRAMESIZE_SVGA: return "800x600";
-    case FRAMESIZE_XGA: return "1024x768";
-    case FRAMESIZE_HD: return "1280x720";
-    case FRAMESIZE_SXGA: return "1280x1024";
-    case FRAMESIZE_UXGA: return "1600x1200";
-    case FRAMESIZE_FHD: return "1920x1080";
-    case FRAMESIZE_QXGA: return "2048x1536";
-    case FRAMESIZE_5MP: return "2592x1944";
-    default: return "Unknown";
+    case FRAMESIZE_96X96:
+      return "96x96";
+    case FRAMESIZE_QQVGA:
+      return "160x120";
+    case FRAMESIZE_QCIF:
+      return "176x144";
+    case FRAMESIZE_QVGA:
+      return "320x240";
+    case FRAMESIZE_CIF:
+      return "400x296";
+    case FRAMESIZE_VGA:
+      return "640x480";
+    case FRAMESIZE_SVGA:
+      return "800x600";
+    case FRAMESIZE_XGA:
+      return "1024x768";
+    case FRAMESIZE_HD:
+      return "1280x720";
+    case FRAMESIZE_SXGA:
+      return "1280x1024";
+    case FRAMESIZE_UXGA:
+      return "1600x1200";
+    case FRAMESIZE_FHD:
+      return "1920x1080";
+    case FRAMESIZE_QXGA:
+      return "2048x1536";
+    case FRAMESIZE_5MP:
+      return "2592x1944";
+    default:
+      return "Unknown";
   }
 }
 
-framesize_t CameraWindowControl::get_max_framesize(sensor_t* sensor) const {
-  if (!sensor) return FRAMESIZE_UXGA;
+framesize_t CameraWindowControl::get_max_framesize(sensor_t *sensor) const {
+  if (!sensor)
+    return FRAMESIZE_UXGA;
 
   uint16_t sensor_pid = sensor->id.PID;
 
   switch (sensor_pid) {
-    case 0x5640: // OV5640
-      return FRAMESIZE_5MP; // 2592x1944
-    case 0x3660: // OV3660
-      return FRAMESIZE_QXGA; // 2048x1536
-    case 0x26:   // OV2640
+    case 0x5640:              // OV5640
+      return FRAMESIZE_5MP;   // 2592x1944
+    case 0x3660:              // OV3660
+      return FRAMESIZE_QXGA;  // 2048x1536
+    case 0x26:                // OV2640
     default:
-      return FRAMESIZE_UXGA; // 1600x1200
+      return FRAMESIZE_UXGA;  // 1600x1200
   }
 }
 
-bool CameraWindowControl::set_window_with_dimensions(esp32_camera::ESP32Camera* camera,
-                                                    int offset_x, int offset_y,
-                                                    int width, int height,
-                                                    int& current_width, int& current_height) {
-    bool success = set_ROI(camera, offset_x, offset_y, width, height);
+bool CameraWindowControl::set_window_with_dimensions(esp32_camera::ESP32Camera *camera, int offset_x, int offset_y,
+                                                     int width, int height, int &current_width, int &current_height) {
+  bool success = set_ROI(camera, offset_x, offset_y, width, height);
 
-    if (success) {
-        auto new_dims = update_dimensions_after_window(
-            camera,
-            WindowConfig{offset_x, offset_y, width, height, true},
-            current_width, current_height);
+  if (success) {
+    auto new_dims = update_dimensions_after_window(camera, WindowConfig{offset_x, offset_y, width, height, true},
+                                                   current_width, current_height);
 
-        current_width = new_dims.first;
-        current_height = new_dims.second;
-    }
+    current_width = new_dims.first;
+    current_height = new_dims.second;
+  }
 
-    return success;
+  return success;
 }
 
-bool CameraWindowControl::set_window_from_crop_zones_with_dimensions(esp32_camera::ESP32Camera* camera,
-                                                                    const std::vector<CropZone>& zones,
-                                                                    int& current_width, int& current_height) {
-    bool success = set_window_from_crop_zones(camera, zones, current_width, current_height);
+bool CameraWindowControl::set_window_from_crop_zones_with_dimensions(esp32_camera::ESP32Camera *camera,
+                                                                     const std::vector<CropZone> &zones,
+                                                                     int &current_width, int &current_height) {
+  bool success = set_window_from_crop_zones(camera, zones, current_width, current_height);
 
-    if (success) {
-        auto config = calculate_window_from_zones(zones, current_width, current_height);
-        auto new_dims = update_dimensions_after_window(camera, config, current_width, current_height);
+  if (success) {
+    auto config = calculate_window_from_zones(zones, current_width, current_height);
+    auto new_dims = update_dimensions_after_window(camera, config, current_width, current_height);
 
-        current_width = new_dims.first;
-        current_height = new_dims.second;
-    }
+    current_width = new_dims.first;
+    current_height = new_dims.second;
+  }
 
-    return success;
+  return success;
 }
 
-bool CameraWindowControl::reset_to_full_frame_with_dimensions(esp32_camera::ESP32Camera* camera,
-                                                             int original_width, int original_height,
-                                                             int& current_width, int& current_height) {
-    bool success = reset_to_full_frame(camera);
+bool CameraWindowControl::reset_to_full_frame_with_dimensions(esp32_camera::ESP32Camera *camera, int original_width,
+                                                              int original_height, int &current_width,
+                                                              int &current_height) {
+  bool success = reset_to_full_frame(camera);
 
-    if (success) {
-        current_width = original_width;
-        current_height = original_height;
-    }
+  if (success) {
+    current_width = original_width;
+    current_height = original_height;
+  }
 
-    return success;
+  return success;
 }
 
-bool CameraWindowControl::supports_window(esp32_camera::ESP32Camera* camera) const {
-  if (!camera) return false;
+bool CameraWindowControl::supports_window(esp32_camera::ESP32Camera *camera) const {
+  if (!camera)
+    return false;
 
-  sensor_t* sensor = esp_camera_sensor_get();
+  sensor_t *sensor = esp_camera_sensor_get();
   if (!sensor) {
     ESP_LOGD(TAG, "No sensor found - camera may not be initialized yet");
     return false;
@@ -502,101 +545,103 @@ bool CameraWindowControl::supports_window(esp32_camera::ESP32Camera* camera) con
   return is_sensor_supported(sensor);
 }
 
-std::pair<int, int> CameraWindowControl::get_current_dimensions(esp32_camera::ESP32Camera* camera,
-                                                               const WindowConfig& config,
-                                                               int original_width, int original_height) const {
-    return update_dimensions_after_window(camera, config, original_width, original_height);
+std::pair<int, int> CameraWindowControl::get_current_dimensions(esp32_camera::ESP32Camera *camera,
+                                                                const WindowConfig &config, int original_width,
+                                                                int original_height) const {
+  return update_dimensions_after_window(camera, config, original_width, original_height);
 }
 
+bool CameraWindowControl::hard_reset_camera(esp32_camera::ESP32Camera *camera) {
+  if (!camera)
+    return false;
 
+  ESP_LOGI(TAG, "Performing hard camera reset...");
 
-bool CameraWindowControl::hard_reset_camera(esp32_camera::ESP32Camera* camera) {
-    if (!camera) return false;
+  // 1. Return all frame buffers to ensure clean state
+  esp_camera_return_all();
+  vTaskDelay(100 / portTICK_PERIOD_MS);
 
-    ESP_LOGI(TAG, "Performing hard camera reset...");
-
-    // 1. Return all frame buffers to ensure clean state
-    esp_camera_return_all();
-    vTaskDelay(100 / portTICK_PERIOD_MS);
-
-    // 2. Reset the sensor
-    sensor_t* sensor = esp_camera_sensor_get();
-    if (sensor && sensor->reset) {
-        ESP_LOGI(TAG, "Performing sensor hardware reset...");
-        int reset_result = sensor->reset(sensor);
-        if (reset_result == 0) {
-            ESP_LOGI(TAG, "Sensor hardware reset successful");
-        } else {
-            ESP_LOGW(TAG, "Sensor hardware reset returned: %d", reset_result);
-        }
+  // 2. Reset the sensor
+  sensor_t *sensor = esp_camera_sensor_get();
+  if (sensor && sensor->reset) {
+    ESP_LOGI(TAG, "Performing sensor hardware reset...");
+    int reset_result = sensor->reset(sensor);
+    if (reset_result == 0) {
+      ESP_LOGI(TAG, "Sensor hardware reset successful");
+    } else {
+      ESP_LOGW(TAG, "Sensor hardware reset returned: %d", reset_result);
     }
+  }
 
-    vTaskDelay(300 / portTICK_PERIOD_MS);
+  vTaskDelay(300 / portTICK_PERIOD_MS);
 
-    // 3. Reset to maximum resolution
-    if (sensor) {
-        framesize_t max_framesize = get_max_framesize(sensor);
-        sensor->set_framesize(sensor, max_framesize);
-        vTaskDelay(200 / portTICK_PERIOD_MS);
-    }
-
-    ESP_LOGI(TAG, "Hard camera reset completed");
-    return true;
-}
-
-bool CameraWindowControl::soft_reset_camera(esp32_camera::ESP32Camera* camera) {
-    if (!camera) return false;
-
-    ESP_LOGI(TAG, "Performing soft camera reset...");
-
-    sensor_t* sensor = esp_camera_sensor_get();
-    if (!sensor) return false;
-
-    // Reset through framesize changes
-    framesize_t current_size = sensor->status.framesize;
-    framesize_t max_size = get_max_framesize(sensor);
-
-    // Change to a different size and back to force reinitialization
-    if (current_size != FRAMESIZE_QVGA) {
-        sensor->set_framesize(sensor, FRAMESIZE_QVGA);
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
-
-    sensor->set_framesize(sensor, max_size);
+  // 3. Reset to maximum resolution
+  if (sensor) {
+    framesize_t max_framesize = get_max_framesize(sensor);
+    sensor->set_framesize(sensor, max_framesize);
     vTaskDelay(200 / portTICK_PERIOD_MS);
+  }
 
-    ESP_LOGI(TAG, "Soft camera reset completed");
-    return true;
+  ESP_LOGI(TAG, "Hard camera reset completed");
+  return true;
 }
 
-bool CameraWindowControl::set_window_with_reset(esp32_camera::ESP32Camera* camera, const WindowConfig& config) {
-    if (!camera || !config.validate()) {
-        ESP_LOGE(TAG, "Invalid camera or window configuration");
-        return false;
-    }
+bool CameraWindowControl::soft_reset_camera(esp32_camera::ESP32Camera *camera) {
+  if (!camera)
+    return false;
 
-    ESP_LOGI(TAG, "Setting camera window with reset...");
+  ESP_LOGI(TAG, "Performing soft camera reset...");
 
-    // Perform reset before window change
-    if (!soft_reset_camera(camera)) {
-        ESP_LOGW(TAG, "Soft reset had minor issues, continuing...");
-    }
+  sensor_t *sensor = esp_camera_sensor_get();
+  if (!sensor)
+    return false;
+
+  // Reset through framesize changes
+  framesize_t current_size = sensor->status.framesize;
+  framesize_t max_size = get_max_framesize(sensor);
+
+  // Change to a different size and back to force reinitialization
+  if (current_size != FRAMESIZE_QVGA) {
+    sensor->set_framesize(sensor, FRAMESIZE_QVGA);
     vTaskDelay(100 / portTICK_PERIOD_MS);
+  }
 
-    // Call the existing set_window method
-    return set_window(camera, config);
+  sensor->set_framesize(sensor, max_size);
+  vTaskDelay(200 / portTICK_PERIOD_MS);
+
+  ESP_LOGI(TAG, "Soft camera reset completed");
+  return true;
 }
 
-bool CameraWindowControl::reset_to_full_frame_with_reset(esp32_camera::ESP32Camera* camera) {
-    if (!camera) return false;
+bool CameraWindowControl::set_window_with_reset(esp32_camera::ESP32Camera *camera, const WindowConfig &config) {
+  if (!camera || !config.validate()) {
+    ESP_LOGE(TAG, "Invalid camera or window configuration");
+    return false;
+  }
 
-    ESP_LOGI(TAG, "Resetting to full frame with reset...");
+  ESP_LOGI(TAG, "Setting camera window with reset...");
 
-    // Perform reset before full frame
-    soft_reset_camera(camera);
+  // Perform reset before window change
+  if (!soft_reset_camera(camera)) {
+    ESP_LOGW(TAG, "Soft reset had minor issues, continuing...");
+  }
+  vTaskDelay(100 / portTICK_PERIOD_MS);
 
-    // Call the existing reset_to_full_frame method
-    return reset_to_full_frame(camera);
+  // Call the existing set_window method
+  return set_window(camera, config);
+}
+
+bool CameraWindowControl::reset_to_full_frame_with_reset(esp32_camera::ESP32Camera *camera) {
+  if (!camera)
+    return false;
+
+  ESP_LOGI(TAG, "Resetting to full frame with reset...");
+
+  // Perform reset before full frame
+  soft_reset_camera(camera);
+
+  // Call the existing reset_to_full_frame method
+  return reset_to_full_frame(camera);
 }
 
 }  // namespace esp32_camera_utils

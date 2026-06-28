@@ -30,38 +30,38 @@ class DrawingUtils {
    * @param channels Number of channels (2 for RGB565, 3 for RGB888).
    * @param color Color in RGB565 format (uint16_t).
    */
-  static void draw_pixel(uint8_t* buffer, int x, int y, int w, int h, int channels, uint16_t color);
+  static void draw_pixel(uint8_t *buffer, int x, int y, int w, int h, int channels, uint16_t color);
 
   /**
    * @brief Draw a rectangle outline.
    */
-  static void draw_rectangle(uint8_t* buffer, int x, int y, int rect_w, int rect_h,
-                             int img_w, int img_h, int channels, uint16_t color);
+  static void draw_rectangle(uint8_t *buffer, int x, int y, int rect_w, int rect_h, int img_w, int img_h, int channels,
+                             uint16_t color);
 
   /**
    * @brief Draw a filled rectangle.
    */
-  static void draw_filled_rectangle(uint8_t* buffer, int x, int y, int rect_w, int rect_h,
-                                    int img_w, int img_h, int channels, uint16_t color);
+  static void draw_filled_rectangle(uint8_t *buffer, int x, int y, int rect_w, int rect_h, int img_w, int img_h,
+                                    int channels, uint16_t color);
 
   /**
    * @brief Draw a circle outline.
    */
-  static void draw_circle(uint8_t* buffer, int center_x, int center_y, int radius,
-                          int img_w, int img_h, int channels, uint16_t color);
+  static void draw_circle(uint8_t *buffer, int center_x, int center_y, int radius, int img_w, int img_h, int channels,
+                          uint16_t color);
 
   /**
    * @brief Draw a filled circle.
    */
-  static void draw_filled_circle(uint8_t* buffer, int center_x, int center_y, int radius,
-                                 int img_w, int img_h, int channels, uint16_t color);
+  static void draw_filled_circle(uint8_t *buffer, int center_x, int center_y, int radius, int img_w, int img_h,
+                                 int channels, uint16_t color);
 
  private:
   // Helper to convert RGB565 color to RGB888
-  static void rgb565_to_rgb888(uint16_t color, uint8_t& r, uint8_t& g, uint8_t& b);
+  static void rgb565_to_rgb888(uint16_t color, uint8_t &r, uint8_t &g, uint8_t &b);
 };
 
 }  // namespace esp32_camera_utils
 }  // namespace esphome
 
-#endif // USE_CAMERA_DRAWING
+#endif  // USE_CAMERA_DRAWING

@@ -33,24 +33,24 @@ class ValueValidatorCoordinator {
 
   bool validate_reading(std::span<const float> digits, std::span<const float> confidences, int &validated_value) {
     if (this->validator_ == nullptr) {
-        if (digits.empty()) {
-            return false;
+      if (digits.empty()) {
+        return false;
+      }
+      long long val = 0;
+      for (float d : digits) {
+        int digit = static_cast<int>(round(d));
+        if (digit < 0 || digit >= 10) {
+          digit = 0;
         }
-        long long val = 0;
-        for (float d : digits) {
-            int digit = static_cast<int>(round(d));
-            if (digit < 0 || digit >= 10) {
-                digit = 0;
-            }
-            val = val * 10 + digit;
-        }
+        val = val * 10 + digit;
+      }
 
-        if (val > std::numeric_limits<int>::max()) {
-            validated_value = std::numeric_limits<int>::max();
-        } else {
-            validated_value = static_cast<int>(val);
-        }
-        return true;
+      if (val > std::numeric_limits<int>::max()) {
+        validated_value = std::numeric_limits<int>::max();
+      } else {
+        validated_value = static_cast<int>(val);
+      }
+      return true;
     }
     return this->validator_->validate_reading(digits, confidences, validated_value);
   }
@@ -67,8 +67,7 @@ class ValueValidatorCoordinator {
     }
   }
 
-  value_validator::ValueValidator* get_validator() const { return this->validator_; }
-
+  value_validator::ValueValidator *get_validator() const { return this->validator_; }
 
  protected:
   value_validator::ValueValidator *validator_{nullptr};
@@ -83,42 +82,45 @@ class ValueValidatorCoordinator {
   }
 
   bool validate_reading(std::span<const float> digits, std::span<const float> confidences, int &validated_value) {
-        if (digits.empty()) {
-            return false;
-        }
-        long long val = 0;
-        for (float d : digits) {
-            int digit = static_cast<int>(round(d));
-            if (digit < 0 || digit >= 10) digit = 0;
-            val = val * 10 + digit;
-        }
-        if (val > std::numeric_limits<int>::max()) {
-            validated_value = std::numeric_limits<int>::max();
-        } else {
-            validated_value = static_cast<int>(val);
-        }
-        return true;
+    if (digits.empty()) {
+      return false;
+    }
+    long long val = 0;
+    for (float d : digits) {
+      int digit = static_cast<int>(round(d));
+      if (digit < 0 || digit >= 10)
+        digit = 0;
+      val = val * 10 + digit;
+    }
+    if (val > std::numeric_limits<int>::max()) {
+      validated_value = std::numeric_limits<int>::max();
+    } else {
+      validated_value = static_cast<int>(val);
+    }
+    return true;
   }
 
   bool validate_reading(std::span<const float> digits, std::span<const float> confidences, float &validated_value) {
-      if (digits.empty()) return false;
-      long long val = 0;
-      for (float d : digits) {
-          int digit = static_cast<int>(round(d));
-          if (digit < 0 || digit >= 10) digit = 0;
-          val = val * 10 + digit;
-      }
-      validated_value = static_cast<float>(val);
-      return true;
+    if (digits.empty())
+      return false;
+    long long val = 0;
+    for (float d : digits) {
+      int digit = static_cast<int>(round(d));
+      if (digit < 0 || digit >= 10)
+        digit = 0;
+      val = val * 10 + digit;
+    }
+    validated_value = static_cast<float>(val);
+    return true;
   }
 
   void set_last_valid_reading(int value) {}
   void set_last_valid_reading(const std::string &value) {}
-  void* get_validator() const { return nullptr; }
+  void *get_validator() const { return nullptr; }
 #endif
 };
 
 }  // namespace meter_reader_tflite
 }  // namespace esphome
 
-#endif // USE_METER_READER_TFLITE
+#endif  // USE_METER_READER_TFLITE

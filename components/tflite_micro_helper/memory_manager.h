@@ -15,8 +15,9 @@ class MemoryManager {
  public:
   struct AllocationResult {
     struct HeapCapsDeleter {
-      void operator()(uint8_t* p) const {
-        if (p) heap_caps_free(p);
+      void operator()(uint8_t *p) const {
+        if (p)
+          heap_caps_free(p);
       }
     };
 
@@ -30,10 +31,7 @@ class MemoryManager {
   };
 
   [[nodiscard]] static AllocationResult allocate_tensor_arena(size_t requested_size);
-  static void report_memory_status(size_t requested_size,
-                                 size_t allocated_size,
-                                 size_t peak_usage,
-                                 size_t model_size);
+  static void report_memory_status(size_t requested_size, size_t allocated_size, size_t peak_usage, size_t model_size);
 
   /**
    * @brief Parse an arena size string (e.g. "110KB", "2MB", "51200") to bytes.
@@ -41,7 +39,7 @@ class MemoryManager {
    * @param size_str The size string to parse.
    * @return The size in bytes, or 0 if parsing fails.
    */
-  static size_t parse_size_string(const std::string& size_str);
+  static size_t parse_size_string(const std::string &size_str);
 
   /**
    * @brief Check if PSRAM (SPIRAM) is available on this device.
@@ -53,4 +51,4 @@ class MemoryManager {
 }  // namespace tflite_micro_helper
 }  // namespace esphome
 
-#endif // USE_TFLITE_MICRO_HELPER
+#endif  // USE_TFLITE_MICRO_HELPER

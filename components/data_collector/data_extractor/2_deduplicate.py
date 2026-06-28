@@ -1,11 +1,12 @@
 import argparse
-import os
-import sys
-from PIL import Image
-import imagehash
 from collections import defaultdict
 import hashlib
-import shutil
+import os
+import sys
+
+import imagehash
+from PIL import Image
+
 
 def calculate_phash(image_path):
     """Calculate perceptual hash for an image."""
@@ -16,13 +17,14 @@ def calculate_phash(image_path):
         print(f"Error processing {image_path}: {e}")
         return None
 
+
 def parse_filename(filepath):
     """
     Parses the filename formatted as [val]_[conf]_[timestamp]_[uuid].jpg.
     Returns (val, conf) or (None, None) if parsing fails.
     """
     filename = os.path.basename(filepath)
-    parts = filename.split('_')
+    parts = filename.split("_")
     if len(parts) >= 4:
         try:
             val = parts[0]
@@ -32,7 +34,10 @@ def parse_filename(filepath):
             pass
     return None, None
 
-def find_duplicates_comprehensive(image_folder, hash_threshold=5, all_files=None, confidence_threshold=0.9):
+
+def find_duplicates_comprehensive(
+    image_folder, hash_threshold=5, all_files=None, confidence_threshold=0.9
+):
     """
     Find exact and near-duplicate images in a folder.
 
@@ -45,7 +50,7 @@ def find_duplicates_comprehensive(image_folder, hash_threshold=5, all_files=None
     Returns:
         tuple: (exact_duplicates, similar_duplicates, all_files)
     """
-    image_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.webp')
+    image_extensions = (".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".webp")
     exact_duplicates = defaultdict(list)
     similar_groups = defaultdict(list)
 
@@ -80,7 +85,7 @@ def find_duplicates_comprehensive(image_folder, hash_threshold=5, all_files=None
 
         # Exact hash (MD5)
         try:
-            with open(path, 'rb') as f:
+            with open(path, "rb") as f:
                 file_hash = hashlib.md5(f.read()).hexdigest()
             # We key exact duplicates by BOTH hash and the predicted value,
             # so we never accidentally merge images predicted differently.
@@ -118,7 +123,10 @@ def find_duplicates_comprehensive(image_folder, hash_threshold=5, all_files=None
 
     return exact_duplicates, similar_groups, valid_files
 
-def delete_duplicates(exact_duplicates, similar_groups, keep_original='oldest', dry_run=False):
+
+def delete_duplicates(
+    exact_duplicates, similar_groups, keep_original="oldest", dry_run=False
+):
     """
     Delete duplicate files based on the specified strategy.
 
@@ -137,9 +145,9 @@ def delete_duplicates(exact_duplicates, similar_groups, keep_original='oldest', 
     for file_hash, file_list in exact_duplicates.items():
         if len(file_list) > 1:
             # Determine which file to keep
-            if keep_original == 'oldest':
+            if keep_original == "oldest":
                 keep_file = min(file_list, key=lambda x: os.path.getmtime(x))
-            elif keep_original == 'newest':
+            elif keep_original == "newest":
                 keep_file = max(file_list, key=lambda x: os.path.getmtime(x))
             else:  # 'first'
                 keep_file = min(file_list)
@@ -153,9 +161,9 @@ def delete_duplicates(exact_duplicates, similar_groups, keep_original='oldest', 
     for group_key, file_list in similar_groups.items():
         if len(file_list) > 1:
             # Determine which file to keep
-            if keep_original == 'oldest':
+            if keep_original == "oldest":
                 keep_file = min(file_list, key=lambda x: os.path.getmtime(x))
-            elif keep_original == 'newest':
+            elif keep_original == "newest":
                 keep_file = max(file_list, key=lambda x: os.path.getmtime(x))
             else:  # 'first'
                 keep_file = min(file_list)
@@ -190,13 +198,16 @@ def delete_duplicates(exact_duplicates, similar_groups, keep_original='oldest', 
 
     return len(files_to_delete), total_saved_space
 
+
 def print_duplicate_report(exact_duplicates, similar_groups):
     """Print a detailed report of found duplicates."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("DUPLICATE REPORT")
-    print("="*60)
+    print("=" * 60)
 
-    exact_dup_count = sum(len(files) - 1 for files in exact_duplicates.values() if len(files) > 1)
+    exact_dup_count = sum(
+        len(files) - 1 for files in exact_duplicates.values() if len(files) > 1
+    )
     similar_dup_count = sum(len(files) - 1 for files in similar_groups.values())
 
     print(f"Exact duplicates found: {exact_dup_count} files can be removed")
@@ -204,7 +215,9 @@ def print_duplicate_report(exact_duplicates, similar_groups):
     print(f"Total potential space savings: {exact_dup_count + similar_dup_count} files")
 
     if exact_duplicates:
-        print(f"\n=== EXACT DUPLICATES ({len([x for x in exact_duplicates.values() if len(x) > 1])} groups) ===")
+        print(
+            f"\n=== EXACT DUPLICATES ({len([x for x in exact_duplicates.values() if len(x) > 1])} groups) ==="
+        )
         for hash_val, files in exact_duplicates.items():
             if len(files) > 1:
                 print(f"\nExact duplicate group ({len(files)} files):")
@@ -223,19 +236,42 @@ def print_duplicate_report(exact_duplicates, similar_groups):
                     mtime = os.path.getmtime(f)
                     print(f"  - {f} ({file_size} bytes, modified: {mtime})")
 
+
 def main():
-    parser = argparse.ArgumentParser(description='Find and remove duplicate images')
-    parser.add_argument('--folder', default='extracted', help='Folder containing images to scan (default: extracted)')
-    parser.add_argument('--threshold', type=int, default=5,
-                       help='Perceptual hash threshold (0-64, lower=more strict, default=5)')
-    parser.add_argument('--keep', choices=['oldest', 'newest', 'first'], default='newest',
-                       help='Which file to keep when duplicates found (default: newest)')
-    parser.add_argument('--delete', action='store_true',
-                       help='Actually delete duplicates (without this flag, only shows report)')
-    parser.add_argument('--dry-run', action='store_true',
-                       help='Show what would be deleted without actually deleting')
-    parser.add_argument('--confidence', type=float, default=0.9,
-                       help='Minimum confidence threshold for deduplication (default: 0.9)')
+    parser = argparse.ArgumentParser(description="Find and remove duplicate images")
+    parser.add_argument(
+        "--folder",
+        default="extracted",
+        help="Folder containing images to scan (default: extracted)",
+    )
+    parser.add_argument(
+        "--threshold",
+        type=int,
+        default=5,
+        help="Perceptual hash threshold (0-64, lower=more strict, default=5)",
+    )
+    parser.add_argument(
+        "--keep",
+        choices=["oldest", "newest", "first"],
+        default="newest",
+        help="Which file to keep when duplicates found (default: newest)",
+    )
+    parser.add_argument(
+        "--delete",
+        action="store_true",
+        help="Actually delete duplicates (without this flag, only shows report)",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be deleted without actually deleting",
+    )
+    parser.add_argument(
+        "--confidence",
+        type=float,
+        default=0.9,
+        help="Minimum confidence threshold for deduplication (default: 0.9)",
+    )
 
     args = parser.parse_args()
 
@@ -257,7 +293,7 @@ def main():
     # Find duplicates
     # Since extractor outputs to subfolders (e.g., extracted/coldwater), we need to scan recursively
     all_files = []
-    image_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.webp')
+    image_extensions = (".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".webp")
     for root, dirs, files in os.walk(args.folder):
         for file in files:
             if file.lower().endswith(image_extensions):
@@ -282,13 +318,14 @@ def main():
 
         print(f"\n{'DRY RUN: ' if args.dry_run else ''}Summary:")
         print(f"Files marked for deletion: {deleted_count}")
-        print(f"Estimated space savings: {saved_space / (1024*1024):.2f} MB")
+        print(f"Estimated space savings: {saved_space / (1024 * 1024):.2f} MB")
 
         if args.dry_run:
             print("\nThis was a dry run. Use --delete to actually remove files.")
     else:
-        print(f"\nTo remove these duplicates, run with --delete flag")
-        print(f"To see what would be deleted without removing, use --dry-run")
+        print("\nTo remove these duplicates, run with --delete flag")
+        print("To see what would be deleted without removing, use --dry-run")
+
 
 if __name__ == "__main__":
     main()

@@ -1,10 +1,9 @@
 import os
-import re
 import random
+import re
 import subprocess
 import threading
 import time
-import sys
 
 SOURCE_CONFIG = "config_test.yaml"
 NUM_WORKERS = 3
@@ -18,45 +17,72 @@ BOARD_KEYS = [
     "boards/board_generic_esp32-s3-n16r8.yaml",
     "boards/board_wrover_kit.yaml",
     "boards/board_m5stack_psram.yaml",
-    "boards/board_esp32cam_aithinker.yaml"
+    "boards/board_esp32cam_aithinker.yaml",
 ]
 
 TARGETS = {
     "tflite_micro_helper": ["debug"],
     "esp32_camera_utils": [
-        "debug", "debug_memory",
-        "enable_rotation", "rotation",
-        "enable_scaler", "enable_cropper", "enable_drawing"
+        "debug",
+        "debug_memory",
+        "enable_rotation",
+        "rotation",
+        "enable_scaler",
+        "enable_cropper",
+        "enable_drawing",
     ],
     "flash_light_controller": ["debug"],
-    "meter_reader_tflite": ["debug", "debug_memory", "generate_preview", "enable_rotation", "allow_negative_rates", "debug_image", "debug_image_out_serial"],
-    "substitutions": ["camera_pixel_format", "name"]
+    "meter_reader_tflite": [
+        "debug",
+        "debug_memory",
+        "generate_preview",
+        "enable_rotation",
+        "allow_negative_rates",
+        "debug_image",
+        "debug_image_out_serial",
+    ],
+    "substitutions": ["camera_pixel_format", "name"],
 }
 
 # Facultative components - can be randomly enabled/disabled
 FACULTATIVE_COMPONENTS = [
-    'meter_reader_tflite',
-    'tflite_micro_helper',
-    'esp32_camera_utils',
-    'flash_light_controller',
-    'value_validator',
-    'data_collector',
+    "meter_reader_tflite",
+    "tflite_micro_helper",
+    "esp32_camera_utils",
+    "flash_light_controller",
+    "value_validator",
+    "data_collector",
 ]
 
 # Component dependencies - if a component is enabled, these must also be enabled
 COMPONENT_DEPENDENCIES = {
-    'meter_reader_tflite': ['tflite_micro_helper', 'esp32_camera_utils', 'flash_light_controller', 'value_validator'],
-    'data_collector': [],  # Optional for meter_reader_tflite
+    "meter_reader_tflite": [
+        "tflite_micro_helper",
+        "esp32_camera_utils",
+        "flash_light_controller",
+        "value_validator",
+    ],
+    "data_collector": [],  # Optional for meter_reader_tflite
 }
 
 PARAM_CHOICES = {
-    "camera_pixel_format": ["JPEG", "RGB565", "RGB888", "YUV422", "YUV420", "RAW", "GRAYSCALE"],
-    "rotation": ["0", "90", "180", "270", "15", "45.5"]
+    "camera_pixel_format": [
+        "JPEG",
+        "RGB565",
+        "RGB888",
+        "YUV422",
+        "YUV420",
+        "RAW",
+        "GRAYSCALE",
+    ],
+    "rotation": ["0", "90", "180", "270", "15", "45.5"],
 }
 
+
 def read_config():
-    with open(SOURCE_CONFIG, "r") as f:
+    with open(SOURCE_CONFIG) as f:
         return f.readlines()
+
 
 def randomize_config(lines, worker_id):
     new_lines = []
@@ -98,26 +124,30 @@ def randomize_config(lines, worker_id):
             clean_comp = stripped.replace("#", "").strip()[:-1]
             if clean_comp in TARGETS:
                 current_component = clean_comp
-                processed_keys = set() # Reset for new component
+                processed_keys = set()  # Reset for new component
             else:
                 current_component = None
 
         # --- 2.5. Replace key substitutions for fuzz testing ---
         if current_component == "substitutions":
             if stripped.startswith("id_prefix:"):
-                indent = line[:line.index('id_prefix:')]
+                indent = line[: line.index("id_prefix:")]
                 new_lines.append(f"{indent}id_prefix: fuzz\n")
-                change_log.append(f"[substitutions] Set id_prefix = fuzz")
+                change_log.append("[substitutions] Set id_prefix = fuzz")
                 modified = True
-            elif stripped.startswith("name:") and '#' not in line.split('name:')[0]:  # Avoid commented lines
-                indent = line[:line.index('name:')]
+            elif (
+                stripped.startswith("name:") and "#" not in line.split("name:")[0]
+            ):  # Avoid commented lines
+                indent = line[: line.index("name:")]
                 new_lines.append(f"{indent}name: fuzz-{worker_id}\n")
                 change_log.append(f"[substitutions] Set name = fuzz-{worker_id}")
                 modified = True
             elif stripped.startswith("friendly_name:"):
-                indent = line[:line.index('friendly_name:')]
-                new_lines.append(f"{indent}friendly_name: \"Fuzz {worker_id}\"\n")
-                change_log.append(f"[substitutions] Set friendly_name = Fuzz {worker_id}")
+                indent = line[: line.index("friendly_name:")]
+                new_lines.append(f'{indent}friendly_name: "Fuzz {worker_id}"\n')
+                change_log.append(
+                    f"[substitutions] Set friendly_name = Fuzz {worker_id}"
+                )
                 modified = True
 
         # --- 3. Handle Component Keys ---
@@ -129,7 +159,7 @@ def randomize_config(lines, worker_id):
                 if match:
                     if key in processed_keys:
                         # Already handled this key for this component, skip duplicate source lines
-                        modified = True # Mark as modified so we don't append original
+                        modified = True  # Mark as modified so we don't append original
                         break
 
                     indent = match.group(1)
@@ -168,9 +198,9 @@ def randomize_config(lines, worker_id):
 
     # Ensure at least meter_reader_tflite is enabled with all dependencies
     # (config.yaml is designed for meter_reader_tflite)
-    if 'meter_reader_tflite' not in enabled_components:
-        enabled_components.add('meter_reader_tflite')
-        for dep in COMPONENT_DEPENDENCIES['meter_reader_tflite']:
+    if "meter_reader_tflite" not in enabled_components:
+        enabled_components.add("meter_reader_tflite")
+        for dep in COMPONENT_DEPENDENCIES["meter_reader_tflite"]:
             enabled_components.add(dep)
 
     # Modify the external_components section
@@ -182,18 +212,18 @@ def randomize_config(lines, worker_id):
     for line in new_lines:
         stripped = line.strip()
 
-        if stripped.startswith('external_components:'):
+        if stripped.startswith("external_components:"):
             in_external_components = True
             modified_lines.append(line)
             continue
 
-        if in_external_components and 'components:' in line:
+        if in_external_components and "components:" in line:
             in_components_list = True
             # Track the indent level to detect end of block sequence
             components_indent = len(line) - len(line.lstrip())
             # Replace with randomized component list
-            indent = line[:line.index('components:')]
-            components_str = ', '.join(sorted(enabled_components))
+            indent = line[: line.index("components:")]
+            components_str = ", ".join(sorted(enabled_components))
             modified_lines.append(f"{indent}components: [{components_str}]\n")
             change_log.append(f"[Components] Enabled: {components_str}")
             continue
@@ -203,12 +233,16 @@ def randomize_config(lines, worker_id):
             line_indent = len(line) - len(line.lstrip())
             if line_indent > components_indent:
                 continue  # Still a child of components: --- skip it
-            else:
-                in_components_list = False  # Back to same level --- stop skipping
-                # Fall through to copy this line
+            in_components_list = False  # Back to same level --- stop skipping
+            # Fall through to copy this line
 
         # Exit external_components section when we hit a new top-level key
-        if in_external_components and not line.startswith(' ') and stripped and not stripped.startswith('#'):
+        if (
+            in_external_components
+            and not line.startswith(" ")
+            and stripped
+            and not stripped.startswith("#")
+        ):
             in_external_components = False
             in_components_list = False  # Reset list flag when leaving section
 
@@ -248,12 +282,11 @@ def worker_task(worker_id):
 
         with open(log_file, "w") as log:
             # Write config changes header
-            log.write("="*40 + "\n")
+            log.write("=" * 40 + "\n")
             log.write(f"FUZZ CONFIGURATION (Worker {worker_id}, Iter {i})\n")
-            log.write("="*40 + "\n")
-            for c in changes:
-                log.write(f"{c}\n")
-            log.write("="*40 + "\n\n")
+            log.write("=" * 40 + "\n")
+            log.writelines(f"{c}\n" for c in changes)
+            log.write("=" * 40 + "\n\n")
             log.flush()
 
             try:
@@ -262,10 +295,15 @@ def worker_task(worker_id):
                 print(f"[Worker {worker_id}] Iter {i}: PASS ({duration:.1f}s)")
             except subprocess.CalledProcessError:
                 duration = time.time() - start_t
-                print(f"[Worker {worker_id}] Iter {i}: FAIL ({duration:.1f}s) - See {log_file}")
+                print(
+                    f"[Worker {worker_id}] Iter {i}: FAIL ({duration:.1f}s) - See {log_file}"
+                )
+
 
 if __name__ == "__main__":
-    print(f"Starting Parallel Fuzz: {NUM_WORKERS} workers, {ITERATIONS_PER_WORKER} iters each.")
+    print(
+        f"Starting Parallel Fuzz: {NUM_WORKERS} workers, {ITERATIONS_PER_WORKER} iters each."
+    )
     threads = []
     for i in range(NUM_WORKERS):
         t = threading.Thread(target=worker_task, args=(i,))

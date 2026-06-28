@@ -1,4 +1,3 @@
-
 ================================================================================
 TFLITE MODEL COMPREHENSIVE INSPECTION REPORT
 ================================================================================
@@ -10,32 +9,32 @@ File Size: 313.52 KB
 ================================================================================
 MODEL SUMMARY: TFLite Model
 ================================================================================
-Layer (type)              Output Shape         Param #         Size (KB) 
+Layer (type)              Output Shape         Param #         Size (KB)
 --------------------------------------------------------------------------------
-CONV_2D_0                 [ 1 32 20 16]        0               40.38     
-CONV_2D_1                 [ 1 32 20 64]        0               0.78      
-DEPTHWISE_CONV_2D_2       [ 1 16 10 64]        0               82.50     
-CONV_2D_3                 [ 1 16 10 24]        0               0.78      
-CONV_2D_4                 [ 1 16 10 96]        0               0.77      
-DEPTHWISE_CONV_2D_5       [ 1 16 10 96]        0               60.39     
-CONV_2D_6                 [ 1 16 10 24]        0               0.40      
-ADD_7                     [ 1 16 10 24]        0               0.00      
-CONV_2D_8                 [ 1 16 10 96]        0               0.40      
-DEPTHWISE_CONV_2D_9       [ 1  8  5 96]        0               6.62      
-CONV_2D_10                [ 1  8  5 40]        0               67.89     
-CONV_2D_11                [  1   8   5 240]    0               0.78      
-DEPTHWISE_CONV_2D_12      [  1   8   5 240]    0               73.75     
-CONV_2D_13                [ 1  8  5 40]        0               0.77      
-ADD_14                    [ 1  8  5 40]        0               0.00      
-CONV_2D_15                [  1   8   5 240]    0               67.88     
-DEPTHWISE_CONV_2D_16      [  1   8   5 240]    0               8.75      
-CONV_2D_17                [ 1  8  5 56]        0               67.52     
-CONV_2D_18                [ 1  8  5 96]        0               67.50     
-MEAN_19                   [ 1  1  1 96]        0               0.00      
-TRANSPOSE_20              [ 1 96  1  1]        0               0.00      
-RESHAPE_21                [ 1 96]              0               0.00      
-FULLY_CONNECTED_22        [  1 100]            0               0.38      
-SOFTMAX_23                [  1 100]            0               0.00      
+CONV_2D_0                 [ 1 32 20 16]        0               40.38
+CONV_2D_1                 [ 1 32 20 64]        0               0.78
+DEPTHWISE_CONV_2D_2       [ 1 16 10 64]        0               82.50
+CONV_2D_3                 [ 1 16 10 24]        0               0.78
+CONV_2D_4                 [ 1 16 10 96]        0               0.77
+DEPTHWISE_CONV_2D_5       [ 1 16 10 96]        0               60.39
+CONV_2D_6                 [ 1 16 10 24]        0               0.40
+ADD_7                     [ 1 16 10 24]        0               0.00
+CONV_2D_8                 [ 1 16 10 96]        0               0.40
+DEPTHWISE_CONV_2D_9       [ 1  8  5 96]        0               6.62
+CONV_2D_10                [ 1  8  5 40]        0               67.89
+CONV_2D_11                [  1   8   5 240]    0               0.78
+DEPTHWISE_CONV_2D_12      [  1   8   5 240]    0               73.75
+CONV_2D_13                [ 1  8  5 40]        0               0.77
+ADD_14                    [ 1  8  5 40]        0               0.00
+CONV_2D_15                [  1   8   5 240]    0               67.88
+DEPTHWISE_CONV_2D_16      [  1   8   5 240]    0               8.75
+CONV_2D_17                [ 1  8  5 56]        0               67.52
+CONV_2D_18                [ 1  8  5 96]        0               67.50
+MEAN_19                   [ 1  1  1 96]        0               0.00
+TRANSPOSE_20              [ 1 96  1  1]        0               0.00
+RESHAPE_21                [ 1 96]              0               0.00
+FULLY_CONNECTED_22        [  1 100]            0               0.38
+SOFTMAX_23                [  1 100]            0               0.00
 --------------------------------------------------------------------------------
 Total params: 0
 Total memory: 548.22 KB
@@ -50,28 +49,28 @@ Output 0: [  1 100]       <class 'numpy.float32'>
 ================================================================================
 MEMORY USAGE ANALYSIS
 ================================================================================
-Tensor Name                    Shape                Dtype      Elements     Memory (KB) 
+Tensor Name                    Shape                Dtype      Elements     Memory (KB)
 --------------------------------------------------------------------------------
-model_5/tf.nn.relu6_13/Relu6   [ 1 32 20 64]        <class 'numpy.float32'> 40,960       160.00      
-                               [ 1 32 20 27]        <class 'numpy.float32'> 17,280       67.50       
-model_5/tf.nn.relu6_15/Relu6   [ 1 16 10 96]        <class 'numpy.float32'> 15,360       60.00       
-model_5/tf.nn.relu6_16/Relu6   [ 1 16 10 96]        <class 'numpy.float32'> 15,360       60.00       
-model_5/tf.nn.relu6_17/Relu6   [ 1 16 10 96]        <class 'numpy.float32'> 15,360       60.00       
-arith.constant6                [ 56   1   1 240]    <class 'numpy.float32'> 13,440       52.50       
-model_5/tf.nn.relu6_12/Relu6   [ 1 32 20 16]        <class 'numpy.float32'> 10,240       40.00       
-model_5/tf.nn.relu6_14/Relu6   [ 1 16 10 64]        <class 'numpy.float32'> 10,240       40.00       
-arith.constant8                [240   1   1  40]    <class 'numpy.float32'> 9,600        37.50       
-arith.constant9                [ 40   1   1 240]    <class 'numpy.float32'> 9,600        37.50       
-arith.constant10               [240   1   1  40]    <class 'numpy.float32'> 9,600        37.50       
-arith.constant22               [100  96]            <class 'numpy.float32'> 9,600        37.50       
-model_5/tf.nn.relu6_19/Relu6   [  1   8   5 240]    <class 'numpy.float32'> 9,600        37.50       
-model_5/tf.nn.relu6_20/Relu6   [  1   8   5 240]    <class 'numpy.float32'> 9,600        37.50       
-model_5/tf.nn.relu6_21/Relu6   [  1   8   5 240]    <class 'numpy.float32'> 9,600        37.50       
-model_5/tf.nn.relu6_22/Relu6   [  1   8   5 240]    <class 'numpy.float32'> 9,600        37.50       
-arith.constant5                [96  1  1 56]        <class 'numpy.float32'> 5,376        21.00       
-arith.constant12               [40  1  1 96]        <class 'numpy.float32'> 3,840        15.00       
-model_5/tf.nn.convolution_14   [ 1 16 10 24]        <class 'numpy.float32'> 3,840        15.00       
-model_5/tf.nn.convolution_16   [ 1 16 10 24]        <class 'numpy.float32'> 3,840        15.00       
+model_5/tf.nn.relu6_13/Relu6   [ 1 32 20 64]        <class 'numpy.float32'> 40,960       160.00
+                               [ 1 32 20 27]        <class 'numpy.float32'> 17,280       67.50
+model_5/tf.nn.relu6_15/Relu6   [ 1 16 10 96]        <class 'numpy.float32'> 15,360       60.00
+model_5/tf.nn.relu6_16/Relu6   [ 1 16 10 96]        <class 'numpy.float32'> 15,360       60.00
+model_5/tf.nn.relu6_17/Relu6   [ 1 16 10 96]        <class 'numpy.float32'> 15,360       60.00
+arith.constant6                [ 56   1   1 240]    <class 'numpy.float32'> 13,440       52.50
+model_5/tf.nn.relu6_12/Relu6   [ 1 32 20 16]        <class 'numpy.float32'> 10,240       40.00
+model_5/tf.nn.relu6_14/Relu6   [ 1 16 10 64]        <class 'numpy.float32'> 10,240       40.00
+arith.constant8                [240   1   1  40]    <class 'numpy.float32'> 9,600        37.50
+arith.constant9                [ 40   1   1 240]    <class 'numpy.float32'> 9,600        37.50
+arith.constant10               [240   1   1  40]    <class 'numpy.float32'> 9,600        37.50
+arith.constant22               [100  96]            <class 'numpy.float32'> 9,600        37.50
+model_5/tf.nn.relu6_19/Relu6   [  1   8   5 240]    <class 'numpy.float32'> 9,600        37.50
+model_5/tf.nn.relu6_20/Relu6   [  1   8   5 240]    <class 'numpy.float32'> 9,600        37.50
+model_5/tf.nn.relu6_21/Relu6   [  1   8   5 240]    <class 'numpy.float32'> 9,600        37.50
+model_5/tf.nn.relu6_22/Relu6   [  1   8   5 240]    <class 'numpy.float32'> 9,600        37.50
+arith.constant5                [96  1  1 56]        <class 'numpy.float32'> 5,376        21.00
+arith.constant12               [40  1  1 96]        <class 'numpy.float32'> 3,840        15.00
+model_5/tf.nn.convolution_14   [ 1 16 10 24]        <class 'numpy.float32'> 3,840        15.00
+model_5/tf.nn.convolution_16   [ 1 16 10 24]        <class 'numpy.float32'> 3,840        15.00
 --------------------------------------------------------------------------------
 Total Memory Usage: 1054.99 KB
 Number of Tensors: 57
@@ -89,7 +88,7 @@ Recommended tensor_arena_size: 441KB
 
 Top tensors by memory:
   [ 30]   160.00 KB  [ 1 32 20 64]             <class 'numpy.float32'> model_5/tf.nn.relu6_13/Relu6;model_5/tf.nn.convolu
-  [ 53]    67.50 KB  [ 1 32 20 27]             <class 'numpy.float32'> 
+  [ 53]    67.50 KB  [ 1 32 20 27]             <class 'numpy.float32'>
   [ 33]    60.00 KB  [ 1 16 10 96]             <class 'numpy.float32'> model_5/tf.nn.relu6_15/Relu6;model_5/tf.nn.convolu
   [ 34]    60.00 KB  [ 1 16 10 96]             <class 'numpy.float32'> model_5/tf.nn.relu6_16/Relu6;model_5/tf.math.multi
   [ 37]    60.00 KB  [ 1 16 10 96]             <class 'numpy.float32'> model_5/tf.nn.relu6_17/Relu6;model_5/tf.nn.convolu

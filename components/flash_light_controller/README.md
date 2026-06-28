@@ -13,14 +13,14 @@ A specialized component to manage flash/LED timing during image capture. It ensu
 ```yaml
 flash_light_controller:
   id: my_flash_controller
-  
+
   # Link to an existing light
   flash_light: my_light_id
-  
+
   # Timing Configuration
   flash_pre_time: 5s     # Time to wait after turning on before capture
   flash_post_time: 2s    # Time to keep on after (optional)
-  
+
   debug: false
 ```
 

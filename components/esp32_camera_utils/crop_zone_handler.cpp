@@ -1,7 +1,7 @@
 #include "crop_zone_handler.h"
 #include "esphome/core/log.h"
 #include <algorithm>
-#include <cstdlib> // for strtol
+#include <cstdlib>  // for strtol
 #include "debug_utils.h"
 
 namespace esphome {
@@ -46,9 +46,11 @@ void CropZoneHandler::parse_zones(const std::string &zones_json) {
   size_t pos = 0;
   while (pos < stripped.length()) {
     size_t start = stripped.find('[', pos);
-    if (start == std::string::npos) break;
+    if (start == std::string::npos)
+      break;
     size_t end = stripped.find(']', start);
-    if (end == std::string::npos) break;
+    if (end == std::string::npos)
+      break;
 
     std::string zone_str = stripped.substr(start + 1, end - start - 1);
     std::vector<int> coords;
@@ -57,7 +59,8 @@ void CropZoneHandler::parse_zones(const std::string &zones_json) {
 
     while (true) {
       size_t comma_pos = zone_str.find(',', coord_start);
-      if (comma_pos == std::string::npos) break;
+      if (comma_pos == std::string::npos)
+        break;
 
       std::string num_str = zone_str.substr(coord_start, comma_pos - coord_start);
       char *end_ptr;
@@ -94,12 +97,11 @@ void CropZoneHandler::parse_zones(const std::string &zones_json) {
     }
 
     if (coords.size() == 4) {
-      ESP_LOGD(TAG, "Added zone [%d,%d,%d,%d]",
-               coords[0], coords[1], coords[2], coords[3]);
+      ESP_LOGD(TAG, "Added zone [%d,%d,%d,%d]", coords[0], coords[1], coords[2], coords[3]);
       zones_.push_back({coords[0], coords[1], coords[2], coords[3]});
     } else {
-      ESP_LOGE(TAG, "Invalid zone format (expected 4 coordinates, got %d): %s",
-               static_cast<int>(coords.size()), zone_str.c_str());
+      ESP_LOGE(TAG, "Invalid zone format (expected 4 coordinates, got %d): %s", static_cast<int>(coords.size()),
+               zone_str.c_str());
     }
 
     pos = end + 1;
@@ -109,34 +111,31 @@ void CropZoneHandler::parse_zones(const std::string &zones_json) {
 }
 
 void CropZoneHandler::set_default_zone(int width, int height) {
-    zones_.clear();
-    zones_.push_back({
-        static_cast<int>(width * 0.1f),    // x1 - 10% from left
-        static_cast<int>(height * 0.1f),   // y1 - 10% from top
-        static_cast<int>(width * 0.9f),    // x2 - 10% from right
-        static_cast<int>(height * 0.9f)    // y2 - 10% from bottom
-    });
-    ESP_LOGI(TAG, "Set default crop zone: [%d,%d,%d,%d]",
-             zones_[0].x1, zones_[0].y1, zones_[0].x2, zones_[0].y2);
+  zones_.clear();
+  zones_.push_back({
+      static_cast<int>(width * 0.1f),   // x1 - 10% from left
+      static_cast<int>(height * 0.1f),  // y1 - 10% from top
+      static_cast<int>(width * 0.9f),   // x2 - 10% from right
+      static_cast<int>(height * 0.9f)   // y2 - 10% from bottom
+  });
+  ESP_LOGI(TAG, "Set default crop zone: [%d,%d,%d,%d]", zones_[0].x1, zones_[0].y1, zones_[0].x2, zones_[0].y2);
 }
-
 
 void CropZoneHandler::set_debug_zones() {
-    zones_.clear();
-    // Static crop zones for debug image
-    zones_ = {
-        {80, 233, 116, 307},   // Digit 1
-        {144, 235, 180, 307},  // Digit 2
-        {202, 234, 238, 308},  // Digit 3
-        {265, 233, 304, 306},  // Digit 4
-        {328, 232, 367, 311},  // Digit 5
-        {393, 231, 433, 310},  // Digit 6
-        {460, 235, 499, 311},  // Digit 7
-        {520, 235, 559, 342}   // Digit 8
-    };
-    ESP_LOGI(TAG, "Set debug crop zones (8 zones)");
+  zones_.clear();
+  // Static crop zones for debug image
+  zones_ = {
+      {80, 233, 116, 307},   // Digit 1
+      {144, 235, 180, 307},  // Digit 2
+      {202, 234, 238, 308},  // Digit 3
+      {265, 233, 304, 306},  // Digit 4
+      {328, 232, 367, 311},  // Digit 5
+      {393, 231, 433, 310},  // Digit 6
+      {460, 235, 499, 311},  // Digit 7
+      {520, 235, 559, 342}   // Digit 8
+  };
+  ESP_LOGI(TAG, "Set debug crop zones (8 zones)");
 }
-
 
 }  // namespace esp32_camera_utils
 }  // namespace esphome

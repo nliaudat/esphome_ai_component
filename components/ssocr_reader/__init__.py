@@ -1,16 +1,14 @@
 import esphome.codegen as cg
+from esphome.components import esp32_camera, sensor, text_sensor
 import esphome.config_validation as cv
-from esphome.components import sensor, text_sensor, esp32_camera
+
 try:
     from esphome.components import value_validator
 except ImportError:
     value_validator = None
 
+from esphome.const import CONF_ID, CONF_NAME
 from esphome.core import CORE
-from esphome.const import (
-    CONF_ID,
-    CONF_NAME,
-)
 
 CONF_CAMERA_ID = "camera_id"
 
@@ -35,7 +33,9 @@ CONF_VALIDATOR = "validator"
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(SSOCRReader),
-        cv.Optional(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator) if value_validator else cv.string,
+        cv.Optional(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator)
+        if value_validator
+        else cv.string,
         cv.Optional(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera),
         cv.Optional(CONF_VALUE): sensor.sensor_schema(),
         cv.Optional("debug", default=False): cv.boolean,
@@ -75,7 +75,14 @@ async def to_code(config):
         cg.add(var.set_value_sensor(sens))
 
     cg.add(var.set_threshold_config(config[CONF_THRESHOLD_LEVEL]))
-    cg.add(var.set_crop_config(config[CONF_CROP_X], config[CONF_CROP_Y], config[CONF_CROP_W], config[CONF_CROP_H]))
+    cg.add(
+        var.set_crop_config(
+            config[CONF_CROP_X],
+            config[CONF_CROP_Y],
+            config[CONF_CROP_W],
+            config[CONF_CROP_H],
+        )
+    )
     cg.add(var.set_digit_config(config[CONF_DIGIT_COUNT]))
 
     # Inject resolution and format
@@ -85,11 +92,12 @@ async def to_code(config):
     substitutions = CORE.config.get("substitutions", {})
     if "camera_resolution" in substitutions:
         try:
-             res = substitutions["camera_resolution"]
-             if 'x' in res:
-                w, h = map(int, res.split('x'))
+            res = substitutions["camera_resolution"]
+            if "x" in res:
+                w, h = map(int, res.split("x"))
                 width, height = w, h
-        except: pass
+        except:
+            pass
 
     if "camera_pixel_format" in substitutions:
         pixel_format = substitutions["camera_pixel_format"]

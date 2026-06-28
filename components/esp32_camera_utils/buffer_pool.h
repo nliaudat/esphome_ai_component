@@ -18,7 +18,7 @@ namespace esp32_camera_utils {
 class BufferPool {
  public:
   struct Buffer {
-    uint8_t* data{nullptr};
+    uint8_t *data{nullptr};
     size_t size{0};
     bool from_pool{false};  // Track origin for statistics
   };
@@ -34,7 +34,7 @@ class BufferPool {
    * @brief Return a buffer to the pool or free it.
    * @param buffer Buffer to release (will be reset to nullptr)
    */
-  void release(Buffer& buffer);
+  void release(Buffer &buffer);
 
   /**
    * @brief Get pool hit rate as percentage.
@@ -62,7 +62,7 @@ class BufferPool {
 
  private:
   struct PoolSlot {
-    uint8_t* data{nullptr};
+    uint8_t *data{nullptr};
     size_t size{0};
     bool in_use{false};
   };

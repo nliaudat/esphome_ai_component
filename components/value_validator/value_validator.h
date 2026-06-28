@@ -22,7 +22,7 @@ namespace value_validator {
 
 // FreeDeleter for RAII-managed PSRAM/internal RAM buffers (shared by ReadingHistory and ValueValidator)
 struct FreeDeleter {
-  void operator()(void* p) const { free(p); }
+  void operator()(void *p) const { free(p); }
 };
 
 /**
@@ -55,8 +55,8 @@ class ReadingHistory {
   // RAII-managed buffer using unique_ptr with custom deleter (free for psram_alloc)
   std::unique_ptr<HistoricalReading[], FreeDeleter> buffer_;
   size_t capacity_{0};
-  size_t head_{0}; // Write index (points to next free slot)
-  size_t count_{0}; // Current number of elements
+  size_t head_{0};   // Write index (points to next free slot)
+  size_t count_{0};  // Current number of elements
 
   size_t max_history_size_bytes_{51200};
 
@@ -72,22 +72,22 @@ class ValueValidator : public Component {
   struct ValidationConfig {
     bool allow_negative_rates{false};
     int max_absolute_diff{100};
-    float max_rate_change{0.15f}; // Maximum relative change as fraction (0.15 = 15%)
+    float max_rate_change{0.15f};  // Maximum relative change as fraction (0.15 = 15%)
     bool enable_smart_validation{true};
     int smart_validation_window{5};
-    float high_confidence_threshold{0.90f}; // Threshold for validation override
-    size_t max_history_size_bytes{51200}; // 50KB limit for history buffer
-    float per_digit_confidence_threshold{0.85f}; // Minimum confidence to accept a changed digit
-    bool strict_confidence_check{false}; // If true, requires all digits to be above threshold
-    float first_reading_digit_threshold{0.70f}; // Relaxed per-digit threshold for first reading (default 70%)
-    int max_consecutive_rejections{10}; // Self-correct after N consecutive high-confidence rejections
-    int small_negative_tolerance{5}; // Allow negative changes up to this many units
-    bool persist_state{false}; // Persist last_valid_reading_ across reboots
+    float high_confidence_threshold{0.90f};       // Threshold for validation override
+    size_t max_history_size_bytes{51200};         // 50KB limit for history buffer
+    float per_digit_confidence_threshold{0.85f};  // Minimum confidence to accept a changed digit
+    bool strict_confidence_check{false};          // If true, requires all digits to be above threshold
+    float first_reading_digit_threshold{0.70f};   // Relaxed per-digit threshold for first reading (default 70%)
+    int max_consecutive_rejections{10};           // Self-correct after N consecutive high-confidence rejections
+    int small_negative_tolerance{5};              // Allow negative changes up to this many units
+    bool persist_state{false};                    // Persist last_valid_reading_ across reboots
 
     // Dial-aware correction (used when analog_reader provides dial fraction)
     bool enable_dial_correction{true};
-    float dial_correction_high_threshold{0.80f}; // Above this fraction → subtract 1 from integer reading
-    float dial_correction_low_threshold{0.20f};  // Below this fraction → keep integer as-is (digit is solid)
+    float dial_correction_high_threshold{0.80f};  // Above this fraction → subtract 1 from integer reading
+    float dial_correction_low_threshold{0.20f};   // Below this fraction → keep integer as-is (digit is solid)
   };
 
   ~ValueValidator();
@@ -96,12 +96,12 @@ class ValueValidator : public Component {
   float get_setup_priority() const override { return setup_priority::DATA; }
 
   // Legacy single-value validation
-  bool validate_reading(int new_reading, float confidence, int& validated_reading);
+  bool validate_reading(int new_reading, float confidence, int &validated_reading);
   // Per-digit validation (returns int)
-  bool validate_reading(std::span<const float> digits, std::span<const float> confidences, int& validated_reading);
+  bool validate_reading(std::span<const float> digits, std::span<const float> confidences, int &validated_reading);
 
-  void set_config(const ValidationConfig& config) { this->config_ = config; }
-  const ValidationConfig& get_config() const { return this->config_; }
+  void set_config(const ValidationConfig &config) { this->config_ = config; }
+  const ValidationConfig &get_config() const { return this->config_; }
 
   // Setters for configuration
   void set_allow_negative_rates(bool v) { this->config_.allow_negative_rates = v; }
@@ -129,7 +129,7 @@ class ValueValidator : public Component {
 
   int get_last_valid_reading() const { return this->last_valid_reading_; }
   int get_consecutive_rejections() const { return this->consecutive_rejections_; }
-  const ReadingHistory& get_history() const { return this->history_; }
+  const ReadingHistory &get_history() const { return this->history_; }
 
   void reset();
   void set_debug(bool debug) { this->debug_ = debug; }
@@ -154,15 +154,15 @@ class ValueValidator : public Component {
   size_t last_valid_digits_count_{0};
 
   // Per-digit history for stability check (Flat arrays for PSRAM efficiency) — RAII
-  std::unique_ptr<int[], FreeDeleter> digit_history_data_;      // [num_digits * 5]
-  std::unique_ptr<uint8_t[], FreeDeleter> digit_history_counts_; // [num_digits]
-  std::unique_ptr<uint8_t[], FreeDeleter> digit_history_heads_;  // [num_digits]
+  std::unique_ptr<int[], FreeDeleter> digit_history_data_;        // [num_digits * 5]
+  std::unique_ptr<uint8_t[], FreeDeleter> digit_history_counts_;  // [num_digits]
+  std::unique_ptr<uint8_t[], FreeDeleter> digit_history_heads_;   // [num_digits]
   size_t digit_history_num_digits_{0};
   static constexpr size_t DIGIT_HISTORY_SIZE = 5;
 
   bool first_reading_{true};
-  int first_reading_count_{0}; // Count of consistent first readings
-  int first_reading_candidate_{0}; // Candidate first reading value
+  int first_reading_count_{0};      // Count of consistent first readings
+  int first_reading_candidate_{0};  // Candidate first reading value
 
   // Self-correction tracking
   int consecutive_rejections_{0};
@@ -194,14 +194,14 @@ class ValueValidator : public Component {
 
   bool is_digit_plausible(int new_reading, int last_reading) const;
   int apply_smart_validation(int new_reading, float confidence, float last_confidence);
-  int find_most_plausible_reading(int new_reading, const std::vector<int>& recent_readings);
+  int find_most_plausible_reading(int new_reading, const std::vector<int> &recent_readings);
   int get_stable_digit(size_t digit_index, int new_digit);
   void ensure_digit_history_size(size_t num_digits);
   void ensure_last_valid_digits_size(size_t num_digits);
   void ensure_last_good_values_capacity(size_t capacity);
   void add_good_value(int value);
   int get_good_values_median() const;
-  void publish_diagnostics_(const char* state);
+  void publish_diagnostics_(const char *state);
   void save_state_();
 
   void free_digit_history();

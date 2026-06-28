@@ -10,16 +10,15 @@ namespace meter_reader_tflite {
 
 class OpResolverManager {
  public:
-  template <size_t tOpCount>
+  template<size_t tOpCount>
   static bool RegisterOps(tflite::MicroMutableOpResolver<tOpCount> &resolver,
-                          const std::set<tflite::BuiltinOperator> &required_ops,
-                          const char *tag) {
+                          const std::set<tflite::BuiltinOperator> &required_ops, const char *tag) {
     for (auto op : required_ops) {
-      const char* op_name = tflite::EnumNameBuiltinOperator(op);
+      const char *op_name = tflite::EnumNameBuiltinOperator(op);
       ESP_LOGD(tag, "Registering op: %s", op_name);
-      
+
       TfLiteStatus add_status = kTfLiteError;
-      
+
       // X-Macro: generate case statements from tflm_operators.h
       // For available operators: call resolver.AddXxx()
       // For unavailable operators: log warning and return false

@@ -1,8 +1,6 @@
 """Helper utilities for ESPHome AI Component lint scripts."""
 
-import os
 import subprocess
-from pathlib import Path
 
 import colorama
 
@@ -32,6 +30,7 @@ def print_error_for_file(file, body=None):
     except UnicodeEncodeError:
         # Fallback: write raw bytes to stderr
         import sys as _sys
+
         try:
             _sys.stderr.buffer.write(
                 ("### File " + str(file) + "\n\n" + (body or "") + "\n\n").encode(
@@ -50,7 +49,12 @@ def filter_changed(files):
             for remote in ("origin",):
                 try:
                     merge_base = subprocess.check_output(
-                        ["git", "merge-base", f"refs/remotes/{remote}/{branch}", "HEAD"],
+                        [
+                            "git",
+                            "merge-base",
+                            f"refs/remotes/{remote}/{branch}",
+                            "HEAD",
+                        ],
                         text=True,
                     ).strip()
                     changed = subprocess.check_output(

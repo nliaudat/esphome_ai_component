@@ -1,22 +1,21 @@
 # generate_test_image.py - UPDATED VERSION
 from PIL import Image, ImageDraw, ImageFont
-import numpy as np
 
 # Create a 640x480 background with color markers
 width, height = 640, 480
-image = Image.new('RGB', (width, height), color=(0, 125, 255))  # Blue-green background
+image = Image.new("RGB", (width, height), color=(0, 125, 255))  # Blue-green background
 draw = ImageDraw.Draw(image)
 
 # Your hardcoded debug crop zones
 debug_zones = [
-    (80, 233, 116, 307),   # Digit 1
+    (80, 233, 116, 307),  # Digit 1
     (144, 235, 180, 307),  # Digit 2
     (202, 234, 238, 308),  # Digit 3
     (265, 233, 304, 306),  # Digit 4
     (328, 232, 367, 311),  # Digit 5
     (393, 231, 433, 310),  # Digit 6
     (460, 235, 499, 311),  # Digit 7
-    (520, 235, 559, 342)   # Digit 8
+    (520, 235, 559, 342),  # Digit 8
 ]
 
 # Correct digits for each zone
@@ -28,12 +27,12 @@ draw.rectangle([10, 10, 50, 50], fill=(255, 0, 0))
 draw.text((55, 15), "R", fill=(255, 255, 255))
 
 # Top-right: Pure Green (0,255,0)
-draw.rectangle([width-50, 10, width-10, 50], fill=(0, 255, 0))
-draw.text((width-85, 15), "G", fill=(255, 255, 255))
+draw.rectangle([width - 50, 10, width - 10, 50], fill=(0, 255, 0))
+draw.text((width - 85, 15), "G", fill=(255, 255, 255))
 
 # Bottom-left: Pure Blue (0,0,255)
-draw.rectangle([10, height-50, 50, height-10], fill=(0, 0, 255))
-draw.text((55, height-45), "B", fill=(255, 255, 255))
+draw.rectangle([10, height - 50, 50, height - 10], fill=(0, 0, 255))
+draw.text((55, height - 45), "B", fill=(255, 255, 255))
 
 # Draw each digit with specific background colors for testing
 colors = [
@@ -58,7 +57,6 @@ try:
         except:
             try:
                 # Try to make regular font bold using fontconfig (if available)
-                from fontTools.ttLib import TTFont
                 font = ImageFont.truetype("arial.ttf", 50)
                 # Note: PIL doesn't directly support making fonts bold,
                 # so we'll use a thicker stroke as a fallback
@@ -83,11 +81,18 @@ for i, (zone, digit, color) in enumerate(zip(debug_zones, digits, colors)):
     text_y = y1 + (zone_height - text_height) // 2 - 5
 
     # Use white text with black outline for bold appearance
-    draw.text((text_x, text_y), digit, fill=(255, 255, 255), font=font, stroke_width=2, stroke_fill=(0, 0, 0))
+    draw.text(
+        (text_x, text_y),
+        digit,
+        fill=(255, 255, 255),
+        font=font,
+        stroke_width=2,
+        stroke_fill=(0, 0, 0),
+    )
 
     # Draw zone border and label
     draw.rectangle([x1, y1, x2, y2], outline=(255, 0, 0), width=2)
-    #draw.text((x1 + 5, y1 + 5), str(i+1), fill=(255, 0, 0), font=font)
+    # draw.text((x1 + 5, y1 + 5), str(i+1), fill=(255, 0, 0), font=font)
 
 # Add info text (also in bold)
 try:

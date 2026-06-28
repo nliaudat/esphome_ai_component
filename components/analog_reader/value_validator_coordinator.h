@@ -21,15 +21,15 @@ class ValueValidatorCoordinator {
   bool validate_reading(int raw_value, float confidence, int &validated_value) {
     if (validator_ == nullptr) {
       validated_value = raw_value;
-      return true; // Assume valid if no validator set, or handle as policy
+      return true;  // Assume valid if no validator set, or handle as policy
     }
     return validator_->validate_reading(raw_value, confidence, validated_value);
   }
 
   bool validate_reading(const std::vector<float> &digits, const std::vector<float> &confidences, int &validated_value) {
     if (validator_ == nullptr) {
-        // Safe default: fail validation if component is missing to avoid bad data
-        return false;
+      // Safe default: fail validation if component is missing to avoid bad data
+      return false;
     }
     return validator_->validate_reading(digits, confidences, validated_value);
   }
@@ -59,7 +59,7 @@ class ValueValidatorCoordinator {
   }
 
   bool validate_reading(const std::vector<float> &digits, const std::vector<float> &confidences, int &validated_value) {
-      return false;
+    return false;
   }
 
   void set_last_valid_reading(int value) {}
@@ -70,4 +70,4 @@ class ValueValidatorCoordinator {
 }  // namespace analog_reader
 }  // namespace esphome
 
-#endif // USE_ANALOG_READER
+#endif  // USE_ANALOG_READER

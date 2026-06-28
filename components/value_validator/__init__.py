@@ -1,7 +1,7 @@
 import esphome.codegen as cg
+from esphome.components import sensor, text_sensor
 import esphome.config_validation as cv
 from esphome.const import CONF_ID
-from esphome.components import sensor, text_sensor
 
 CODEOWNERS = ["@nliaudat"]
 DEPENDENCIES = []
@@ -31,40 +31,63 @@ CONF_DIAL_CORRECTION_HIGH_THRESHOLD = "dial_correction_high_threshold"
 CONF_DIAL_CORRECTION_LOW_THRESHOLD = "dial_correction_low_threshold"
 CONF_VALIDATED_VALUE_SENSOR = "validated_value_sensor"
 
-CONFIG_SCHEMA = cv.All(cv.ensure_list(cv.Schema({
-    cv.GenerateID(): cv.declare_id(ValueValidator),
-    cv.Optional(CONF_ALLOW_NEGATIVE_RATES, default=False): cv.boolean,
-    cv.Optional(CONF_MAX_ABSOLUTE_DIFF, default=100): cv.positive_int,
-    cv.Optional(CONF_MAX_RATE_CHANGE, default=0.15): cv.float_range(min=0, max=10),
-    cv.Optional(CONF_ENABLE_SMART_VALIDATION, default=True): cv.boolean,
-    cv.Optional(CONF_SMART_VALIDATION_WINDOW, default=5): cv.positive_int,
-    cv.Optional(CONF_HIGH_CONFIDENCE_THRESHOLD, default=0.90): cv.percentage,
-    cv.Optional(CONF_MAX_HISTORY_SIZE, default="50kB"): cv.validate_bytes,
-    cv.Optional(CONF_PER_DIGIT_CONFIDENCE_THRESHOLD, default=0.85): cv.percentage,
-    cv.Optional(CONF_STRICT_CONFIDENCE_CHECK, default=False): cv.boolean,
-    cv.Optional(CONF_FIRST_READING_DIGIT_THRESHOLD, default=0.70): cv.percentage,
-    cv.Optional(CONF_MAX_CONSECUTIVE_REJECTIONS, default=10): cv.positive_int,
-    cv.Optional(CONF_SMALL_NEGATIVE_TOLERANCE, default=5): cv.positive_int,
-    cv.Optional(CONF_PERSIST_STATE, default=False): cv.boolean,
-    cv.Optional(CONF_ENABLE_DIAL_CORRECTION, default=True): cv.boolean,
-    cv.Optional(CONF_DIAL_CORRECTION_HIGH_THRESHOLD, default=0.80): cv.percentage,
-    cv.Optional(CONF_DIAL_CORRECTION_LOW_THRESHOLD, default=0.20): cv.percentage,
-    cv.Optional(CONF_REJECTION_COUNT_SENSOR): sensor.sensor_schema(
-        accuracy_decimals=0,
-        icon="mdi:counter",
-    ),
-    cv.Optional(CONF_RAW_READING_SENSOR): sensor.sensor_schema(
-        accuracy_decimals=0,
-        icon="mdi:eye",
-    ),
-    cv.Optional(CONF_VALIDATOR_STATE_SENSOR): text_sensor.text_sensor_schema(
-        icon="mdi:state-machine",
-    ),
-    cv.Optional(CONF_VALIDATED_VALUE_SENSOR): sensor.sensor_schema(
-        icon="mdi:check-circle",
-    ),
-    cv.Optional("debug", default=False): cv.boolean,
-}).extend(cv.COMPONENT_SCHEMA)))
+CONFIG_SCHEMA = cv.All(
+    cv.ensure_list(
+        cv.Schema(
+            {
+                cv.GenerateID(): cv.declare_id(ValueValidator),
+                cv.Optional(CONF_ALLOW_NEGATIVE_RATES, default=False): cv.boolean,
+                cv.Optional(CONF_MAX_ABSOLUTE_DIFF, default=100): cv.positive_int,
+                cv.Optional(CONF_MAX_RATE_CHANGE, default=0.15): cv.float_range(
+                    min=0, max=10
+                ),
+                cv.Optional(CONF_ENABLE_SMART_VALIDATION, default=True): cv.boolean,
+                cv.Optional(CONF_SMART_VALIDATION_WINDOW, default=5): cv.positive_int,
+                cv.Optional(
+                    CONF_HIGH_CONFIDENCE_THRESHOLD, default=0.90
+                ): cv.percentage,
+                cv.Optional(CONF_MAX_HISTORY_SIZE, default="50kB"): cv.validate_bytes,
+                cv.Optional(
+                    CONF_PER_DIGIT_CONFIDENCE_THRESHOLD, default=0.85
+                ): cv.percentage,
+                cv.Optional(CONF_STRICT_CONFIDENCE_CHECK, default=False): cv.boolean,
+                cv.Optional(
+                    CONF_FIRST_READING_DIGIT_THRESHOLD, default=0.70
+                ): cv.percentage,
+                cv.Optional(
+                    CONF_MAX_CONSECUTIVE_REJECTIONS, default=10
+                ): cv.positive_int,
+                cv.Optional(CONF_SMALL_NEGATIVE_TOLERANCE, default=5): cv.positive_int,
+                cv.Optional(CONF_PERSIST_STATE, default=False): cv.boolean,
+                cv.Optional(CONF_ENABLE_DIAL_CORRECTION, default=True): cv.boolean,
+                cv.Optional(
+                    CONF_DIAL_CORRECTION_HIGH_THRESHOLD, default=0.80
+                ): cv.percentage,
+                cv.Optional(
+                    CONF_DIAL_CORRECTION_LOW_THRESHOLD, default=0.20
+                ): cv.percentage,
+                cv.Optional(CONF_REJECTION_COUNT_SENSOR): sensor.sensor_schema(
+                    accuracy_decimals=0,
+                    icon="mdi:counter",
+                ),
+                cv.Optional(CONF_RAW_READING_SENSOR): sensor.sensor_schema(
+                    accuracy_decimals=0,
+                    icon="mdi:eye",
+                ),
+                cv.Optional(
+                    CONF_VALIDATOR_STATE_SENSOR
+                ): text_sensor.text_sensor_schema(
+                    icon="mdi:state-machine",
+                ),
+                cv.Optional(CONF_VALIDATED_VALUE_SENSOR): sensor.sensor_schema(
+                    icon="mdi:check-circle",
+                ),
+                cv.Optional("debug", default=False): cv.boolean,
+            }
+        ).extend(cv.COMPONENT_SCHEMA)
+    )
+)
+
 
 async def to_code(config):
     cg.add_define("USE_VALUE_VALIDATOR")
@@ -81,15 +104,33 @@ async def to_code(config):
         cg.add(var.set_smart_validation_window(conf[CONF_SMART_VALIDATION_WINDOW]))
         cg.add(var.set_high_confidence_threshold(conf[CONF_HIGH_CONFIDENCE_THRESHOLD]))
         cg.add(var.set_max_history_size_bytes(conf[CONF_MAX_HISTORY_SIZE]))
-        cg.add(var.set_per_digit_confidence_threshold(conf[CONF_PER_DIGIT_CONFIDENCE_THRESHOLD]))
+        cg.add(
+            var.set_per_digit_confidence_threshold(
+                conf[CONF_PER_DIGIT_CONFIDENCE_THRESHOLD]
+            )
+        )
         cg.add(var.set_strict_confidence_check(conf[CONF_STRICT_CONFIDENCE_CHECK]))
-        cg.add(var.set_first_reading_digit_threshold(conf[CONF_FIRST_READING_DIGIT_THRESHOLD]))
-        cg.add(var.set_max_consecutive_rejections(conf[CONF_MAX_CONSECUTIVE_REJECTIONS]))
+        cg.add(
+            var.set_first_reading_digit_threshold(
+                conf[CONF_FIRST_READING_DIGIT_THRESHOLD]
+            )
+        )
+        cg.add(
+            var.set_max_consecutive_rejections(conf[CONF_MAX_CONSECUTIVE_REJECTIONS])
+        )
         cg.add(var.set_small_negative_tolerance(conf[CONF_SMALL_NEGATIVE_TOLERANCE]))
         cg.add(var.set_persist_state(conf[CONF_PERSIST_STATE]))
         cg.add(var.set_enable_dial_correction(conf[CONF_ENABLE_DIAL_CORRECTION]))
-        cg.add(var.set_dial_correction_high_threshold(conf[CONF_DIAL_CORRECTION_HIGH_THRESHOLD]))
-        cg.add(var.set_dial_correction_low_threshold(conf[CONF_DIAL_CORRECTION_LOW_THRESHOLD]))
+        cg.add(
+            var.set_dial_correction_high_threshold(
+                conf[CONF_DIAL_CORRECTION_HIGH_THRESHOLD]
+            )
+        )
+        cg.add(
+            var.set_dial_correction_low_threshold(
+                conf[CONF_DIAL_CORRECTION_LOW_THRESHOLD]
+            )
+        )
         cg.add(var.set_debug(conf["debug"]))
 
         # Optional diagnostic sensors

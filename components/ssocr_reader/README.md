@@ -29,28 +29,28 @@ ssocr_reader:
   id: ssocr_main
   # Camera ID to use (from esp32_camera)
   camera_id: my_camera
-  
+
   # Validator (recommended)
   validator: ${id_prefix}_validator
-  
+
   # Update interval
   update_interval: 60s
-  
+
   # Image Processing Config
   threshold_level: 128      # 0-255: Binarization threshold
   digit_count: 6            # Number of digits to expect
-  
+
   # Crop Window (CRITICAL: Must match digits exactly)
   crop_x: 100
   crop_y: 200
   crop_w: 300
   crop_h: 80
-  
+
   # Sensors
   value:
     name: "Water Meter Value"
     id: water_value
-  
+
   confidence: # Always returns 100% or NaN currently
     name: "SSOCR Confidence"
 ```

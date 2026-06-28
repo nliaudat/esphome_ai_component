@@ -19,26 +19,25 @@ namespace meter_reader_tflite {
 
 class CameraCoordinator {
  public:
-  void set_camera(esp32_camera::ESP32Camera* camera);
-  void set_config(int width, int height, const std::string& pixel_format);
+  void set_camera(esp32_camera::ESP32Camera *camera);
+  void set_config(int width, int height, const std::string &pixel_format);
   void set_rotation(float rot) { this->rotation_ = rot; }
 
   void unload();
 
   // Image Processor
-  void update_image_processor_config(int model_width, int model_height, int model_channels,
-                                     int input_type, bool normalize, const std::string& input_order);
+  void update_image_processor_config(int model_width, int model_height, int model_channels, int input_type,
+                                     bool normalize, const std::string &input_order);
 
   using ProcessResult = esphome::esp32_camera_utils::ImageProcessor::ProcessResult;
-  std::vector<ProcessResult> process_frame(
-      std::shared_ptr<camera::CameraImage> frame,
-      const std::vector<esp32_camera_utils::CropZone>& zones);
+  std::vector<ProcessResult> process_frame(std::shared_ptr<camera::CameraImage> frame,
+                                           const std::vector<esp32_camera_utils::CropZone> &zones);
 
   std::shared_ptr<camera::CameraImage> get_debug_image() const {
-      if (this->image_processor_) return this->image_processor_->get_last_processed_image();
-      return nullptr;
+    if (this->image_processor_)
+      return this->image_processor_->get_last_processed_image();
+    return nullptr;
   }
-
 
   // Window control
   bool set_window(int offset_x, int offset_y, int width, int height);
@@ -49,27 +48,31 @@ class CameraCoordinator {
   // State
   int get_width() const { return current_width_; }
   int get_height() const { return current_height_; }
-  const std::string& get_format() const { return current_format_; }
+  const std::string &get_format() const { return current_format_; }
   bool is_window_configured() const { return window_configured_; }
 
   // Configuration setters (partial update support)
   void set_window_config(int x, int y, int w, int h) {
-      if (x != -1) this->window_offset_x_ = x;
-      if (y != -1) this->window_offset_y_ = y;
-      if (w != -1) this->window_width_ = w;
-      if (h != -1) this->window_height_ = h;
-      this->window_configured_ = true;
+    if (x != -1)
+      this->window_offset_x_ = x;
+    if (y != -1)
+      this->window_offset_y_ = y;
+    if (w != -1)
+      this->window_width_ = w;
+    if (h != -1)
+      this->window_height_ = h;
+    this->window_configured_ = true;
   }
 
   // Helpers
-  bool test_camera_after_reset(std::atomic<bool>& frame_available, std::atomic<bool>& frame_requested);
+  bool test_camera_after_reset(std::atomic<bool> &frame_available, std::atomic<bool> &frame_requested);
   void basic_recovery();
   std::string get_pixel_format() const { return current_format_; }
   void set_enable_preview(bool enable) { this->enable_preview_ = enable; }
   void set_debug(bool debug) { this->debug_ = debug; }
 
  protected:
-  esp32_camera::ESP32Camera* camera_{nullptr};
+  esp32_camera::ESP32Camera *camera_{nullptr};
   esp32_camera_utils::CameraWindowControl window_control_;
   esp32_camera_utils::ImageProcessorConfig ip_config_;
   std::unique_ptr<esp32_camera_utils::ImageProcessor> image_processor_;
@@ -99,4 +102,4 @@ class CameraCoordinator {
 }  // namespace meter_reader_tflite
 }  // namespace esphome
 
-#endif // USE_METER_READER_TFLITE
+#endif  // USE_METER_READER_TFLITE
