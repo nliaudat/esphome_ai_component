@@ -15,15 +15,31 @@ def styled(color, msg, reset=True):
 
 
 def print_error_for_file(file, body=None):
-    """Print a formatted error block for a file."""
-    print(
-        styled(colorama.Fore.GREEN, "### File ")
-        + styled((colorama.Fore.GREEN, colorama.Style.BRIGHT), str(file))
-    )
-    print()
-    if body is not None:
-        print(body)
+    """Print a formatted error block for a file.
+
+    On Windows, non-ASCII characters in error messages may crash the cp1252
+    console. Fall back to raw stderr write in that case.
+    """
+    try:
+        print(
+            styled(colorama.Fore.GREEN, "### File ")
+            + styled((colorama.Fore.GREEN, colorama.Style.BRIGHT), str(file))
+        )
         print()
+        if body is not None:
+            print(body)
+            print()
+    except UnicodeEncodeError:
+        # Fallback: write raw bytes to stderr
+        import sys as _sys
+        try:
+            _sys.stderr.buffer.write(
+                ("### File " + str(file) + "\n\n" + (body or "") + "\n\n").encode(
+                    "utf-8", errors="replace"
+                )
+            )
+        except Exception:
+            pass
 
 
 def filter_changed(files):

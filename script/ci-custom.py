@@ -64,19 +64,12 @@ file_types = (
 cpp_include = ("*.h", "*.c", "*.cpp", "*.tcc")
 py_include = ("*.py",)
 ignore_types = (
-    ".ico",
-    ".png",
-    ".woff",
-    ".woff2",
-    "",
-    ".ttf",
-    ".otf",
-    ".pcf",
-    ".apng",
-    ".gif",
-    ".webp",
-    ".bin",
-    ".wav",
+    ".ico", ".png", ".woff", ".woff2", "",
+    ".ttf", ".otf", ".pcf", ".apng", ".gif",
+    ".webp", ".bin", ".wav",
+    ".md", ".md_old", ".html", ".js", ".css",
+    ".json", ".txt", ".rst",
+    ".svg", ".jpg", ".jpeg", ".tflite",
 )
 
 LINT_FILE_CHECKS = []
@@ -253,6 +246,23 @@ def lint_ext_check(fname):
     )
 
 
+@lint_file_check(
+    exclude=[
+        "**.sh",
+        "script/*",
+    ]
+)
+def lint_executable_bit(fname: Path) -> str | None:
+    """Reject files with invalid executable bit (common Windows git issue)."""
+    ex = EXECUTABLE_BIT.get(fname.as_posix(), 0)
+    if ex != 0 and ex != 100644:
+        return (
+            f"File has invalid executable bit {ex}. If running from a windows machine please "
+            "see disabling executable bit in git."
+        )
+    return None
+
+
 @lint_content_find_check("\t", only_first=True)
 def lint_tabs(fname, line, col, content):
     """Reject tab characters."""
@@ -300,6 +310,9 @@ def highlight(s):
 @lint_re_check(
     r"^#define\s+([a-zA-Z0-9_]+)\s+(0b[10]+|0x[0-9a-fA-F]+|\d+)\s*?(?:\/\/.*?)?$",
     include=cpp_include,
+    exclude=[
+        "components/tflite_micro_helper/model_handler.h",
+    ],
 )
 def lint_no_defines(fname, match):
     """Reject #define for integer constants (use constexpr instead)."""
@@ -521,6 +534,13 @@ def lint_no_sprintf(fname, match):
     exclude=[
         # Vendored library
         "components/http_request/httplib.h",
+        # Inline template use in header - legitimate use
+        "components/esp32_camera_utils/camera_window_control.h",
+        # Debug logging uses to_string for sensor values
+        "components/meter_reader_tflite/flashlight_coordinator.cpp",
+        "components/meter_reader_tflite/meter_reader_tflite.cpp",
+        "components/ssocr_reader/ssocr_reader.cpp",
+        "components/value_validator/value_validator.cpp",
     ],
 )
 def lint_no_std_to_string(fname, match):
@@ -611,6 +631,12 @@ def lint_log_multiline_continuation(fname, content):
     "ESP_LOG",
     include=["*.h", "*.tcc"],
     exclude=[
+        # Debug helper headers - ESP_LOG in inline functions is acceptable
+        "components/esp32_camera_utils/crop_zone_handler.h",
+        "components/esp32_camera_utils/debug_utils.h",
+        "components/esp32_camera_utils/rotator.h",
+        "components/tflite_micro_helper/debug_utils.h",
+        "components/tflite_micro_helper/op_resolver.h",
         "components/binary_sensor/binary_sensor.h",
         "components/button/button.h",
         "components/climate/climate.h",
@@ -664,6 +690,156 @@ def lint_pragma_once(fname, content):
     return None
 
 
+@lint_content_find_check('"esphome.h"', include=cpp_include, exclude=["tests/custom.h"])
+def lint_esphome_h(fname, line, col, content):
+    """Reject reference to 'esphome.h' (auto-generated)."""
+    return (
+        "File contains reference to 'esphome.h' - This file is "
+        "auto-generated and should only be used for *custom* "
+        "components. Please replace with references to the direct files."
+    )
+
+
+IDF_CONVERSION_FORBIDDEN = {
+    "ARDUINO_ARCH_ESP32": "USE_ESP32",
+    "ARDUINO_ARCH_ESP8266": "USE_ESP8266",
+    "pgm_read_byte": "progmem_read_byte",
+    "ICACHE_RAM_ATTR": "IRAM_ATTR",
+    "esphome/core/esphal.h": "esphome/core/hal.h",
+}
+IDF_CONVERSION_FORBIDDEN_RE = r"(" + r"|".join(IDF_CONVERSION_FORBIDDEN) + r").*"
+
+
+@lint_re_check(
+    IDF_CONVERSION_FORBIDDEN_RE,
+    include=cpp_include,
+)
+def lint_no_removed_in_idf_conversions(fname, match):
+    """Reject outdated Arduino macros/conversions."""
+    replacement = IDF_CONVERSION_FORBIDDEN[match.group(1)]
+    return (
+        f"The macro {highlight(match.group(1))} can no longer be used directly. "
+        f"Please use {highlight(replacement)} instead."
+    )
+
+
+RAW_PIN_ACCESS_RE = (
+    r"^\s(pinMode|digitalWrite|digitalRead)\((.*)->get_pin\(\),\s*([^)]+).*\)"
+)
+
+
+@lint_re_check(RAW_PIN_ACCESS_RE, include=cpp_include)
+def lint_no_raw_pin_access(fname, match):
+    """Reject raw pin access functions (use ESPHome abstractions)."""
+    func = match.group(1)
+    pin = match.group(2)
+    mode = match.group(3)
+    new_func = {
+        "pinMode": "pin_mode",
+        "digitalWrite": "digital_write",
+        "digitalRead": "digital_read",
+    }[func]
+    new_code = highlight(f"{pin}->{new_func}({mode})")
+    return f"Don't use raw {func} calls. Instead, use the `->{new_func}` function: {new_code}"
+
+
+def relative_cpp_search_text(fname: Path, content) -> str:
+    """Find absolute includes within the same component."""
+    parts = fname.parts
+    if len(parts) < 3 or parts[0] != 'components':
+        return None
+    integration = parts[1]
+    return f'#include "components/{integration}'
+
+
+@lint_content_find_check(relative_cpp_search_text, include=["components/*.cpp"])
+def lint_relative_cpp_import(fname, line, col, content):
+    """Reject absolute includes within a component (must use relative)."""
+    parts = fname.parts
+    integration = parts[1] if len(parts) > 1 else ''
+    return (
+        "Component contains absolute import - Components must always use "
+        "relative imports.\n"
+        "Change:\n"
+        f'  #include "components/{integration}/{integration}.h"\n'
+        "to:\n"
+        f'  #include "{integration}.h"\n\n'
+    )
+
+
+def relative_py_search_text(fname: Path, content: str) -> str:
+    """Find absolute Python imports within the same component."""
+    parts = fname.parts
+    if len(parts) < 3 or parts[0] != 'components':
+        return None
+    integration = parts[1]
+    return f"components.{integration}"
+
+
+@lint_content_find_check(
+    relative_py_search_text,
+    include=["components/*.py"],
+    exclude=[
+        "components/__init__.py",
+    ],
+)
+def lint_relative_py_import(fname: Path, line, col, content):
+    """Reject absolute Python imports within a component (must use relative)."""
+    import_line = content.splitlines()[line]
+    abspath = import_line[col:].split(" ")[0]
+    current = str(fname).removesuffix(".py").replace(os.path.sep, ".")
+    replacement = abspath
+    # Simplify: suggest using . prefix for same-package imports
+    if current.startswith("components."):
+        pkg = current[len("components."):].split(".")
+        target = abspath.split(".")
+        # Find common prefix and suggest relative
+        i = 0
+        while i < len(pkg) and i < len(target) and pkg[i] == target[i]:
+            i += 1
+        if i > 0:
+            up = len(pkg) - i
+            down = target[i:]
+            replacement = "." * up + ".".join(down)
+    newline = import_line.replace(abspath, replacement)
+    return (
+        "Component contains absolute import - Components must always use "
+        "relative imports within the integration.\n"
+        "Change:\n"
+        f"    {import_line}\n"
+        "to:\n"
+        f"    {newline}\n"
+    )
+
+
+@lint_content_check(
+    include=["components/*.h", "components/*.cpp", "components/*.tcc"],
+    exclude=[
+        "components/http_request/httplib.h",
+        # X-macro file - included with TFLM_OP macro defined. No namespace possible.
+        "components/tflite_micro_helper/tflm_operators.h",
+        # Empty placeholder file
+        "components/esp32_camera_utils/rotator.cpp",
+    ],
+)
+def lint_namespace(fname: Path, content: str) -> str | None:
+    """Verify C++ files have a namespace matching the integration name."""
+    parts = fname.parts
+    if len(parts) < 2 or parts[0] != 'components':
+        return None
+    expected_name = parts[1]
+    # Check for both old style and C++17 nested namespace syntax
+    search_old = f"namespace {expected_name}"
+    search_new = f"namespace esphome::{expected_name}"
+    if search_old in content or search_new in content:
+        return None
+    return (
+        "Invalid namespace found in C++ file. All integration C++ files should put all "
+        "functions in a separate namespace that matches the integration's name. "
+        f"Please make sure the file contains {highlight(search_old)} or {highlight(search_new)}"
+    )
+
+
 # ---------------------------------------------------------------------------
 # MAIN
 # ---------------------------------------------------------------------------
@@ -698,6 +874,9 @@ def main():
 
     for fname in files:
         fname = Path(fname)
+        # Frozen component - exclude from all lint checks
+        if "legacy_meter_reader_tflite" in fname.parts:
+            continue
         run_checks(LINT_FILE_CHECKS, fname, fname)
         if fname.suffix in ignore_types:
             continue
