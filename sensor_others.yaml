@@ -1,8 +1,7 @@
-
 sensor:
-    
+
   - platform: uptime
-    name: "${friendly_name} Uptime"    
+    name: "${friendly_name} Uptime"
     id: ${id_prefix}_uptime_sensor
     update_interval: 5min
     internal: true
@@ -23,20 +22,20 @@ sensor:
                 (hours ? to_string(hours) + "h " : "") +
                 (minutes ? to_string(minutes) + "m " : "") +
                 (to_string(seconds) + "s")
-              ).c_str();      
+              ).c_str();
     # web_server:
       # sorting_group_id: sorting_group_sensors
-              
+
 
   # - platform: internal_temperature
     # name: "${friendly_name} Internal Temperature"
 
 
 
-text_sensor:  
+text_sensor:
   - platform: template
     name: "${friendly_name} uptime"
     id: ${id_prefix}_uptime_human
-    icon: mdi:clock-start  
+    icon: mdi:clock-start
     # web_server:
       # sorting_group_id: sorting_group_sensors

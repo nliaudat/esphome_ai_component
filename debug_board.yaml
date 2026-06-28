@@ -37,7 +37,7 @@ sensor:
   - platform: internal_temperature
     name: "${id_prefix} CPU Temperature"
     id: ${id_prefix}_cpu_temperature
-    unit_of_measurement: "°C"
+    unit_of_measurement: "degC"
     accuracy_decimals: 1
     device_class: temperature
     state_class: measurement
