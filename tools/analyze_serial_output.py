@@ -104,7 +104,7 @@ def parse_zone_analysis(log_text):
             current_pixel = None
 
     # Try to match zone coordinates with zone names
-    for zone_name, zone_data in zones.items():
+    for zone_data in zones.values():
         # Try to extract zone number from name (e.g., "zone1" -> "1")
         zone_num_match = re.search(r"zone(\d+)", zone_data["name"].lower())
         if zone_num_match:
@@ -124,7 +124,7 @@ def print_analysis(zones):
     """Print formatted analysis of all zones"""
     print(f"Found {len(zones)} zones:")
 
-    for zone_unique_name, zone_data in zones.items():
+    for zone_data in zones.values():
         print(
             f"\n=== {zone_data['name']} ({zone_data['dimensions']}, normalized={zone_data['normalized']}) ==="
         )
@@ -197,7 +197,7 @@ def reconstruct_image(zones):
 
 def calculate_zone_stats(zones):
     """Calculate actual statistics from the parsed pixel data"""
-    for zone_unique_name, zone_data in zones.items():
+    for zone_data in zones.values():
         if zone_data["pixels"]:
             all_values = []
             for pixel in zone_data["pixels"]:

@@ -94,15 +94,25 @@ select = [
 ]
 
 ignore = [
+  "BLE001", # catch blind Exception (intentional in host-side utility scripts)
+  "E402", # module level import not at top of file (intentional in data tools)
   "E501", # line too long
+  "F401", # unused import (intentional in ESPHome __init__.py for module registration)
+  "G004", # Logging f-strings in host-side utility scripts (OK for data pipeline tools)
+  "NPY002", # legacy numpy random (OK in tools scripts)
+  "PERF401", # Use list.extend (minor perf in utility scripts)
+  "PERF402", # Use list.copy (minor perf in utility scripts)
   "PLC0415", # `import` should be at the top-level of a file
   "PLR0911", # Too many return statements
   "PLR0912", # Too many branches
   "PLR0913", # Too many arguments to function call
   "PLR0915", # Too many statements
+  "PLW0602", # Using global for name but no assignment is done (OK for OpenCV callback patterns)
+  "PLW0603", # Using the global statement to update name is discouraged (OK for OpenCV callback patterns)
   "PLW1641", # Object does not implement `__hash__` method
   "PLR2004", # Magic value used in comparison
   "PLW2901", # Outer variable overwritten by inner target
+  "PTH", # flake8-use-pathlib (host utilities - os.path is acceptable)
 ]
 
 [tool.ruff.lint.isort]

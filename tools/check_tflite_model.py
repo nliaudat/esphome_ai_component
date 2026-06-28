@@ -1,5 +1,5 @@
 import argparse
-from datetime import datetime
+from datetime import UTC, datetime, timezone
 import os
 import sys
 
@@ -172,8 +172,7 @@ def safe_print(*args, **kwargs):
             for old, new in replacements.items():
                 s = s.replace(old, new)
             # Remove any remaining non-ASCII characters
-            s = s.encode("ascii", "replace").decode("ascii")
-            return s
+            return s.encode("ascii", "replace").decode("ascii")
 
         args = [safe_str(a) for a in args]
         kwargs_str = {k: safe_str(v) for k, v in kwargs.items()}
@@ -452,7 +451,7 @@ def check_delegate_ops(interpreter):
     )
 
     # Check unique operator types
-    unique_ops = set(op["op_name"] for op in ops_details)
+    unique_ops = {op["op_name"] for op in ops_details}
     summary_lines.append(f"\nUnique operator types: {len(unique_ops)}")
     for op_name in sorted(unique_ops):
         count = sum(1 for op in ops_details if op["op_name"] == op_name)
@@ -734,7 +733,7 @@ def inspect_tflite_model(
             "TFLITE MODEL COMPREHENSIVE INSPECTION REPORT",
             f"{'=' * 80}",
             f"Model: {model_path}",
-            f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            f"Timestamp: {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}",
             f"TensorFlow Version: {tf.__version__}",
             f"File Size: {os.path.getsize(model_path) / 1024:.2f} KB",
         ]

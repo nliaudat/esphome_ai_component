@@ -31,7 +31,7 @@ def process_images(input_folder, output_folder):
 
     # app.py saves images into device-specific subdirectories, so we walk the tree
     image_paths = []
-    for root, dirs, files in os.walk(input_folder):
+    for root, _dirs, files in os.walk(input_folder):
         for file in files:
             if file.lower().endswith((".jpg", ".jpeg")):
                 image_paths.append(os.path.join(root, file))

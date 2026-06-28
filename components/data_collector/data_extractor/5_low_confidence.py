@@ -112,7 +112,7 @@ class MeterReader:
             self._debug_model_info()
 
         except Exception as e:
-            raise RuntimeError(f"Failed to initialize model: {str(e)}")
+            raise RuntimeError(f"Failed to initialize model: {str(e)}") from e
 
     def _log_quantization_info(self) -> None:
         """Log detailed quantization information."""
@@ -394,10 +394,7 @@ class MeterReader:
             )
 
             # Apply scaling based on model type
-            if (
-                self.model_config.output_processing == "direct_class"
-                or self.model_config.output_processing == "softmax"
-            ):
+            if self.model_config.output_processing in {"direct_class", "softmax"}:
                 meter_reading = float(predicted_class)
             else:  # "softmax_scale10"
                 meter_reading = float(predicted_class) / self.model_config.scale_factor
@@ -405,8 +402,8 @@ class MeterReader:
             return meter_reading, confidence
 
         except Exception as e:
-            logger.error(f"Prediction error: {str(e)}", exc_info=True)
-            raise ValueError(f"Error during prediction: {str(e)}")
+            logger.exception(f"Prediction error: {str(e)}")
+            raise ValueError(f"Error during prediction: {str(e)}") from e
 
 
 def load_regions(regions_source: str | Path) -> list[tuple[int, int, int, int]]:
@@ -439,7 +436,7 @@ def load_regions(regions_source: str | Path) -> list[tuple[int, int, int, int]]:
         return valid_regions
 
     except (FileNotFoundError, json.JSONDecodeError, SyntaxError, ValueError) as e:
-        logger.error(f"Error loading regions: {e}", exc_info=True)
+        logger.exception(f"Error loading regions: {e}")
         return []
 
 
@@ -449,12 +446,7 @@ def load_image(image_source: str | Path, input_channels: int = 1) -> np.ndarray 
         image_source_str = str(image_source)
 
         # Determine loading mode based on input_channels
-        if input_channels == 1:
-            # Load as grayscale
-            load_mode = cv2.IMREAD_GRAYSCALE
-        else:
-            # Load as color (BGR)
-            load_mode = cv2.IMREAD_COLOR
+        load_mode = cv2.IMREAD_GRAYSCALE if input_channels == 1 else cv2.IMREAD_COLOR
 
         if image_source_str.startswith(("http://", "https://")):
             # Load from URL
@@ -496,10 +488,10 @@ def load_image(image_source: str | Path, input_channels: int = 1) -> np.ndarray 
         return image
 
     except requests.exceptions.RequestException as e:
-        logger.error(f"Error downloading image: {e}", exc_info=True)
+        logger.exception(f"Error downloading image: {e}")
         return None
     except Exception as e:
-        logger.error(f"Unexpected error loading image: {e}", exc_info=True)
+        logger.exception(f"Unexpected error loading image: {e}")
         return None
 
 
@@ -747,7 +739,7 @@ def process_image(
             valid_regions.append(region)
 
         except Exception as e:
-            logger.error(f"Error processing region {region}: {str(e)}", exc_info=True)
+            logger.exception(f"Error processing region {region}: {str(e)}")
             continue
 
     if not results["raw_readings"]:
@@ -796,7 +788,7 @@ def process_folder(
     images = []
 
     # Recursively find images
-    for root, dirs, files in os.walk(folder):
+    for root, _dirs, files in os.walk(folder):
         for file in files:
             if any(file.lower().endswith(ext) for ext in image_extensions):
                 images.append(Path(root) / file)
@@ -945,6 +937,7 @@ def main() -> int:
                     result.get("raw_readings", []),
                     result.get("processed_readings", []),
                     result.get("confidence_scores", []),
+                    strict=False,
                 )
             ):
                 logger.info(
@@ -965,7 +958,7 @@ def main() -> int:
         # Handle folder processing
         if args.folder:
             logger.info(f"Processing folder: {args.folder}")
-            results = process_folder(
+            process_folder(
                 folder_path=args.folder,
                 meter_reader=meter_reader,
                 regions=regions,
@@ -978,7 +971,7 @@ def main() -> int:
         logger.info("Execution interrupted by user")
         return 130
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}", exc_info=True)
+        logger.exception(f"Unexpected error: {str(e)}")
         return 1
 
 

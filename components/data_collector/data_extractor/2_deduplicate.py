@@ -111,11 +111,15 @@ def find_duplicates_comprehensive(
         processed_paths.add(path1)
 
         for path2, (phash2, val2) in phash_dict.items():
-            if path2 not in processed_paths and path1 != path2:
+            if (
+                path2 not in processed_paths
+                and path1 != path2
+                and val1 == val2
+                and (phash1 - phash2) <= hash_threshold
+            ):
                 # Must be perceptual match AND must have identical inferred values
-                if val1 == val2 and (phash1 - phash2) <= hash_threshold:
-                    similar_group.append(path2)
-                    processed_paths.add(path2)
+                similar_group.append(path2)
+                processed_paths.add(path2)
 
         if len(similar_group) > 1:
             # Use first path as the group key
@@ -142,13 +146,13 @@ def delete_duplicates(
     files_to_delete = []
 
     # Process exact duplicates
-    for file_hash, file_list in exact_duplicates.items():
+    for file_list in exact_duplicates.values():
         if len(file_list) > 1:
             # Determine which file to keep
             if keep_original == "oldest":
-                keep_file = min(file_list, key=lambda x: os.path.getmtime(x))
+                keep_file = min(file_list, key=os.path.getmtime)
             elif keep_original == "newest":
-                keep_file = max(file_list, key=lambda x: os.path.getmtime(x))
+                keep_file = max(file_list, key=os.path.getmtime)
             else:  # 'first'
                 keep_file = min(file_list)
 
@@ -158,13 +162,13 @@ def delete_duplicates(
                     files_to_delete.append(file_path)
 
     # Process similar images (near-duplicates)
-    for group_key, file_list in similar_groups.items():
+    for file_list in similar_groups.values():
         if len(file_list) > 1:
             # Determine which file to keep
             if keep_original == "oldest":
-                keep_file = min(file_list, key=lambda x: os.path.getmtime(x))
+                keep_file = min(file_list, key=os.path.getmtime)
             elif keep_original == "newest":
-                keep_file = max(file_list, key=lambda x: os.path.getmtime(x))
+                keep_file = max(file_list, key=os.path.getmtime)
             else:  # 'first'
                 keep_file = min(file_list)
 
@@ -218,7 +222,7 @@ def print_duplicate_report(exact_duplicates, similar_groups):
         print(
             f"\n=== EXACT DUPLICATES ({len([x for x in exact_duplicates.values() if len(x) > 1])} groups) ==="
         )
-        for hash_val, files in exact_duplicates.items():
+        for files in exact_duplicates.values():
             if len(files) > 1:
                 print(f"\nExact duplicate group ({len(files)} files):")
                 for f in files:
@@ -228,7 +232,7 @@ def print_duplicate_report(exact_duplicates, similar_groups):
 
     if similar_groups:
         print(f"\n=== SIMILAR IMAGES ({len(similar_groups)} groups) ===")
-        for group_key, files in similar_groups.items():
+        for files in similar_groups.values():
             if len(files) > 1:
                 print(f"\nSimilar image group ({len(files)} files):")
                 for f in files:
@@ -294,7 +298,7 @@ def main():
     # Since extractor outputs to subfolders (e.g., extracted/coldwater), we need to scan recursively
     all_files = []
     image_extensions = (".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".webp")
-    for root, dirs, files in os.walk(args.folder):
+    for root, _dirs, files in os.walk(args.folder):
         for file in files:
             if file.lower().endswith(image_extensions):
                 all_files.append(os.path.join(root, file))

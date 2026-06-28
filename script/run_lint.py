@@ -45,7 +45,9 @@ def run_check(name, args, cwd=None, fix=False):
     if cwd is None:
         cwd = ROOT
     try:
-        r = subprocess.run(args, capture_output=True, text=True, cwd=cwd, timeout=120)
+        r = subprocess.run(
+            args, capture_output=True, text=True, cwd=cwd, timeout=120, check=False
+        )
         passed = r.returncode == 0
         return passed, r.stdout, r.stderr
     except subprocess.TimeoutExpired:
@@ -86,7 +88,7 @@ def fix_crlf_trailing_ws():
                 if b"\r\n" in data or data.count(b"\r") > 0:
                     text = data.decode("utf-8")
                     text = text.replace("\r\n", "\n").replace("\r", "\n")
-                    lines = [l.rstrip() for l in text.split("\n")]
+                    lines = [line_.rstrip() for line_ in text.split("\n")]
                     text = "\n".join(lines).strip("\n") + "\n"
                     f.write_text(text, encoding="utf-8")
                     count += 1

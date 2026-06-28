@@ -279,7 +279,7 @@ def lint_ext_check(fname):
 def lint_executable_bit(fname: Path) -> str | None:
     """Reject files with invalid executable bit (common Windows git issue)."""
     ex = EXECUTABLE_BIT.get(fname.as_posix(), 0)
-    if ex != 0 and ex != 100644:
+    if ex not in {0, 100644}:
         return (
             f"File has invalid executable bit {ex}. If running from a windows machine please "
             "see disabling executable bit in git."

@@ -76,6 +76,7 @@ def regenerate_report(tflite_path, txt_path, verbose=False):
         env["PYTHONIOENCODING"] = "utf-8"
         result = subprocess.run(
             cmd,
+            check=False,
             capture_output=False,  # Let output flow to terminal directly
             timeout=120,  # 2 minute timeout per model
             env=env,

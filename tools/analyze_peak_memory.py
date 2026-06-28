@@ -34,14 +34,17 @@ def analyze_peak_memory(model_path):
     for op_idx in range(len(ops_details)):
         active_memory = 0
         for t_idx, tensor in enumerate(tensor_details):
-            if t_idx in tensor_first and t_idx in tensor_last:
-                if tensor_first[t_idx] <= op_idx <= tensor_last[t_idx]:
-                    dtype_size = tf.dtypes.as_dtype(tensor["dtype"]).size
-                    num_elements = 1
-                    for dim in tensor["shape"]:
-                        if dim is not None:
-                            num_elements *= dim
-                    active_memory += dtype_size * num_elements
+            if (
+                t_idx in tensor_first
+                and t_idx in tensor_last
+                and tensor_first[t_idx] <= op_idx <= tensor_last[t_idx]
+            ):
+                dtype_size = tf.dtypes.as_dtype(tensor["dtype"]).size
+                num_elements = 1
+                for dim in tensor["shape"]:
+                    if dim is not None:
+                        num_elements *= dim
+                active_memory += dtype_size * num_elements
         memory_by_op.append(active_memory)
         if active_memory > peak_memory:
             peak_memory = active_memory
