@@ -18,9 +18,9 @@ def extract_exif_metadata(image_path):
                 try:
                     metadata_str = piexif.helper.UserComment.load(user_comment)
                     return json.loads(metadata_str)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     print(f"Error decoding user comment in {image_path}: {e}")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"Error reading EXIF from {image_path}: {e}")
 
     return None

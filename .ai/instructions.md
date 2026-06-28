@@ -1,13 +1,13 @@
 # ESPHome AI Component - AI Collaboration Guide
 
-**Repository:** https://github.com/nliaudat/esphome_ai_component  
-**Primary Goal:** Run TensorFlow Lite Micro models and computer vision algorithms on ESP32 devices within the ESPHome ecosystem  
-**License:** Apache 2.0 OR MIT (dual license)  
-**Target Boards:** ESP32, ESP32-S2, ESP32-S3 (optimized), ESP32-C3, ESP8266 (limited)  
-**ESPHome Version:** 2026.1.0+ (C++20, ESP-IDF 5.5.2)  
+**Repository:** https://github.com/nliaudat/esphome_ai_component
+**Primary Goal:** Run TensorFlow Lite Micro models and computer vision algorithms on ESP32 devices within the ESPHome ecosystem
+**License:** Apache 2.0 OR MIT (dual license)
+**Target Boards:** ESP32, ESP32-S2, ESP32-S3 (optimized), ESP32-C3, ESP8266 (limited)
+**ESPHome Version:** 2026.1.0+ (C++20, ESP-IDF 5.5.2)
 
-**⚠️ When this file changes, `.ai/instructions.yaml` MUST be regenerated.**  
-The YAML file is the token-optimized machine-readable derivative used by `.clinerules/` and `.greptile/`.  
+**⚠️ When this file changes, `.ai/instructions.yaml` MUST be regenerated.**
+The YAML file is the token-optimized machine-readable derivative used by `.clinerules/` and `.greptile/`.
 
 ---
 
@@ -48,7 +48,7 @@ This project provides a modular framework for running **TensorFlow Lite Micro mo
 -   **Memory-Constrained:** Must operate with as little as 320KB free heap
 -   **Active Learning:** Optional data collection for model improvement
 
-**This file is the SINGLE SOURCE OF TRUTH for all code reviews.**  
+**This file is the SINGLE SOURCE OF TRUTH for all code reviews.**
 Generic C++ advice is OVERRIDDEN by the rules below.
 
 ### 🚨 ESP-IDF & Classic ESP32 Compatibility (Added 2026-04)
@@ -411,10 +411,10 @@ CONFIG_SCHEMA = cv.Schema({
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
-    
+
     if CONF_MY_PARAM in config:
         cg.add(var.set_my_param(config[CONF_MY_PARAM]))
-    
+
     # Get dependency reference
     cam = await cg.get_variable(config[CONF_CAMERA_ID])
     cg.add(var.set_camera(cam))
@@ -534,7 +534,7 @@ class ClimateDevice {
     this->custom_fan_modes_ = modes;
     this->active_custom_fan_mode_ = nullptr;  // Reset on change
   }
-  
+
   bool set_custom_fan_mode(const char* mode) {
     // Store pointer FROM the validated list, NOT the input pointer
     const char* validated = this->find_in_list(mode);
@@ -544,7 +544,7 @@ class ClimateDevice {
     }
     return false;
   }
-  
+
  private:
   std::vector<const char*> custom_fan_modes_;  // String literals in flash
   const char* active_custom_fan_mode_{nullptr};  // MUST point to list entry
@@ -1074,9 +1074,9 @@ All source files MUST contain only ASCII characters (U+0000 to U+007F). Non-ASCI
 ### ❌ Trailing Whitespace
 
 ```cpp
-// WRONG - Line ends with spaces   
-void setup() {    
-  this->init();    
+// WRONG - Line ends with spaces
+void setup() {
+  this->init();
 }
 ```
 
@@ -1373,6 +1373,6 @@ while (xQueueReceive(this->upload_queue_, &job, 0) == pdTRUE) {
 *This document is the authoritative standard for the esphome_ai_component repository.*
 *Last updated: June 2026*
 
-**⚠️ Maintenance:** When editing this file, also sync `.ai/instructions.yaml` 
+**⚠️ Maintenance:** When editing this file, also sync `.ai/instructions.yaml`
 (token-optimized derivative for `.clinerules/` and `.greptile/` consumption).
 ```

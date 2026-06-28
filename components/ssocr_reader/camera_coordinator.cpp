@@ -103,7 +103,7 @@ bool CameraCoordinator::test_camera_after_reset(std::atomic<bool> &frame_availab
       frame_requested.store(false);
       return true;
     }
-    delay(100);
+    delay(100);  // NOLINT
   }
   frame_requested.store(false);
   return false;
