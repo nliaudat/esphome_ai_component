@@ -132,26 +132,47 @@ const char *ImageProcessor::jpeg_error_to_string(jpeg_error_t error) const {
 // Static Helpers
 // -------------------------------------------------------------------------
 
-bool ImageProcessor::get_jpeg_dimensions(const uint8_t *data, size_t len, int &width, int &height) {
-  if (!data || len < 10)
+bool ImageProcessor::get_jpeg_dimensions(const uint8_t *data, size_t size, int &width, int &height) {
+  // Robust parser: walks JPEG marker segments properly, skipping entropy bytes
+  // that can contain 0xFF 0xC0 as data. Handles both SOF0 (Baseline) and SOF2 (Progressive).
+  if (size < 2 || data[0] != 0xFF || data[1] != 0xD8)
     return false;
+  size_t pos = 2;
+  while (pos < size) {
+    // Skip padding 0xFF
+    while (pos < size && data[pos] == 0xFF)
+      pos++;
+    if (pos >= size)
+      return false;
 
-  // Simple JPEG generic parser to find SOF0 (Start Of Frame 0) marker 0xFFC0
-  // Based on standard JPEG structure
-  for (size_t i = 0; i < len - 9; i++) {
-    if (data[i] == 0xFF && data[i + 1] == 0xC0) {
-      // Found SOF0
-      // Skip marker (2) + length (2) + precision (1) to get height (2) + width (2)
-      // Height is at offset 5, Width at offset 7 from marker start (0xFF)
-      int h_high = data[i + 5];
-      int h_low = data[i + 6];
-      int w_high = data[i + 7];
-      int w_low = data[i + 8];
+    uint8_t marker = data[pos];
+    pos++;
 
+    if (marker == 0xDA)
+      return false;  // SOS - header ended
+    if (marker == 0xD9)
+      return false;  // EOI
+
+    if (pos + 2 > size)
+      return false;
+    uint16_t len = (data[pos] << 8) | data[pos + 1];
+
+    if (marker == 0xC0 || marker == 0xC2) {  // SOF0 (Baseline) or SOF2 (Progressive)
+      if (pos + 7 > size)
+        return false;
+      uint8_t h_high = data[pos + 3];
+      uint8_t h_low = data[pos + 4];
+      uint8_t w_high = data[pos + 5];
+      uint8_t w_low = data[pos + 6];
       height = (h_high << 8) | h_low;
       width = (w_high << 8) | w_low;
       return true;
     }
+
+    // Skip to next marker (length includes the 2-byte length field itself)
+    if (len < 2)
+      return false;
+    pos += len;
   }
   return false;
 }
@@ -980,43 +1001,6 @@ bool ImageProcessor::process_zone_to_buffer(std::shared_ptr<camera::CameraImage>
   }
 
   return success;
-}
-
-// Helper to parse JPEG dimensions (accessible to class)
-bool get_jpeg_dimensions(const uint8_t *data, size_t size, int &width, int &height) {
-  if (size < 2 || data[0] != 0xFF || data[1] != 0xD8)
-    return false;
-  size_t pos = 2;
-  while (pos < size) {
-    // Skip padding 0xFF
-    while (pos < size && data[pos] == 0xFF)
-      pos++;
-    if (pos >= size)
-      return false;
-
-    uint8_t marker = data[pos];
-    pos++;
-
-    if (marker == 0xDA)
-      return false;  // SOS - header ended
-    if (marker == 0xD9)
-      return false;  // EOI
-
-    if (pos + 2 > size)
-      return false;
-    uint16_t len = (data[pos] << 8) | data[pos + 1];
-
-    if (marker == 0xC0 || marker == 0xC2) {  // SOF0 (Baseline) or SOF2 (Progressive)
-      if (pos + 7 > size)
-        return false;
-      height = (data[pos + 3] << 8) | data[pos + 4];
-      width = (data[pos + 5] << 8) | data[pos + 6];
-      return true;
-    }
-
-    pos += len;
-  }
-  return false;
 }
 
 bool ImageProcessor::process_jpeg_zone_to_buffer(std::shared_ptr<camera::CameraImage> image, const CropZone &zone,
