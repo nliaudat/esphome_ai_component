@@ -62,7 +62,7 @@ class DataCollector : public Component {
       UploadJob(const UploadJob&) = delete;
       UploadJob& operator=(const UploadJob&) = delete;
       // Allow move
-      UploadJob(UploadJob&& other) noexcept 
+      UploadJob(UploadJob&& other) noexcept
           : data(other.data), len(other.len), confidence(other.confidence),
             metadata(other.metadata), metadata_len(other.metadata_len) {
           std::memcpy(this->value, other.value, sizeof(this->value));

@@ -13,11 +13,11 @@ class ScopedDuration {
   explicit ScopedDuration(const char* tag) : tag_(tag), start_(esphome::millis()) {}
 
   uint32_t elapsed() const { return esphome::millis() - this->start_; }
-  
+
   void log_duration(const char* func) {
     ESP_LOGD(this->tag_, "%s duration: %lums", func, this->elapsed());
   }
-  
+
   void log(const char* msg, uint32_t val) {
     ESP_LOGD(this->tag_, "%s: %lums", msg, val);
   }

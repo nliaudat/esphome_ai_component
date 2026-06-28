@@ -17,14 +17,14 @@ class Scaler {
    * @brief Scale RGB888 buffer to uint8 (grayscale) with resizing.
    * Uses fixed-point arithmetic for optimization.
    */
-  static bool scale_rgb888_to_uint8(const uint8_t* src, int src_w, int src_h, 
+  static bool scale_rgb888_to_uint8(const uint8_t* src, int src_w, int src_h,
                                     uint8_t* dst, int dst_w, int dst_h, int channels);
 
   /**
    * @brief Scale RGB888 buffer to float32 (for TensorFlow Lite) with resizing.
    * Uses fixed-point arithmetic for optimization.
    */
-  static bool scale_rgb888_to_float32(const uint8_t* src, int src_w, int src_h, 
+  static bool scale_rgb888_to_float32(const uint8_t* src, int src_w, int src_h,
                                       uint8_t* dst, int dst_w, int dst_h, int channels, bool normalize);
 
   /**
@@ -32,7 +32,7 @@ class Scaler {
    */
   static bool scale_nearest(const uint8_t* src, int src_w, int src_h, int src_channels,
                             uint8_t* dst, int dst_w, int dst_h);
-                            
+
   /**
    * @brief Simple bilinear scaling (software only, slower but better quality).
    */

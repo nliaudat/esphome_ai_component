@@ -21,7 +21,7 @@ void CameraCoordinator::set_config(int width, int height, const std::string& pix
     this->current_width_ = width;
     this->current_height_ = height;
     this->current_format_ = pixel_format;
-    
+
     // Assume initial config is "original"
     if (this->orig_width_ == 0) {
         this->orig_width_ = width;
@@ -37,24 +37,24 @@ bool CameraCoordinator::supports_window() const {
 
 bool CameraCoordinator::set_window(int offset_x, int offset_y, int width, int height) {
     if (!this->camera_) return false;
-    ESP_LOGI(TAG, "Setting camera window: off(%d,%d) size(%dx%d)", 
+    ESP_LOGI(TAG, "Setting camera window: off(%d,%d) size(%dx%d)",
              offset_x, offset_y, width, height);
 
     bool success = this->window_control_.set_window_with_reset(
-        this->camera_, 
+        this->camera_,
         esp32_camera_utils::CameraWindowControl::WindowConfig{
             offset_x, offset_y, width, height, true});
 
     if (success) {
         auto new_dims = this->window_control_.update_dimensions_after_window(
-            this->camera_, 
+            this->camera_,
             esp32_camera_utils::CameraWindowControl::WindowConfig{
                 offset_x, offset_y, width, height, true},
             this->current_width_, this->current_height_);
-        
+
         this->current_width_ = new_dims.first;
         this->current_height_ = new_dims.second;
-        
+
         // Blocking delay required: camera must stabilize before returning success
         // Cannot use set_timeout() as caller expects immediate result
         delay(WINDOW_SET_STABILIZATION_MS);
@@ -77,24 +77,24 @@ bool CameraCoordinator::reset_window() {
     if (success) {
          success = this->window_control_.reset_to_full_frame_with_dimensions(
              this->camera_, this->orig_width_, this->orig_height_, this->current_width_, this->current_height_);
-         
+
          if (success) {
              this->current_format_ = this->orig_format_;
              delay(WINDOW_RESET_STABILIZATION_MS); // Blocking: camera must stabilize
          }
     }
-    
+
     if (!success) {
         ESP_LOGE(TAG, "Failed to reset camera window completely");
         this->basic_recovery();
     }
-    
+
     return success;
 }
 
 void CameraCoordinator::basic_recovery() {
      ESP_LOGI(TAG, "Executing basic camera recovery (state reset)");
-     // Implement any specific camera re-init calls if exposed by esp32_camera, 
+     // Implement any specific camera re-init calls if exposed by esp32_camera,
      // but mostly this just logs and maybe allows the system to try again next loop.
 }
 
@@ -115,7 +115,7 @@ bool CameraCoordinator::test_camera_after_reset(std::atomic<bool>& frame_availab
 
 
 
-void CameraCoordinator::update_image_processor_config(int model_width, int model_height, int model_channels, 
+void CameraCoordinator::update_image_processor_config(int model_width, int model_height, int model_channels,
                                                       int input_type, bool normalize, const std::string& input_order) {
     esp32_camera_utils::ImageProcessorConfig config;
     config.camera_width = this->current_width_;
@@ -124,20 +124,20 @@ void CameraCoordinator::update_image_processor_config(int model_width, int model
     config.model_width = model_width;
     config.model_height = model_height;
     config.model_channels = model_channels;
-    
+
     switch(static_cast<int>(this->rotation_)) {
         case 90:  config.rotation = esp32_camera_utils::ROTATION_90;  break;
         case 180: config.rotation = esp32_camera_utils::ROTATION_180; break;
         case 270: config.rotation = esp32_camera_utils::ROTATION_270; break;
         default:  config.rotation = esp32_camera_utils::ROTATION_0;   break;
     }
-    
+
     config.input_type = static_cast<esp32_camera_utils::ImageProcessorInputType>(input_type);
     config.normalize = normalize;
     config.input_order = input_order;
 
     this->image_processor_ = std::make_unique<esp32_camera_utils::ImageProcessor>(config);
-    ESP_LOGI(TAG, "ImageProcessor initialized in CameraCoord: %dx%d %s -> Model %dx%d", 
+    ESP_LOGI(TAG, "ImageProcessor initialized in CameraCoord: %dx%d %s -> Model %dx%d",
              this->current_width_, this->current_height_, this->current_format_.c_str(), config.model_width, config.model_height);
 }
 
@@ -155,7 +155,7 @@ std::vector<CameraCoordinator::ProcessResult> CameraCoordinator::process_frame(
 bool CameraCoordinator::apply_window() {
     if (!this->window_configured_) {
         ESP_LOGD(TAG, "Window not configured locally, nothing to apply");
-        return true; 
+        return true;
     }
     return this->set_window(this->window_offset_x_, this->window_offset_y_, this->window_width_, this->window_height_);
 }

@@ -49,7 +49,7 @@ void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, in
   }
 
   uint32_t start_time = millis();
-  ESP_LOGI(TAG, "Starting data collection (Value: %s, Confidence: %.2f%%, Size: %dx%d, Fmt: %s)", 
+  ESP_LOGI(TAG, "Starting data collection (Value: %s, Confidence: %.2f%%, Size: %dx%d, Fmt: %s)",
            raw_value.c_str(), confidence * 100.0f, width, height, format.c_str());
 
   // Determine format
@@ -58,31 +58,31 @@ void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, in
   else if (format == "RGB565") pix_fmt = PIXFORMAT_RGB565;
   else if (format == "RGB888") pix_fmt = PIXFORMAT_RGB888;
   else if (format == "YUV422") pix_fmt = PIXFORMAT_YUV422;
-  
+
   // Basic JPEG encoding
   uint8_t *jpeg_buf = nullptr;
   size_t jpeg_len = 0;
-  
+
   if (pix_fmt == PIXFORMAT_JPEG) {
       // Already JPEG, just cast (copy might be needed if upload logic modifies it, but here we likely just send)
       jpeg_buf = const_cast<uint8_t *>(frame->get_data_buffer());
       jpeg_len = frame->get_data_length();
-      
+
       // We don't own this buffer, so we shouldn't free it unless we copied it.
       this->upload_image(jpeg_buf, jpeg_len, raw_value, confidence, metadata.c_str());
-      return; 
+      return;
   }
 
   // Convert to JPEG
   bool converted = fmt2jpg(const_cast<uint8_t *>(frame->get_data_buffer()), frame->get_data_length(), width, height, pix_fmt, 90, &jpeg_buf, &jpeg_len);
-  
+
   if (!converted || !jpeg_buf) {
     ESP_LOGE(TAG, "JPEG compression failed");
     return;
   }
-  
+
   this->upload_image(jpeg_buf, jpeg_len, raw_value, confidence, metadata.c_str());
-  
+
   // fmt2jpg allocates jpeg_buf on success — free it
   free(jpeg_buf);
 }
@@ -100,7 +100,7 @@ bool DataCollector::upload_image(const uint8_t *data, size_t len, const std::str
         // Fallback to internal RAM if PSRAM not available or full
         copy = static_cast<uint8_t *>(malloc(len));
     }
-    
+
     if (!copy) {
         ESP_LOGE(TAG, "Failed to allocate memory for upload queue (%zu bytes)", len);
         return false;
@@ -110,11 +110,11 @@ bool DataCollector::upload_image(const uint8_t *data, size_t len, const std::str
     UploadJob job;
     job.data = copy;
     job.len = len;
-    
+
     // Copy string safely
     strncpy(job.value, raw_value.c_str(), sizeof(job.value) - 1);
     job.value[sizeof(job.value) - 1] = '\0'; // Ensure null-termination
-    
+
     job.confidence = confidence;
 
     // Handle Metadata
@@ -139,7 +139,7 @@ bool DataCollector::upload_image(const uint8_t *data, size_t len, const std::str
         // job destructor handles free(data) and free(metadata) via RAII
         return false;
     }
-    
+
     // Queued successfully — release ownership so destructor doesn't free
     job.data = nullptr;
     job.metadata = nullptr;
@@ -162,13 +162,13 @@ void DataCollector::start_upload_task() {
 void DataCollector::upload_task(void *arg) {
     DataCollector *collector = static_cast<DataCollector*>(arg);
     UploadJob job;
-    
+
     while (collector->task_running_.load()) {
         // Use a timeout so we periodically check task_running_
         if (xQueueReceive(collector->upload_queue_, &job, 1000 / portTICK_PERIOD_MS) == pdTRUE) {
             // Process upload
             collector->process_upload_sync(job.data, job.len, std::string(job.value), job.confidence, job.metadata);
-            
+
             // Manual free required: xQueueReceive uses raw memcpy to overwrite job struct,
             // bypassing C++ assignment operators and RAII. Previous iteration's pointers
             // would be overwritten without freeing.
@@ -186,7 +186,7 @@ void DataCollector::upload_task(void *arg) {
 DataCollector::~DataCollector() {
     // Signal task to stop
     this->task_running_ = false;
-    
+
     // Wait briefly for task to exit
     if (this->upload_task_handle_) {
         vTaskDelay(1100 / portTICK_PERIOD_MS); // Slightly longer than queue timeout
@@ -197,7 +197,7 @@ DataCollector::~DataCollector() {
         }
         this->upload_task_handle_ = nullptr;
     }
-    
+
     // Drain remaining queue items — manual free required (xQueueReceive raw memcpy)
     if (this->upload_queue_) {
         UploadJob job;
@@ -238,7 +238,7 @@ bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, const s
 
   // Set Headers
   esp_http_client_set_header(client, "Content-Type", "image/jpeg");
-  
+
   if (!this->api_key_.empty()) {
        // Check if it starts with "Bearer " or just a key
        if (this->api_key_.rfind("Bearer ", 0) == 0) {
@@ -248,11 +248,11 @@ bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, const s
            esp_http_client_set_header(client, "X-Api-Key", this->api_key_.c_str());
        }
   }
-  
+
   // Add metadata headers
   // Pass raw value as string directly
   esp_http_client_set_header(client, "X-Meter-Value", raw_value.c_str());
-  
+
   char buf[32];
   snprintf(buf, sizeof(buf), "%.4f", confidence);
   esp_http_client_set_header(client, "X-Meter-Confidence", buf);
@@ -265,10 +265,10 @@ bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, const s
 
   esp_err_t err = esp_http_client_perform(client);
   bool success = false;
-  
+
   if (err == ESP_OK) {
     int status_code = esp_http_client_get_status_code(client);
-    ESP_LOGI(TAG, "HTTP POST Status = %d, content_length = %lld", 
+    ESP_LOGI(TAG, "HTTP POST Status = %d, content_length = %lld",
              status_code, esp_http_client_get_content_length(client));
     if (this->debug_) {
         ESP_LOGD(TAG, "Full upload metrics: Value=%s, Conf=%.4f, Size=%zu", raw_value.c_str(), confidence, len);

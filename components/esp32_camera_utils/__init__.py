@@ -63,7 +63,7 @@ CONFIG_SCHEMA = cv.Schema({
 
 async def to_code(config):
     cg.add_define("USE_ESP32_CAMERA_UTILS")
-    
+
     esp32.add_idf_component(
         name="espressif/esp_new_jpeg",
         ref="1.0.2"
@@ -71,21 +71,21 @@ async def to_code(config):
 
     cg.add_build_flag("-DUSE_ESP32_CAMERA_CONV")
 
-    
+
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
-    
+
     if CONF_CAMERA_WINDOW in config:
         conf = config[CONF_CAMERA_WINDOW]
         cg.add(var.set_camera_window_config(conf[CONF_OFFSET_X], conf[CONF_OFFSET_Y], conf[CONF_WIDTH], conf[CONF_HEIGHT]))
-        
+
     if CONF_CAMERA_ID in config:
         cam = await cg.get_variable(config[CONF_CAMERA_ID])
         cg.add(var.set_camera(cam))
-    
+
     # Set image rotation
     cg.add(var.set_rotation(config[CONF_ROTATION]))
-    
+
     # Enable modular features
     if config.get("enable_rotation", False) or config[CONF_ROTATION] != 0:
          cg.add_define("USE_CAMERA_ROTATOR")
@@ -96,27 +96,27 @@ async def to_code(config):
             conf = config[CONF_SCALER]
             if CONF_WIDTH in conf and CONF_HEIGHT in conf:
                 cg.add(var.set_scaler_config(conf[CONF_WIDTH], conf[CONF_HEIGHT]))
-        
+
     if config.get("enable_cropper", True):
         cg.add_define("USE_CAMERA_CROPPER")
         if CONF_CROPPER in config:
             conf = config[CONF_CROPPER]
             if CONF_WIDTH in conf and CONF_HEIGHT in conf:
                 cg.add(var.set_cropper_config(conf[CONF_WIDTH], conf[CONF_HEIGHT], conf[CONF_OFFSET_X], conf[CONF_OFFSET_Y]))
-        
+
     if config.get("enable_drawing", True):
         cg.add_define("USE_CAMERA_DRAWING")
 
     if config.get("debug", False):
         cg.add_define("DEBUG_ESP32_CAMERA_UTILS")
         cg.add(var.set_debug(True))
-        
+
     if 'web_server' in CORE.config:
         cg.add_define("USE_WEB_SERVER")
 
     if config.get(CONF_DEBUG_MEMORY, False):
         cg.add_define("DEBUG_ESP32_CAMERA_UTILS_MEMORY")
-        
+
         # Helper to create and register a sensor
         async def create_sensor(name, unit, accuracy_decimals=0, icon="mdi:memory"):
             # Create a manual ID for the new sensor
@@ -129,7 +129,7 @@ async def to_code(config):
                 CONF_ICON: icon,
                 CONF_FORCE_UPDATE: False,
             }
-            
+
             sens = await sensor.new_sensor(sens_conf)
             cg.add(sens.set_unit_of_measurement(unit))
             cg.add(sens.set_accuracy_decimals(accuracy_decimals))
@@ -138,9 +138,7 @@ async def to_code(config):
         # Buffer Size
         s = await create_sensor("camera_buffer_size", "B", 0)
         cg.add(var.set_camera_buffer_size_sensor(s))
-        
+
         # Free PSRAM
         s = await create_sensor("camera_free_psram", "B", 0)
         cg.add(var.set_camera_free_psram_sensor(s))
-
-

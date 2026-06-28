@@ -9,7 +9,7 @@ static constexpr float OVERSIZE_THRESHOLD_FACTOR = 1.2f;
 
 BufferPool::Buffer BufferPool::acquire(size_t size) {
   std::lock_guard<std::mutex> lock(this->mutex_);
-  
+
   // Strategy 1: Search for exact size match
   for (auto& slot : this->pool_) {
     if (!slot.in_use && slot.size == size) {
@@ -19,7 +19,7 @@ BufferPool::Buffer BufferPool::acquire(size_t size) {
       return {slot.data, size, true};
     }
   }
-  
+
   // Strategy 2: Try to reuse oversized slot (within 20% overhead)
   for (auto& slot : this->pool_) {
     if (!slot.in_use && slot.size >= size && slot.size <= size * OVERSIZE_THRESHOLD_FACTOR) {
@@ -29,33 +29,33 @@ BufferPool::Buffer BufferPool::acquire(size_t size) {
       return {slot.data, slot.size, true};
     }
   }
-  
+
   // Strategy 3: Allocate new buffer
   this->misses_++;
-  
+
   // Prefer SPIRAM for buffers >1KB
   uint8_t* data = nullptr;
   if (size > 1024) {
     data = static_cast<uint8_t *>(heap_caps_aligned_alloc(64, size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
   }
-  
+
   // Fallback to internal RAM
   if (!data) {
     data = static_cast<uint8_t *>(heap_caps_aligned_alloc(64, size, MALLOC_CAP_8BIT));
   }
-  
+
   if (!data) {
     ESP_LOGE(TAG, "Failed to allocate %zu bytes", size);
     return {nullptr, 0, false};
   }
-  
+
   // Try to add to pool if space available
   if (this->pool_.size() < MAX_POOL_ENTRIES) {
     this->pool_.push_back({data, size, true});
     ESP_LOGD(TAG, "Pool miss: allocated %zu bytes, added to pool (size: %zu)", size, this->pool_.size());
     return {data, size, true};
   }
-  
+
   // Pool full, return non-pooled buffer
   this->saturation_misses_++;
   ESP_LOGW(TAG, "Pool miss: allocated %zu bytes (pool full)", size);
@@ -64,9 +64,9 @@ BufferPool::Buffer BufferPool::acquire(size_t size) {
 
 void BufferPool::release(Buffer& buffer) {
   if (!buffer.data) return;
-  
+
   std::lock_guard<std::mutex> lock(this->mutex_);
-  
+
   // Find in pool and mark available
   for (auto& slot : this->pool_) {
     if (slot.data == buffer.data) {
@@ -76,7 +76,7 @@ void BufferPool::release(Buffer& buffer) {
       return;
     }
   }
-  
+
   // Not in pool, free it
   heap_caps_free(buffer.data);
   buffer.data = nullptr;

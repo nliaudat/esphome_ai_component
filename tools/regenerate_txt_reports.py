@@ -129,7 +129,7 @@ def main():
 
     # Find .tflite files from main models/
     tflite_files = find_tflite_files(MODELS_DIR)
-    
+
     # Also find from data_extractor/models if requested
     data_extractor_files = []
     if args.data_extractor or not tflite_files:

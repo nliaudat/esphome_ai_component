@@ -68,11 +68,11 @@ CONFIG_SCHEMA = cv.All(cv.ensure_list(cv.Schema({
 
 async def to_code(config):
     cg.add_define("USE_VALUE_VALIDATOR")
-    
+
     for conf in config:
         var = cg.new_Pvariable(conf[CONF_ID])
         await cg.register_component(var, conf)
-        
+
         # Construct config struct
         cg.add(var.set_allow_negative_rates(conf[CONF_ALLOW_NEGATIVE_RATES]))
         cg.add(var.set_max_absolute_diff(conf[CONF_MAX_ABSOLUTE_DIFF]))
@@ -91,7 +91,7 @@ async def to_code(config):
         cg.add(var.set_dial_correction_high_threshold(conf[CONF_DIAL_CORRECTION_HIGH_THRESHOLD]))
         cg.add(var.set_dial_correction_low_threshold(conf[CONF_DIAL_CORRECTION_LOW_THRESHOLD]))
         cg.add(var.set_debug(conf["debug"]))
-        
+
         # Optional diagnostic sensors
         if CONF_REJECTION_COUNT_SENSOR in conf:
             sens = await sensor.new_sensor(conf[CONF_REJECTION_COUNT_SENSOR])

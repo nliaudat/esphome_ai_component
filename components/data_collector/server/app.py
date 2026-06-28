@@ -40,20 +40,20 @@ def uploaded_file(filename):
 def upload(device_id):
     # Sanitize device_id to prevent directory traversal
     device_id = secure_filename(device_id)
-    
+
     # Create device specific folder
     device_folder = os.path.join(UPLOAD_FOLDER, device_id)
     os.makedirs(device_folder, exist_ok=True)
-    
+
     # 1. Mandatory Authentication Check
     # Check X-Api-Key header
     client_key = request.headers.get('X-Api-Key')
     # Check Authorization header (Bearer token)
     auth_header = request.headers.get('Authorization')
-    
+
     authorized = (client_key and client_key == API_KEY) or \
                  (auth_header and auth_header == f"Bearer {API_KEY}")
-        
+
     if not authorized:
         return "Unauthorized", 401
 
@@ -62,9 +62,9 @@ def upload(device_id):
         # Security: sanitize headers used in file paths
         raw_value = request.headers.get('X-Meter-Value', 'unknown')
         value = secure_filename(raw_value)
-        
+
         conf = request.headers.get('X-Meter-Confidence', '0.0')
-        
+
         # Create a descriptive filename
         # Format: collect_{timestamp}_{value}_{confidence}.jpg
         timestamp = int(time.time())
@@ -75,27 +75,27 @@ def upload(device_id):
             # Fallback for non-float confidence, ensuring safety
             safe_conf = secure_filename(conf)
             filename = f"collect_{timestamp}_{value}_{safe_conf}.jpg"
-            
+
         filepath = os.path.join(device_folder, filename)
-        
+
         # Save the raw binary data from the request body
         with open(filepath, "wb") as f:
             f.write(request.data)
-            
+
         print(f"Saved {filepath} (Value: {value}, Conf: {conf})")
-        
+
         # Inject Metadata if present
         metadata_json = request.headers.get('X-Meter-Json')
         if metadata_json:
             try:
                 # Prepare EXIF data
                 exif_dict = {"0th": {}, "Exif": {}, "GPS": {}, "1st": {}, "thumbnail": None}
-                
+
                 # UserComment expects specific encoding. piexif helper handles it.
                 # Ensure the string is proper JSON or at least a string
                 user_comment = piexif.helper.UserComment.dump(metadata_json)
                 exif_dict["Exif"][piexif.ExifIFD.UserComment] = user_comment
-                
+
                 exif_bytes = piexif.dump(exif_dict)
                 piexif.insert(exif_bytes, filepath)
                 print(f"Injected EXIF metadata into {filename}")
@@ -103,7 +103,7 @@ def upload(device_id):
                 print(f"Failed to inject EXIF: {e}")
 
         return "OK", 200
-        
+
     except Exception as e:
         # Security: Log error internally, do not expose details to client
         print(f"Error saving upload: {e}")

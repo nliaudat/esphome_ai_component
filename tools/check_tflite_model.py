@@ -193,12 +193,12 @@ def model_summary(interpreter):
     output_details = interpreter.get_output_details()
     tensor_details = interpreter.get_tensor_details()
     ops_details = interpreter._get_ops_details()
-    
+
     # Calculate memory usage and parameters
     total_memory = 0
     total_params = 0
     layer_info = []
-    
+
     # Group tensors by operations
     op_tensors = {}
     for op in ops_details:
@@ -206,22 +206,22 @@ def model_summary(interpreter):
         if op_name not in op_tensors:
             op_tensors[op_name] = []
         op_tensors[op_name].extend(op['inputs'] + op['outputs'])
-    
+
     # Analyze each operation as a "layer"
     for op in ops_details:
         op_name = op['op_name']
-        
+
         # Calculate output shape
         output_shape = "Unknown"
         if op['outputs']:
             first_output_idx = op['outputs'][0]
             if first_output_idx < len(tensor_details):
                 output_shape = tensor_details[first_output_idx]['shape']
-        
+
         # Calculate parameters (for weights/biases)
         op_params = 0
         op_memory = 0
-        
+
         for tensor_idx in op['inputs'] + op['outputs']:
             if tensor_idx < len(tensor_details):
                 tensor = tensor_details[tensor_idx]
@@ -230,15 +230,15 @@ def model_summary(interpreter):
                 for dim in tensor['shape']:
                     if dim is not None:
                         num_elements *= dim
-                
+
                 tensor_memory = dtype_size * num_elements
                 op_memory += tensor_memory
-                
+
                 # Count as parameters if it's a weight tensor
-                if (tensor['name'] and 
+                if (tensor['name'] and
                     any(keyword in tensor['name'].lower() for keyword in ['weight', 'bias', 'kernel'])):
                     op_params += num_elements
-        
+
         layer_info.append({
             'layer_type': op_name,
             'output_shape': output_shape,
@@ -247,7 +247,7 @@ def model_summary(interpreter):
         })
         total_params += op_params
         total_memory += op_memory
-    
+
     # Build summary table
     summary_lines = []
     summary_lines.append("\n" + "=" * 80)
@@ -255,102 +255,102 @@ def model_summary(interpreter):
     summary_lines.append("=" * 80)
     summary_lines.append(f"{'Layer (type)':<25} {'Output Shape':<20} {'Param #':<15} {'Size (KB)':<10}")
     summary_lines.append("-" * 80)
-    
+
     for i, info in enumerate(layer_info):
         layer_name = f"{info['layer_type']}_{i}"
         output_shape_str = str(info['output_shape']).replace("(", "[").replace(")", "]")
         params_str = f"{info['params']:,}" if info['params'] > 0 else "0"
         memory_str = f"{info['memory_kb']:.2f}"
-        
+
         summary_lines.append(f"{layer_name:<25} {output_shape_str:<20} {params_str:<15} {memory_str:<10}")
-    
+
     # Add totals
     summary_lines.append("-" * 80)
     summary_lines.append(f"Total params: {total_params:,}")
     summary_lines.append(f"Total memory: {total_memory / 1024:.2f} KB")
     summary_lines.append(f"Total operations: {len(ops_details)}")
-    
+
     # Input/Output summary
     summary_lines.append("\n" + "=" * 80)
     summary_lines.append("INPUT/OUTPUT SUMMARY")
     summary_lines.append("=" * 80)
-    
+
     for i, inp in enumerate(input_details):
         shape_str = str(inp['shape']).replace("(", "[").replace(")", "]")
         dtype_str = str(inp['dtype'])
         summary_lines.append(f"Input {i}:  {shape_str:<15} {dtype_str:<10}")
-    
+
     for i, out in enumerate(output_details):
         shape_str = str(out['shape']).replace("(", "[").replace(")", "]")
         dtype_str = str(out['dtype'])
         summary_lines.append(f"Output {i}: {shape_str:<15} {dtype_str:<10}")
-    
+
     return '\n'.join(summary_lines)
 
 def get_detailed_operations_summary(interpreter):
     """More detailed operations breakdown"""
     ops_details = interpreter._get_ops_details()
     tensor_details = interpreter.get_tensor_details()
-    
+
     summary_lines = []
     summary_lines.append("\n" + "=" * 80)
     summary_lines.append("DETAILED OPERATIONS BREAKDOWN")
     summary_lines.append("=" * 80)
-    
+
     # Count operations by type
     op_counts = {}
     for op in ops_details:
         op_name = op['op_name']
         op_counts[op_name] = op_counts.get(op_name, 0) + 1
-    
+
     summary_lines.append("\nOPERATION COUNTS:")
     for op_name, count in sorted(op_counts.items()):
         summary_lines.append(f"  {op_name}: {count}")
-    
+
     # Detailed operation info
     summary_lines.append("\nDETAILED OPERATION INFO:")
     for op in ops_details:
         summary_lines.append(f"\n{op['op_name']} (index: {op['index']}):")
         summary_lines.append(f"  Input tensors: {op['inputs']}")
         summary_lines.append(f"  Output tensors: {op['outputs']}")
-        
+
         # Show tensor details
         for tensor_idx in op['inputs']:
             if tensor_idx < len(tensor_details):
                 tensor = tensor_details[tensor_idx]
                 shape_str = str(tensor['shape'])
                 summary_lines.append(f"    Input {tensor_idx}: shape={shape_str}, dtype={tensor['dtype']}")
-        
+
         for tensor_idx in op['outputs']:
             if tensor_idx < len(tensor_details):
                 tensor = tensor_details[tensor_idx]
                 shape_str = str(tensor['shape'])
                 summary_lines.append(f"    Output {tensor_idx}: shape={shape_str}, dtype={tensor['dtype']}")
-    
+
     return '\n'.join(summary_lines)
 
 def get_memory_analysis(interpreter):
     """Detailed memory usage analysis"""
     tensor_details = interpreter.get_tensor_details()
-    
+
     summary_lines = []
     summary_lines.append("\n" + "=" * 80)
     summary_lines.append("MEMORY USAGE ANALYSIS")
     summary_lines.append("=" * 80)
-    
+
     memory_breakdown = []
     total_memory = 0
-    
+
     for tensor in tensor_details:
         dtype_size = tf.dtypes.as_dtype(tensor['dtype']).size
         num_elements = 1
         for dim in tensor['shape']:
             if dim is not None:
                 num_elements *= dim
-        
+
         tensor_memory = dtype_size * num_elements
         total_memory += tensor_memory
-        
+
         memory_breakdown.append({
             'name': tensor.get('name', 'unnamed'),
             'shape': tensor['shape'],
@@ -358,24 +358,24 @@ def get_memory_analysis(interpreter):
             'memory_kb': tensor_memory / 1024,
             'elements': num_elements
         })
-    
+
     # Sort by memory usage
     memory_breakdown.sort(key=lambda x: x['memory_kb'], reverse=True)
-    
+
     summary_lines.append(f"{'Tensor Name':<30} {'Shape':<20} {'Dtype':<10} {'Elements':<12} {'Memory (KB)':<12}")
     summary_lines.append("-" * 80)
-    
+
     for tensor_info in memory_breakdown[:20]:  # Show top 20
         shape_str = str(tensor_info['shape'])[:18] + "..." if len(str(tensor_info['shape'])) > 18 else str(tensor_info['shape'])
         summary_lines.append(
             f"{tensor_info['name'][:28]:<30} {shape_str:<20} {str(tensor_info['dtype']):<10} "
             f"{tensor_info['elements']:<12,} {tensor_info['memory_kb']:<12.2f}"
         )
-    
+
     summary_lines.append("-" * 80)
     summary_lines.append(f"Total Memory Usage: {total_memory / 1024:.2f} KB")
     summary_lines.append(f"Number of Tensors: {len(tensor_details)}")
-    
+
     return '\n'.join(summary_lines)
 
 
@@ -383,12 +383,12 @@ def check_delegate_ops(interpreter):
     """Check if the model contains DELEGATE operations (not supported by TFLite Micro)"""
     ops_details = interpreter._get_ops_details()
     delegate_ops = [op for op in ops_details if op['op_name'] == 'DELEGATE']
-    
+
     summary_lines = []
     summary_lines.append("\n" + "=" * 80)
     summary_lines.append("TFLITE MICRO COMPATIBILITY CHECK")
     summary_lines.append("=" * 80)
-    
+
     if delegate_ops:
         summary_lines.append(f"\n[WARN] Found {len(delegate_ops)} DELEGATE operation(s)!")
         summary_lines.append("   TFLite Micro does NOT support delegate operations.")
@@ -402,7 +402,7 @@ def check_delegate_ops(interpreter):
             summary_lines.append(f"     Outputs: {op['outputs']}")
     else:
         summary_lines.append("\n[OK] No DELEGATE operations found - compatible with TFLite Micro")
-    
+
     # Check total ops vs MAX_OPERATORS
     total_ops = len(ops_details)
     # Use total_ops + 5 as recommended MAX_OPERATORS (safety margin)
@@ -410,25 +410,25 @@ def check_delegate_ops(interpreter):
     summary_lines.append(f"\n[INFO] Model has {total_ops} operations")
     summary_lines.append(f"   Recommended MAX_OPERATORS: {recommended_max_ops} (total ops + 5 margin)")
     summary_lines.append(f"   Set via build flag: -DMAX_OPERATORS={recommended_max_ops}")
-    
+
     # Check unique operator types
     unique_ops = set(op['op_name'] for op in ops_details)
     summary_lines.append(f"\nUnique operator types: {len(unique_ops)}")
     for op_name in sorted(unique_ops):
         count = sum(1 for op in ops_details if op['op_name'] == op_name)
         summary_lines.append(f"  {op_name}: {count}")
-    
+
     return '\n'.join(summary_lines)
 
 
 def get_peak_memory_analysis(interpreter):
     """Analyze peak memory using tensor lifetime analysis with an empirical arena size rule.
-    
+
     TFLite Micro's GreedyMemoryPlanner allocates tensors based on their lifetimes
-    (first op read/output → last op read as input). The actual arena size needed
+    (first op read/output -> last op read as input). The actual arena size needed
     falls between the peak concurrent tensor memory and the sum of all tensors.
     The exact overhead depends on the planner's first-fit algorithm and alignment.
-    
+
     Using empirical observations from TFLite Micro runtime:
     - Peak concurrent tensor memory is the lower bound
     - A safety multiplier of 2.2x covers alignment, planner metadata, and overhead
@@ -437,24 +437,24 @@ def get_peak_memory_analysis(interpreter):
     ops_details = interpreter._get_ops_details()
     tensor_details = interpreter.get_tensor_details()
     num_tensors = len(tensor_details)
-    
+
     summary_lines = []
     summary_lines.append("\n" + "=" * 80)
     summary_lines.append("PEAK MEMORY ANALYSIS (TFLite Micro Arena Estimate)")
     summary_lines.append("=" * 80)
-    
+
     # Identify model inputs (persistently live) and all tensors ever produced as outputs
     # Constants (weights/biases) are stored in the model flatbuffer (Flash/ROM) and
     # do NOT occupy space in the mutable tensor arena. We exclude them from the
     # peak concurrent memory calculation to get an accurate activation-only peak.
     model_inputs = {x['index'] for x in interpreter.get_input_details()}
     all_outputs = {t for op in ops_details for t in op['outputs'] if t >= 0}
-    
+
     # Build tensor lifetime map: for each tensor, find first and last op that uses it
     # Uses the same algorithm as TFLite Micro's GreedyMemoryPlanner
     tensor_first_use = {}
     tensor_last_use = {}
-    
+
     for op_idx, op in enumerate(ops_details):
         for tensor_idx in op['inputs']:
             if tensor_idx >= 0 and tensor_idx < num_tensors:
@@ -467,12 +467,12 @@ def get_peak_memory_analysis(interpreter):
                     tensor_first_use[tensor_idx] = op_idx
                 if tensor_idx not in tensor_last_use:
                     tensor_last_use[tensor_idx] = op_idx
-    
+
     # Calculate peak concurrent memory using lifetime analysis
     # (the minimum size possible if planner was perfect)
     peak_concurrent = 0
     peak_op_idx = 0
-    
+
     for op_idx in range(len(ops_details)):
         concurrent = 0
         for tensor_idx, t in enumerate(tensor_details):
@@ -487,13 +487,13 @@ def get_peak_memory_analysis(interpreter):
                         if dim is not None:
                             num_elements *= dim
                     concurrent += dtype_size * num_elements
-        
+
         if concurrent > peak_concurrent:
             peak_concurrent = concurrent
             peak_op_idx = op_idx
-    
+
     peak_op_name = ops_details[peak_op_idx]['op_name'] if peak_op_idx < len(ops_details) else 'END'
-    
+
     # Calculate arena size: peak * safety factor to cover planner overhead, alignment, bookkeeping
     # Safety factor of 2.2x covers:
     # - 16-byte alignment per tensor
@@ -511,19 +511,19 @@ def get_peak_memory_analysis(interpreter):
     #   v23: 28KB peak * 2.2 = 61KB  (vs 59.5KB actual - 2.5% margin)
     # The C++ tflite_coordinator.cpp applies an additional 1.5x for S3 cache.
     SAFETY_FACTOR = 2.2
-    
+
     arena_bytes_raw = peak_concurrent * SAFETY_FACTOR
-    
+
     # Add fixed overhead for head metadata (buffer handles, interpreter state)
     # TFLite Micro stores buffer_handles_ array with one 12-byte entry per tensor
     head_overhead = 64 + num_tensors * 12
     head_overhead = (head_overhead + 63) & ~63  # Align to 64 bytes
-    
+
     arena_bytes = int(head_overhead + arena_bytes_raw)
-    
+
     # Align final size to 1024 bytes (1KB) so recommendation is clean
     arena_bytes_aligned = ((arena_bytes + 1023) // 1024) * 1024
-    
+
     total_memory = 0
     for t in tensor_details:
         dtype_size = tf.dtypes.as_dtype(t['dtype']).size
@@ -532,13 +532,13 @@ def get_peak_memory_analysis(interpreter):
             if dim is not None:
                 num_elements *= dim
         total_memory += dtype_size * num_elements
-    
+
     summary_lines.append(f"\nTotal tensor memory (sum of all tensors): {total_memory / 1024:.2f} KB")
     summary_lines.append(f"Peak concurrent tensor memory (lifetime analysis): {peak_concurrent / 1024:.2f} KB at op {peak_op_idx} ({peak_op_name})")
     summary_lines.append(f"Planner overhead: {SAFETY_FACTOR:.1f}x safety factor + {head_overhead}B head")
     summary_lines.append(f"Estimated arena size: {arena_bytes_aligned / 1024:.2f} KB ({arena_bytes_aligned} bytes)")
     summary_lines.append(f"\nRecommended tensor_arena_size: {int(arena_bytes_aligned / 1024)}KB")
-    
+
     # Show top tensors by memory
     tensor_memory = []
     for idx, t in enumerate(tensor_details):
@@ -548,13 +548,13 @@ def get_peak_memory_analysis(interpreter):
             if dim is not None:
                 num_elements *= dim
         tensor_memory.append((idx, dtype_size * num_elements / 1024, t['shape'], t['dtype'], t.get('name', '')))
-    
+
     tensor_memory.sort(key=lambda x: x[1], reverse=True)
-    
+
     summary_lines.append(f"\nTop tensors by memory:")
     for idx, mem_kb, shape, dtype, name in tensor_memory[:10]:
         summary_lines.append(f"  [{idx:3d}] {mem_kb:8.2f} KB  {str(shape):<25} {str(dtype):<20} {name[:50]}")
-    
+
     return '\n'.join(summary_lines)
 
 
@@ -562,26 +562,26 @@ def evaluate_tflite_model(tflite_path, x_test=None, y_test=None):
     """Evaluate TFLite model accuracy if test data is provided"""
     if x_test is None or y_test is None:
         return None
-    
+
     safe_print("[TEST] Evaluating TFLite model accuracy...")
-    
+
     try:
         interpreter = tf.lite.Interpreter(model_path=tflite_path)
         interpreter.allocate_tensors()
-        
+
         input_details = interpreter.get_input_details()
         output_details = interpreter.get_output_details()
-        
+
         input_dtype = input_details[0]['dtype']
-        
+
         correct_predictions = 0
         total_samples = len(x_test)
         all_predictions = []
         all_confidences = []
-        
+
         for i in tqdm(range(total_samples), desc="Evaluating", leave=False):
             input_data = x_test[i:i+1]
-            
+
             # Handle quantization
             if input_dtype in [np.int8, np.uint8]:
                 input_scale, input_zero_point = input_details[0]['quantization']
@@ -589,38 +589,38 @@ def evaluate_tflite_model(tflite_path, x_test=None, y_test=None):
                 input_data = input_data.astype(input_dtype)
             else:
                 input_data = input_data.astype(np.float32)
-            
+
             interpreter.set_tensor(input_details[0]['index'], input_data)
             interpreter.invoke()
-            
+
             output_data = interpreter.get_tensor(output_details[0]['index'])
-            
+
             # Handle output quantization
             if output_details[0]['dtype'] in [np.int8, np.uint8]:
                 output_scale, output_zero_point = output_details[0]['quantization']
                 output_data = (output_data.astype(np.float32) - output_zero_point) * output_scale
-            
+
             predicted_class = np.argmax(output_data)
             confidence = np.max(output_data)
-            
+
             all_predictions.append(predicted_class)
             all_confidences.append(confidence)
-            
+
             # Get true class
             if len(y_test.shape) > 1 and y_test.shape[1] > 1:
                 true_class = np.argmax(y_test[i])
             else:
                 true_class = y_test[i]
-            
+
             if predicted_class == true_class:
                 correct_predictions += 1
-        
+
         accuracy = correct_predictions / total_samples
-        
+
         # Additional metrics
         avg_confidence = np.mean(all_confidences)
         confidence_std = np.std(all_confidences)
-        
+
         return {
             'accuracy': accuracy,
             'correct_predictions': correct_predictions,
@@ -630,12 +630,12 @@ def evaluate_tflite_model(tflite_path, x_test=None, y_test=None):
             'predictions': np.array(all_predictions),
             'confidences': np.array(all_confidences)
         }
-    
+
     except Exception as e:
         safe_print(f"[FAIL] Evaluation failed: {e}")
         return None
 
-def inspect_tflite_model(model_path, verbose=False, output_file=None, 
+def inspect_tflite_model(model_path, verbose=False, output_file=None,
                         evaluate=False, test_data=None, debug=False,
                         summary_type="basic"):
     """Enhanced TFLite model inspection with comprehensive analysis"""
@@ -649,10 +649,10 @@ def inspect_tflite_model(model_path, verbose=False, output_file=None,
             experimental_op_resolver_type=tf.lite.experimental.OpResolverType.BUILTIN_WITHOUT_DEFAULT_DELEGATES
         )
         interpreter.allocate_tensors()
-        
+
         # Initialize output content
         output_content = []
-        
+
         # --- Report Header ---
         header = [
             f"\n{'='*80}",
@@ -664,28 +664,28 @@ def inspect_tflite_model(model_path, verbose=False, output_file=None,
             f"File Size: {os.path.getsize(model_path) / 1024:.2f} KB"
         ]
         output_content.extend(header)
-        
+
         # --- Model Summary (Keras-style) ---
         output_content.append(model_summary(interpreter))
-        
+
         # --- Memory Analysis ---
         output_content.append(get_memory_analysis(interpreter))
-        
+
         # --- Peak Memory Analysis (TFLite Micro Arena Estimate) ---
         output_content.append(get_peak_memory_analysis(interpreter))
-        
+
         # --- TFLite Micro Compatibility Check ---
         output_content.append(check_delegate_ops(interpreter))
-        
+
         # --- Detailed Operations Summary ---
         if verbose:
             output_content.append(get_detailed_operations_summary(interpreter))
-        
+
         # --- Analyzer Output ---
         analyzer_output = safe_analyze_model(model_path)
         if analyzer_output:
             output_content.append("\n[EXPERIMENTAL ANALYZER OUTPUT]\n" + analyzer_output)
-        
+
         # --- Evaluation ---
         if evaluate and test_data:
             x_test, y_test = test_data
@@ -697,12 +697,12 @@ def inspect_tflite_model(model_path, verbose=False, output_file=None,
                 output_content.append(f"Accuracy: {eval_results['accuracy']:.4f} "
                                     f"({eval_results['correct_predictions']}/{eval_results['total_samples']})")
                 output_content.append(f"Average Confidence: {eval_results['avg_confidence']:.4f} "
-                                    f"(±{eval_results['confidence_std']:.4f})")
-        
+                                    f"(+/-{eval_results['confidence_std']:.4f})")
+
         # --- Output Results ---
         report = '\n'.join(output_content)
         safe_print(report)
-        
+
         if output_file:
             with open(output_file, 'w') as f:
                 f.write(report)
@@ -762,9 +762,9 @@ if __name__ == "__main__":
         default="28,28,1",
         help="Input shape for model (comma-separated, e.g., '28,28,1')"
     )
-    
+
     args = parser.parse_args()
-    
+
     # Prepare test data if needed
     test_data = None
     if args.evaluate:
@@ -784,7 +784,7 @@ if __name__ == "__main__":
             safe_print("[RETRY] Using random sample data for evaluation...")
             input_shape = tuple(map(int, args.input_shape.split(',')))
             test_data = create_sample_data(input_shape)
-    
+
     inspect_tflite_model(
         model_path=args.model_path,
         verbose=args.verbose,
@@ -793,7 +793,7 @@ if __name__ == "__main__":
         test_data=test_data,
         debug=args.debug
     )
-    
+
 # Basic inspection
 # py check_tflite_model.py ../models/digit_recognizer_v4_10cls_RGB.tflite
 

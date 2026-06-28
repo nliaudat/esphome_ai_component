@@ -7,5 +7,5 @@ namespace analog_reader  {
 // Kept this file if we need to expand later or to satisfy build systems expecting .cpp
 // But for now it can be empty or just include the header.
 
-}  // namespace analog_reader 
+}  // namespace analog_reader
 }  // namespace esphome

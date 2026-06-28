@@ -83,7 +83,7 @@ DIAL_SCHEMA = cv.Schema({
     cv.Optional(CONF_CROP_H, default=64): cv.int_,
     cv.Optional(CONF_MIN_ANGLE, default=0): cv.float_,
     cv.Optional(CONF_MAX_ANGLE, default=360): cv.float_,
-    cv.Optional(CONF_ANGLE_OFFSET, default=0): cv.float_, 
+    cv.Optional(CONF_ANGLE_OFFSET, default=0): cv.float_,
     cv.Optional(CONF_CLOCKWISE, default=True): cv.boolean,
     cv.Optional(CONF_MIN_VALUE, default=0): cv.float_,
     cv.Optional(CONF_MAX_VALUE, default=10): cv.float_,
@@ -92,14 +92,14 @@ DIAL_SCHEMA = cv.Schema({
     cv.Optional(CONF_DEADZONE_DIAMETER, default=0.0): cv.float_,
     cv.Optional(CONF_AUTO_CONTRAST, default=True): cv.boolean,
     cv.Optional(CONF_CONTRAST, default=1.0): cv.float_,
-    cv.Optional("target_color"): cv.hex_int, 
+    cv.Optional("target_color"): cv.hex_int,
     cv.Optional("color_tolerance", default=0.0): cv.float_,
-    
+
     # Per-dial sensors
     cv.Optional(CONF_VALUE): sensor.sensor_schema(),
     cv.Optional(CONF_CONFIDENCE): sensor.sensor_schema(),
     cv.Optional(CONF_ANGLE): sensor.sensor_schema(),
-    
+
     # Internal Calibration Mapping
     cv.Optional(CONF_CALIBRATION): cv.ensure_list(cv.Schema({
         cv.Required(CONF_RAW): cv.float_,
@@ -124,7 +124,7 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
 
     await cg.register_component(var, config)
-    
+
     cg.add_define("USE_ANALOG_READER")
 
     # Validator
@@ -137,7 +137,7 @@ async def to_code(config):
 
     if config[CONF_PAUSED]:
         cg.add(var.set_pause_processing(True))
-        
+
     if config[CONF_DEBUG]:
         cg.add(var.set_debug(True))
 
@@ -153,10 +153,10 @@ async def to_code(config):
         # We need to map Py config to C++ struct DialConfig
         # cpp: struct DialConfig { string id; float scale; ... }
         # generated: var.add_dial({id, scale, ...})
-        
+
         # We can't pass a dict directly to add_dial typically in codegen unless we struct init.
         # cg.StructInitializer
-        
+
         s = cg.StructInitializer(
             analog_reader_ns.struct("DialConfig"),
             ("id", dial[CONF_ID]),
@@ -186,14 +186,14 @@ async def to_code(config):
             ("confidence_sensor", await sensor.new_sensor(dial[CONF_CONFIDENCE]) if CONF_CONFIDENCE in dial else None),
             ("angle_sensor", await sensor.new_sensor(dial[CONF_ANGLE]) if CONF_ANGLE in dial else None),
         )
-        
+
         # Handle calibration mapping
         if CONF_CALIBRATION in dial:
             # Convert list of dicts to list of pairs for C++ vector<pair<float,float>>
             # Generate C++ initializer list string: {{r1, m1}, {r2, m2}, ...}
             cal_str = ", ".join([f"{{ {item[CONF_RAW]}f, {item[CONF_MAPPED]}f }}" for item in dial[CONF_CALIBRATION]])
             s.args["calibration_mapping"] = cg.RawExpression(f"{{ {cal_str} }}")
-        
+
         cg.add(var.add_dial(s))
 
     # Get camera resolution from substitutions
@@ -203,6 +203,6 @@ async def to_code(config):
         res = substitutions["camera_resolution"]
         if 'x' in res:
             width, height = map(int, res.split('x'))
-    
+
     pixel_format = substitutions.get("camera_pixel_format", "RGB888")
     cg.add(var.set_camera_image_format(width, height, pixel_format))

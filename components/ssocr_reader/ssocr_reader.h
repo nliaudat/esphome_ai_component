@@ -27,11 +27,11 @@ class SSOCRReader : public PollingComponent, public esphome::camera::CameraListe
   void dump_config() override;
 
   void set_value_sensor(sensor::Sensor *s) { this->value_sensor_ = s; }
-  void set_confidence_sensor(sensor::Sensor *s) { this->confidence_sensor_ = s; } 
+  void set_confidence_sensor(sensor::Sensor *s) { this->confidence_sensor_ = s; }
 #ifdef USE_VALUE_VALIDATOR
   void set_validator(value_validator::ValueValidator *v) { this->validation_coord_.set_validator(v); }
 #endif
-  
+
   void set_threshold_config(int level) { this->threshold_level_ = level; }
   void set_crop_config(int x, int y, int w, int h) {
       this->crop_x_ = x; this->crop_y_ = y; this->crop_w_ = w; this->crop_h_ = h;
@@ -60,8 +60,8 @@ class SSOCRReader : public PollingComponent, public esphome::camera::CameraListe
   ValueValidatorCoordinator validation_coord_;
 
   esphome::camera::Camera *camera_{nullptr};
-  int img_width_{0}; 
-  int img_height_{0}; 
+  int img_width_{0};
+  int img_height_{0};
   std::string pixel_format_str_{"JPEG"};
   sensor::Sensor *value_sensor_{nullptr};
   sensor::Sensor *confidence_sensor_{nullptr};
@@ -71,10 +71,10 @@ class SSOCRReader : public PollingComponent, public esphome::camera::CameraListe
   int crop_w_{0};
   int crop_h_{0};
   int digit_count_{6};
-  
+
   bool debug_{false};
   std::mutex frame_mutex_;
-  
+
   // Async processing (non-blocking camera callback)
   std::shared_ptr<esphome::camera::CameraImage> pending_frame_{nullptr};
 

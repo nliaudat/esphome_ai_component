@@ -17,7 +17,7 @@ void Esp32CameraUtils::setup() {
       bool success = this->window_control_.set_window_with_reset(
           this->camera_, CameraWindowControl::WindowConfig{
               this->offset_x_, this->offset_y_, this->width_, this->height_, true});
-              
+
       if (success) {
         ESP_LOGI(TAG, "Camera window configured successfully");
       } else {
@@ -40,11 +40,11 @@ bool Esp32CameraUtils::set_camera_window(int offset_x, int offset_y, int width, 
     DURATION_START();
     this->set_camera_window_config(offset_x, offset_y, width, height);
     bool success = this->window_control_.set_window(this->camera_, offset_x, offset_y, width, height);
-    
+
     if (success) {
         this->camera_width_ = width;
         this->camera_height_ = height;
-        
+
         if (this->has_processor_config_) {
             this->reinitialize_image_processor(this->last_config_template_);
         }
@@ -63,7 +63,7 @@ void Esp32CameraUtils::set_camera_image_format(int width, int height, const std:
   this->camera_width_ = width;
   this->camera_height_ = height;
   this->pixel_format_ = pixel_format;
-  
+
   // Store as original dimensions if not already set
   if (this->original_camera_width_ == 0) {
     this->original_camera_width_ = width;
@@ -74,8 +74,8 @@ void Esp32CameraUtils::set_camera_image_format(int width, int height, const std:
   if (this->original_pixel_format_.empty()) {
     this->original_pixel_format_ = pixel_format;
   }
-  
-  ESP_LOGD(TAG, "Camera format set: %dx%d, %s (original: %dx%d, %s)", 
+
+  ESP_LOGD(TAG, "Camera format set: %dx%d, %s (original: %dx%d, %s)",
            width, height, pixel_format.c_str(),
            this->original_camera_width_, this->original_camera_height_, this->original_pixel_format_.c_str());
 }
@@ -91,7 +91,7 @@ void Esp32CameraUtils::reinitialize_image_processor(const ImageProcessorConfig& 
         config.camera_width = this->camera_width_;
         config.camera_height = this->camera_height_;
         config.pixel_format = this->pixel_format_;
-        
+
         // Apply modular configs if present
         if (this->has_scaler_config_) {
             config.scaler_width = this->scaler_width_;
@@ -103,7 +103,7 @@ void Esp32CameraUtils::reinitialize_image_processor(const ImageProcessorConfig& 
             config.cropper_offset_x = this->cropper_offset_x_;
             config.cropper_offset_y = this->cropper_offset_y_;
         }
-        
+
         this->image_processor_ = std::make_unique<ImageProcessor>(config);
         ESP_LOGI(TAG, "ImageProcessor initialized with dimensions: %dx%d, format: %s",
                  this->camera_width_, this->camera_height_, this->pixel_format_.c_str());
@@ -124,37 +124,37 @@ bool Esp32CameraUtils::test_camera_after_reset() {
     if (!this->camera_) return false;
     // Simple check if we can request a frame or if camera is responsive
     // For now, just return true as in original code
-    return true; 
+    return true;
 }
 
 void Esp32CameraUtils::basic_camera_recovery() {
     ESP_LOGW(TAG, "Attempting basic camera recovery...");
-    
+
     // Reinitialize image processor if we have a config
     if (this->has_processor_config_) {
         this->reinitialize_image_processor(this->last_config_template_);
     }
-    
+
     ESP_LOGI(TAG, "Basic camera recovery completed");
 }
 
 bool Esp32CameraUtils::reset_window(int &width, int &height) {
     DURATION_START();
     if (!this->camera_) return false;
-    
+
     bool success = this->window_control_.reset_to_full_frame_with_dimensions(
-        this->camera_, 
-        this->original_camera_width_, 
+        this->camera_,
+        this->original_camera_width_,
         this->original_camera_height_,
-        width, 
+        width,
         height
     );
-    
+
     if (success) {
         this->camera_width_ = width;
         this->camera_height_ = height;
         this->pixel_format_ = this->original_pixel_format_;
-        
+
         // Reinitialize processor if we have a template
         if (this->has_processor_config_) {
             this->reinitialize_image_processor(this->last_config_template_);
@@ -163,12 +163,12 @@ bool Esp32CameraUtils::reset_window(int &width, int &height) {
     } else {
         ESP_LOGE(TAG, "Failed to reset camera window");
     }
-    
+
     DURATION_END("reset_window");
     return success;
 }
 
-bool Esp32CameraUtils::process_zone(std::shared_ptr<camera::CameraImage> frame, const CropZone& zone, 
+bool Esp32CameraUtils::process_zone(std::shared_ptr<camera::CameraImage> frame, const CropZone& zone,
                                    uint8_t* output_buffer, size_t output_size) {
     if (!this->image_processor_) {
         ESP_LOGE(TAG, "ImageProcessor not initialized");
@@ -185,20 +185,20 @@ bool Esp32CameraUtils::process_zone(std::shared_ptr<camera::CameraImage> frame, 
 
     // Translate global crop zone to local window coordinates
     CropZone local_zone = zone;
-    
+
     // If we have a window offset, adjust the coordinates
     if (this->has_config_) {
         local_zone.x1 -= this->offset_x_;
         local_zone.y1 -= this->offset_y_;
         local_zone.x2 -= this->offset_x_;
         local_zone.y2 -= this->offset_y_;
-        
+
         // Clip to actual image dimensions to prevent out-of-bounds errors
         // This handles cases where the crop zone might slightly overlap the window edge
         // or if the window configuration is slightly out of sync.
         int img_width = this->camera_width_;
         int img_height = this->camera_height_;
-        
+
         // Use actual frame dimensions if available and different (e.g. JPEG)
         // Note: CameraImage doesn't expose dimensions directly, so we rely on camera_width_
         // which should match the window width if configured correctly.
@@ -210,11 +210,11 @@ bool Esp32CameraUtils::process_zone(std::shared_ptr<camera::CameraImage> frame, 
         local_zone.y1 = std::max(0, local_zone.y1);
         local_zone.x2 = std::min(img_width, local_zone.x2);
         local_zone.y2 = std::min(img_height, local_zone.y2);
-        
+
         // Check if the zone is valid after clipping
         if (local_zone.x2 <= local_zone.x1 || local_zone.y2 <= local_zone.y1) {
-            ESP_LOGW(TAG, "Crop zone outside of current camera window (Global: %d,%d->%d,%d | Window Offset: %d,%d | Local: %d,%d->%d,%d)", 
-                     zone.x1, zone.y1, zone.x2, zone.y2, 
+            ESP_LOGW(TAG, "Crop zone outside of current camera window (Global: %d,%d->%d,%d | Window Offset: %d,%d | Local: %d,%d->%d,%d)",
+                     zone.x1, zone.y1, zone.x2, zone.y2,
                      this->offset_x_, this->offset_y_,
                      local_zone.x1, local_zone.y1, local_zone.x2, local_zone.y2);
             return false;

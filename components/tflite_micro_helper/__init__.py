@@ -16,7 +16,7 @@ CONFIG_SCHEMA = cv.Schema({
 
 async def to_code(config):
     cg.add_define("USE_TFLITE_MICRO_HELPER")
-    
+
     if CORE.target_platform == "esp32":
         esp32.add_idf_component(
             name="espressif/esp-tflite-micro",
@@ -24,7 +24,7 @@ async def to_code(config):
             # ref="1.3.4" # fix to 1.3.4 cause 1.3.5 has bug
             ref="1.3.7"
         )
-        
+
         esp32.add_idf_component(
             name="espressif/esp-nn",
             # ref="~1.1.2"
@@ -36,10 +36,10 @@ async def to_code(config):
         # cg.add_platformio_option("build_unflags", ["-std=gnu++11", "-std=gnu99"])
         # cg.add_build_flag("-std=gnu++14")
         # cg.add_build_flag("-std=gnu11")  # For C files
-        
+
         # Alternative: Just disable -Werror for this component
         # cg.add_build_flag("-Wno-error")
-            
+
         cg.add_build_flag("-DTF_LITE_STATIC_MEMORY")
         cg.add_build_flag("-DTF_LITE_DISABLE_X86_NEON")
         cg.add_build_flag("-DESP_NN")

@@ -1,5 +1,4 @@
-
-## Todos by priorites : 
+## Todos by priorites :
 
 ### add grayscale support
 - waiting for https://github.com/esphome/esphome/pull/9496
@@ -10,7 +9,7 @@ Grayscale Flow: Sensor -> Gray (Raw) -> Transfer -> Resize -> Model.
 Savings: You completely eliminate the JPEG Decoding step, which is computationally expensive on the ESP32. You also reduce memory bandwidth if processing 1 byte/pixel vs 2 or 3.
 
 
-## done in order of make : 
+## done in order of make :
 
 ### Model enhancement
 - done by https://github.com/nliaudat/digit_recognizer
@@ -93,5 +92,3 @@ Savings: You completely eliminate the JPEG Decoding step, which is computational
 - Implemented full software rotation support
 - Handles JPEG (via decode-rotate), RGB565, RGB888, and Grayscale
 - Integrated with arbitrary rotation (float degrees)
-
-

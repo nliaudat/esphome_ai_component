@@ -29,7 +29,7 @@ class ValueValidatorCoordinator {
   bool validate_reading(const std::vector<float> &digits, const std::vector<float> &confidences, int &validated_value) {
     if (this->validator_ == nullptr) {
         // Fallback or error? defaulting to false safely
-        return false; 
+        return false;
     }
     return this->validator_->validate_reading(digits, confidences, validated_value);
   }
@@ -45,7 +45,7 @@ class ValueValidatorCoordinator {
 #else
   // Dummy implementation when ValueValidator component is not used
   void set_validator(void *validator) {}
-  
+
   bool validate_reading(int raw_value, float confidence, int &validated_value) {
     validated_value = raw_value;
     return true;

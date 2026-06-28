@@ -69,13 +69,13 @@ class PersistentDecodedImage : public esphome::camera::CameraImage {
       : data_(data), width_(width), height_(height), format_(format) {}
 
   uint8_t *get_data_buffer() override { return data_; }
-  size_t get_data_length() override { 
-      return width_ * height_ * (format_ == PIXFORMAT_GRAYSCALE ? 1 : 3); 
+  size_t get_data_length() override {
+      return width_ * height_ * (format_ == PIXFORMAT_GRAYSCALE ? 1 : 3);
   }
   int get_width() const { return width_; }
   int get_height() const { return height_; }
   pixformat_t get_format() const { return format_; }
-  
+
   bool was_requested_by(esphome::camera::CameraRequester requester) const override { return true; }
 
  protected:
@@ -112,7 +112,7 @@ void AnalogReader::setup() {
    // Sort calibration mappings for correct interpolation
    for (auto &dial : this->dials_) {
        if (!dial.calibration_mapping.empty()) {
-           std::sort(dial.calibration_mapping.begin(), dial.calibration_mapping.end(), 
+           std::sort(dial.calibration_mapping.begin(), dial.calibration_mapping.end(),
                [](const std::pair<float, float>& a, const std::pair<float, float>& b) {
                    return a.first < b.first;
                });
@@ -132,7 +132,7 @@ void AnalogReader::setup() {
                 break;
             }
         }
-        
+
         size_t rgb_size = this->img_width_ * this->img_height_ * 3;
         size_t gray_size = this->img_width_ * this->img_height_ * 1;
         bool sufficient_psram_for_rgb = free_psram > (rgb_size + 1536 * 1024);
@@ -140,17 +140,17 @@ void AnalogReader::setup() {
         if (this->requires_color_ || sufficient_psram_for_rgb) {
             this->buffer_format_ = PIXFORMAT_RGB888;
             this->persistent_buffer_size_ = rgb_size;
-            ESP_LOGI(TAG, "Selected RGB888 format for persistent buffer (ReqColor=%s, SuffPSRAM=%s)", 
+            ESP_LOGI(TAG, "Selected RGB888 format for persistent buffer (ReqColor=%s, SuffPSRAM=%s)",
                 this->requires_color_ ? "YES" : "NO", sufficient_psram_for_rgb ? "YES" : "NO");
         } else {
             this->buffer_format_ = PIXFORMAT_GRAYSCALE;
             this->persistent_buffer_size_ = gray_size;
             ESP_LOGI(TAG, "Selected GRAYSCALE format for persistent buffer (Low PSRAM Mode)");
         }
-        
+
         ESP_LOGI(TAG, "Allocating persistent buffer: %u bytes (%dx%d)", static_cast<uint32_t>(this->persistent_buffer_size_), this->img_width_, this->img_height_);
         this->persistent_buffer_.reset(static_cast<uint8_t *>(heap_caps_malloc(this->persistent_buffer_size_, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)));
-        
+
         if (this->persistent_buffer_) {
             ESP_LOGI(TAG, "Success: Buffer allocated in PSRAM");
         } else {
@@ -175,7 +175,7 @@ void AnalogReader::setup() {
       s_luts_initialized = true;
       ESP_LOGD(TAG, "Trigonometric LUTs initialized");
   }
-  
+
   this->flashlight_coord_.setup(this, nullptr, nullptr);
 
   size_t max_crop_area = 0;
@@ -199,7 +199,7 @@ void AnalogReader::dump_config() {
   ESP_LOGCONFIG(TAG, "  Update Interval: %u ms", this->get_update_interval());
   ESP_LOGCONFIG(TAG, "  Stacked Digits: %s", this->stacked_digits_ ? "YES" : "NO");
   for (const auto &dial : this->dials_) {
-      ESP_LOGCONFIG(TAG, "  Dial '%s': Scale=%.3f, Crop=[%d,%d,%d,%d], AutoContrast=%s, Contrast=%.2f, Deadzone=%.1fpx", 
+      ESP_LOGCONFIG(TAG, "  Dial '%s': Scale=%.3f, Crop=[%d,%d,%d,%d], AutoContrast=%s, Contrast=%.2f, Deadzone=%.1fpx",
           dial.id.c_str(), dial.scale, dial.crop_x, dial.crop_y, dial.crop_w, dial.crop_h,
           dial.auto_contrast ? "ON" : "OFF", dial.contrast, dial.deadzone_diameter);
   }
@@ -273,7 +273,7 @@ static void apply_auto_contrast(uint8_t* data, int size) {
         if (data[i] < min_val) min_val = data[i];
         if (data[i] > max_val) max_val = data[i];
     }
-    
+
     if (max_val > min_val) {
         float scale = 255.0f / static_cast<float>(max_val - min_val);
         for (int i = 0; i < size; i++) {
@@ -287,7 +287,7 @@ static void apply_contrast(uint8_t* data, int size, float contrast) {
     for (int i = 0; i < size; i++) {
         float val = static_cast<float>(data[i]);
         val = (val - 128.0f) * contrast + 128.0f;
-        if (val < 0) val = 0; 
+        if (val < 0) val = 0;
         if (val > 255) val = 255;
         data[i] = static_cast<uint8_t>(val);
     }
@@ -296,7 +296,7 @@ static void apply_contrast(uint8_t* data, int size, float contrast) {
 // Helper class to wrap decoded JPEG buffer
 class DecodedImage : public esphome::camera::CameraImage {
  public:
-  DecodedImage(esphome::esp32_camera_utils::ImageProcessor::JpegBufferPtr &&data, 
+  DecodedImage(esphome::esp32_camera_utils::ImageProcessor::JpegBufferPtr &&data,
                size_t width, size_t height)
       : data_(std::move(data)), width_(width), height_(height),
         size_(width * height * 3) {}
@@ -304,7 +304,7 @@ class DecodedImage : public esphome::camera::CameraImage {
   uint8_t *get_data_buffer() override { return this->data_.get(); }
   size_t get_data_length() override { return this->size_; }
   bool was_requested_by(camera::CameraRequester requester) const override { return true; }
-  
+
   size_t get_width() const { return this->width_; }
   size_t get_height() const { return this->height_; }
 
@@ -331,13 +331,13 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
   // Track time
   uint32_t start_time = micros();
 
-  ESP_LOGD(TAG, "Process Image From Buffer Start. Len: %u, Free Heap: %u", 
+  ESP_LOGD(TAG, "Process Image From Buffer Start. Len: %u, Free Heap: %u",
            len, static_cast<uint32_t>(esp_get_free_heap_size()));
-           
+
   if (data == nullptr || len == 0) {
        return;
   }
-  
+
   std::shared_ptr<esphome::camera::CameraImage> processing_image = nullptr;
   bool is_decoded = false;
   int processing_w = 0;
@@ -346,9 +346,9 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
   if (this->pixel_format_str_ == "JPEG") {
       if (this->persistent_buffer_) {
           int out_w = 0, out_h = 0;
-          
-          jpeg_pixel_format_t out_fmt = (this->buffer_format_ == PIXFORMAT_GRAYSCALE) 
-                                        ? JPEG_PIXEL_FORMAT_GRAY 
+
+          jpeg_pixel_format_t out_fmt = (this->buffer_format_ == PIXFORMAT_GRAYSCALE)
+                                        ? JPEG_PIXEL_FORMAT_GRAY
                                         : JPEG_PIXEL_FORMAT_RGB888;
 
           // Decode JPEG directly into pre-allocated persistent buffer (zero extra heap alloc)
@@ -361,7 +361,7 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
               out_w = dec_w;
               out_h = dec_h;
           }
-          
+
           if (ok) {
               if (out_w != this->img_width_ || out_h != this->img_height_) {
                   ESP_LOGW(TAG, "Decoded dimensions mismatch config: %dx%d vs %dx%d. Skipping analog processing to avoid conflict.", out_w, out_h, this->img_width_, this->img_height_);
@@ -371,19 +371,19 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
               is_decoded = true;
               processing_w = out_w;
               processing_h = out_h;
-              ESP_LOGD(TAG, "Decoded JPEG to %s (Persistent Buffer) (%dx%d)", 
+              ESP_LOGD(TAG, "Decoded JPEG to %s (Persistent Buffer) (%dx%d)",
                   (this->buffer_format_ == PIXFORMAT_GRAYSCALE ? "GRAY" : "RGB888"), out_w, out_h);
           } else {
               ESP_LOGE(TAG, "Failed to decode JPEG to persistent buffer.");
           }
       }
-      
+
       if (!is_decoded) {
             ESP_LOGW(TAG, "Persistent buffer not used, falling back to dynamic (likely slower/fragmented)");
           int w, h;
           auto decoded_buf = esphome::esp32_camera_utils::ImageProcessor::decode_jpeg(
               data, len, &w, &h);
-          
+
           if (decoded_buf) {
               processing_image = std::make_shared<DecodedImage>(std::move(decoded_buf), static_cast<size_t>(w), static_cast<size_t>(h));
               is_decoded = true;
@@ -400,25 +400,25 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
       ESP_LOGE(TAG, "No valid image available for processing.");
       return;
   }
-  
+
   float total_value = 0.0f;
   std::string debug_str;
   debug_str.reserve(this->dials_.size() * 10);
-  
+
   // Collect per-dial measured values so they can be combined after every dial is read.
   // Positional/odometer combination needs each dial's less-significant neighbour.
   this->readings_.clear();
-  
+
   for (const auto& dial : this->dials_) {
       int check_w = (processing_w > 0) ? processing_w : this->img_width_;
       int check_h = (processing_h > 0) ? processing_h : this->img_height_;
 
       if (dial.crop_x + dial.crop_w > check_w || dial.crop_y + dial.crop_h > check_h) {
-          ESP_LOGE(TAG, "Dial %s crop is out of bounds! Crop: [x=%d, w=%d] > Img: %d OR [y=%d, h=%d] > Img: %d", 
+          ESP_LOGE(TAG, "Dial %s crop is out of bounds! Crop: [x=%d, w=%d] > Img: %d OR [y=%d, h=%d] > Img: %d",
                    dial.id.c_str(), dial.crop_x, dial.crop_w, check_w, dial.crop_y, dial.crop_h, check_h);
           continue;
       }
-      
+
       esphome::esp32_camera_utils::ImageProcessorConfig config;
       if (is_decoded) {
            config.camera_width = processing_w;
@@ -427,59 +427,59 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
             config.camera_width = (processing_w > 0) ? processing_w : this->img_width_;
             config.camera_height = (processing_h > 0) ? processing_h : this->img_height_;
        }
-      
+
       bool need_rgb = dial.use_color || (dial.process_channel != PROCESS_CHANNEL_GRAYSCALE);
-      
+
       if (need_rgb && this->buffer_format_ == PIXFORMAT_GRAYSCALE) {
           ESP_LOGE(TAG, "Dial %s needs color but buffer is Grayscale! Check setup logic.", dial.id.c_str());
-          continue; 
+          continue;
       }
 
-      config.pixel_format = need_rgb ? "RGB888" : "GRAYSCALE"; 
+      config.pixel_format = need_rgb ? "RGB888" : "GRAYSCALE";
       config.model_width = dial.crop_w;
       config.model_height = dial.crop_h;
       config.model_channels = need_rgb ? 3 : 1;
       config.input_type = esphome::esp32_camera_utils::kInputTypeUInt8;
-      
+
       auto processor = std::make_unique<esphome::esp32_camera_utils::ImageProcessor>(config);
 
       std::vector<esphome::esp32_camera_utils::CropZone> zones;
       zones.push_back({dial.crop_x, dial.crop_y, dial.crop_x + dial.crop_w, dial.crop_y + dial.crop_h});
-      
+
       auto results = processor->split_image_in_zone(processing_image, zones);
-      
+
       if (results.empty() || !results[0].data) {
            ESP_LOGE(TAG, "Failed to process dial %s", dial.id.c_str());
            continue;
       }
-      
+
       uint8_t* raw = results[0].data->get();
       size_t raw_len = results[0].size;
       int crop_w = dial.crop_w;
       int crop_h = dial.crop_h;
-      
+
       const uint8_t* input_for_algo = raw;
-      
+
       if (this->debug_) ESP_LOGD(TAG, "Processing Dial: %s (Algorithm: %s)", dial.id.c_str(), dial.algorithm.c_str());
 
       if (dial.process_channel != PROCESS_CHANNEL_GRAYSCALE && !dial.use_color) {
           if (this->scratch_buffer_.size() != static_cast<size_t>(crop_w * crop_h)) {
               this->scratch_buffer_.resize(crop_w * crop_h);
           }
-          
+
           int offset = 0;
           if (dial.process_channel == PROCESS_CHANNEL_RED) offset = 0;
           else if (dial.process_channel == PROCESS_CHANNEL_GREEN) offset = 1;
           else if (dial.process_channel == PROCESS_CHANNEL_BLUE) offset = 2;
-          
+
           bool input_is_rgb = (config.model_channels == 3);
-          
+
           if (input_is_rgb) {
               for (int i = 0; i < crop_w * crop_h; i++) {
                   this->scratch_buffer_[i] = raw[i*3 + offset];
               }
               input_for_algo = this->scratch_buffer_.data();
-              
+
               if (dial.auto_contrast) {
                   apply_auto_contrast(this->scratch_buffer_.data(), crop_w * crop_h);
               }
@@ -489,27 +489,27 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
           } else {
              ESP_LOGW(TAG, "Dial %s configured for channel %d but input is Grayscale", dial.id.c_str(), static_cast<int>(dial.process_channel));
           }
-      } 
+      }
       else if (dial.use_color) {
           if (this->scratch_buffer_.size() != static_cast<size_t>(crop_w * crop_h)) {
               this->scratch_buffer_.resize(crop_w * crop_h);
           }
-          
+
           uint8_t tr = (dial.target_color >> 16) & 0xFF;
           uint8_t tg = (dial.target_color >> 8) & 0xFF;
           uint8_t tb = dial.target_color & 0xFF;
-          
+
           // When a tolerance is set, stretch [0..tol] -> [0..255] and clamp anything
           // beyond it to 255 (flat background). This removes off-colour noise (digits,
           // markings) that would otherwise survive the linear 0-442 mapping.
           float tol = dial.color_tolerance;
           bool use_tol = tol > 0.0f && tol < 442.0f;
-          
+
           for (int i = 0; i < crop_w * crop_h; i++) {
               uint8_t r = raw[i*3 + 0];
               uint8_t g = raw[i*3 + 1];
               uint8_t b = raw[i*3 + 2];
-              
+
               float dr = static_cast<float>(r - tr);
               float dg = static_cast<float>(g - tg);
               float db = static_cast<float>(b - tb);
@@ -534,28 +534,28 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
               apply_contrast(raw, static_cast<int>(raw_len), dial.contrast);
           }
       }
-      
+
       uint32_t start_algo = micros();
       DetectionResult result = this->find_needle_angle(input_for_algo, crop_w, crop_h, dial);
       uint32_t dur_algo = micros() - start_algo;
-      
+
       float angle = result.angle;
       float confidence = result.confidence;
 
       if (this->debug_) {
           this->debug_angle_calculation(angle, dial);
       }
-      
+
       float val = this->angle_to_value(angle, dial);
-      
-      float display_angle = angle + 90.0f; 
+
+      float display_angle = angle + 90.0f;
       if (display_angle >= 360.0f) display_angle -= 360.0f;
-      
+
       ESP_LOGD(TAG, "Dial %s: Angle=%.1f (North), Val=%.2f, Conf=%.2f, Time=%u us", dial.id.c_str(), display_angle, val, confidence, dur_algo);
-      
+
       if (dial.angle_sensor) dial.angle_sensor->publish_state(display_angle);
       if (dial.confidence_sensor) dial.confidence_sensor->publish_state(confidence);
-      
+
       this->readings_.push_back({&dial, val});
   }
 
@@ -724,7 +724,7 @@ void AnalogReader::process_image_from_buffer(const uint8_t* data, size_t len) {
         debug_str += val_buf;
     }
   }
-  
+
   // Round to a precision derived from the dials. In stacked mode every dial contributes
   // a single integer digit, so the finest meaningful resolution is the smallest scale;
   // round to it to drop float noise (e.g. 0.330343008 -> 0.3303). Otherwise fall back to
@@ -751,9 +751,9 @@ AnalogReader::DetectionResult AnalogReader::find_needle_angle(const uint8_t* img
     int cx = w / 2;
     int cy = h / 2;
     int radius = std::min(cx, cy) - 2;
-    
+
     DetectionResult selected_result;
-    
+
     bool run_comparison = (dial.algorithm == "auto") || this->debug_;
 
     DetectionResult result_legacy, result_radial, result_hough, result_template;
@@ -803,18 +803,18 @@ AnalogReader::DetectionResult AnalogReader::find_needle_angle(const uint8_t* img
         if (has_template) ESP_LOGD(TAG, "  Template Match: angle=%.1f°, val=%.2f, conf=%.2f", result_template.angle, this->angle_to_value(result_template.angle, dial), result_template.confidence);
         ESP_LOGD(TAG, "  Selected: %s", selected_result.algorithm.c_str());
     }
-    
+
     if (this->debug_) {
-        ESP_LOGD(TAG, "%s using %s: angle=%.1f°, confidence=%.2f", 
+        ESP_LOGD(TAG, "%s using %s: angle=%.1f°, confidence=%.2f",
                  dial.id.c_str(), selected_result.algorithm.c_str(), selected_result.angle, selected_result.confidence);
-        
+
         if (dial.algorithm == "legacy") {
             this->debug_dial_image(img, w, h, selected_result.angle);
         } else {
             this->debug_dial_image(this->working_buffer_.data(), w, h, selected_result.angle);
         }
     }
-    
+
     return selected_result;
 }
 
@@ -822,29 +822,29 @@ AnalogReader::DetectionResult AnalogReader::find_needle_angle(const uint8_t* img
 float AnalogReader::angle_to_value(float image_angle, const DialConfig& dial) {
     // Image: 0° = East (3 o'clock), clockwise
     // Dial: 0° = North (12 o'clock), clockwise
-    
+
     // Conversion: Image to North-based
     // Image 0° (East) = North 90° (East)
-    // Image 90° (South) = North 180° (South)  
+    // Image 90° (South) = North 180° (South)
     // Image 180° (West) = North 270° (West)
     // Image 270° (North) = North 0° (North)
     // Formula: North = (Image + 90) % 360
-    
+
     float dial_angle = fmodf(image_angle + 90.0f, 360.0f);
-    
+
     // Needle sweep direction. The detection works in a clockwise frame; for dials
     // whose value increases counter-clockwise (common on alternating odometer dials),
     // mirror the angle so the linear mapping below still increases with the value.
     if (!dial.clockwise) {
         dial_angle = fmodf(360.0f - dial_angle, 360.0f);
     }
-    
+
     // Apply user's angle offset
     dial_angle = fmodf(dial_angle - dial.angle_offset + 360.0f, 360.0f);
-    
+
     // Now handle the dial range
     float effective_dial_angle = dial_angle;
-    
+
     // If min_angle > max_angle (e.g., 300 to 60), handle wrap-around
     if (dial.min_angle > dial.max_angle) {
         if (effective_dial_angle < dial.min_angle) {
@@ -855,20 +855,20 @@ float AnalogReader::angle_to_value(float image_angle, const DialConfig& dial) {
         float fraction = rel_angle / range;
         return dial.min_value + fraction * (dial.max_value - dial.min_value);
     }
-    
+
     // Calibration Map Override (non-linear mapping)
     if (!dial.calibration_mapping.empty()) {
         float input_x = dial_angle;
-        
+
         if (input_x <= dial.calibration_mapping.front().first) return dial.calibration_mapping.front().second;
         if (input_x >= dial.calibration_mapping.back().first) return dial.calibration_mapping.back().second;
-        
+
         for (size_t i = 0; i < dial.calibration_mapping.size() - 1; i++) {
             float x1 = dial.calibration_mapping[i].first;
             float y1 = dial.calibration_mapping[i].second;
             float x2 = dial.calibration_mapping[i+1].first;
             float y2 = dial.calibration_mapping[i+1].second;
-            
+
             if (input_x >= x1 && input_x <= x2) {
                 if (std::abs(x2 - x1) < 0.001f) return y1;
                 float t = (input_x - x1) / (x2 - x1);
@@ -888,37 +888,37 @@ float AnalogReader::angle_to_value(float image_angle, const DialConfig& dial) {
 void AnalogReader::debug_angle_calculation(float image_angle, const DialConfig& dial) {
     ESP_LOGD(TAG, "=== DEBUG ANGLE CONVERSION for %s ===", dial.id.c_str());
     ESP_LOGD(TAG, "Input image angle: %.1f° (0°=East, clockwise)", image_angle);
-    
+
     float dial_angle = fmodf(image_angle + 90.0f, 360.0f);
     ESP_LOGD(TAG, "Dial angle (after +90 to North): %.1f°", dial_angle);
-    
+
     dial_angle = fmodf(dial_angle - dial.angle_offset + 360.0f, 360.0f);
     ESP_LOGD(TAG, "After angle_offset (%.1f): %.1f°", dial.angle_offset, dial_angle);
-    
+
     float range_angle = dial.max_angle - dial.min_angle;
     if (dial.min_angle > dial.max_angle) {
         range_angle = (dial.max_angle + 360.0f) - dial.min_angle;
     }
-    
+
     float effective_dial_angle = dial_angle;
     if (dial.min_angle > dial.max_angle && effective_dial_angle < dial.min_angle) {
         effective_dial_angle += 360.0f;
     }
-    
+
     float rel_angle = effective_dial_angle - dial.min_angle;
-    
+
     float fraction = 0.0f;
     if (range_angle > 0) {
         fraction = rel_angle / range_angle;
         fraction = std::max(0.0f, std::min(1.0f, fraction));
     }
-    
+
     float value = dial.min_value + fraction * (dial.max_value - dial.min_value);
-    
-    ESP_LOGD(TAG, "Range: %.1f° to %.1f° (span=%.1f°)", 
+
+    ESP_LOGD(TAG, "Range: %.1f° to %.1f° (span=%.1f°)",
              dial.min_angle, dial.max_angle, range_angle);
     ESP_LOGD(TAG, "Rel angle: %.1f°, Fraction: %.3f", rel_angle, fraction);
-    ESP_LOGD(TAG, "Value: %.3f (%.1f to %.1f)", 
+    ESP_LOGD(TAG, "Value: %.3f (%.1f to %.1f)",
              value, dial.min_value, dial.max_value);
     ESP_LOGD(TAG, "=====================================");
 }
@@ -932,10 +932,10 @@ void AnalogReader::debug_dial_image(const uint8_t* img, int w, int h, float dete
     // 0-85: # in Dark Gray
     // 86-170: + in Light Gray
     // 171-255: . in Bright White
-    
+
     std::vector<std::string> lines(grid_h, std::string(grid_w, ' '));
     std::vector<uint8_t> grid_vals(grid_w * grid_h, 0);
-    
+
     // Initialize grid
     for (int y = 0; y < grid_h; y++) {
         for (int x = 0; x < grid_w; x++) {
@@ -944,30 +944,30 @@ void AnalogReader::debug_dial_image(const uint8_t* img, int w, int h, float dete
             if (px < w && py < h) {
                 uint8_t val = img[py * w + px];
                 grid_vals[y * grid_w + x] = val;
-                
+
                 if (val <= 85) lines[y][x] = '#';
                 else if (val <= 170) lines[y][x] = '+';
                 else lines[y][x] = '.';
             }
         }
     }
-    
+
     // Draw needle
     float rad = detected_angle * static_cast<float>(M_PI) / 180.0f;
     int cx = grid_w / 2;
     int cy = grid_h / 2;
-    
+
     int max_r = std::min(cx, cy);
-    
+
     for (int r = max_r/5; r < max_r; r++) {
         int draw_x = cx + static_cast<int>(cos(rad) * static_cast<float>(r) * static_cast<float>(grid_w) / static_cast<float>(max_r * 2));
         int draw_y = cy + static_cast<int>(sin(rad) * static_cast<float>(r) * static_cast<float>(grid_h) / static_cast<float>(max_r * 2));
-        
+
         if (draw_x >= 0 && draw_x < grid_w && draw_y >= 0 && draw_y < grid_h) {
             lines[draw_y][draw_x] = 'X';
         }
     }
-    
+
     float north_angle = fmodf(90.0f - detected_angle + 360.0f, 360.0f);
 
     // ANSI color codes for better visualization
@@ -977,10 +977,10 @@ void AnalogReader::debug_dial_image(const uint8_t* img, int w, int h, float dete
     const char* COLOR_LOW = "\033[90m";      // Dark Gray for low values
     const char* COLOR_MID = "\033[37m";      // Light Gray for mid values
     const char* COLOR_HIGH = "\033[97m";     // Bright white for high values
-    
+
     // Print header with legend
     ESP_LOGD(TAG, "Dial visualization (Raw %.1f / North %.1f):", detected_angle, north_angle);
-    ESP_LOGD(TAG, "Legend: '%s#'%s=0-85 | '%s+'%s=86-170 | '%s.'%s=171-255 | %sX%s = Detected needle", 
+    ESP_LOGD(TAG, "Legend: '%s#'%s=0-85 | '%s+'%s=86-170 | '%s.'%s=171-255 | %sX%s = Detected needle",
              COLOR_LOW, COLOR_RESET, COLOR_MID, COLOR_RESET, COLOR_HIGH, COLOR_RESET, COLOR_RED, COLOR_RESET);
 
     // Print grid with colors
@@ -989,7 +989,7 @@ void AnalogReader::debug_dial_image(const uint8_t* img, int w, int h, float dete
         for (int x = 0; x < grid_w; x++) {
             char c = lines[y][x];
             uint8_t val = grid_vals[y * grid_w + x];
-            
+
             if (c == 'X') {
                 // Needle in RED
                 colored_line += COLOR_RED;
@@ -1005,7 +1005,7 @@ void AnalogReader::debug_dial_image(const uint8_t* img, int w, int h, float dete
                 if (val <= 85) colored_line += COLOR_LOW;
                 else if (val <= 170) colored_line += COLOR_MID;
                 else colored_line += COLOR_HIGH;
-                
+
                 colored_line += c;
                 colored_line += COLOR_RESET;
             } else {

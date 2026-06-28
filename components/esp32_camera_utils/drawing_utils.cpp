@@ -28,7 +28,7 @@ void DrawingUtils::draw_pixel(uint8_t* buffer, int x, int y, int w, int h, int c
     // Re-checking standard assignment: usually cast to uint16_t* is safer if aligned.
     // But buffer is uint8_t*.
     // Let's rely on standard byte order.
-    *(uint16_t*)(&buffer[index]) = color; 
+    *(uint16_t*)(&buffer[index]) = color;
   } else if (channels == 3) {
     // RGB888
     uint8_t r, g, b;
@@ -39,7 +39,7 @@ void DrawingUtils::draw_pixel(uint8_t* buffer, int x, int y, int w, int h, int c
   }
 }
 
-void DrawingUtils::draw_rectangle(uint8_t* buffer, int x, int y, int rect_w, int rect_h, 
+void DrawingUtils::draw_rectangle(uint8_t* buffer, int x, int y, int rect_w, int rect_h,
                                   int img_w, int img_h, int channels, uint16_t color) {
     // Top and bottom
     for (int i = x; i < x + rect_w; ++i) {
@@ -53,7 +53,7 @@ void DrawingUtils::draw_rectangle(uint8_t* buffer, int x, int y, int rect_w, int
     }
 }
 
-void DrawingUtils::draw_filled_rectangle(uint8_t* buffer, int x, int y, int rect_w, int rect_h, 
+void DrawingUtils::draw_filled_rectangle(uint8_t* buffer, int x, int y, int rect_w, int rect_h,
                                          int img_w, int img_h, int channels, uint16_t color) {
     for (int j = y; j < y + rect_h; ++j) {
         for (int i = x; i < x + rect_w; ++i) {
@@ -62,7 +62,7 @@ void DrawingUtils::draw_filled_rectangle(uint8_t* buffer, int x, int y, int rect
     }
 }
 
-void DrawingUtils::draw_circle(uint8_t* buffer, int center_x, int center_y, int radius, 
+void DrawingUtils::draw_circle(uint8_t* buffer, int center_x, int center_y, int radius,
                                int img_w, int img_h, int channels, uint16_t color) {
     int x = 0;
     int y = radius;
@@ -91,7 +91,7 @@ void DrawingUtils::draw_circle(uint8_t* buffer, int center_x, int center_y, int 
     }
 }
 
-void DrawingUtils::draw_filled_circle(uint8_t* buffer, int center_x, int center_y, int radius, 
+void DrawingUtils::draw_filled_circle(uint8_t* buffer, int center_x, int center_y, int radius,
                                       int img_w, int img_h, int channels, uint16_t color) {
     int x = 0;
     int y = radius;
@@ -109,7 +109,7 @@ void DrawingUtils::draw_filled_circle(uint8_t* buffer, int center_x, int center_
         draw_scanline(center_y - x, center_x - y, center_x + y);
         draw_scanline(center_y + y, center_x - x, center_x + x);
         draw_scanline(center_y - y, center_x - x, center_x + x);
-        
+
         x++;
         if (d > 0) {
             y--;

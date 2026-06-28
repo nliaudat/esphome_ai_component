@@ -16,7 +16,7 @@ class PreviewWebHandler : public web_server_idf::AsyncWebHandler {
  public:
   /**
    * @brief Construct a new Preview Web Handler object
-   * 
+   *
    * @param image_provider Callback that returns a shared pointer to the current preview image (RotatedPreviewImage)
    */
   PreviewWebHandler(std::function<std::shared_ptr<camera::CameraImage>()> image_provider);
@@ -31,5 +31,3 @@ class PreviewWebHandler : public web_server_idf::AsyncWebHandler {
 }  // namespace esp32_camera_utils
 }  // namespace esphome
 #endif
-
-

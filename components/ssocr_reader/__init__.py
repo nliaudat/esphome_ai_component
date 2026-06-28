@@ -55,9 +55,9 @@ CONFIG_SCHEMA = cv.Schema(
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
-    
+
     cg.add_define("USE_SSOCR_READER")
-    
+
     if config.get("debug", False):
         cg.add(var.set_debug(True))
 
@@ -81,7 +81,7 @@ async def to_code(config):
     # Inject resolution and format
     width, height = 640, 480
     pixel_format = "JPEG"
-    
+
     substitutions = CORE.config.get("substitutions", {})
     if "camera_resolution" in substitutions:
         try:
@@ -90,7 +90,7 @@ async def to_code(config):
                 w, h = map(int, res.split('x'))
                 width, height = w, h
         except: pass
-    
+
     if "camera_pixel_format" in substitutions:
         pixel_format = substitutions["camera_pixel_format"]
 

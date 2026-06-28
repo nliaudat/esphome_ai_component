@@ -21,7 +21,7 @@ class DrawingUtils {
  public:
   /**
    * @brief Draw a single pixel.
-   * 
+   *
    * @param buffer Pointer to the image buffer.
    * @param x X coordinate.
    * @param y Y coordinate.
@@ -35,25 +35,25 @@ class DrawingUtils {
   /**
    * @brief Draw a rectangle outline.
    */
-  static void draw_rectangle(uint8_t* buffer, int x, int y, int rect_w, int rect_h, 
+  static void draw_rectangle(uint8_t* buffer, int x, int y, int rect_w, int rect_h,
                              int img_w, int img_h, int channels, uint16_t color);
 
   /**
    * @brief Draw a filled rectangle.
    */
-  static void draw_filled_rectangle(uint8_t* buffer, int x, int y, int rect_w, int rect_h, 
+  static void draw_filled_rectangle(uint8_t* buffer, int x, int y, int rect_w, int rect_h,
                                     int img_w, int img_h, int channels, uint16_t color);
 
   /**
    * @brief Draw a circle outline.
    */
-  static void draw_circle(uint8_t* buffer, int center_x, int center_y, int radius, 
+  static void draw_circle(uint8_t* buffer, int center_x, int center_y, int radius,
                           int img_w, int img_h, int channels, uint16_t color);
 
   /**
    * @brief Draw a filled circle.
    */
-  static void draw_filled_circle(uint8_t* buffer, int center_x, int center_y, int radius, 
+  static void draw_filled_circle(uint8_t* buffer, int center_x, int center_y, int radius,
                                  int img_w, int img_h, int channels, uint16_t color);
 
  private:

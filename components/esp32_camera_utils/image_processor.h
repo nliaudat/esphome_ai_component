@@ -1,7 +1,7 @@
 /**
  * @file image_processor.h
  * @brief Image processing utilities for cropping, scaling, and format conversion.
- * 
+ *
  * Handles JPEG decoding with optional rotation (0 deg, 90 deg, 180 deg, 270 deg),
  * raw format processing (RGB888, RGB565, Grayscale), and conversion to
  * TensorFlow Lite model input formats (float32 or uint8).
@@ -21,7 +21,7 @@
 #include "esphome/components/esp32_camera/esp32_camera.h"
 #include "crop_zone_handler.h"
 #include "esp_jpeg_dec.h"
-#include "esp_jpeg_version.h" 
+#include "esp_jpeg_version.h"
 
 #include "drawing_utils.h"
 #include "scaler.h"
@@ -49,16 +49,16 @@ struct ImageProcessorConfig {
   int camera_width;
   int camera_height;
   std::string pixel_format; // "RGB888", "RGB565", "GRAYSCALE", "JPEG"
-  
+
   float rotation{0.0f};  // Image rotation in degrees (clockwise)
-  
+
   int model_width;
   int model_height;
   int model_channels;
   ImageProcessorInputType input_type;
   bool normalize; // For float32 conversion
   std::string input_order{"RGB"}; // "RGB" or "BGR"
-  
+
   // Custom module settings
   int scaler_width{0};
   int scaler_height{0};
@@ -66,9 +66,9 @@ struct ImageProcessorConfig {
   int cropper_height{0};
   int cropper_offset_x{0};
   int cropper_offset_y{0};
-  
+
   bool cache_preview_image{false}; // Optimization: Only cache master image if needed for preview
-  
+
   bool validate() const {
     return camera_width > 0 && camera_height > 0 && !pixel_format.empty() &&
            model_width > 0 && model_height > 0 && model_channels > 0;
@@ -80,11 +80,11 @@ struct ProcessingStats {
   uint32_t failed_frames{0};
   uint32_t total_processing_time_ms{0};
   uint32_t jpeg_decoding_errors{0};
-  
+
   float get_avg_processing_time() const {
     return total_frames > 0 ? static_cast<float>(total_processing_time_ms) / total_frames : 0.0f;
   }
-  
+
   float get_success_rate() const {
     return total_frames > 0 ? 100.0f * (1.0f - static_cast<float>(failed_frames) / total_frames) : 0.0f;
   }
@@ -99,17 +99,17 @@ class ImageProcessor {
       bool is_spiram;
       bool is_jpeg_aligned;
       bool is_pooled;  // Track if buffer is from pool
-      
+
       // Static counter for leak detection
       static std::atomic<int32_t> active_instances;
 
-      TrackedBuffer(uint8_t* p = nullptr, bool spiram = false, bool aligned = false, bool pooled = false, size_t sz = 0) 
+      TrackedBuffer(uint8_t* p = nullptr, bool spiram = false, bool aligned = false, bool pooled = false, size_t sz = 0)
           : ptr(p), size(sz), is_spiram(spiram), is_jpeg_aligned(aligned), is_pooled(pooled) {
           if (p) {
               active_instances++;
           }
       }
-          
+
       ~TrackedBuffer() {
           if (ptr) {
               active_instances--;
@@ -124,31 +124,31 @@ class ImageProcessor {
               }
           }
       }
-      
-      
+
+
       // Prevent copying
       TrackedBuffer(const TrackedBuffer&) = delete;
       TrackedBuffer& operator=(const TrackedBuffer&) = delete;
-      
+
       // Allow moving
-      TrackedBuffer(TrackedBuffer&& other) noexcept 
-          : ptr(other.ptr), size(other.size), is_spiram(other.is_spiram), 
+      TrackedBuffer(TrackedBuffer&& other) noexcept
+          : ptr(other.ptr), size(other.size), is_spiram(other.is_spiram),
             is_jpeg_aligned(other.is_jpeg_aligned), is_pooled(other.is_pooled) {
           // Ownership transferred, no new allocation created
-          
+
           other.ptr = nullptr;
           other.size = 0;
           other.is_spiram = false;
           other.is_jpeg_aligned = false;
           other.is_pooled = false;
       }
-      
+
       TrackedBuffer& operator=(TrackedBuffer&& other) noexcept {
           if (this != &other) {
               // Existing instance being overwritten - count stays same (1 destruction conceptually, 1 creation)
               // Actually, simpler: this object stays alive, just changes ownership.
               // So active_instances count does not change.
-              
+
               if (ptr) {
                   active_instances--;
                   if (is_pooled) {
@@ -165,7 +165,7 @@ class ImageProcessor {
               is_spiram = other.is_spiram;
               is_jpeg_aligned = other.is_jpeg_aligned;
               is_pooled = other.is_pooled;
-              
+
               other.ptr = nullptr;
               other.size = 0;
               other.is_spiram = false;
@@ -174,7 +174,7 @@ class ImageProcessor {
           }
           return *this;
       }
-      
+
       uint8_t* get() const { return ptr; }
   };
 
@@ -192,7 +192,7 @@ class ImageProcessor {
    */
   // C++20: Span-based overload for safer processing
   std::vector<ProcessResult> split_image_in_zone(std::span<uint8_t> image_data, int width, int height, const std::vector<CropZone> &zones);
-  
+
   // Legacy wrapper
   std::vector<ProcessResult> split_image_in_zone(std::shared_ptr<camera::CameraImage> image, const std::vector<CropZone> &zones);
 
@@ -217,7 +217,7 @@ class ImageProcessor {
   // Validate zone boundaries
 
   bool validate_zone(const CropZone &zone) const;
-  
+
   size_t get_required_buffer_size() const;
 
 #ifdef USE_CAMERA_DRAWING
@@ -254,14 +254,14 @@ private:
   static UniqueBufferPtr allocate_image_buffer(size_t size);
   bool validate_buffer_size(size_t required, size_t available, const char* context) const;
   bool validate_input_image(std::shared_ptr<camera::CameraImage> image) const;
-  
+
   // Internal processing methods
   bool process_jpeg_zone_to_buffer(
       std::shared_ptr<camera::CameraImage> image,
       const CropZone &zone,
       uint8_t* output_buffer,
       size_t output_buffer_size);
-      
+
   bool process_raw_zone_to_buffer(
       std::shared_ptr<camera::CameraImage> image,
       const CropZone &zone,
@@ -270,14 +270,14 @@ private:
 
   // Helper for raw pointer processing (no CameraImage dependency)
   bool process_raw_zone_pointer(const uint8_t* input_data, size_t input_len, int width, int height, const CropZone &zone, uint8_t *output_buffer, size_t output_buffer_size);
-      
+
   // Helper processing methods
   bool process_rgb888_crop_and_scale_to_float32(const uint8_t* input_data, const CropZone& zone, int crop_width, int crop_height, uint8_t* output_buffer, int model_width, int model_height, int channels, bool normalize, int src_stride_width);
   bool process_rgb888_crop_and_scale_to_uint8(const uint8_t* input_data, const CropZone& zone, int crop_width, int crop_height, uint8_t* output_buffer, int model_width, int model_height, int channels, int src_stride_width);
-  
+
   bool process_rgb565_crop_and_scale_to_float32(const uint8_t* input_data, const CropZone &zone, int crop_width, int crop_height, uint8_t* output_buffer, int model_width, int model_height, int model_channels, bool normalize, int src_stride_width);
   bool process_rgb565_crop_and_scale_to_uint8(const uint8_t* input_data, const CropZone &zone, int crop_width, int crop_height, uint8_t* output_buffer, int model_width, int model_height, int model_channels, int src_stride_width);
-  
+
   bool process_grayscale_crop_and_scale_to_float32(const uint8_t* input_data, const CropZone &zone, int crop_width, int crop_height, uint8_t* output_buffer, int model_width, int model_height, int model_channels, bool normalize, int src_stride_width);
   bool process_grayscale_crop_and_scale_to_uint8(const uint8_t* input_data, const CropZone &zone, int crop_width, int crop_height, uint8_t* output_buffer, int model_width, int model_height, int model_channels, int src_stride_width);
 
@@ -299,7 +299,7 @@ public:
    * Generates a rotated preview image from a source image.
    */
   static std::shared_ptr<camera::CameraImage> generate_rotated_preview(
-      std::shared_ptr<camera::CameraImage> source, 
+      std::shared_ptr<camera::CameraImage> source,
       float rotation, int width, int height);
 #endif
 

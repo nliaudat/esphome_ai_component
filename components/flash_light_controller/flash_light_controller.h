@@ -20,25 +20,25 @@ class FlashLightController : public Component {
   void set_flash_post_time(uint32_t post_time) { this->flash_post_time_ = post_time; }
   uint32_t get_flash_pre_time() const { return this->flash_pre_time_; }
   uint32_t get_flash_post_time() const { return this->flash_post_time_; }
-  
+
   void set_debug(bool debug) { this->debug_ = debug; }
-  
+
   using CaptureCallback = std::function<void()>;
-  
+
   /**
    * @brief Initiates the flash sequence for image capture.
-   * 
+   *
    * Sequence:
    * 1. Turn on flash
    * 2. Wait for flash_pre_time_ (warmup)
    * 3. Call callback (capture image)
    * 4. Wait for flash_post_time_ (ensure light during capture)
    * 5. Turn off flash
-   * 
+   *
    * @param callback Function to execute when flash is ready (usually image capture)
    */
   void initiate_capture_sequence(CaptureCallback callback);
-  
+
   bool is_active() const { return this->is_active_; }
 
   void enable_flash();

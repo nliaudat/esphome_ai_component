@@ -17,7 +17,7 @@ This project provides a robust, modular framework for running TensorFlow Lite Mi
 Unlike other solutions that are standalone firmwares, this is a **native ESPHome component**, meaning you get all the power of the ESPHome ecosystem combined with edge AI:
 
 *   **Broad Hardware Support**: Compatible with [many microcontrollers](https://esphome.io/components/) and camera boards (ESP32-CAM, ESP32-S3, Xiao, etc.).
-*   **Infinite Extensibility**: Easily integrate with thousands of other [ESPHome components](https://esphome.io/) like **MQTT**, Displays, Time, or simple sensors. 
+*   **Infinite Extensibility**: Easily integrate with thousands of other [ESPHome components](https://esphome.io/) like **MQTT**, Displays, Time, or simple sensors.
 *   **Native Control**: Native API, OTA updates, and simple YAML configuration come standard.
 
 ### 🚀 Reusable AI Core & Technical Excellence
@@ -69,12 +69,12 @@ external_components:
       type: git
       url: https://github.com/nliaudat/esphome_ai_component
       ref: main
-    components: 
+    components:
       # Choose the reader type you need:
       - meter_reader_tflite   # AI-powered digit recognition
       # - ssocr_reader        # Seven-segment OCR (no AI)
       # - analog_reader       # Analog gauge/dial reader (no AI)
-      
+
       # Supporting components:
       - value_validator       # Validation engine (recommended)
       - tflite_micro_helper   # Required for meter_reader_tflite
@@ -106,17 +106,17 @@ meter_reader_tflite:
   validator: my_validator
 
   # If no validator is set, use simple threshold:
-  # confidence_threshold: 0.85 
+  # confidence_threshold: 0.85
 
   update_interval: 60s
-  
+
   # Optional: Link to other components
   flash_light_controller: my_flash_controller
   crop_zones_global: my_crop_zones
-  
+
   # Image Rotation (Dev)
   rotation: "90" # Options: "0", "90", "180", "270"
-  
+
   # Data Collection Thresholds
   collect_min_global_confidence: 0.90
   collect_min_digit_confidence: 0.90
@@ -173,9 +173,9 @@ meter_reader_tflite:
   # ... existing config ...
   data_collector: my_data_collector
   collect_low_confidence: true # Trigger upload on low confidence (uses min_global/digit_confidence)
-  
+
   # Optional: Customize collection thresholds (defaults to 0.90)
-  collect_min_global_confidence: 0.80 
+  collect_min_global_confidence: 0.80
   collect_min_digit_confidence: 0.80
 ```
 
@@ -275,7 +275,7 @@ These models are recommended for faster response times and lower power consumpti
 
 **This project needs your help!**
 
-This component has grown to **over 20,000 lines of C++ code**, implementing complex features like Neural Network inference (`tflite-micro`), Image Processing, and native ESPHome integration. 
+This component has grown to **over 20,000 lines of C++ code**, implementing complex features like Neural Network inference (`tflite-micro`), Image Processing, and native ESPHome integration.
 
 > [!NOTE]
 > **AI-Assisted Development**: While the legacy version was manually written, this new modular version (v2.0) leverages AI assistance to achieve advanced features like **dual-core optimizations**, **complex memory management**, and **leak prevention** that were beyond my initial ESPHome knowledge. While the results are excellent and performance is high, this approach has introduced complexity that needs human review.

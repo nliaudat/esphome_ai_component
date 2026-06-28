@@ -40,7 +40,7 @@ from _model_utils import (
 
 class MeterReader:
     """Class for reading meter values using TensorFlow Lite models."""
-    
+
     def __init__(self, model_type: str = DEFAULT_MODEL) -> None:
         """Initialize the MeterReader with a specific model type."""
         # NEW: Check if default model.tflite exists when no specific model is specified
@@ -74,31 +74,31 @@ class MeterReader:
         else:
             self.model_config = MODELS[model_type]
             self.model_type = model_type
-        
+
         logger.info(f"Loading {self.model_type} model from: {self.model_config.path.absolute()}")
-        
+
         if not self.model_config.path.exists():
             raise FileNotFoundError(f"Model file not found: {self.model_config.path}")
-            
+
         try:
             self.interpreter = tf.lite.Interpreter(model_path=str(self.model_config.path))
             self.interpreter.allocate_tensors()
             self.input_details = self.interpreter.get_input_details()
             self.output_details = self.interpreter.get_output_details()
-            
+
             # Store quantization parameters
             self.input_quantization = self.input_details[0].get('quantization', (1.0, 0))
             self.output_quantization = self.output_details[0].get('quantization', (1.0, 0))
-            
+
             # Log quantization info
             self._log_quantization_info()
-            
+
             # Validate model configuration matches actual model
             self._validate_model_config()
-            
+
             # Debug logging
             self._debug_model_info()
-            
+
         except Exception as e:
             raise RuntimeError(f"Failed to initialize model: {str(e)}")
 
@@ -107,12 +107,12 @@ class MeterReader:
         if self.model_config.quantized:
             input_scale, input_zero_point = self.input_quantization
             output_scale, output_zero_point = self.output_quantization
-            
+
             logger.info(f"Quantization detected:")
             logger.info(f"  Input type: {self.model_config.input_type}")
             logger.info(f"  Input scale: {input_scale}, zero_point: {input_zero_point}")
             logger.info(f"  Output scale: {output_scale}, zero_point: {output_zero_point}")
-            
+
             # Detect actual quantization scheme based on parameters
             if input_zero_point == -128 and abs(input_scale - 1/255.0) < 1e-6:
                 logger.info("  Actual scheme: uint8 in int8 container [0,255] -> [-128,127]")
@@ -120,7 +120,7 @@ class MeterReader:
                 logger.info("  Actual scheme: True ESP-DL [-128,127]")
             else:
                 logger.info("  Actual scheme: Standard quantization")
-            
+
             # Additional output quantization info
             logger.info(f"  Output quantization - scale: {output_scale}, zero_point: {output_zero_point}")
             if output_zero_point != 0:
@@ -146,7 +146,7 @@ class MeterReader:
 
         if channels != self.model_config.input_channels:
             logger.warning(f"Model config input_channels {self.model_config.input_channels} doesn't match actual model channels {channels}")
-            
+
     def debug_output(self, output: np.ndarray) -> None:
         """Debug method to analyze output tensor."""
         logger.debug("=== OUTPUT DEBUG ===")
@@ -154,21 +154,21 @@ class MeterReader:
         logger.debug(f"Raw output dtype: {output.dtype}")
         logger.debug(f"Raw output range: [{output.min()}, {output.max()}]")
         logger.debug(f"Raw output values: {output[0]}")
-        
+
         # Check if output is quantized
         if self.model_config.quantized:
             output_scale, output_zero_point = self.output_quantization
             logger.debug(f"Output quantization: scale={output_scale}, zero_point={output_zero_point}")
-            
+
             # Dequantize manually
             dequantized = (output.astype(np.float32) - output_zero_point) * output_scale
             logger.debug(f"Dequantized range: [{dequantized.min():.6f}, {dequantized.max():.6f}]")
             logger.debug(f"Dequantized values: {dequantized[0]}")
-            
+
             # Apply softmax to dequantized
             probs_dequant = tf.nn.softmax(dequantized[0]).numpy()
             logger.debug(f"Probabilities from dequant: {[f'{p:.4f}' for p in probs_dequant]}")
-            
+
             # Apply softmax directly to raw output
             probs_raw = tf.nn.softmax(output[0].astype(np.float32)).numpy()
             logger.debug(f"Probabilities from raw: {[f'{p:.4f}' for p in probs_raw]}")
@@ -224,11 +224,11 @@ class MeterReader:
         # Apply preprocessing operations
         if self.model_config.invert:
             image = cv2.bitwise_not(image)
-        
+
         # Handle quantization and normalization - ROBUST DYNAMIC SCALING
         # Always normalize to [0, 1] first as a consistent starting point
         image = image.astype(np.float32) / 255.0
-        
+
         if input_dtype == np.uint8:
             image = (image * 255.0).astype(np.uint8)
         elif input_dtype == np.int8:
@@ -243,7 +243,7 @@ class MeterReader:
         else:
             # Keep as float32 [0.0, 1.0]
             pass
-        
+
         # Add batch dimension
         if len(input_shape) == 4:
             image = np.expand_dims(image, axis=0)  # Add batch dimension (1, H, W, C)
@@ -258,13 +258,13 @@ class MeterReader:
         """Validate input image dimensions and type."""
         if image is None or image.size == 0:
             raise ValueError("Invalid or empty image provided")
-        
+
         # Check if image dimensions match expected input size
         if self.model_config.input_size:
             expected_height, expected_width = self.model_config.input_size
             if image.shape[:2] != (expected_height, expected_width):
                 logger.warning(f"Image size {image.shape[:2]} (HxW) doesn't match expected size {(expected_height, expected_width)} (HxW)")
-                
+
     def _debug_model_info(self) -> None:
         """Log detailed model information for debugging."""
         logger.debug("=== Model Input Details ===")
@@ -273,14 +273,14 @@ class MeterReader:
         logger.debug(f"Input name: {self.input_details[0]['name']}")
         if 'quantization' in self.input_details[0]:
             logger.debug(f"Input quantization: {self.input_details[0]['quantization']}")
-        
+
         logger.debug("=== Model Output Details ===")
         logger.debug(f"Output shape: {self.output_details[0]['shape']}")
         logger.debug(f"Output dtype: {self.output_details[0]['dtype']}")
         logger.debug(f"Output name: {self.output_details[0]['name']}")
         if 'quantization' in self.output_details[0]:
             logger.debug(f"Output quantization: {self.output_details[0]['quantization']}")
-        
+
         logger.debug("=== Model Configuration ===")
         logger.debug(f"Model type: {self.model_type}")
         logger.debug(f"Input size: {self.model_config.input_size}")
@@ -303,7 +303,7 @@ class MeterReader:
         try:
             # Use the ORIGINAL working preprocessing
             input_image = self.preprocess_image(image)
-            
+
             # Verify shape matches expected input shape
             expected_shape = self.input_details[0]['shape']
             if input_image.shape != tuple(expected_shape):
@@ -311,21 +311,21 @@ class MeterReader:
                 if input_image.size == np.prod(expected_shape):
                     input_image = input_image.reshape(expected_shape)
                     logger.info(f"Reshaped input to: {input_image.shape}")
-            
+
             # Set input tensor and run inference
             self.interpreter.set_tensor(self.input_details[0]['index'], input_image)
             self.interpreter.invoke()
-            
+
             # Get model output
             output = self.interpreter.get_tensor(self.output_details[0]['index'])
-            
+
             # DEBUG: Check what we're getting
             logger.debug(f"Raw output: {output[0]}")
             logger.debug(f"Raw output dtype: {output.dtype}")
-            
+
             # Determine if output is quantized based on tensor details, not just config
             output_dtype = self.output_details[0]['dtype']
-            
+
             if output_dtype in [np.uint8, np.int8]:
                 # Dequantize output
                 output_scale, output_zero_point = self.output_quantization
@@ -333,7 +333,7 @@ class MeterReader:
             else:
                 # Float model, already float32 probabilities
                 output_values = output[0]
-                
+
             predicted_class = int(np.argmax(output_values))
             raw_confidence = float(np.max(output_values))
 
@@ -341,7 +341,7 @@ class MeterReader:
             confidence = max(0.0, min(1.0, raw_confidence))
 
             logger.debug(f"Predicted class: {predicted_class}, raw_confidence: {raw_confidence:.4f}, normalized: {confidence:.4f}")
-            
+
             # Apply scaling based on model type
             if self.model_config.output_processing == "direct_class":
                 meter_reading = float(predicted_class)
@@ -349,9 +349,9 @@ class MeterReader:
                 meter_reading = float(predicted_class)
             else:  # "softmax_scale10"
                 meter_reading = float(predicted_class) / self.model_config.scale_factor
-            
+
             return meter_reading, confidence
-            
+
         except Exception as e:
             logger.error(f"Prediction error: {str(e)}", exc_info=True)
             raise ValueError(f"Error during prediction: {str(e)}")
@@ -360,7 +360,7 @@ def load_regions(regions_source: Union[str, Path]) -> List[Tuple[int, int, int, 
     """Load regions from file or string representation."""
     try:
         regions_path = Path(regions_source)
-        
+
         if regions_path.exists():
             with regions_path.open('r') as f:
                 regions = json.load(f)
@@ -368,7 +368,7 @@ def load_regions(regions_source: Union[str, Path]) -> List[Tuple[int, int, int, 
             # Try to parse as string representation
             regions_str = str(regions_source).strip().strip('"').strip("'")
             regions = ast.literal_eval(regions_str)
-        
+
         # Validate regions format and convert to tuples
         valid_regions = []
         for region in regions:
@@ -379,12 +379,12 @@ def load_regions(regions_source: Union[str, Path]) -> List[Tuple[int, int, int, 
                     logger.warning(f"Invalid region format: {region}")
             else:
                 logger.warning(f"Region must have 4 coordinates, got: {region}")
-        
+
         if not valid_regions:
             logger.error("No valid regions found in input")
-        
+
         return valid_regions
-        
+
     except (FileNotFoundError, json.JSONDecodeError, SyntaxError, ValueError) as e:
         logger.error(f"Error loading regions: {e}", exc_info=True)
         return []
@@ -393,7 +393,7 @@ def load_image(image_source: Union[str, Path], input_channels: int = 1) -> Optio
     """Load image from local file or remote URL based on model's input requirements."""
     try:
         image_source_str = str(image_source)
-        
+
         # Determine loading mode based on input_channels
         if input_channels == 1:
             # Load as grayscale
@@ -401,18 +401,18 @@ def load_image(image_source: Union[str, Path], input_channels: int = 1) -> Optio
         else:
             # Load as color (BGR)
             load_mode = cv2.IMREAD_COLOR
-        
+
         if image_source_str.startswith(('http://', 'https://')):
             # Load from URL
             response = requests.get(image_source_str, timeout=10)
             response.raise_for_status()
-            
+
             # Check content type
             content_type = response.headers.get('content-type', '')
             if 'image' not in content_type:
                 logger.error(f"URL doesn't point to an image (Content-Type: {content_type})")
                 return None
-                
+
             image_array = np.asarray(bytearray(response.content), dtype=np.uint8)
             image = cv2.imdecode(image_array, load_mode)
         else:
@@ -421,24 +421,24 @@ def load_image(image_source: Union[str, Path], input_channels: int = 1) -> Optio
             if not image_path.exists():
                 logger.error(f"Image file not found: {image_path}")
                 return None
-                
+
             image = cv2.imread(str(image_path), load_mode)
-        
+
         if image is None:
             logger.error(f"Unable to decode image from: {image_source_str}")
             return None
-            
+
         # Convert BGR to RGB for color images if needed
         if input_channels == 3 and len(image.shape) == 3:
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            
+
         # Check image size
         if image.nbytes > 50 * 1024 * 1024:  # 50MB
             logger.warning("Large image detected, consider resizing")
-            
+
         # logger.info(f"Loaded image: {image_source_str}, shape: {image.shape}, channels: {1 if len(image.shape) == 2 else image.shape[2]}")
         return image
-        
+
     except requests.exceptions.RequestException as e:
         logger.error(f"Error downloading image: {e}", exc_info=True)
         return None
@@ -454,11 +454,11 @@ def validate_arguments(args: argparse.Namespace) -> bool:
         if not default_model_path.exists():
             logger.error(f"Invalid model type: {args.model}. Available models: {list(MODELS.keys())}")
             return False
-    
+
     if not args.image_source and not args.folder:
         logger.error("Either --image_source or --folder must be specified")
         return False
-    
+
     # UPDATED: Don't require regions file to exist - will process full image if not found
     return True
 
@@ -474,10 +474,10 @@ Options:
   --help                     Show this help message and exit
   --model MODEL_TYPE        Model type to use (default: {DEFAULT_MODEL} or model.tflite if exists)
                              Available models:"""
-    
+
     for model_name, config in MODELS.items():
         help_text += f"\n                               {model_name}: {config.description}"
-    
+
     help_text += f"""
   --regions REGIONS_SOURCE  Path to JSON file or string representation of regions (default: {DEFAULT_REGIONS_FILE})
                              If not specified or file doesn't exist, the entire image will be processed
@@ -492,13 +492,13 @@ Options:
 Examples:
   # Process single image
   python meter_reading.py --image_source sample.jpg
-  
+
   # Process folder of images
   python meter_reading.py --folder ./images
-  
+
   # Process folder with specific model
   python meter_reading.py --folder ./images --model class100-0180
-  
+
   # Process single image with regions
   python meter_reading.py --model {DEFAULT_MODEL} --regions custom_regions.json --image_source sample.jpg
 
@@ -517,7 +517,7 @@ def get_output_filename(prediction: float, confidence: float, original_path: Uni
     original_path = Path(original_path)
     training_dir = Path("training_low_confidence")
     training_dir.mkdir(exist_ok=True)
-    
+
     # Maintain the subfolder structure (e.g. training/coldwater/...)
     rel_dir = original_path.parent.name
     if rel_dir and rel_dir != "extracted":
@@ -525,16 +525,16 @@ def get_output_filename(prediction: float, confidence: float, original_path: Uni
     else:
         target_dir = training_dir
     target_dir.mkdir(exist_ok=True)
-    
+
     name_parts = original_path.stem  # e.g. "5_0.996_1771866086_q7o"
     extension = original_path.suffix
-    
+
     # [new_inference]_[new_confidence]_[old_name]_err_corr.[ext]
     # Ensure prediction retains its decimal structure implicitly (e.g. 5.0)
     pred_str = str(prediction)
     conf_str = f"{confidence:.3f}"
     new_filename = f"{pred_str}_{conf_str}_{name_parts}_low_conf{extension}"
-        
+
     return target_dir / new_filename
 
 def process_full_image_as_region(image: np.ndarray) -> List[Tuple[int, int, int, int]]:
@@ -553,14 +553,14 @@ def find_images_in_folder(folder_path: Union[str, Path]) -> List[Path]:
     if not folder.exists() or not folder.is_dir():
         logger.error(f"Folder not found: {folder_path}")
         return []
-    
+
     image_extensions = get_supported_image_extensions()
     images = []
-    
+
     for ext in image_extensions:
         images.extend(folder.glob(f"*{ext}"))
         images.extend(folder.glob(f"*{ext.upper()}"))
-    
+
     # Sort for consistent processing order
     images.sort()
     logger.info(f"Found {len(images)} images in folder: {folder_path}")
@@ -598,9 +598,9 @@ def process_single_image(
             regions = process_full_image_as_region(image)
 
         result = process_image(
-            meter_reader, 
-            image, 
-            regions, 
+            meter_reader,
+            image,
+            regions,
             no_confidence=no_confidence,
             image_source=image_path
         )
@@ -640,13 +640,13 @@ def process_image(
         "final_reading": -1.0,
         "result_image": None
     }
-    
+
     valid_regions = []
-    
+
     for region in regions:
         x1, y1, x2, y2 = region
         try:
-            if (x1 >= x2 or y1 >= y2 or x1 < 0 or y1 < 0 or 
+            if (x1 >= x2 or y1 >= y2 or x1 < 0 or y1 < 0 or
                 x2 > image.shape[1] or y2 > image.shape[0]):
                 continue
 
@@ -663,7 +663,7 @@ def process_image(
                 processed_reading = 0
             results["processed_readings"].append(processed_reading)
             valid_regions.append(region)
-            
+
         except Exception as e:
             logger.error(f"Error processing region {region}: {str(e)}", exc_info=True)
             continue
@@ -708,26 +708,26 @@ def process_folder(
     if not folder.exists() or not folder.is_dir():
         logger.error(f"Folder not found: {folder_path}")
         return []
-    
+
     image_extensions = get_supported_image_extensions()
     images = []
-    
+
     # Recursively find images
     for root, dirs, files in os.walk(folder):
         for file in files:
             if any(file.lower().endswith(ext) for ext in image_extensions):
                 images.append(Path(root) / file)
-                
+
     if not images:
         logger.error(f"No images found recursively in folder: {folder_path}")
         return []
-        
+
     results = []
     successful = 0
     failed = 0
-    
+
     logger.info(f"Starting batch processing of {len(images)} images...")
-    
+
     for image_path in tqdm(images, desc="Processing images", unit="img"):
         try:
             result = process_single_image(
@@ -738,17 +738,17 @@ def process_folder(
                 save_output=save_output,
                 confidence_threshold=confidence_threshold
             )
-            
+
             if "error" not in result:
                 successful += 1
                 # logger.info(f"SUCCESS: {image_path.name} -> {result['final_reading']}")
             else:
                 failed += 1
                 # logger.error(f"FAILED: {image_path.name} -> Error: {result['error']}")
-            
+
             result["image_path"] = str(image_path)
             results.append(result)
-            
+
         except Exception as e:
             failed += 1
             # logger.error(f"FAILED: {image_path.name} -> Unexpected error: {str(e)}")
@@ -756,7 +756,7 @@ def process_folder(
                 "image_path": str(image_path),
                 "error": str(e)
             })
-    
+
     logger.info(f"Batch processing completed: {successful} successful, {failed} failed")
     logger.info(f"Folder processing complete: {successful}/{len(results)} successful")
     return results
@@ -775,20 +775,20 @@ def main() -> int:
     parser.add_argument("--test-all-models", action="store_true", help="Test all models")
     parser.add_argument("--expected_result", type=int, help="The real number read by human")
     parser.add_argument("--threshold", type=float, default=0.6, help="Confidence threshold below which images are exported")
-    
+
     args = parser.parse_args()
-    
+
     if args.help:
         print_help()
         return 0
-    
+
     if not validate_arguments(args):
         return 1
-    
+
     try:
         # Initialize meter reader
         meter_reader = MeterReader(args.model)
-        
+
         # Load regions
         regions = load_regions(args.regions)
         if not regions:
@@ -826,8 +826,8 @@ def main() -> int:
             logger.info(f"Number of regions processed: {len(regions)}")
 
             for i, (raw, processed, confidence) in enumerate(zip(
-                result.get("raw_readings", []), 
-                result.get("processed_readings", []), 
+                result.get("raw_readings", []),
+                result.get("processed_readings", []),
                 result.get("confidence_scores", [])
             )):
                 logger.info(f"Digit {i+1}: Raw={raw:.2f}, Processed={processed}, Confidence={confidence:.2%}")
@@ -842,7 +842,7 @@ def main() -> int:
                 cv2.destroyAllWindows()
 
             return 0
-            
+
         # Handle folder processing
         if args.folder:
             logger.info(f"Processing folder: {args.folder}")
@@ -864,7 +864,7 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-    
-    
+
+
 # # Process all images in a folder with default settings
 # python correct_errors.py --folder all_errors --model class100-0180

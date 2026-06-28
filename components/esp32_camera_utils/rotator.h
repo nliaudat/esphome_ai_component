@@ -26,7 +26,7 @@ class Rotator {
  public:
   /**
    * @brief Apply arbitrary software rotation.
-   * 
+   *
    * @param input Input buffer.
    * @param output Output buffer (must be pre-allocated).
    * @param src_w Source width.
@@ -37,20 +37,20 @@ class Rotator {
    * @param out_h Output height.
    * @return true if successful.
    */
-  static bool perform_rotation(const uint8_t* input, uint8_t* output, 
-                     int src_w, int src_h, int channels, 
+  static bool perform_rotation(const uint8_t* input, uint8_t* output,
+                     int src_w, int src_h, int channels,
                      float angle_deg, int out_w, int out_h);
 
   /**
    * @brief Calculate the bounding box dimensions for a rotated image.
-   * 
+   *
    * @param src_w Source width.
    * @param src_h Source height.
    * @param angle_deg Angle in degrees.
    * @param out_w [out] New width.
    * @param out_h [out] New height.
    */
-  static void get_rotated_dimensions(int src_w, int src_h, float angle_deg, 
+  static void get_rotated_dimensions(int src_w, int src_h, float angle_deg,
                                      int& out_w, int& out_h);
 
  private:
@@ -60,7 +60,7 @@ class Rotator {
 };
 
 // Implementation moved to header to resolve linker issues
-inline void Rotator::get_rotated_dimensions(int src_w, int src_h, float angle_deg, 
+inline void Rotator::get_rotated_dimensions(int src_w, int src_h, float angle_deg,
                                      int& out_w, int& out_h) {
     float angle_rad = angle_deg * deg_to_rad;
     float cos_a = std::abs(std::cos(angle_rad));
@@ -68,17 +68,17 @@ inline void Rotator::get_rotated_dimensions(int src_w, int src_h, float angle_de
 
     out_w = static_cast<int>(src_w * cos_a + src_h * sin_a);
     out_h = static_cast<int>(src_w * sin_a + src_h * cos_a);
-    
+
     // Ensure even dimensions for compatibility usually
     if (out_w % 2 != 0) out_w++;
     if (out_h % 2 != 0) out_h++;
 }
 
-inline bool Rotator::perform_rotation(const uint8_t* input, uint8_t* output, 
-                     int src_w, int src_h, int channels, 
+inline bool Rotator::perform_rotation(const uint8_t* input, uint8_t* output,
+                     int src_w, int src_h, int channels,
                      float angle_deg, int out_w, int out_h) {
     if (!input || !output) return false;
-    
+
     // We only log non-trivial rotations to avoid spam on pass-through
     bool is_trivial = (std::abs(angle_deg) < 0.1f || std::abs(angle_deg - 360.0f) < 0.1f);
     if (!is_trivial) {
@@ -86,7 +86,7 @@ inline bool Rotator::perform_rotation(const uint8_t* input, uint8_t* output,
     } else {
         // Still define start to avoid compilation errors if macro expands freely
         #ifdef DURATION_START
-        DURATION_START(); 
+        DURATION_START();
         #endif
     }
 
@@ -117,7 +117,7 @@ inline bool Rotator::perform_rotation(const uint8_t* input, uint8_t* output,
             for (int x = 0; x < src_w; x++) {
                 int src_idx = (y * src_w + x) * channels;
                 int dst_idx = (x * out_w + (src_h - 1 - y)) * channels;
-                
+
                 if (channels == 3) {
                     output[dst_idx] = input[src_idx];
                     output[dst_idx+1] = input[src_idx+1];
@@ -140,7 +140,7 @@ inline bool Rotator::perform_rotation(const uint8_t* input, uint8_t* output,
             for (int x = 0; x < src_w; x++) {
                 int src_idx = (y * src_w + x) * channels;
                 int dst_idx = ((src_h - 1 - y) * out_w + (src_w - 1 - x)) * channels;
-                
+
                 if (channels == 3) {
                     output[dst_idx] = input[src_idx];
                     output[dst_idx+1] = input[src_idx+1];
@@ -163,7 +163,7 @@ inline bool Rotator::perform_rotation(const uint8_t* input, uint8_t* output,
             for (int x = 0; x < src_w; x++) {
                 int src_idx = (y * src_w + x) * channels;
                 int dst_idx = ((src_w - 1 - x) * out_w + y) * channels;
-                
+
                 if (channels == 3) {
                     output[dst_idx] = input[src_idx];
                     output[dst_idx+1] = input[src_idx+1];
@@ -201,7 +201,7 @@ inline bool Rotator::perform_rotation(const uint8_t* input, uint8_t* output,
             if (sx >= 0 && sx < src_w && sy >= 0 && sy < src_h) {
                 int src_idx = (sy * src_w + sx) * channels;
                 int dst_idx = (y * out_w + x) * channels;
-                
+
                 if (channels == 3) {
                     output[dst_idx] = input[src_idx];
                     output[dst_idx+1] = input[src_idx+1];

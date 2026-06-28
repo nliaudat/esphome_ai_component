@@ -19,22 +19,22 @@ class MemoryManager {
         if (p) heap_caps_free(p);
       }
     };
-    
+
     std::unique_ptr<uint8_t[], HeapCapsDeleter> data;
     size_t actual_size;
-    
+
     // Source of allocation for logging / diagnostics
     bool from_psram{false};
-    
+
     operator bool() const { return static_cast<bool>(data); }
   };
 
   [[nodiscard]] static AllocationResult allocate_tensor_arena(size_t requested_size);
-  static void report_memory_status(size_t requested_size, 
+  static void report_memory_status(size_t requested_size,
                                  size_t allocated_size,
                                  size_t peak_usage,
                                  size_t model_size);
-  
+
   /**
    * @brief Parse an arena size string (e.g. "110KB", "2MB", "51200") to bytes.
    * Shared utility — replaces duplicated logic in ModelHandler and TFLiteMicroHelper.
