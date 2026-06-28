@@ -96,7 +96,7 @@ async def to_code(config):
             if "x" in res:
                 w, h = map(int, res.split("x"))
                 width, height = w, h
-        except:
+        except Exception:
             pass
 
     if "camera_pixel_format" in substitutions:

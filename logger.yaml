@@ -1,7 +1,7 @@
 # Enable logging
 logger:
   # level: ERROR #NONE# ERROR #INFO #DEBUG  #VERBOSE
-  level: DEBUG #NONE# ERROR #INFO #DEBUG  #VERBOSE
+  level: DEBUG  #NONE# ERROR #INFO #DEBUG  #VERBOSE
   # baud_rate: 0 #to disable logging via UART
   logs:
     sensor: INFO
@@ -13,7 +13,6 @@ logger:
     tflite_coordinator: DEBUG
     internal_temperature: ERROR
     internal_temperature.esp32: ERROR
-
 
 # text_sensor:
 #   - platform: template

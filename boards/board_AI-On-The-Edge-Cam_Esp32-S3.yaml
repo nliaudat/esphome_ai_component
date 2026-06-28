@@ -1,12 +1,11 @@
 # https://www.tindie.com/products/allexok/ai-on-the-edge-cam-esp32-s3-with-poe-sd-camera/
 # https://github.com/jomjol/AI-on-the-edge-device/discussions/2963
 
-
 esphome:
   name: ${name}
   friendly_name: ${friendly_name}
   min_version: ${esphome_min_version}
-  name_add_mac_suffix: False # this appends to 'name' NOT 'friendly_name'
+  name_add_mac_suffix: False  # this appends to 'name' NOT 'friendly_name'
   on_loop:
     - lambda: |-
           if (id(${id_prefix}_espcam_update)) {
@@ -37,22 +36,20 @@ esphome:
     board_build.f_flash: 80000000L
     board_build.flash_size: 16MB
     board_build.arduino.memory_type: opi_opi
-    board_build.flash_mode: dio # opi
+    board_build.flash_mode: dio  # opi
     board_build.psram_type: opi
     board_upload.maximum_size: 16777216
     board_build.extra_flags:
     - -DBOARD_HAS_PSRAM
-    - -DTF_LITE_STATIC_MEMORY # for tflite micro
-    - -DTF_LITE_DISABLE_X86_NEON #for tflite micro
+    - -DTF_LITE_STATIC_MEMORY  # for tflite micro
+    - -DTF_LITE_DISABLE_X86_NEON  #for tflite micro
     - -DESP_NN  #use hardware acceleration : https://github.com/espressif/esp-nn (only if using tflite)
-    board_name: AI-On-The-Edge-Cam Esp32-S3 (N16R8) #https://www.tindie.com/products/allexok/ai-on-the-edge-cam-esp32-s3-with-poe-sd-camera/
-
+    board_name: AI-On-The-Edge-Cam Esp32-S3 (N16R8)  #https://www.tindie.com/products/allexok/ai-on-the-edge-cam-esp32-s3-with-poe-sd-camera/
 
 substitutions:
-  #board and compilation
+  # board and compilation
   board: esp32-s3-devkitc-1
   framework: esp-idf
-
 
   # Power control pins
   eth_enable_pin: GPIO45
@@ -67,13 +64,13 @@ substitutions:
   eth_int_pin: GPIO38
 
   # SD Card Configuration
-  sdcard_clk_pin: GPIO40 #SD_SCLK
-  sdcard_cmd_pin: GPIO42 #SD_MOSI
-  sdcard_d0_pin: GPIO41 #SD_MISO
-  sdcard_d3_pin: GPIO3 #SD_CS, CD/DAT3
+  sdcard_clk_pin: GPIO40  #SD_SCLK
+  sdcard_cmd_pin: GPIO42  #SD_MOSI
+  sdcard_d0_pin: GPIO41  #SD_MISO
+  sdcard_d3_pin: GPIO3  #SD_CS, CD/DAT3
 
   # Camera Pins
-  camera_pwdn_pin: GPIO44 # Not used on this board, dummy valid pin
+  camera_pwdn_pin: GPIO44  # Not used on this board, dummy valid pin
   external_clock_pin: GPIO15
   external_clock_frequency: 20MHz
   i2c_pins_sda: GPIO4
@@ -94,8 +91,6 @@ substitutions:
   # LED Pins
   status_led_pin: GPIO48
   flash_led_pin: GPIO12
-
-
 
 esp32:
   board: ${board}
@@ -122,19 +117,19 @@ esp32:
       CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
       CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: "y"
       CONFIG_MBEDTLS_SSL_PROTO_TLS1_3: "y"
-      CONFIG_FATFS_LFN_STACK: "y" # to support long file name in sdcard
-      CONFIG_TASK_WDT: "y" # prevents watchdog timeouts
-      CONFIG_TASK_WDT_TIMEOUT_S: "30" # prevents watchdog timeouts
-      CONFIG_TASK_WDT_CHECK_IDLE_TASK_CPU0: "n" # prevents watchdog timeouts
-      ### needed by new jpeg camera : https://github.com/esphome/esphome/pull/9496
+      CONFIG_FATFS_LFN_STACK: "y"  # to support long file name in sdcard
+      CONFIG_TASK_WDT: "y"  # prevents watchdog timeouts
+      CONFIG_TASK_WDT_TIMEOUT_S: "30"  # prevents watchdog timeouts
+      CONFIG_TASK_WDT_CHECK_IDLE_TASK_CPU0: "n"  # prevents watchdog timeouts
+      # ## needed by new jpeg camera : https://github.com/esphome/esphome/pull/9496
       CONFIG_SPIRAM_SUPPORT: y
       CONFIG_SPIRAM_USE_CAPS_ALLOC: y
       CONFIG_SPIRAM_USE_MALLOC: y
-      CONFIG_LOG_DEFAULT_LEVEL: "0" # prevents "ESP-IDF" Guru Meditation Error
-      #CONFIG_LOG_DEFAULT_LEVEL: 0 # prevents "ESP-IDF" Guru Meditation Error
+      CONFIG_LOG_DEFAULT_LEVEL: "0"  # prevents "ESP-IDF" Guru Meditation Error
+      # CONFIG_LOG_DEFAULT_LEVEL: 0 # prevents "ESP-IDF" Guru Meditation Error
       # CONFIG_CAMERA_TASK_STACK_SIZE: "4096"
       CONFIG_CAMERA_TASK_STACK_SIZE: "8192"
-      #### testing
+      # ### testing
       # CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: y
       CONFIG_FREERTOS_HZ: "1000"
       CONFIG_ESP32S3_SPIRAM_SUPPORT: y
@@ -144,7 +139,7 @@ psram:
   mode: octal
   speed: 80MHz
 
-######## LIGHTS
+# ####### LIGHTS
 
 light:
   - platform: esp32_rmt_led_strip
@@ -156,15 +151,15 @@ light:
     id: ${id_prefix}_flash
 
     effects:
-      - addressable_scan:
+        - addressable_scan:
           name: "Scan Effect"
           move_interval: 100ms
           scan_width: 1
-      - addressable_rainbow:
+        - addressable_rainbow:
           name: "Rainbow Effect"
           speed: 10
           width: 50
-      - pulse:
+        - pulse:
           name: "Slow Pulse"
           transition_length: 500ms
           update_interval: 2s
@@ -175,9 +170,7 @@ light:
     restore_mode: ALWAYS_OFF
     pin: ${status_led_pin}
 
-
-
-######## Power management (wifi or ethernet)
+# ####### Power management (wifi or ethernet)
 output:
   - platform: gpio
     pin: ${eth_enable_pin}
@@ -194,22 +187,22 @@ switch:
     id: ${id_prefix}_eth_power_switch
     icon: "mdi:ethernet"
     turn_on_action:
-      - output.turn_on: ${id_prefix}_eth_power
-      - delay: 500ms
+        - output.turn_on: ${id_prefix}_eth_power
+        - delay: 500ms
     turn_off_action:
-      - output.turn_off: ${id_prefix}_eth_power
+        - output.turn_off: ${id_prefix}_eth_power
 
   - platform: template
     name: "Peripheral Power"
     id: ${id_prefix}_periph_power_switch
     icon: "mdi:camera"
     turn_on_action:
-      - output.turn_on: ${id_prefix}_periph_power
-      - delay: 1000ms
+        - output.turn_on: ${id_prefix}_periph_power
+        - delay: 1000ms
     turn_off_action:
-      - output.turn_off: ${id_prefix}_periph_power
+        - output.turn_off: ${id_prefix}_periph_power
 
-## only if wifi.yaml is enabled
+# # only if wifi.yaml is enabled
   # - platform: template
     # name: "WiFi Power"
     # id: wifi_power_switch
@@ -221,12 +214,10 @@ switch:
     # turn_off_action:
       # - delay: 100ms
 
+# ####### SD Card Configuration
 
-
-######## SD Card Configuration
-
-## need external_components in config.yaml
-## as of 23.07.2025, the PR #26 must be called as it fixes changes in esphome 2025.7
+# # need external_components in config.yaml
+# # as of 23.07.2025, the PR #26 must be called as it fixes changes in esphome 2025.7
   # - source:
       # type: git
       # url: https://github.com/n-serrette/esphome_sd_card
@@ -240,7 +231,6 @@ switch:
   # cmd_pin: ${sdcard_cmd_pin}  #SD_MOSI
   # data0_pin: ${sdcard_d0_pin}  #SD_MISO
   # data3_pin: ${sdcard_d3_pin} #SD_CS, CD/DAT3
-
 
 # sensor:
   # - platform: sd_mmc_card

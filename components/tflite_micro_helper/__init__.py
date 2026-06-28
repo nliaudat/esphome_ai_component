@@ -3,10 +3,7 @@ from esphome.components import esp32
 import esphome.config_validation as cv
 from esphome.core import CORE
 
-if CORE.target_platform == "esp32":
-    DEPENDENCIES = ["esp32"]
-else:
-    DEPENDENCIES = []
+DEPENDENCIES = ["esp32"] if CORE.target_platform == "esp32" else []
 
 tflite_micro_helper_ns = cg.esphome_ns.namespace("tflite_micro_helper")
 

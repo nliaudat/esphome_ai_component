@@ -40,3 +40,10 @@ ignore =
   D401,
 
 exclude = venv,.esphome,generated
+per-file-ignores =
+  # Unused imports in __init__.py are intentional for ESPHome module registration
+  components/legacy_meter_reader_tflite/__init__.py: F401
+  components/meter_reader_tflite/__init__.py: F401
+  components/ssocr_reader/__init__.py: F401
+  # Unused globals in draw_regions.py are intentionally declared for OpenCV callbacks
+  tools/draw_regions.py: F824

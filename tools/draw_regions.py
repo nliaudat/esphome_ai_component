@@ -74,11 +74,9 @@ def get_display_image():
     new_height = int(img_height * zoom_level)
 
     # Resize the image
-    display_image = cv2.resize(
+    return cv2.resize(
         original_image, (new_width, new_height), interpolation=cv2.INTER_LINEAR
     )
-
-    return display_image
 
 
 def screen_to_image_coords(sx, sy):

@@ -51,21 +51,23 @@ try:
     # Try different bold font options
     try:
         font = ImageFont.truetype("arialbd.ttf", 50)  # Arial Bold
-    except:
+    except OSError:
         try:
             font = ImageFont.truetype("Arial Bold.ttf", 50)  # Another common name
-        except:
+        except OSError:
             try:
                 # Try to make regular font bold using fontconfig (if available)
                 font = ImageFont.truetype("arial.ttf", 50)
                 # Note: PIL doesn't directly support making fonts bold,
                 # so we'll use a thicker stroke as a fallback
-            except:
+            except OSError:
                 font = ImageFont.load_default()
-except:
+except OSError:
     font = ImageFont.load_default()
 
-for i, (zone, digit, color) in enumerate(zip(debug_zones, digits, colors)):
+for _i, (zone, digit, color) in enumerate(
+    zip(debug_zones, digits, colors, strict=False)
+):
     x1, y1, x2, y2 = zone
     zone_width = x2 - x1
     zone_height = y2 - y1
@@ -97,7 +99,7 @@ for i, (zone, digit, color) in enumerate(zip(debug_zones, digits, colors)):
 # Add info text (also in bold)
 try:
     info_font = ImageFont.truetype("arialbd.ttf", 20)
-except:
+except OSError:
     info_font = ImageFont.load_default()
 
 draw.text((10, 60), f"Test Meter: {digits}", fill=(255, 255, 255), font=info_font)

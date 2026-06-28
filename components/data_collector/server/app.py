@@ -23,7 +23,7 @@ if not API_KEY:
 
 @app.route("/")
 def index():
-    images = reversed(sorted(os.listdir(UPLOAD_FOLDER)))
+    images = sorted(os.listdir(UPLOAD_FOLDER), reverse=True)
     html = "<h1>Captured Images</h1>"
     html += "<div style='display: flex; flex-wrap: wrap; gap: 10px;'>"
     for img in images:

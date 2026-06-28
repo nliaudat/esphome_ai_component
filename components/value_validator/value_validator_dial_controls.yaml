@@ -59,4 +59,3 @@ number:
           if (id(${id_prefix}_validator) != nullptr) {
             id(${id_prefix}_validator)->set_dial_correction_low_threshold(x / 100.0);
           }
-

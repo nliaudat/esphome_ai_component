@@ -1,5 +1,6 @@
 """Helper utilities for ESPHome AI Component lint scripts."""
 
+import contextlib
 import subprocess
 
 import colorama
@@ -31,14 +32,12 @@ def print_error_for_file(file, body=None):
         # Fallback: write raw bytes to stderr
         import sys as _sys
 
-        try:
+        with contextlib.suppress(Exception):
             _sys.stderr.buffer.write(
                 ("### File " + str(file) + "\n\n" + (body or "") + "\n\n").encode(
                     "utf-8", errors="replace"
                 )
             )
-        except Exception:
-            pass
 
 
 def filter_changed(files):
