@@ -144,10 +144,15 @@ void AnalogReader::remove_background(uint8_t *img, int w, int h, int cx, int cy,
 }
 
 void AnalogReader::median_filter_3x3(uint8_t *img, int w, int h) {
-  std::vector<uint8_t> temp(w * h);
-  memcpy(temp.data(), img, w * h);
+  // Ensure scratch buffer is sized; resize only once (avoids heap alloc per call)
+  const size_t needed = static_cast<size_t>(w) * h;
+  if (this->scratch_buffer_2_.size() < needed) {
+    this->scratch_buffer_2_.resize(needed);
+  }
+  uint8_t *temp = this->scratch_buffer_2_.data();
+  memcpy(temp, img, needed);
 
-  // Fixed-size window on stack — avoids heap allocation per pixel
+  // Fixed-size window on stack -- avoids heap allocation per pixel
   uint8_t window[9];
   for (int y = 1; y < h - 1; y++) {
     for (int x = 1; x < w - 1; x++) {
@@ -543,7 +548,7 @@ AnalogReader::DetectionResult AnalogReader::detect_template_match(const uint8_t 
     }
   }
 
-  // Fine search around best angle (±5 degrees, 1 degree steps)
+  // Fine search around best angle (+-5 degrees, 1 degree steps)
   float refined_angle = best_angle;
   float refined_score = best_score;
 

@@ -101,7 +101,7 @@ void CameraCoordinator::basic_recovery() {
   // but mostly this just logs and maybe allows the system to try again next loop.
 }
 
-// Legacy function — kept for API compatibility but no longer called.
+// Legacy function -- kept for API compatibility but no longer called.
 // The component now uses the unified FrameState enum (meter_reader_tflite.h)
 // instead of separate std::atomic<bool> flags for frame management.
 bool CameraCoordinator::test_camera_after_reset(std::atomic<bool> &frame_available,
@@ -136,7 +136,7 @@ void CameraCoordinator::update_image_processor_config(int model_width, int model
   // of the configured pixel_format. For grayscale models, the zone processing
   // functions (process_rgb888_crop_and_scale_to_*) call arrange_channels() which
   // handles model_channels == 1 by computing luminance from R,G,B per-pixel.
-  // This avoids expensive full-frame BGR→RGB swap and grayscale conversion.
+  // This avoids expensive full-frame BGR->RGB swap and grayscale conversion.
   config.pixel_format = this->current_format_;
   config.model_width = model_width;
   config.model_height = model_height;
@@ -181,7 +181,7 @@ std::vector<CameraCoordinator::ProcessResult> CameraCoordinator::process_frame(
 
   // Validation is handled by ImageProcessor which has access to actual decoded frame dimensions.
   // Local check logic can be stale if camera windowing (ROI) is used.
-  // Pass all zones directly — ImageProcessor validates against the actual image.
+  // Pass all zones directly -- ImageProcessor validates against the actual image.
   if (zones.empty()) {
     ESP_LOGE(TAG, "No crop zones provided. Skipping processing.");
     return {};

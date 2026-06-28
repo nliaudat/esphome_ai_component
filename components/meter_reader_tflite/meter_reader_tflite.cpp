@@ -20,7 +20,7 @@ namespace meter_reader_tflite {
 
 static const char *const TAG = "meter_reader_tflite";
 
-// RAII ScopedTimer — replaces METER_DURATION_START/END macros
+// RAII ScopedTimer -- replaces METER_DURATION_START/END macros
 class ScopedTimer {
  public:
   ScopedTimer(const char *name) : name_(name), start_(millis()) {}
@@ -118,7 +118,7 @@ static InferenceJobPtr allocate_inference_job() {
   pool_job_misses++;
   uint32_t total = pool_job_hits + pool_job_misses;
   if (total > 0 && (total % 100 == 0)) {  // Log every 100 allocations
-    ESP_LOGW(TAG, "InferenceJob pool exhausted (efficiency: %.1f%%) – allocating on heap",
+    ESP_LOGW(TAG, "InferenceJob pool exhausted (efficiency: %.1f%%) -- allocating on heap",
              100.0f * pool_job_hits / total);
   }
   ESP_LOGI(TAG, "Pool exhausted. Allocating new InferenceJob on heap.");
@@ -139,7 +139,7 @@ static void free_inference_job(InferenceJob *job) {
       }
     }
   }
-  // Not from pool — heap-allocated fallback
+  // Not from pool -- heap-allocated fallback
   delete job;
 }
 
@@ -164,7 +164,7 @@ static InferenceResultPtr allocate_inference_result() {
   pool_result_misses++;
   uint32_t total = pool_result_hits + pool_result_misses;
   if (total > 0 && (total % 100 == 0)) {  // Log every 100 allocations
-    ESP_LOGW(TAG, "InferenceResult pool exhausted (efficiency: %.1f%%) – allocating on heap",
+    ESP_LOGW(TAG, "InferenceResult pool exhausted (efficiency: %.1f%%) -- allocating on heap",
              100.0f * pool_result_hits / total);
   }
   return InferenceResultPtr(new InferenceResult(), free_inference_result);
@@ -180,7 +180,7 @@ static void free_inference_result(InferenceResult *res) {
       }
     }
   }
-  // Not from pool — heap-allocated fallback
+  // Not from pool -- heap-allocated fallback
   delete res;
 }
 
@@ -189,7 +189,7 @@ static void free_inference_result(InferenceResult *res) {
 // Named constants for better readability (compile-time only)
 static constexpr uint32_t MODEL_LOAD_DELAY_MS = 10000;
 
-// Named constants for calibration timing (single source of truth — .cpp only)
+// Named constants for calibration timing (single source of truth -- .cpp only)
 static constexpr uint32_t CALIBRATION_START_PRE_MS = 500;
 static constexpr uint32_t CALIBRATION_END_PRE_MS = 100;
 static constexpr uint32_t CALIBRATION_STEP_PRE_MS = 100;
@@ -239,7 +239,7 @@ void MeterReaderTFLite::setup() {
     this->camera_coord_.set_enable_preview(this->generate_preview_);
 
     // Use consolidated helper (replaces 4 copies of ImageProcessorConfig construction)
-    // Map: spec.input_type 1=FLOAT → 0=FLOAT, 0=UINT8 → 1=UINT8 (ImageProcessorInputType)
+    // Map: spec.input_type 1=FLOAT -> 0=FLOAT, 0=UINT8 -> 1=UINT8 (ImageProcessorInputType)
     int processor_input_type = (spec.input_type == 1) ? 0 : 1;
     this->refresh_image_processor_config(processor_input_type);
 
@@ -757,7 +757,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
 // Flush data cache for any PSRAM-backed crop buffers before cross-core read.
 // Core 1 writes these buffers to PSRAM, Core 0 reads them for inference.
 // Without a writeback on ESP32-S3 (which has data cache), Core 0 reads stale
-// cache lines → subtly wrong pixel data → lower accuracy.
+// cache lines -> subtly wrong pixel data -> lower accuracy.
 // esp_cache_msync() is a no-op on ESP32 (no data cache), so it's safe always.
 #ifdef SUPPORT_DOUBLE_BUFFERING
   for (const auto &crop : job->crops) {
@@ -899,7 +899,7 @@ void MeterReaderTFLite::publish_inference_result(const std::string &digit_str, f
       this->confidence_sensor_->publish_state(avg_conf * 100.0f);
     if (valid) {
       ESP_LOGI(TAG, "Result: VALID (Raw: %s, Conf: %.3f, %s)", digit_str.c_str(), avg_conf, conf_list.c_str());
-      return;  // Valid with validator → no data collection needed
+      return;  // Valid with validator -> no data collection needed
     }
     ESP_LOGI(TAG, "Result: INVALID (Raw: %s, Conf: %.3f, %s)", digit_str.c_str(), avg_conf, conf_list.c_str());
   } else
@@ -1255,7 +1255,7 @@ void MeterReaderTFLite::dump_config() {
   }
 }
 
-// Consolidated ImageProcessorConfig refresh — replaces 4+ copies of the same logic
+// Consolidated ImageProcessorConfig refresh -- replaces 4+ copies of the same logic
 void MeterReaderTFLite::refresh_image_processor_config(int processor_input_type) {
   auto spec = this->tflite_coord_.get_model_spec();
 

@@ -212,7 +212,7 @@ bool ValueValidator::validate_reading(int new_reading, float confidence, int &va
   // First reading: require high confidence or 3 consistent readings
   if (this->first_reading_) {
     if (confidence >= this->config_.high_confidence_threshold) {
-      // High confidence — accept immediately
+      // High confidence -- accept immediately
       this->last_valid_reading_ = new_reading;
       this->first_reading_ = false;
       this->first_reading_count_ = 0;
@@ -228,7 +228,7 @@ bool ValueValidator::validate_reading(int new_reading, float confidence, int &va
       return true;
     }
 
-    // Low confidence — require consistency
+    // Low confidence -- require consistency
     if (new_reading == this->first_reading_candidate_) {
       this->first_reading_count_++;
     } else {
@@ -237,7 +237,7 @@ bool ValueValidator::validate_reading(int new_reading, float confidence, int &va
     }
 
     if (this->first_reading_count_ >= 3) {
-      // 3 consistent readings — accept
+      // 3 consistent readings -- accept
       this->last_valid_reading_ = new_reading;
       this->first_reading_ = false;
       this->first_reading_count_ = 0;
@@ -465,13 +465,13 @@ bool ValueValidator::validate_reading(std::span<const float> digits, std::span<c
     if (this->config_.enable_dial_correction && !this->first_reading_) {
       if (current_fraction > this->config_.dial_correction_high_threshold) {
         corrected_val = dial_correct_decrement(filtered_val);
-        ESP_LOGD(TAG, "Dial correction: raw=%d, fraction=%.4f > %.2f → corrected=%d", filtered_val, current_fraction,
+        ESP_LOGD(TAG, "Dial correction: raw=%d, fraction=%.4f > %.2f -> corrected=%d", filtered_val, current_fraction,
                  this->config_.dial_correction_high_threshold, corrected_val);
       } else if (current_fraction < this->config_.dial_correction_low_threshold) {
-        ESP_LOGD(TAG, "Dial correction: fraction=%.4f < %.2f → keeping raw=%d (solid digit)", current_fraction,
+        ESP_LOGD(TAG, "Dial correction: fraction=%.4f < %.2f -> keeping raw=%d (solid digit)", current_fraction,
                  this->config_.dial_correction_low_threshold, filtered_val);
       } else {
-        ESP_LOGD(TAG, "Dial correction: fraction=%.4f in middle zone (%.2f-%.2f) → no correction", current_fraction,
+        ESP_LOGD(TAG, "Dial correction: fraction=%.4f in middle zone (%.2f-%.2f) -> no correction", current_fraction,
                  this->config_.dial_correction_low_threshold, this->config_.dial_correction_high_threshold);
       }
     }
@@ -553,7 +553,7 @@ int ValueValidator::apply_smart_validation(int new_reading, float confidence, fl
       this->rejection_confidence_sum_ = 0.0f;
       return new_reading;
     }
-    // Not plausible without smart validation — accept anyway to prevent stuck state.
+    // Not plausible without smart validation -- accept anyway to prevent stuck state.
     // Without consistency checks, fallback strategies, or self-correction, the only
     // option is to accept the reading or get permanently stuck. Accepting lets the
     // rest of the pipeline (validator, confidence threshold) decide.
@@ -593,7 +593,7 @@ int ValueValidator::apply_smart_validation(int new_reading, float confidence, fl
       if (!this->config_.allow_negative_rates && new_reading < this->last_valid_reading_) {
         int negative_diff = this->last_valid_reading_ - new_reading;
         if (negative_diff <= this->config_.small_negative_tolerance) {
-          // Small fluctuation — always allowed
+          // Small fluctuation -- always allowed
         } else if (this->consecutive_rejections_ >= this->config_.max_consecutive_rejections) {
           float avg_rejection_conf = (this->consecutive_rejections_ > 0)
                                          ? (this->rejection_confidence_sum_ / this->consecutive_rejections_)

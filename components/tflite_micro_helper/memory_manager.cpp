@@ -51,7 +51,7 @@ MemoryManager::AllocationResult MemoryManager::allocate_tensor_arena(size_t requ
 
 // Check build-time override flags (these don't need has_psram() check)
 #ifdef TFLITE_FORCE_SRAM
-  ESP_LOGI(TAG, "TFLITE_FORCE_SRAM is defined — forcing SRAM allocation");
+  ESP_LOGI(TAG, "TFLITE_FORCE_SRAM is defined -- forcing SRAM allocation");
   uint8_t *arena_ptr =
       static_cast<uint8_t *>(heap_caps_aligned_alloc(16, requested_size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
 
@@ -72,7 +72,7 @@ MemoryManager::AllocationResult MemoryManager::allocate_tensor_arena(size_t requ
 #endif
 
 #ifdef TFLITE_FORCE_PSRAM
-  ESP_LOGI(TAG, "TFLITE_FORCE_PSRAM is defined — forcing PSRAM allocation");
+  ESP_LOGI(TAG, "TFLITE_FORCE_PSRAM is defined -- forcing PSRAM allocation");
   uint8_t *arena_ptr =
       static_cast<uint8_t *>(heap_caps_aligned_alloc(16, requested_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
 

@@ -605,7 +605,7 @@ void AnalogReader::process_image_from_buffer(const uint8_t *data, size_t len) {
     std::vector<int> order(n);
     std::iota(order.begin(), order.end(), 0);
 
-    // Validate all dial scales before proceeding — zero or non-finite scales cause
+    // Validate all dial scales before proceeding -- zero or non-finite scales cause
     // division-by-zero / NaN downstream and must be caught early.
     for (int i = 0; i < n; ++i) {
       float s = this->readings_[i].dial->scale;
@@ -669,7 +669,7 @@ void AnalogReader::process_image_from_buffer(const uint8_t *data, size_t len) {
 
     // Preserve old behaviour: final value rounded to the finest dial step.
     // For conservative meter-style reading, replace llroundf() with floorf().
-    // Manual rounding — avoids llroundf() which may not be available on all ESP-IDF targets
+    // Manual rounding -- avoids llroundf() which may not be available on all ESP-IDF targets
     const float steps = continuous_total / finest_scale;
     if (!std::isfinite(steps) || std::abs(steps) > 1e15f) {
       ESP_LOGE(TAG, "Continuous total steps are non-finite or too large; cannot compute rounded steps");
@@ -811,22 +811,22 @@ AnalogReader::DetectionResult AnalogReader::find_needle_angle(const uint8_t *img
   if (run_comparison && this->debug_) {
     ESP_LOGD(TAG, "%s Algorithm Comparison:", dial.id.c_str());
     if (has_legacy)
-      ESP_LOGD(TAG, "  Legacy: angle=%.1f°, val=%.2f, conf=%.2f", result_legacy.angle,
+      ESP_LOGD(TAG, "  Legacy: angle=%.1f deg, val=%.2f, conf=%.2f", result_legacy.angle,
                this->angle_to_value(result_legacy.angle, dial), result_legacy.confidence);
     if (has_radial)
-      ESP_LOGD(TAG, "  Radial Profile: angle=%.1f°, val=%.2f, conf=%.2f", result_radial.angle,
+      ESP_LOGD(TAG, "  Radial Profile: angle=%.1f deg, val=%.2f, conf=%.2f", result_radial.angle,
                this->angle_to_value(result_radial.angle, dial), result_radial.confidence);
     if (has_hough)
-      ESP_LOGD(TAG, "  Hough Transform: angle=%.1f°, val=%.2f, conf=%.2f", result_hough.angle,
+      ESP_LOGD(TAG, "  Hough Transform: angle=%.1f deg, val=%.2f, conf=%.2f", result_hough.angle,
                this->angle_to_value(result_hough.angle, dial), result_hough.confidence);
     if (has_template)
-      ESP_LOGD(TAG, "  Template Match: angle=%.1f°, val=%.2f, conf=%.2f", result_template.angle,
+      ESP_LOGD(TAG, "  Template Match: angle=%.1f deg, val=%.2f, conf=%.2f", result_template.angle,
                this->angle_to_value(result_template.angle, dial), result_template.confidence);
     ESP_LOGD(TAG, "  Selected: %s", selected_result.algorithm.c_str());
   }
 
   if (this->debug_) {
-    ESP_LOGD(TAG, "%s using %s: angle=%.1f°, confidence=%.2f", dial.id.c_str(), selected_result.algorithm.c_str(),
+    ESP_LOGD(TAG, "%s using %s: angle=%.1f deg, confidence=%.2f", dial.id.c_str(), selected_result.algorithm.c_str(),
              selected_result.angle, selected_result.confidence);
 
     if (dial.algorithm == "legacy") {
@@ -840,14 +840,14 @@ AnalogReader::DetectionResult AnalogReader::find_needle_angle(const uint8_t *img
 }
 
 float AnalogReader::angle_to_value(float image_angle, const DialConfig &dial) {
-  // Image: 0° = East (3 o'clock), clockwise
-  // Dial: 0° = North (12 o'clock), clockwise
+  // Image: 0 deg = East (3 o'clock), clockwise
+  // Dial: 0 deg = North (12 o'clock), clockwise
 
   // Conversion: Image to North-based
-  // Image 0° (East) = North 90° (East)
-  // Image 90° (South) = North 180° (South)
-  // Image 180° (West) = North 270° (West)
-  // Image 270° (North) = North 0° (North)
+  // Image 0 deg (East) = North 90 deg (East)
+  // Image 90 deg (South) = North 180 deg (South)
+  // Image 180 deg (West) = North 270 deg (West)
+  // Image 270 deg (North) = North 0 deg (North)
   // Formula: North = (Image + 90) % 360
 
   float dial_angle = fmodf(image_angle + 90.0f, 360.0f);
@@ -909,13 +909,13 @@ float AnalogReader::angle_to_value(float image_angle, const DialConfig &dial) {
 
 void AnalogReader::debug_angle_calculation(float image_angle, const DialConfig &dial) {
   ESP_LOGD(TAG, "=== DEBUG ANGLE CONVERSION for %s ===", dial.id.c_str());
-  ESP_LOGD(TAG, "Input image angle: %.1f° (0°=East, clockwise)", image_angle);
+  ESP_LOGD(TAG, "Input image angle: %.1f deg (0 deg=East, clockwise)", image_angle);
 
   float dial_angle = fmodf(image_angle + 90.0f, 360.0f);
-  ESP_LOGD(TAG, "Dial angle (after +90 to North): %.1f°", dial_angle);
+  ESP_LOGD(TAG, "Dial angle (after +90 to North): %.1f deg", dial_angle);
 
   dial_angle = fmodf(dial_angle - dial.angle_offset + 360.0f, 360.0f);
-  ESP_LOGD(TAG, "After angle_offset (%.1f): %.1f°", dial.angle_offset, dial_angle);
+  ESP_LOGD(TAG, "After angle_offset (%.1f): %.1f deg", dial.angle_offset, dial_angle);
 
   float range_angle = dial.max_angle - dial.min_angle;
   if (dial.min_angle > dial.max_angle) {
@@ -937,8 +937,8 @@ void AnalogReader::debug_angle_calculation(float image_angle, const DialConfig &
 
   float value = dial.min_value + fraction * (dial.max_value - dial.min_value);
 
-  ESP_LOGD(TAG, "Range: %.1f° to %.1f° (span=%.1f°)", dial.min_angle, dial.max_angle, range_angle);
-  ESP_LOGD(TAG, "Rel angle: %.1f°, Fraction: %.3f", rel_angle, fraction);
+  ESP_LOGD(TAG, "Range: %.1f deg to %.1f deg (span=%.1f deg)", dial.min_angle, dial.max_angle, range_angle);
+  ESP_LOGD(TAG, "Rel angle: %.1f deg, Fraction: %.3f", rel_angle, fraction);
   ESP_LOGD(TAG, "Value: %.3f (%.1f to %.1f)", value, dial.min_value, dial.max_value);
   ESP_LOGD(TAG, "=====================================");
 }
@@ -960,7 +960,7 @@ void AnalogReader::debug_dial_image(const uint8_t *img, int w, int h, float dete
     for (int x = 0; x < grid_w; x++) {
       int px = x * w / grid_w;
       int py = y * h / grid_h;
-      if (px < w && py < h) {
+      if (px >= 0 && px < w && py >= 0 && py < h) {
         uint8_t val = img[py * w + px];
         grid_vals[y * grid_w + x] = val;
 

@@ -1179,7 +1179,7 @@ void ImageProcessor::arrange_channels(float *output, uint8_t r, uint8_t g, uint8
   }
 
 #ifdef DEBUG_METER_READER_TFLITE
-  ESP_LOGD(TAG, "Channel swap debug: raw(R,G,B)=(%d,%d,%d) → stored(%d,%d,%d)", r, g, b, output[0], output[1],
+  ESP_LOGD(TAG, "Channel swap debug: raw(R,G,B)=(%d,%d,%d) -> stored(%d,%d,%d)", r, g, b, output[0], output[1],
            output[2]);
 #endif
 
@@ -1520,10 +1520,10 @@ bool ImageProcessor::verify_quantization_consistency() const {
     bool zp_match = (actual_zp == expected_zp);
 
     if (scale_match && zp_match) {
-        ESP_LOGI(TAG, "✓ Quantization parameters match Python expectations");
+        ESP_LOGI(TAG, "OK Quantization parameters match Python expectations");
         return true;
     } else {
-        ESP_LOGW(TAG, "⚠️ Quantization parameters differ from Python");
+        ESP_LOGW(TAG, "WARNING: Quantization parameters differ from Python");
         if (!scale_match) {
             ESP_LOGW(TAG, "  Scale difference: %.6f vs %.6f", actual_scale, expected_scale);
         }
@@ -1566,9 +1566,9 @@ void ImageProcessor::debug_quantization_analysis(const uint8_t* processed_data,
     // Check if data matches model expectations
     if (input_tensor->type == kTfLiteUInt8) {
         if (min_val >= 0 && max_val <= 255) {
-            ESP_LOGI(TAG, "✓ Processed data matches uint8 model expectations");
+            ESP_LOGI(TAG, "OK Processed data matches uint8 model expectations");
         } else {
-            ESP_LOGW(TAG, "⚠️ Processed data outside uint8 range");
+            ESP_LOGW(TAG, "WARNING: Processed data outside uint8 range");
         }
     }
 

@@ -366,7 +366,7 @@ ProcessedOutput ModelHandler::process_output(const float *output_data) const {
    * ----------------------------------------------------------------------- */
   if (config_.output_processing == "direct_class") {
     /* ---------------------------------------------------------------
-     *  Direct class – the tensor already contains the class index.
+     *  Direct class -- the tensor already contains the class index.
      * --------------------------------------------------------------- */
     result.value = static_cast<float>(max_idx);
     result.confidence = max_val_output;
@@ -374,7 +374,7 @@ ProcessedOutput ModelHandler::process_output(const float *output_data) const {
 
   } else if (config_.output_processing == "softmax") {
     /* ---------------------------------------------------------------
-     *  Soft-max – compute probabilities from raw logits.
+     *  Soft-max -- compute probabilities from raw logits.
      * --------------------------------------------------------------- */
     float max_logit = *std::max_element(output_data, output_data + num_classes);
     std::vector<float> exp_vals(num_classes);
@@ -400,7 +400,7 @@ ProcessedOutput ModelHandler::process_output(const float *output_data) const {
 
   } else if (config_.output_processing == "logits") {
     /* ---------------------------------------------------------------
-     *  Logits – raw scores, need a confidence derived from the range.
+     *  Logits -- raw scores, need a confidence derived from the range.
      * --------------------------------------------------------------- */
     result.value = static_cast<float>(max_idx);
 
@@ -409,7 +409,7 @@ ProcessedOutput ModelHandler::process_output(const float *output_data) const {
       /* Values already in 0-1 range (behave like probabilities). */
       result.confidence = max_val_output;
     } else {
-      /* Wider range – normalise to 0-1. */
+      /* Wider range -- normalise to 0-1. */
       float confidence_range = max_val - min_val;
       if (confidence_range > 0.001f) {
         result.confidence = (max_val_output - min_val) / confidence_range;
@@ -429,7 +429,7 @@ ProcessedOutput ModelHandler::process_output(const float *output_data) const {
 
   } else if (config_.output_processing == "qat_quantized") {
     /* ---------------------------------------------------------------
-     *  QAT-quantized – de-quantised output, treat similarly to logits
+     *  QAT-quantized -- de-quantised output, treat similarly to logits
      *  but clamp confidence to [0,1].
      * --------------------------------------------------------------- */
     result.value = static_cast<float>(max_idx);
@@ -450,7 +450,7 @@ ProcessedOutput ModelHandler::process_output(const float *output_data) const {
 
   } else if (config_.output_processing == "experimental_scale") {
     /* ---------------------------------------------------------------
-     *  Experimental – scale logits before soft-max (helps very negative
+     *  Experimental -- scale logits before soft-max (helps very negative
      *  values).  The scale factor can be tuned per model.
      * --------------------------------------------------------------- */
     const float scale_factor = 0.1f;  // tweak if needed
@@ -483,7 +483,7 @@ ProcessedOutput ModelHandler::process_output(const float *output_data) const {
 
   } else if (config_.output_processing == "logits_jomjol") {
     /* ---------------------------------------------------------------
-     *  Logits Jomjol – same as “logits” but confidence is the raw max.
+     *  Logits Jomjol -- same as “logits” but confidence is the raw max.
      * --------------------------------------------------------------- */
     result.value = static_cast<float>(max_idx) / config_.scale_factor;
     result.confidence = max_val_output;  // raw max as confidence
@@ -491,7 +491,7 @@ ProcessedOutput ModelHandler::process_output(const float *output_data) const {
 
   } else if (config_.output_processing == "softmax_jomjol") {
     /* ---------------------------------------------------------------
-     *  Softmax Jomjol – replicate the Python script: always apply soft-max,
+     *  Softmax Jomjol -- replicate the Python script: always apply soft-max,
      *  then take the arg-max.
      * --------------------------------------------------------------- */
     float max_logit = *std::max_element(output_data, output_data + num_classes);
@@ -527,7 +527,7 @@ ProcessedOutput ModelHandler::process_output(const float *output_data) const {
 
   } else if (config_.output_processing == "auto_detect") {
     /* ---------------------------------------------------------------
-     *  AUTO-DETECT – decide at run-time whether the tensor already
+     *  AUTO-DETECT -- decide at run-time whether the tensor already
      *  contains probabilities, a one-hot class index, or raw logits.
      * --------------------------------------------------------------- */
     // ---- gather basic statistics ------------------------------------------------
@@ -586,7 +586,7 @@ ProcessedOutput ModelHandler::process_output(const float *output_data) const {
       result.confidence = 1.0f;  // no probability info, assume full confidence
       ESP_LOGD(TAG, "Auto-detect (direct): value=%.1f confidence=1.0", result.value);
     } else {
-      // ----- Raw logits – compute soft-max ourselves -----
+      // ----- Raw logits -- compute soft-max ourselves -----
       float max_logit_ad = *std::max_element(output_data, output_data + num_classes);
       std::vector<float> exp_vals_ad(num_classes);
       float exp_sum_ad = 0.0f;
@@ -612,7 +612,7 @@ ProcessedOutput ModelHandler::process_output(const float *output_data) const {
 
   } else {
     /* ---------------------------------------------------------------
-     *  Unknown processing method – fall back to direct classification.
+     *  Unknown processing method -- fall back to direct classification.
      * --------------------------------------------------------------- */
     ESP_LOGE(TAG, "Unknown output processing method: %s", config_.output_processing.c_str());
 
@@ -924,7 +924,7 @@ bool ModelHandler::invoke_model(const uint8_t *input_data, size_t input_size) {
     memcpy(dst, input_data, input_size);
 
     // if (config_.normalize) {
-    //// Convert 0-255 → 0-1
+    //// Convert 0-255 -> 0-1
     // for (size_t i = 0; i < input_size / sizeof(float); ++i) {
     // dst[i] = static_cast<float>(input_data[i]) / 255.0f;
     // }
@@ -1376,9 +1376,9 @@ void ModelHandler::debug_input_quantization_analysis(const uint8_t *input_data, 
     bool zp_match = (input->params.zero_point == expected_zp);
 
     if (scale_match && zp_match) {
-      ESP_LOGI(TAG, "✓ Quantization matches expected (scale=1/255, zp=0)");
+      ESP_LOGI(TAG, "OK Quantization matches expected (scale=1/255, zp=0)");
     } else {
-      ESP_LOGW(TAG, "⚠️ Quantization differs from expected");
+      ESP_LOGW(TAG, "WARNING: Quantization differs from expected");
       ESP_LOGW(TAG, "  Expected: scale=%.6f, zp=%d", expected_scale, expected_zp);
       ESP_LOGW(TAG, "  Actual: scale=%.6f, zp=%d", input->params.scale, input->params.zero_point);
     }
@@ -1459,9 +1459,9 @@ void ModelHandler::debug_tensor_types() const {
     // Compare with Python expectations
     if (input->type == kTfLiteUInt8 && std::abs(input->params.scale - 0.003922f) < 0.000001f &&
         input->params.zero_point == 0) {
-      ESP_LOGI(TAG, "✓ INPUT matches Python: UINT8, scale=0.003922, zp=0");
+      ESP_LOGI(TAG, "OK INPUT matches Python: UINT8, scale=0.003922, zp=0");
     } else if (input->type == kTfLiteUInt8) {
-      ESP_LOGI(TAG, "⚠️ INPUT is UINT8 but scale/zp don't match Python exactly");
+      ESP_LOGI(TAG, "WARNING: INPUT is UINT8 but scale/zp don't match Python exactly");
     }
   }
 
@@ -1475,9 +1475,9 @@ void ModelHandler::debug_tensor_types() const {
     // Compare with Python expectations
     if (output->type == kTfLiteUInt8 && std::abs(output->params.scale - 0.003906f) < 0.000001f &&
         output->params.zero_point == 0) {
-      ESP_LOGI(TAG, "✓ OUTPUT matches Python: UINT8, scale=0.003906, zp=0");
+      ESP_LOGI(TAG, "OK OUTPUT matches Python: UINT8, scale=0.003906, zp=0");
     } else if (output->type == kTfLiteUInt8) {
-      ESP_LOGI(TAG, "⚠️ OUTPUT is UINT8 but scale/zp don't match Python exactly");
+      ESP_LOGI(TAG, "WARNING: OUTPUT is UINT8 but scale/zp don't match Python exactly");
     }
   }
 
@@ -1527,10 +1527,10 @@ void ModelHandler::debug_input_data_stats(const uint8_t *input_data, size_t inpu
 
   // Check for potential issues
   if (zero_count > input_size * 0.3f) {
-    ESP_LOGW(TAG, "⚠️  High zero count - possible preprocessing issue");
+    ESP_LOGW(TAG, "WARNING:  High zero count - possible preprocessing issue");
   }
   if (max_val < 100) {
-    ESP_LOGW(TAG, "⚠️  Low maximum value - image might be too dark");
+    ESP_LOGW(TAG, "WARNING:  Low maximum value - image might be too dark");
   }
 }
 
@@ -1550,7 +1550,7 @@ void ModelHandler::debug_quantized_input_details(TfLiteTensor *input, size_t inp
   if (input->params.scale == 0.003922f && input->params.zero_point == 0) {
     ESP_LOGI(TAG, "✅ Input quantization matches Python preprocessing");
   } else {
-    ESP_LOGW(TAG, "⚠️  Input quantization differs from Python expectations");
+    ESP_LOGW(TAG, "WARNING:  Input quantization differs from Python expectations");
   }
 }
 

@@ -86,8 +86,8 @@ class ValueValidator : public Component {
 
     // Dial-aware correction (used when analog_reader provides dial fraction)
     bool enable_dial_correction{true};
-    float dial_correction_high_threshold{0.80f};  // Above this fraction → subtract 1 from integer reading
-    float dial_correction_low_threshold{0.20f};   // Below this fraction → keep integer as-is (digit is solid)
+    float dial_correction_high_threshold{0.80f};  // Above this fraction -> subtract 1 from integer reading
+    float dial_correction_low_threshold{0.20f};   // Below this fraction -> keep integer as-is (digit is solid)
   };
 
   ~ValueValidator();
@@ -149,11 +149,11 @@ class ValueValidator : public Component {
   bool debug_{false};
   int last_valid_reading_{0};
 
-  // Last valid digits (PSRAM array) — RAII via unique_ptr with FreeDeleter
+  // Last valid digits (PSRAM array) -- RAII via unique_ptr with FreeDeleter
   std::unique_ptr<int[], FreeDeleter> last_valid_digits_data_;
   size_t last_valid_digits_count_{0};
 
-  // Per-digit history for stability check (Flat arrays for PSRAM efficiency) — RAII
+  // Per-digit history for stability check (Flat arrays for PSRAM efficiency) -- RAII
   std::unique_ptr<int[], FreeDeleter> digit_history_data_;        // [num_digits * 5]
   std::unique_ptr<uint8_t[], FreeDeleter> digit_history_counts_;  // [num_digits]
   std::unique_ptr<uint8_t[], FreeDeleter> digit_history_heads_;   // [num_digits]
@@ -177,7 +177,7 @@ class ValueValidator : public Component {
   // Persistent state
   ESPPreferenceObject pref_;
 
-  // Recent good values ring buffer (PSRAM) — RAII
+  // Recent good values ring buffer (PSRAM) -- RAII
   std::unique_ptr<int[], FreeDeleter> last_good_values_data_;
   size_t last_good_values_capacity_{0};
   size_t last_good_values_head_{0};

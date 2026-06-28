@@ -51,7 +51,7 @@ class TFLiteMicroHelper {
   TFLiteMicroHelper() = default;
   ~TFLiteMicroHelper() = default;
 
-  // ── Model Config Setters ───────────────────────────────────────────
+  // -- Model Config Setters -------------------------------------------
   void set_model_type(const std::string &t) { this->model_type_ = t; }
   void set_tensor_arena_size(size_t size);
   void set_model(const uint8_t *model_data, size_t model_size);
@@ -66,12 +66,12 @@ class TFLiteMicroHelper {
   void set_normalize(bool n) { this->normalize_ = n; }
   void set_invert(bool i) { this->invert_ = i; }
 
-  // ── Lifecycle ──────────────────────────────────────────────────────
+  // -- Lifecycle ------------------------------------------------------
   bool load_model();
   void unload_model();
   bool is_model_loaded() const { return this->model_loaded_.load(); }
 
-  // ── Inference ──────────────────────────────────────────────────────
+  // -- Inference ------------------------------------------------------
   TfLiteStatus invoke() { return this->model_handler_.invoke(); }
 
   TfLiteTensor *input_tensor() { return this->model_handler_.input_tensor(); }
@@ -92,7 +92,7 @@ class TFLiteMicroHelper {
    */
   ProcessedOutput run_inference(const uint8_t *src_data, size_t src_size);
 
-  // ── Accessors ─────────────────────────────────────────────────────
+  // -- Accessors -----------------------------------------------------
   ModelSpec get_model_spec() const;
 
   int get_input_width() const { return this->model_handler_.get_input_width(); }
@@ -100,7 +100,7 @@ class TFLiteMicroHelper {
   int get_input_channels() const { return this->model_handler_.get_input_channels(); }
   const ModelConfig &get_config() const { return this->model_handler_.get_config(); }
 
-  // ── Memory ─────────────────────────────────────────────────────────
+  // -- Memory ---------------------------------------------------------
   size_t get_arena_used_bytes() const { return this->model_handler_.get_arena_used_bytes(); }
   size_t get_tensor_arena_size() const { return this->tensor_arena_size_requested_; }
   size_t get_tensor_arena_size_actual() const { return this->tensor_arena_allocation_.actual_size; }
@@ -110,7 +110,7 @@ class TFLiteMicroHelper {
   void update_arena_stats_cache();
   void report_memory_status();
 
-  // ── Debug ──────────────────────────────────────────────────────────
+  // -- Debug ----------------------------------------------------------
   void set_debug(bool debug) {
     this->debug_ = debug;
     this->model_handler_.set_debug(debug);

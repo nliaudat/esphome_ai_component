@@ -67,7 +67,7 @@ bool TFLiteMicroHelper::validate_input_tensor_(const uint8_t *src_data, size_t s
 
 bool TFLiteMicroHelper::run_inference_on_buffer(const uint8_t *src_data, size_t src_size) {
   if (!this->model_loaded_.load()) {
-    ESP_LOGE(TAG, "Cannot run inference — model not loaded");
+    ESP_LOGE(TAG, "Cannot run inference -- model not loaded");
     return false;
   }
   if (!this->validate_input_tensor_(src_data, src_size)) {

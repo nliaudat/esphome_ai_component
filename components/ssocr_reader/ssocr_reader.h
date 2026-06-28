@@ -49,7 +49,7 @@ class SSOCRReader : public PollingComponent, public esphome::camera::CameraListe
   void set_debug(bool debug) { this->debug_ = debug; }
 
  protected:
-  // Single atomic state machine — eliminates TOCTOU CWE-367
+  // Single atomic state machine -- eliminates TOCTOU CWE-367
   enum class FrameState : uint8_t { IDLE, REQUESTED, AVAILABLE, PROCESSING, TIMEOUT };
   std::atomic<FrameState> frame_state_{FrameState::IDLE};
   uint32_t last_request_time_{0};

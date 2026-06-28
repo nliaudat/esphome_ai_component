@@ -68,3 +68,4 @@ void print_crop_zone_debug_info(const CropZoneHandler& handler);
 
 }  // namespace meter_reader_tflite
 }  // namespace esphome */
+

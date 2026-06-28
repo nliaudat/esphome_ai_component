@@ -39,3 +39,4 @@ number:
           if (id(${id_prefix}_flash_controller) != nullptr) {
             id(${id_prefix}_flash_controller)->set_flash_post_time((uint32_t)x);
           }
+
