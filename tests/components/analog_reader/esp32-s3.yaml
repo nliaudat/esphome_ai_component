@@ -9,41 +9,4 @@ esp32:
     sdkconfig_options:
       CONFIG_ESP32S3_DATA_CACHE_64KB: y
 
-external_components:
-  - source:
-      type: local
-      path: ../../../components
-    components: [analog_reader, esp32_camera_utils]
-
-logger:
-  level: DEBUG
-
-esp32_camera:
-  name: Test Camera
-  external_clock:
-    pin: GPIO0
-    frequency: 20MHz
-  i2c_pins:
-    sda: GPIO26
-    scl: GPIO27
-  data_pins: [GPIO5, GPIO18, GPIO19, GPIO21, GPIO36, GPIO39, GPIO34, GPIO35]
-  vsync_pin: GPIO25
-  href_pin: GPIO23
-  pixel_clock_pin: GPIO22
-  power_down_pin: GPIO32
-  resolution: 640x480
-  pixel_format: JPEG
-
-esp32_camera_utils:
-  id: test_camera_utils
-
-analog_reader:
-  id: test_analog
-  camera_id: test_camera
-  update_interval: 60s
-  dials:
-    - id: dial1
-      min_value: 0
-      max_value: 100
-      min_scan_radius: 0.3
-      max_scan_radius: 0.9
+<<: !include common.yaml

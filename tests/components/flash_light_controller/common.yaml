@@ -1,0 +1,23 @@
+# ESPHome build test: flash_light_controller common config
+logger:
+  level: DEBUG
+
+external_components:
+  - source:
+      type: local
+      path: ../../../components
+    components: [flash_light_controller]
+
+output:
+  - platform: gpio
+    id: test_light_output
+    pin: GPIO2
+
+light:
+  - platform: binary
+    id: test_light
+    output: test_light_output
+
+flash_light_controller:
+  id: test_flash
+  flash_light: test_light

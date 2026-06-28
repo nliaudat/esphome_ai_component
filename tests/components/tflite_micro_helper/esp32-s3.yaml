@@ -9,15 +9,4 @@ esp32:
     sdkconfig_options:
       CONFIG_ESP32S3_DATA_CACHE_64KB: y
 
-external_components:
-  - source:
-      type: local
-      path: ../../../components
-    components: [tflite_micro_helper]
-
-logger:
-  level: DEBUG
-
-tflite_micro_helper:
-  id: test_tflite
-  debug: true
+<<: !include common.yaml
