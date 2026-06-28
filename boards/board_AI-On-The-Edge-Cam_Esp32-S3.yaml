@@ -6,7 +6,7 @@ esphome:
   name: ${name}
   friendly_name: ${friendly_name}
   min_version: ${esphome_min_version}
-  name_add_mac_suffix: False # this appends to 'name' NOT 'friendly_name'      
+  name_add_mac_suffix: False # this appends to 'name' NOT 'friendly_name'
   on_loop:
     - lambda: |-
           if (id(${id_prefix}_espcam_update)) {
@@ -14,7 +14,7 @@ esphome:
             if(id(${id_prefix}_debug)) { id(${id_prefix}_espcam).dump_config(); }
             id(${id_prefix}_espcam_update) = false;
           }
-          
+
 # << if use_wifi == "true" >>
   # on_boot:
     # priority: 600
@@ -40,8 +40,8 @@ esphome:
     board_build.flash_mode: dio # opi
     board_build.psram_type: opi
     board_upload.maximum_size: 16777216
-    board_build.extra_flags: 
-    - -DBOARD_HAS_PSRAM 
+    board_build.extra_flags:
+    - -DBOARD_HAS_PSRAM
     - -DTF_LITE_STATIC_MEMORY # for tflite micro
     - -DTF_LITE_DISABLE_X86_NEON #for tflite micro
     - -DESP_NN  #use hardware acceleration : https://github.com/espressif/esp-nn (only if using tflite)
@@ -51,13 +51,13 @@ esphome:
 substitutions:
   #board and compilation
   board: esp32-s3-devkitc-1
-  framework: esp-idf 
+  framework: esp-idf
 
 
   # Power control pins
   eth_enable_pin: GPIO45
   per_enable_pin: GPIO46
-  
+
   # Ethernet SPI Configuration
   # need lan.yaml to be activated in config.yaml
   eth_mosi_pin: GPIO1
@@ -65,14 +65,14 @@ substitutions:
   eth_clk_pin: GPIO21
   eth_cs_pin: GPIO39
   eth_int_pin: GPIO38
-  
+
   # SD Card Configuration
   sdcard_clk_pin: GPIO40 #SD_SCLK
   sdcard_cmd_pin: GPIO42 #SD_MOSI
   sdcard_d0_pin: GPIO41 #SD_MISO
   sdcard_d3_pin: GPIO3 #SD_CS, CD/DAT3
-  
-  # Camera Pins 
+
+  # Camera Pins
   camera_pwdn_pin: GPIO44 # Not used on this board, dummy valid pin
   external_clock_pin: GPIO15
   external_clock_frequency: 20MHz
@@ -90,20 +90,20 @@ substitutions:
   vsync_pin: GPIO6
   href_pin: GPIO7
   pixel_clock_pin: GPIO13
-  
+
   # LED Pins
   status_led_pin: GPIO48
   flash_led_pin: GPIO12
-  
-  
+
+
 
 esp32:
-  board: ${board} 
-  variant: esp32s3 
+  board: ${board}
+  variant: esp32s3
   flash_size: 16MB
   cpu_frequency: 240MHZ
   framework:
-    type: ${framework} 
+    type: ${framework}
     version: recommended
     # components:
       # - name: espressif/esp-tflite-micro
@@ -134,7 +134,7 @@ esp32:
       #CONFIG_LOG_DEFAULT_LEVEL: 0 # prevents "ESP-IDF" Guru Meditation Error
       # CONFIG_CAMERA_TASK_STACK_SIZE: "4096"
       CONFIG_CAMERA_TASK_STACK_SIZE: "8192"
-      #### testing 
+      #### testing
       # CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: y
       CONFIG_FREERTOS_HZ: "1000"
       CONFIG_ESP32S3_SPIRAM_SUPPORT: y
@@ -143,13 +143,13 @@ esp32:
 psram:
   mode: octal
   speed: 80MHz
-    
+
 ######## LIGHTS
-  
+
 light:
   - platform: esp32_rmt_led_strip
     rgb_order: GRB
-    pin: ${flash_led_pin} 
+    pin: ${flash_led_pin}
     num_leds: 4
     chipset: ws2812
     name: "${name} Flash LED"
@@ -174,9 +174,9 @@ light:
     icon: "mdi:alarm-light"
     restore_mode: ALWAYS_OFF
     pin: ${status_led_pin}
-    
 
-    
+
+
 ######## Power management (wifi or ethernet)
 output:
   - platform: gpio
@@ -187,7 +187,7 @@ output:
     pin: ${per_enable_pin}
     id: ${id_prefix}_periph_power
     inverted: true
-    
+
 switch:
   - platform: template
     name: "Ethernet Power"
@@ -217,12 +217,12 @@ switch:
     # lambda: |-
       # return id(${id_prefix}wifi_component).is_connected();  // Use the id set in wifi.yaml
     # turn_on_action:
-      # - delay: 100ms  
+      # - delay: 100ms
     # turn_off_action:
       # - delay: 100ms
 
-          
-          
+
+
 ######## SD Card Configuration
 
 ## need external_components in config.yaml
@@ -241,7 +241,7 @@ switch:
   # data0_pin: ${sdcard_d0_pin}  #SD_MISO
   # data3_pin: ${sdcard_d3_pin} #SD_CS, CD/DAT3
 
-  
+
 # sensor:
   # - platform: sd_mmc_card
     # type: used_space

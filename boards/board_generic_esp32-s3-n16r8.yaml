@@ -22,8 +22,8 @@ esphome:
     name: "nliaudat.meter-reader"
     version: "${revision}.dev"
   platformio_options:
-    board_build.extra_flags: 
-    - -DBOARD_HAS_PSRAM 
+    board_build.extra_flags:
+    - -DBOARD_HAS_PSRAM
     - -DTF_LITE_STATIC_MEMORY # for tflite micro
     - -DTF_LITE_DISABLE_X86_NEON #for tflite micro
     - -DESP_NN  #use hardware acceleration : https://github.com/espressif/esp-nn (only if using tflite)
@@ -36,15 +36,15 @@ esphome:
 
 substitutions:
   #board and compilation
-  board: esp32-s3-devkitc-1 
+  board: esp32-s3-devkitc-1
   framework: esp-idf
-  
+
   #Pin definition
   external_clock_pin: GPIO15
   external_clock_frequency: 20MHz
   i2c_pins_sda: GPIO4
   i2c_pins_scl: GPIO5
-  data_pins: [GPIO11, GPIO9, GPIO8, GPIO10, GPIO12, GPIO18, GPIO17, GPIO16] 
+  data_pins: [GPIO11, GPIO9, GPIO8, GPIO10, GPIO12, GPIO18, GPIO17, GPIO16]
   vsync_pin: GPIO6
   href_pin: GPIO7
   pixel_clock_pin: GPIO13
@@ -54,12 +54,12 @@ substitutions:
 
 
 esp32:
-  board: ${board} 
-  # variant: esp32s3 
+  board: ${board}
+  # variant: esp32s3
   cpu_frequency: 240MHZ
   flash_size: 8MB
   framework:
-    type: ${framework} 
+    type: ${framework}
     version: recommended
     sdkconfig_options:
       # CONFIG_COMPILER_OPTIMIZATION_SIZE: y
@@ -85,12 +85,12 @@ esp32:
       #CONFIG_LOG_DEFAULT_LEVEL: 0 # prevents "ESP-IDF" Guru Meditation Error
       # CONFIG_CAMERA_TASK_STACK_SIZE: "4096"
       CONFIG_CAMERA_TASK_STACK_SIZE: "8192"
-      #### testing 
+      #### testing
       # CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: y
       CONFIG_FREERTOS_HZ: "1000"
       CONFIG_ESP32S3_SPIRAM_SUPPORT: y
       CONFIG_SPIRAM_SPEED_80M: y
-      
+
       # https://github.com/espressif/esp32-camera/blob/master/examples/camera_example/sdkconfig.defaults
     # CONFIG_ESP32_DEFAULT_CPU_FREQ_240=y
     # CONFIG_ESP32S2_DEFAULT_CPU_FREQ_240=y
@@ -108,14 +108,14 @@ esp32:
     # CONFIG_ESP32S2_SPIRAM_SUPPORT=y
     # CONFIG_ESP32S3_SPIRAM_SUPPORT=y
     # CONFIG_SPIRAM_SPEED_80M=y
-      
-    
+
+
 psram:
   mode: octal
   speed: 80MHz
-    
 
-  
+
+
 light:
   - platform: esp32_rmt_led_strip
     rgb_order: GRB
@@ -124,8 +124,8 @@ light:
     chipset: ws2812
     name: "${name} Flash LED"
     id: ${id_prefix}_flash
-          
-          
+
+
   - platform: status_led
     name: "${name} Status LED"
     id: ${id_prefix}_status_led

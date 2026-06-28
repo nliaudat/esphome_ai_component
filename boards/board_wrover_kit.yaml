@@ -11,8 +11,8 @@ esphome:
     board_build.flash_mode: qio
     # board_build.partitions: huge_app.csv
     board_name: ESP32 Wrover Kit
-    board_build.extra_flags: 
-    - -DBOARD_HAS_PSRAM 
+    board_build.extra_flags:
+    - -DBOARD_HAS_PSRAM
     - -DTF_LITE_STATIC_MEMORY # for tflite micro
     - -DTF_LITE_DISABLE_X86_NEON #for tflite micro
     - -DESP_NN  #use hardware acceleration : https://github.com/espressif/esp-nn (only if using tflite)
@@ -38,7 +38,7 @@ substitutions:
   vsync_pin: GPIO25
   href_pin: GPIO23
   pixel_clock_pin: GPIO22
-  
+
   # No Power Down / Reset - no camera board connections
 
   # LED Pins
@@ -71,7 +71,7 @@ esp32:
       CONFIG_FREERTOS_HZ: "1000"
 
 psram:
-  
+
 light:
   - platform: binary
     output: ${id_prefix}_flash_light_output
