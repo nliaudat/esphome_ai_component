@@ -477,7 +477,7 @@ async def to_code(config):
         and auto_config.get("output_processing") == "direct_class"
     ):
         print(
-            "  WARNING:  WARNING: output_processing overridden to 'softmax' but model has built-in SOFTMAX."
+            "  WARNING: output_processing overridden to 'softmax' but model has built-in SOFTMAX."
         )
         print(
             "      This will apply softmax TWICE (model + C++), producing incorrect confidence scores."

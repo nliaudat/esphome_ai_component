@@ -1,5 +1,5 @@
 import esphome.codegen as cg
-from esphome.components import esp32, esp32_camera, sensor
+from esphome.components import esp32_camera, sensor
 import esphome.config_validation as cv
 
 try:
@@ -7,7 +7,7 @@ try:
 except ImportError:
     value_validator = None
 
-from esphome.const import CONF_ID, CONF_NAME
+from esphome.const import CONF_ID
 from esphome.core import CORE
 
 DEPENDENCIES = ["esp32_camera"]
