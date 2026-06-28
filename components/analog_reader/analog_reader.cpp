@@ -960,7 +960,7 @@ void AnalogReader::debug_dial_image(const uint8_t *img, int w, int h, float dete
     for (int x = 0; x < grid_w; x++) {
       int px = x * w / grid_w;
       int py = y * h / grid_h;
-      if (px < w && py < h) {
+      if (px >= 0 && px < w && py >= 0 && py < h) {
         uint8_t val = img[py * w + px];
         grid_vals[y * grid_w + x] = val;
 
