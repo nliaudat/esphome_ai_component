@@ -132,5 +132,3 @@ select:
             id(${analog_reader_id})->set_all_algorithm(algo);
             ESP_LOGI("analog_controls", "Algorithm changed to: %s", algo.c_str());
           }
-
-

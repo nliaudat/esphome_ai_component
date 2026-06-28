@@ -26,11 +26,8 @@ sensor:
     # web_server:
       # sorting_group_id: sorting_group_sensors
 
-
   # - platform: internal_temperature
     # name: "${friendly_name} Internal Temperature"
-
-
 
 text_sensor:
   - platform: template

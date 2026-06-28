@@ -207,8 +207,6 @@ sensor:
     accuracy_decimals: 2
     icon: "mdi:percent"
 
-
-
   # Inference Time
   - platform: template
     id: ${id_prefix}_inference_time
@@ -267,7 +265,6 @@ api:
             id(${id_prefix}_crop_zones) = zones;
             id(${id_prefix}_meter_reader).set_crop_zones(zones);
 
-
     # Trigger Inference
     - service: trigger_inference
       then:
@@ -296,4 +293,3 @@ text_sensor:
     name: "Crop Zones"
     id: ${id_prefix}_crop_zones_sensor
     icon: "mdi:crop"
-

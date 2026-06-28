@@ -1,24 +1,24 @@
 wifi:
   id: ${id_prefix}_wifi_component
-  #use_address: floor-heating-controller-v2.local  #use if you want to change device name once.
+  # use_address: floor-heating-controller-v2.local  #use if you want to change device name once.
   networks:
-  - ssid: !secret wifi_ssid_1
-    #hidden: true
-    password: !secret wifi_password_1
-    priority : 1
-  - ssid: !secret wifi_ssid_2
+    - ssid: !secret wifi_ssid_1
+      # hidden: true
+      password: !secret wifi_password_1
+      priority: 1
+    - ssid: !secret wifi_ssid_2
     hidden: true
-    password: !secret wifi_password_2
-    priority : 2
+      password: !secret wifi_password_2
+      priority: 2
   # - ssid: !secret wifi_ssid_3
     # password: !secret wifi_password_3
-    # priority : 3
+    # priority: 3
   # use_address: esp_cam_2mb.local #use if you want to change device name once.
 
 # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
     ssid: "${name} Flbck"
-    password: !secret fallback_hotspot_password
+      password: !secret fallback_hotspot_password
 
 # captive_portal:
 

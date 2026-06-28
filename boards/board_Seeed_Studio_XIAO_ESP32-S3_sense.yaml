@@ -1,10 +1,10 @@
-### https://www.seeedstudio.com/XIAO-ESP32S3-Sense-p-5639.html
+# ## https://www.seeedstudio.com/XIAO-ESP32S3-Sense-p-5639.html
 
 esphome:
   name: ${name}
   friendly_name: ${friendly_name}
   min_version: ${esphome_min_version}
-  name_add_mac_suffix: False # this appends to 'name' NOT 'friendly_name'
+  name_add_mac_suffix: False  # this appends to 'name' NOT 'friendly_name'
   # on_loop:
     # - lambda: |-
         # if(id(${id_prefix}_wifi_component).is_connected()) {
@@ -21,8 +21,8 @@ esphome:
   platformio_options:
     board_build.extra_flags:
     - -DBOARD_HAS_PSRAM
-    - -DTF_LITE_STATIC_MEMORY # for tflite micro
-    - -DTF_LITE_DISABLE_X86_NEON #for tflite micro
+    - -DTF_LITE_STATIC_MEMORY  # for tflite micro
+    - -DTF_LITE_DISABLE_X86_NEON  #for tflite micro
     - -DESP_NN  #use hardware acceleration : https://github.com/espressif/esp-nn (only if using tflite)
     # build_flags: -DBOARD_HAS_PSRAM -DCORE_DEBUG_LEVEL=0
     # board_build.f_cpu: 240000000L
@@ -43,23 +43,22 @@ esphome:
 
     # board_name: Seeed Studio XIAO ESP32S3 Sense:
 
-
 substitutions:
-  #board and compilation
-  board: seeed_xiao_esp32s3 #https://docs.platformio.org/en/latest//boards/espressif32/seeed_xiao_esp32s3.html
+  # board and compilation
+  board: seeed_xiao_esp32s3  #https://docs.platformio.org/en/latest//boards/espressif32/seeed_xiao_esp32s3.html
   framework: esp-idf
 
-  #Pin definition
+  # Pin definition
 
   # SD Card Configuration
-  #https://wiki.seeedstudio.com/xiao_esp32s3_sense_filesystem/
-  sdcard_clk_pin: GPIO07 #SD_SCLK
-  sdcard_cmd_pin: GPIO09 #SD_MOSI
-  sdcard_d0_pin: GPIO08 #SD_MISO
-  sdcard_d3_pin: GPIO21 #SD_CS, CD/DAT3
+  # https://wiki.seeedstudio.com/xiao_esp32s3_sense_filesystem/
+  sdcard_clk_pin: GPIO07  #SD_SCLK
+  sdcard_cmd_pin: GPIO09  #SD_MOSI
+  sdcard_d0_pin: GPIO08  #SD_MISO
+  sdcard_d3_pin: GPIO21  #SD_CS, CD/DAT3
 
   # Camera Pins
-  #https://esphome.io/components/esp32_camera/
+  # https://esphome.io/components/esp32_camera/
   external_clock_pin: GPIO10
   external_clock_frequency: 20MHz
   i2c_pins_sda: GPIO40
@@ -72,7 +71,6 @@ substitutions:
   # LED Pins
   status_led_pin: GPIO21
   flash_led_pin: GPIO4
-
 
 esp32:
   board: ${board}
@@ -95,20 +93,20 @@ esp32:
       CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
       CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: "y"
       CONFIG_MBEDTLS_SSL_PROTO_TLS1_3: "y"
-      CONFIG_TASK_WDT: "y" # prevents watchdog timeouts
-      CONFIG_TASK_WDT_TIMEOUT_S: "30" # prevents watchdog timeouts
-      CONFIG_TASK_WDT_CHECK_IDLE_TASK_CPU0: "n" # prevents watchdog timeouts
-      ### needed by new jpeg camera : https://github.com/esphome/esphome/pull/9496
+      CONFIG_TASK_WDT: "y"  # prevents watchdog timeouts
+      CONFIG_TASK_WDT_TIMEOUT_S: "30"  # prevents watchdog timeouts
+      CONFIG_TASK_WDT_CHECK_IDLE_TASK_CPU0: "n"  # prevents watchdog timeouts
+      # ## needed by new jpeg camera : https://github.com/esphome/esphome/pull/9496
       CONFIG_SPIRAM_SUPPORT: y
       CONFIG_SPIRAM_USE_CAPS_ALLOC: y
       CONFIG_SPIRAM_USE_MALLOC: y
-      CONFIG_LOG_DEFAULT_LEVEL: "0" # prevents "ESP-IDF" Guru Meditation Error
-      #CONFIG_LOG_DEFAULT_LEVEL: 0 # prevents "ESP-IDF" Guru Meditation Error
+      CONFIG_LOG_DEFAULT_LEVEL: "0"  # prevents "ESP-IDF" Guru Meditation Error
+      # CONFIG_LOG_DEFAULT_LEVEL: 0 # prevents "ESP-IDF" Guru Meditation Error
       # CONFIG_CAMERA_TASK_STACK_SIZE: "4096"
       CONFIG_CAMERA_TASK_STACK_SIZE: "8192"
-      #### testing
+      # ### testing
       # CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: y
-      CONFIG_FATFS_LFN_STACK: "y" # to support long file name in sdcard
+      CONFIG_FATFS_LFN_STACK: "y"  # to support long file name in sdcard
       CONFIG_FREERTOS_HZ: "1000"
       CONFIG_ESP32S3_SPIRAM_SUPPORT: y
       CONFIG_SPIRAM_SPEED_80M: y
@@ -130,7 +128,6 @@ esp32:
     # CONFIG_ESP32S2_SPIRAM_SUPPORT=y
     # CONFIG_ESP32S3_SPIRAM_SUPPORT=y
     # CONFIG_SPIRAM_SPEED_80M=y
-
 
 psram:
   mode: octal

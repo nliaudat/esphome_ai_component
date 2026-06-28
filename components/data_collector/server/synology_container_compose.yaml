@@ -16,4 +16,3 @@ services:
       - FLASK_ENV=production
       # WARNING: You MUST change this to a secure key!
       - API_KEY=change-me-to-a-secure-key
-

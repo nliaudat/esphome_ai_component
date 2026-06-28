@@ -247,7 +247,6 @@ number:
   #           id(${id_prefix}_camera_utils)->set_cropper_config(w, h, ox, (int)x);
   #         }
 
-
 # API Services
 api:
   services:
@@ -270,4 +269,3 @@ api:
         - lambda: |-
             int width, height;
             id(${id_prefix}_camera_utils)->reset_window(width, height);
-

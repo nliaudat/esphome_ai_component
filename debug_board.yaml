@@ -30,9 +30,6 @@ sensor:
       name: "CPU Frequency"
       entity_category: diagnostic
 
-
-
-
   # CPU Temperature
   - platform: internal_temperature
     name: "${id_prefix} CPU Temperature"
