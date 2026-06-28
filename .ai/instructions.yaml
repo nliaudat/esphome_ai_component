@@ -1,8 +1,8 @@
 # =============================================================================
-# ESPHome AI Component — Token-Optimized Rule Database (v1.2)
+# ESPHome AI Component --- Token-Optimized Rule Database (v1.2)
 # =============================================================================
-# Source: .ai/instructions.md (SINGLE SOURCE OF TRUTH — full text)
-# This file is a DERIVED ARTIFACT — regenerate when .ai/instructions.md changes.
+# Source: .ai/instructions.md (SINGLE SOURCE OF TRUTH --- full text)
+# This file is a DERIVED ARTIFACT --- regenerate when .ai/instructions.md changes.
 # It enables token-efficient AI queries and automated rule checking.
 # For context/examples, fall back to .ai/instructions.md.
 # =============================================================================
@@ -11,7 +11,7 @@ version: "1.2"
 source: ".ai/instructions.md"
 
 # =============================================================================
-# §1 PROJECT OVERVIEW
+# S1 PROJECT OVERVIEW
 # =============================================================================
 project:
   repo: "https://github.com/nliaudat/esphome_ai_component"
@@ -21,51 +21,51 @@ project:
   note: "SINGLE SOURCE OF TRUTH for all code reviews. Generic C++ advice OVERRIDDEN."
 
 # =============================================================================
-# §2 COMPONENT ARCHITECTURE
+# S2 COMPONENT ARCHITECTURE
 # =============================================================================
 components:
   meter_reader_tflite:
     status: active
     version: "2.0+"
-    description: "AI PRIMARY — Digit recognition with TFLite"
+    description: "AI PRIMARY --- Digit recognition with TFLite"
     depends: [tflite_micro_helper, esp32_camera_utils]
     optional: [value_validator, flash_light_controller, data_collector]
   ssocr_reader:
     status: alpha
-    description: "NO AI — Seven-segment OCR"
+    description: "NO AI --- Seven-segment OCR"
     depends: [esp32_camera_utils]
     optional: [value_validator]
   analog_reader:
     status: alpha
-    description: "NO AI — Analog dial/gauge"
+    description: "NO AI --- Analog dial/gauge"
     depends: [esp32_camera_utils]
     optional: [value_validator]
   value_validator:
     status: active
-    description: "SHARED — Reading validation engine"
+    description: "SHARED --- Reading validation engine"
     used_by: [meter_reader_tflite, ssocr_reader, analog_reader]
   esp32_camera_utils:
     status: active
-    description: "SHARED — Image processing core"
+    description: "SHARED --- Image processing core"
     used_by: [All reader components]
   tflite_micro_helper:
     status: active
-    description: "SHARED — TFLite runtime wrapper"
+    description: "SHARED --- TFLite runtime wrapper"
     used_by: [meter_reader_tflite]
   flash_light_controller:
     status: active
-    description: "SHARED — Illumination timing"
+    description: "SHARED --- Illumination timing"
   data_collector:
     status: active
-    description: "OPTIONAL — Active learning uploader"
+    description: "OPTIONAL --- Active learning uploader"
     depends: [HTTP client]
   legacy_meter_reader_tflite:
     status: frozen
-    description: "FROZEN — No new features, EXCLUDED from review per §12.4"
+    description: "FROZEN --- No new features, EXCLUDED from review per S12.4"
     note: "Use meter_reader_tflite instead"
 
 # =============================================================================
-# §3.1 UNIVERSAL RULES (ALL Components)
+# S3.1 UNIVERSAL RULES (ALL Components)
 # =============================================================================
 universal:
   required:
@@ -78,22 +78,22 @@ universal:
     - "Camera consumers MUST check PSRAM availability"
     - "ESP-NN features guarded with #ifdef ESP_NN"
   blockers:
-    - "No C-style casts — use static_cast<>"
-    - "No #define for constants — use constexpr/enum"
+    - "No C-style casts --- use static_cast<>"
+    - "No #define for constants --- use constexpr/enum"
     - "No missing this-> on class member access"
     - "No std::regex on ESP32"
-    - "No delay() in loop() — use set_timeout()/defer()"
-    - "No strcpy/strcat/sprintf — use snprintf/string"
-    - "No manual new/delete — use RAII (unique_ptr)"
+    - "No delay() in loop() --- use set_timeout()/defer()"
+    - "No strcpy/strcat/sprintf --- use snprintf/string"
+    - "No manual new/delete --- use RAII (unique_ptr)"
     - "No blocking network in main thread"
     - "No heap allocation during loop()"
     - "No stack allocations >1KB"
-    - "No integer overflow in pointer arithmetic — check field_length > (end - ptr)"
-    - "No TOCTOU — use single atomic state machine"
-    - "No format string — ESP_LOGD('tag', '%s', input)"
+    - "No integer overflow in pointer arithmetic --- check field_length > (end - ptr)"
+    - "No TOCTOU --- use single atomic state machine"
+    - "No format string --- ESP_LOGD('tag', '%s', input)"
 
 # =============================================================================
-# §3.2 TFLITE CONSUMER RULES
+# S3.2 TFLITE CONSUMER RULES
 # =============================================================================
 tflite_consumer:
   detection: ["includes tensorflow/lite/* headers", "depends on tflite_micro_helper", "uses TfLiteTensor or MicroInterpreter"]
@@ -105,7 +105,7 @@ tflite_consumer:
     - "Operator registration via X-Macro pattern in tflm_operators.h"
     - "MAX_OPERATORS configurable (default 30, override -DMAX_OPERATORS=N)"
     - "ALL TFLite headers guarded by #ifdef USE_TFLITE_MICRO_HELPER"
-    - "Model dimensions from TfLiteTensor::dims at runtime — NEVER hardcode"
+    - "Model dimensions from TfLiteTensor::dims at runtime --- NEVER hardcode"
     - "process_output() handles BOTH const float* and TfLiteTensor* overloads"
     - "Grayscale optimization only when dims->data[3] == 1"
     - "__init__.py pins esp-tflite-micro + esp-nn versions + build flags"
@@ -113,23 +113,23 @@ tflite_consumer:
     - "Confidence scores exposed to Home Assistant"
   warnings:
     - "PSRAM path does NOT fall back to SRAM"
-    - "heap_caps_aligned_alloc(16, ...) required — do not change"
+    - "heap_caps_aligned_alloc(16, ...) required --- do not change"
     - "Rotation affects inference only, not web stream"
     - "Large models (>1MB) may fail on classic ESP32"
-    - "Calibration timing constants in ONE place — not duplicated"
-    - "Camera recovery after N≥3 frame timeouts, esp_restart() after 5+"
+    - "Calibration timing constants in ONE place --- not duplicated"
+    - "Camera recovery after N>=3 frame timeouts, esp_restart() after 5+"
   blockers:
     - "No stack-allocated tensor arena"
     - "No hardcoded model input dimensions"
     - "No synchronous HTTP in inference path"
     - "No memory allocation during loop() after setup()"
     - "No Arduino-only APIs"
-    - "No new/delete — use heap_caps_aligned_alloc/unique_ptr"
-    - "No assumption PSRAM exists — check has_psram()"
+    - "No new/delete --- use heap_caps_aligned_alloc/unique_ptr"
+    - "No assumption PSRAM exists --- check has_psram()"
     - "No DELEGATE operator in models"
 
 # =============================================================================
-# §3.3 CAMERA CONSUMER RULES
+# S3.3 CAMERA CONSUMER RULES
 # =============================================================================
 camera_consumer:
   detection: ["depends on esp32_camera_utils", "depends on esp32_camera", "uses esp_camera_fb_get() or TrackedBuffer"]
@@ -144,26 +144,26 @@ camera_consumer:
   blockers:
     - "NO JPEG decoding in interrupt context"
     - "NO memory leaks in any code path"
-    - "NO direct esp_camera_fb_get() — ALWAYS wrap in TrackedBuffer"
+    - "NO direct esp_camera_fb_get() --- ALWAYS wrap in TrackedBuffer"
     - "NO assumption PSRAM available"
 
 # =============================================================================
-# §3.4 NETWORK CONSUMER RULES
+# S3.4 NETWORK CONSUMER RULES
 # =============================================================================
 network_consumer:
   detection: ["uses HTTP client", "uses defer() for network", "uses set_timeout() for network"]
   required:
     - "HTTP upload MUST have timeout (default 5s)"
     - "Configurable API key/authentication"
-    - "NON-BLOCKING operation — defer() or set_timeout()"
+    - "NON-BLOCKING operation --- defer() or set_timeout()"
     - "Rate limiting (max 1 per minute)"
   blockers:
     - "NO infinite retry loops"
     - "NO blocking on network in main thread"
-    - "NO silent failures — log upload errors"
+    - "NO silent failures --- log upload errors"
 
 # =============================================================================
-# §3.5 SENSOR CONSUMER RULES
+# S3.5 SENSOR CONSUMER RULES
 # =============================================================================
 sensor_consumer:
   detection: ["publishes readings", "extends sensor::Sensor", "exposes state to Home Assistant"]
@@ -177,18 +177,18 @@ sensor_consumer:
     - "Rate limiting on invalid readings"
 
 # =============================================================================
-# §3.6 COMPONENT-SPECIFIC OVERRIDES
+# S3.6 COMPONENT-SPECIFIC OVERRIDES
 # =============================================================================
 overrides:
   meter_reader_tflite:
-    - "Inference result processing NOT duplicated across sync/async — single publish_inference_result()"
+    - "Inference result processing NOT duplicated across sync/async --- single publish_inference_result()"
     - "Grayscale via runtime 1-channel detection"
-    - "Camera recovery — see TFLite Consumer Rules"
+    - "Camera recovery --- see TFLite Consumer Rules"
   esp32_camera_utils:
     - "Rotation applies to inference only, not web stream"
 
 # =============================================================================
-# §4 PERFORMANCE TARGETS
+# S4 PERFORMANCE TARGETS
 # =============================================================================
 performance:
   targets:
@@ -224,7 +224,7 @@ performance:
       - "Synchronous network during inference"
 
 # =============================================================================
-# §5 MEMORY MANAGEMENT
+# S5 MEMORY MANAGEMENT
 # =============================================================================
 memory:
   camera_pipeline:
@@ -233,7 +233,7 @@ memory:
       - "Camera framebuffer managed by esp32_camera component"
       - "JPEG buffers MUST use TrackedBuffer"
       - "NEVER hold camera framebuffer longer than necessary"
-      - "PSRAM may be absent — always check"
+      - "PSRAM may be absent --- always check"
   arena:
     ok: "auto arena = std::make_unique<uint8_t[]>(size);"
     bad: "uint8_t* arena = new uint8_t[size];"
@@ -246,7 +246,7 @@ memory:
     do_not: ["new/delete in loop()", "std::string for temporary paths in hot loops"]
 
 # =============================================================================
-# §6 CONFIGURATION SCHEMA PATTERNS
+# S6 CONFIGURATION SCHEMA PATTERNS
 # =============================================================================
 schema:
   good:
@@ -259,16 +259,16 @@ schema:
   not_available: ["cv.Regex (does NOT exist)"]
   notes:
     - "Raise cv.Invalid: (_ for _ in ()).throw(cv.Invalid('...'))"
-    - "Do NOT return cv.Invalid — it must be raised"
+    - "Do NOT return cv.Invalid --- it must be raised"
     - "Prefer cv.All() over custom lambdas"
 
 # =============================================================================
-# §7 C++ STANDARDS & STYLE
+# S7 C++ STANDARDS & STYLE
 # =============================================================================
 cpp:
   version: "C++20 (gnu++20) allowed and expected"
   allowed_features: ["std::span", "std::bit_cast", "consteval", "constinit", "designated initializers", "[[likely]]/[[unlikely]]"]
-  this_ref: "MANDATORY — Prefix ALL class member access with this->"
+  this_ref: "MANDATORY --- Prefix ALL class member access with this->"
   visibility: "Prefer protected (extensibility first). Private only for pointer lifetime safety, invariant coupling, resource management."
   constexpr:
     rule: "constexpr/enum over #define for constants"
@@ -323,18 +323,18 @@ cpp:
       enforced_by: ["pre-commit", "CI"]
   whitespace:
     lf_only:
-      rule: "LF line endings only — NO CRLF"
+      rule: "LF line endings only --- NO CRLF"
       enforced_by: ["ci-custom.py:lint_newline", "mixed-line-ending hook", ".editorconfig"]
       fix: "pre-commit run mixed-line-ending --all-files"
     ascii_only:
-      rule: "ASCII-only — NO non-ASCII (U+0080+) in source files"
+      rule: "ASCII-only --- NO non-ASCII (U+0080+) in source files"
       enforced_by: ["ci-custom.py:lint_ascii_only"]
     no_trailing_whitespace:
       rule: "NO trailing whitespace at end of lines"
       enforced_by: ["ci-custom.py:lint_trailing_whitespace", "trailing-whitespace hook"]
       fix: "pre-commit run trailing-whitespace --all-files"
     no_tabs:
-      rule: "NO tab characters — use 2-space indentation"
+      rule: "NO tab characters --- use 2-space indentation"
       enforced_by: ["ci-custom.py:lint_tabs", ".editorconfig"]
     eof_newline:
       rule: "Every file MUST end with a single newline (\n)"
@@ -345,7 +345,7 @@ cpp:
       enforced_by: [".editorconfig"]
 
 # =============================================================================
-# §8 SECURITY & THREAD SAFETY
+# S8 SECURITY & THREAD SAFETY
 # =============================================================================
 security:
   overflow:
@@ -363,11 +363,11 @@ security:
     ok: "ESP_LOGD('tag', '%s', user_input);"
   thread_safety:
     - "Shared state MUST use std::mutex + std::lock_guard"
-    - "No TOCTOU — single atomic state machine"
+    - "No TOCTOU --- single atomic state machine"
     - "No double-checked locking without proper barriers"
 
 # =============================================================================
-# §9 TESTING REQUIREMENTS
+# S9 TESTING REQUIREMENTS
 # =============================================================================
 testing:
   yaml_tests:
@@ -389,7 +389,7 @@ testing:
     - "Measure inference time; regression >10% requires justification"
 
 # =============================================================================
-# §10 ANTI-PATTERNS (ok/bad examples)
+# S10 ANTI-PATTERNS (ok/bad examples)
 # =============================================================================
 anti_patterns:
   - id: AP-DIRECT-CAMERA
@@ -436,7 +436,7 @@ anti_patterns:
     ok: "File ends with single newline: pre-commit run end-of-file-fixer --all-files"
 
 # =============================================================================
-# §11 REVIEW PRIORITIES
+# S11 REVIEW PRIORITIES
 # =============================================================================
 review:
   blocker:
@@ -455,32 +455,32 @@ review:
     - "Const correctness / naming / dead code / include-what-you-use"
 
 # =============================================================================
-# §12 AI-SPECIFIC INSTRUCTIONS
+# S12 AI-SPECIFIC INSTRUCTIONS
 # =============================================================================
 ai_instructions:
   mandatory_pre_read:
     - "BEFORE any analysis: read this entire YAML"
     - "BEFORE any suggestion: check no rule violation"
-  license: "Apache 2.0 OR MIT — no copyleft dependencies without discussion"
-  cpp_version: "C++20 allowed — do NOT flag as 'too modern'"
+  license: "Apache 2.0 OR MIT --- no copyleft dependencies without discussion"
+  cpp_version: "C++20 allowed --- do NOT flag as 'too modern'"
   component_roles:
     - "Determine role by reading __init__.py + .h includes"
-    - "Apply ALL matching role categories from §3.1-3.6"
-    - "This applies to ALL components — no exceptions"
+    - "Apply ALL matching role categories from S3.1-3.6"
+    - "This applies to ALL components --- no exceptions"
   dual_target:
     - "ESP32-S3: optimize for SPEED (<270ms)"
     - "ESP32: optimize for MEMORY (512KB arena)"
   anti_pattern_detection:
-    - "C-style casts → static_cast<>"
-    - "#define → constexpr"
-    - "Missing this-> → add it"
-    - "delay() in loop → set_timeout()"
-    - "std::regex → string operations"
-    - "CRLF → LF-only line endings"
-    - "Tab characters → 2-space indentation"
-    - "Non-ASCII → ASCII-only characters"
-    - "Trailing whitespace → strip it"
-    - "Missing EOF newline → add \\n"
+    - "C-style casts -> static_cast<>"
+    - "#define -> constexpr"
+    - "Missing this-> -> add it"
+    - "delay() in loop -> set_timeout()"
+    - "std::regex -> string operations"
+    - "CRLF -> LF-only line endings"
+    - "Tab characters -> 2-space indentation"
+    - "Non-ASCII -> ASCII-only characters"
+    - "Trailing whitespace -> strip it"
+    - "Missing EOF newline -> add \\n"
   config_validation:
     - "Values MUST be bounds-checked with sensible defaults"
     - "Errors via cv.Invalid (must be RAISED, not returned)"
@@ -495,7 +495,7 @@ ai_instructions:
   communication: "No 'open questions' in code comments. Output only findings and fixes."
 
 # =============================================================================
-# §12.12 ESP32 PATTERNS (static analysis false positives — do NOT flag)
+# S12.12 ESP32 PATTERNS (static analysis false positives --- do NOT flag)
 # =============================================================================
 esp32_suppress:
   - id: SUP-QUEUE-FREE
@@ -515,21 +515,21 @@ esp32_suppress:
     reason: "Named constants preferred but raw int valid when enums differ across components"
   - id: SUP-VALIDATE-GATE
     pattern: "max_consecutive_rejections gating when smart_validation disabled"
-    reason: "Allows rollovers 99999→00001 while rejecting single glitches"
+    reason: "Allows rollovers 99999->00001 while rejecting single glitches"
   - id: SUP-BUF-MULTIPLY
     pattern: "Guarded multiplication: if (h > SIZE_MAX/w) return"
     reason: "32-bit ESP32 overflow risk; correct 3-line guard pattern"
 
 # =============================================================================
-# §12.13 PONYTAIL — Lazy Senior Developer Mode
+# S12.13 PONYTAIL --- Lazy Senior Developer Mode
 # =============================================================================
 ponytail:
   decision_ladder:
-    - "1. YAGNI — Does this need to be built at all?"
-    - "2. std lib — Does the standard library already do this?"
-    - "3. Platform — Does a native platform feature cover it?"
-    - "4. Existing dep — Does an already-installed dependency solve it?"
-    - "5. One line — Can this be one line? Make it one line."
+    - "1. YAGNI --- Does this need to be built at all?"
+    - "2. std lib --- Does the standard library already do this?"
+    - "3. Platform --- Does a native platform feature cover it?"
+    - "4. Existing dep --- Does an already-installed dependency solve it?"
+    - "5. One line --- Can this be one line? Make it one line."
     - "6. Write the minimum code that works."
   rules:
     - "No abstractions not explicitly requested"
@@ -546,7 +546,7 @@ ponytail:
   testing: "Non-trivial logic: one assert-based demo or one small test file. No frameworks, no fixtures."
 
 # =============================================================================
-# §12.14 CODE REVIEW LESSONS (from PR#147–#152 fix commits)
+# S12.14 CODE REVIEW LESSONS (from PR#147--#152 fix commits)
 # =============================================================================
 # These rules were derived from recurring bug patterns found across 8 fix commits.
 # Each bug appeared in at least 2 PRs before being caught.
@@ -557,14 +557,14 @@ code_review_lessons:
     - "NEVER duplicate inverted mapping across call sites (found in 3 places in meter_reader_tflite.cpp)"
     - "Use named enum constants (kTfLiteFloat32) over raw integers (0/1) where both enums are accessible"
   freertos_cpp_impedance:
-    - "Structs passed through xQueueReceive: mark with '// ESP32: xQueueReceive raw memcpy — manual free before next receive'"
+    - "Structs passed through xQueueReceive: mark with '// ESP32: xQueueReceive raw memcpy --- manual free before next receive'"
     - "Tasks MUST exit their loop naturally to unwind the stack (destructors fire on scope exit); vTaskDelete(nullptr) only at end of task function"
     - "NEVER pass or receive non-TriviallyCopyable types directly via xQueueReceive/xQueueSend (raw memcpy bypasses C++ assignment operators)"
     - "When declaring a struct outside a while loop, manual free + nullify is required between iterations"
     - "Destructor of queue-drain variable only fires for the LAST item received"
   python_import_safety:
     - "Directory paths at module level: resolve relative to __file__, NOT cwd"
-    - "NEVER filter dir lists by exists() at import time — directories may be created after import"
+    - "NEVER filter dir lists by exists() at import time --- directories may be created after import"
     - "Defer existence checks to runtime discover_models() function, not module load"
   dead_code_hygiene:
     - "When deleting a source file, search and remove ALL #include references across all files"
@@ -574,12 +574,12 @@ code_review_lessons:
     - "Use pre-allocated scratch buffers (std::vector reserved in setup()) instead of per-frame resize()"
     - "Pre-allocate all column-sum and digit-bounds vectors in SSOCR setup()"
   jpeg_decoder:
-    - "jpeg_dec_handle_t is void* in ESP-IDF — use custom deleter struct with using pointer = jpeg_dec_handle_t"
-    - "When decoding JPEG to pre-allocated buffer, pass output_buffer directly — avoid temp allocation + memcpy"
+    - "jpeg_dec_handle_t is void* in ESP-IDF --- use custom deleter struct with using pointer = jpeg_dec_handle_t"
+    - "When decoding JPEG to pre-allocated buffer, pass output_buffer directly --- avoid temp allocation + memcpy"
     - "Add guarded multiplication (using SIZE_MAX check) for w*h*bpp from JPEG header to prevent 32-bit overflow"
 
 # =============================================================================
-# §13 CI TOOLS & LINT INFRASTRUCTURE
+# S13 CI TOOLS & LINT INFRASTRUCTURE
 # =============================================================================
 ci_tools:
   pre_commit_config: ".pre-commit-config.yaml"
@@ -592,6 +592,6 @@ ci_tools:
     - "pre-commit run --all-files  # Run all hooks"
     - "pre-commit run trailing-whitespace --all-files  # Fix trailing whitespace"
     - "pre-commit run end-of-file-fixer --all-files  # Fix EOF newlines"
-    - "pre-commit run mixed-line-ending --all-files  # Fix CRLF → LF"
+    - "pre-commit run mixed-line-ending --all-files  # Fix CRLF -> LF"
     - "python script/ci-custom.py  # Custom lint checks"
     - "python script/ci-custom.py --changed  # Only changed files"

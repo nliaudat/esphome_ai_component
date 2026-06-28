@@ -55,7 +55,7 @@ Generic C++ advice is OVERRIDDEN by the rules below.
 
 **All code changes MUST:**
 1. **Compile and run on ESP-IDF** (the sole framework for ESP32-S3, standard for all ESP32)
-2. **Fall back gracefully on classic ESP32** — dual-target awareness (§12.5)
+2. **Fall back gracefully on classic ESP32** --- dual-target awareness (§12.5)
 3. **Never assume PSRAM** is available (always check `psramFound()`)
 4. **Guard ESP-NN features** with `#ifdef ESP_NN` + ESP-IDF platform checks
 5. **Never use Arduino-only APIs** in shared code paths (`digitalWrite`, `delay`, `Serial`)
@@ -128,7 +128,7 @@ esphome_ai_component/
 
 ## 3. COMPONENT RULES (Auto-Applied by Role)
 
-Component rules are categorized by **role** — the functionality a component provides or consumes. To determine which roles apply to any given component, inspect its `__init__.py` (`DEPENDENCIES`, `import` statements) and its headers (includes). All matching role categories apply simultaneously. This ensures ALL components — existing and future — are automatically covered.
+Component rules are categorized by **role** --- the functionality a component provides or consumes. To determine which roles apply to any given component, inspect its `__init__.py` (`DEPENDENCIES`, `import` statements) and its headers (includes). All matching role categories apply simultaneously. This ensures ALL components --- existing and future --- are automatically covered.
 
 ### 3.1 Universal Rules (ALL Components)
 
@@ -138,24 +138,24 @@ Component rules are categorized by **role** — the functionality a component pr
 - Configuration schemas MUST bounds-check all user-provided values (§12.8)
 - Configuration schemas MUST provide sensible defaults where applicable
 - Configuration errors MUST be reported with `cv.Invalid`
-- All code MUST compile on ESP-IDF (no Arduino-only APIs in shared code paths — `digitalWrite`, `delay`, `Serial`)
+- All code MUST compile on ESP-IDF (no Arduino-only APIs in shared code paths --- `digitalWrite`, `delay`, `Serial`)
 - Camera consumers MUST check PSRAM availability (never assume it exists)
 - ESP-NN features MUST be guarded with `#ifdef ESP_NN` + ESP-IDF platform checks
 
 **❌ BLOCKER:**
-- No C-style casts — use `static_cast<>` instead
-- No `#define` for constants — use `constexpr` or `enum` instead
+- No C-style casts --- use `static_cast<>` instead
+- No `#define` for constants --- use `constexpr` or `enum` instead
 - No `this->` missing on class member access
-- No `std::regex` on ESP32 — use string operations instead
-- No `delay()` in `loop()` — use `set_timeout()` or `defer()` instead
-- No `strcpy()`, `strcat()`, `sprintf()` — use `snprintf()` or `std::string`
-- No manual `new`/`delete` — use RAII (`unique_ptr`, `make_unique`) instead
-- No blocking network operations in main thread — use `defer()` or `set_timeout()`
-- No heap allocation during `loop()` — allocate in `setup()`
+- No `std::regex` on ESP32 --- use string operations instead
+- No `delay()` in `loop()` --- use `set_timeout()` or `defer()` instead
+- No `strcpy()`, `strcat()`, `sprintf()` --- use `snprintf()` or `std::string`
+- No manual `new`/`delete` --- use RAII (`unique_ptr`, `make_unique`) instead
+- No blocking network operations in main thread --- use `defer()` or `set_timeout()`
+- No heap allocation during `loop()` --- allocate in `setup()`
 - No large stack allocations (>1KB local arrays)
-- No integer overflow in pointer arithmetic — always check `field_length > (end - ptr)` before `ptr + field_length` (CVE-2026-23833 pattern)
-- No TOCTOU (CWE-367) with check-then-act across multiple atomic flags — use a single atomic state machine
-- No format string vulnerabilities — always use `ESP_LOGD("tag", "%s", user_input)` not `ESP_LOGD("tag", user_input)`
+- No integer overflow in pointer arithmetic --- always check `field_length > (end - ptr)` before `ptr + field_length` (CVE-2026-23833 pattern)
+- No TOCTOU (CWE-367) with check-then-act across multiple atomic flags --- use a single atomic state machine
+- No format string vulnerabilities --- always use `ESP_LOGD("tag", "%s", user_input)` not `ESP_LOGD("tag", user_input)`
 - All `cg.add_define()` calls must be mirrored in `esphome/core/defines.h`
 
 ### 3.2 TFLite Consumer Rules
@@ -164,37 +164,37 @@ Component rules are categorized by **role** — the functionality a component pr
 
 **✅ REQUIRED:**
 - **Tensor arena** MUST be user-configurable (YAML or codegen), with reasonable defaults per target: 512KB (ESP32), 768KB (ESP32-S3)
-- **PSRAM-aware arena allocation** — MUST use `MemoryManager::allocate_tensor_arena()` which calls `heap_caps_aligned_alloc()` with appropriate caps (`MALLOC_CAP_SPIRAM` when PSRAM present, `MALLOC_CAP_INTERNAL` otherwise). Supports build-override flags `TFLITE_FORCE_SRAM` / `TFLITE_FORCE_PSRAM` for debugging.
-- **RAII arena lifetime** — arena MUST be wrapped in `std::unique_ptr<uint8_t[], HeapCapsDeleter>` with `heap_caps_free()` deleter. Never manual `new`/`delete`/`free()`.
-- **Model CRC32 verification** — MUST call `verify_model_crc()` on every model load to detect corruption.
+- **PSRAM-aware arena allocation** --- MUST use `MemoryManager::allocate_tensor_arena()` which calls `heap_caps_aligned_alloc()` with appropriate caps (`MALLOC_CAP_SPIRAM` when PSRAM present, `MALLOC_CAP_INTERNAL` otherwise). Supports build-override flags `TFLITE_FORCE_SRAM` / `TFLITE_FORCE_PSRAM` for debugging.
+- **RAII arena lifetime** --- arena MUST be wrapped in `std::unique_ptr<uint8_t[], HeapCapsDeleter>` with `heap_caps_free()` deleter. Never manual `new`/`delete`/`free()`.
+- **Model CRC32 verification** --- MUST call `verify_model_crc()` on every model load to detect corruption.
 - **Operator registration** MUST use the X-Macro pattern in `tflm_operators.h` via `OpResolverManager::RegisterOps()` (not hand-written resolver code)
 - **`MAX_OPERATORS`** MUST be build-time configurable (default 30, override via `-DMAX_OPERATORS=N`)
-- **`USE_TFLITE_MICRO_HELPER` guard** — ALL TFLite headers and source files MUST be wrapped in `#ifdef USE_TFLITE_MICRO_HELPER`
-- **Model dimension derivation** — dimensions MUST come from `TfLiteTensor::dims` at runtime. NEVER hardcode model input dimensions.
-- **Output processing** — `process_output()` must handle BOTH `const float*` and `TfLiteTensor*` overloads, supporting quantized (uint8/int8 dequantization) and float model types
-- **Support BOTH RGB and GRAYSCALE input models** — grayscale pipeline optimization (bypass JPEG decode + RGB→Gray) MUST only activate when the model has 1-channel input (`TfLiteTensor::dims->data[3] == 1`). RGB models MUST be unaffected.
-- **ESP-IDF dependency pinning** — `__init__.py` SHALL pin `esp-tflite-micro` and `esp-nn` versions, and set required build flags (`-DTF_LITE_STATIC_MEMORY`, `-DTF_LITE_DISABLE_X86_NEON`, `-DESP_NN`, `-DOPTIMIZED_KERNEL=esp_nn`)
-- **Debug gating** — ALL debug logging and diagnostic methods MUST be guarded by `#ifdef DEBUG_TFLITE_MICRO_HELPER` (set by YAML `debug: true` → `cg.add_define()`)
+- **`USE_TFLITE_MICRO_HELPER` guard** --- ALL TFLite headers and source files MUST be wrapped in `#ifdef USE_TFLITE_MICRO_HELPER`
+- **Model dimension derivation** --- dimensions MUST come from `TfLiteTensor::dims` at runtime. NEVER hardcode model input dimensions.
+- **Output processing** --- `process_output()` must handle BOTH `const float*` and `TfLiteTensor*` overloads, supporting quantized (uint8/int8 dequantization) and float model types
+- **Support BOTH RGB and GRAYSCALE input models** --- grayscale pipeline optimization (bypass JPEG decode + RGB->Gray) MUST only activate when the model has 1-channel input (`TfLiteTensor::dims->data[3] == 1`). RGB models MUST be unaffected.
+- **ESP-IDF dependency pinning** --- `__init__.py` SHALL pin `esp-tflite-micro` and `esp-nn` versions, and set required build flags (`-DTF_LITE_STATIC_MEMORY`, `-DTF_LITE_DISABLE_X86_NEON`, `-DESP_NN`, `-DOPTIMIZED_KERNEL=esp_nn`)
+- **Debug gating** --- ALL debug logging and diagnostic methods MUST be guarded by `#ifdef DEBUG_TFLITE_MICRO_HELPER` (set by YAML `debug: true` -> `cg.add_define()`)
 - **MUST expose confidence scores** to Home Assistant when performing AI inference
 
 **⚠️ WARNING:**
-- **PSRAM path does NOT fall back to SRAM** — When PSRAM is detected, allocate PSRAM only. Use `TFLITE_FORCE_SRAM` build flag to override.
+- **PSRAM path does NOT fall back to SRAM** --- When PSRAM is detected, allocate PSRAM only. Use `TFLITE_FORCE_SRAM` build flag to override.
 - **`heap_caps_aligned_alloc(16, ...)`** alignment is required by TFLite Micro. Do not change.
 - Rotation ONLY affects inference, not web stream (documented limitation)
 - Large models (>1MB) may fail on classic ESP32
 - Default tensor arena size: 512KB (ESP32), 768KB (ESP32-S3)
-- **Calibration timing constants** MUST NOT be duplicated in header and .cpp — define in ONE place (prefer header struct defaults)
+- **Calibration timing constants** MUST NOT be duplicated in header and .cpp --- define in ONE place (prefer header struct defaults)
 - **Camera recovery** SHOULD implement automatic camera re-initialization after N consecutive frame timeouts (N ≥ 3), with `esp_restart()` as last resort after 5+ timeouts
 
 **❌ BLOCKER:**
 - No stack-allocated tensor arena (stack overflow risk with 512KB+ arenas)
-- No hardcoded model input dimensions — MUST derive from loaded model
+- No hardcoded model input dimensions --- MUST derive from loaded model
 - No synchronous HTTP in inference path
 - No memory allocation during `loop()` after `setup()`
 - No ARDUINO-only APIs (`Serial`, `delay`, `digitalWrite`)
-- No `new`/`delete` — MUST use `heap_caps_aligned_alloc`/`heap_caps_free` wrapped in `unique_ptr` with custom deleter
-- No assumption that PSRAM exists — MUST check via `MemoryManager::has_psram()`
-- No DELEGATE operator in models — MUST export without XNNPACK delegate
+- No `new`/`delete` --- MUST use `heap_caps_aligned_alloc`/`heap_caps_free` wrapped in `unique_ptr` with custom deleter
+- No assumption that PSRAM exists --- MUST check via `MemoryManager::has_psram()`
+- No DELEGATE operator in models --- MUST export without XNNPACK delegate
 
 ### 3.3 Camera Consumer Rules
 
@@ -212,7 +212,7 @@ Component rules are categorized by **role** — the functionality a component pr
 **❌ BLOCKER:**
 - NO JPEG decoding in interrupt context
 - NO memory leaks in any code path
-- NO direct `esp_camera_fb_get()` exposure — ALWAYS wrap in `TrackedBuffer`
+- NO direct `esp_camera_fb_get()` exposure --- ALWAYS wrap in `TrackedBuffer`
 - NO assumption that PSRAM is available
 
 **TrackedBuffer Pattern:**
@@ -237,13 +237,13 @@ if (buffer) {
 **✅ REQUIRED:**
 - HTTP upload MUST have timeout (default: 5 seconds)
 - Configurable API key/authentication
-- NON-BLOCKING operation — MUST use `defer()` or `set_timeout()`
+- NON-BLOCKING operation --- MUST use `defer()` or `set_timeout()`
 - Rate limiting on uploads (default: max 1 per minute)
 
 **❌ BLOCKER:**
 - NO infinite retry loops
 - NO blocking on network in main thread
-- NO silent failures — log upload errors
+- NO silent failures --- log upload errors
 
 ### 3.5 Sensor/Output Consumer Rules
 
@@ -269,7 +269,7 @@ The following rules apply **in addition to** the role-based rules above. They ar
 - **Camera recovery**: See TFLite Consumer Rules above.
 
 #### esp32_camera_utils
-- Rotation setting MUST apply to inference preprocessing (not web stream — documented limitation)
+- Rotation setting MUST apply to inference preprocessing (not web stream --- documented limitation)
 - No additional overrides beyond Camera Consumer Rules.
 
 ---
@@ -579,17 +579,17 @@ All `cg.add_define()` calls MUST be mirrored in `esphome/core/defines.h` for sta
 
 **Pattern (Python `__init__.py`):**
 ```python
-# In config schema — accept the YAML option:
+# In config schema --- accept the YAML option:
 cv.Optional("enable_drawing", default=False): cv.boolean,
 
-# In to_code() — only define the macro when the option is enabled:
+# In to_code() --- only define the macro when the option is enabled:
 if config.get("enable_drawing", False):
     cg.add_define("USE_CAMERA_DRAWING")
 ```
 
 **Pattern (C++ `.h`/`.cpp`):**
 ```cpp
-// The header guard is passive — it only activates when the define exists:
+// The header guard is passive --- it only activates when the define exists:
 #ifdef USE_CAMERA_DRAWING
 void draw_rectangle(...);
 #endif
@@ -609,7 +609,7 @@ DrawingUtils::draw_rectangle(...);
 - Define the macro in `__init__.py`'s `to_code()`, conditioned on the YAML option
 - Guard the corresponding C++ code with `#ifdef MACRO_NAME`
 - Use `cg.add_define()` (compilation unit) or `cg.add_build_flag("-DMACRO")` (global)
-- Document the YAML option → macro mapping in `wiki/Debugging.md`
+- Document the YAML option -> macro mapping in `wiki/Debugging.md`
 
 **Macro naming convention:**
 - Use `USE_FEATURE_NAME` for compile-time feature gates (e.g. `USE_CAMERA_DRAWING`)
@@ -617,8 +617,8 @@ DrawingUtils::draw_rectangle(...);
 - Use `CONFIG_FEATURE_NAME` for ESP-IDF sdkconfig-derived gates (e.g. `CONFIG_ESP32S3_DATA_CACHE_64KB`)
 
 **If a define is ALWAYS set (unconditional), it must be justified:**
-- Platform detection (`SUPPORT_DOUBLE_BUFFERING` when `portNUM_PROCESSORS > 1`) — OK
-- Core component activation (`USE_METER_READER_TFLITE`) — OK
+- Platform detection (`SUPPORT_DOUBLE_BUFFERING` when `portNUM_PROCESSORS > 1`) --- OK
+- Core component activation (`USE_METER_READER_TFLITE`) --- OK
 - Any other unconditional define must be documented in `.ai/instructions.md`
 
 ### 7.5 Naming Conventions
@@ -645,7 +645,7 @@ The following tools are configured at the repository root and enforced via pre-c
 | **ruff** | `pyproject.toml` | Python (linter + formatter) | pre-commit, CI |
 | **flake8** | `.flake8` | Python (docstrings) | pre-commit, CI |
 | **yamllint** | `.yamllint` | YAML (.yaml/.yml) | pre-commit, CI |
-| **pyupgrade** | — | Python (modern syntax) | pre-commit, CI |
+| **pyupgrade** | --- | Python (modern syntax) | pre-commit, CI |
 | **editorconfig** | `.editorconfig` | All files (LF, UTF-8, indent) | IDE/editor |
 | **ci-custom** | `script/ci-custom.py` | C++/Python (custom rules) | pre-commit, CI |
 
@@ -661,12 +661,12 @@ The following tools are configured at the repository root and enforced via pre-c
 The following rules are enforced by `script/ci-custom.py` and `.pre-commit-config.yaml`. All files MUST comply.
 
 **✅ REQUIRED:**
-- **LF line endings only** — No CRLF (`\r` characters). Enforced by `ci-custom.py:lint_newline`, `mixed-line-ending` pre-commit hook, and `.editorconfig`
-- **ASCII-only** — No non-ASCII characters (U+0080+) in source files. Enforced by `ci-custom.py:lint_ascii_only`
-- **No trailing whitespace** — No spaces or tabs at end of lines. Enforced by `ci-custom.py:lint_trailing_whitespace` and `trailing-whitespace` pre-commit hook
-- **No tab characters** — Use 2-space indentation only. Enforced by `ci-custom.py:lint_tabs` and `.editorconfig`
-- **End-of-file newline** — Every file MUST end with a single newline (`\n`). Enforced by `ci-custom.py:lint_end_newline` and `end-of-file-fixer` pre-commit hook
-- **UTF-8 encoding** — All files MUST be valid UTF-8. Enforced by `.editorconfig` (`charset = utf-8`)
+- **LF line endings only** --- No CRLF (`\r` characters). Enforced by `ci-custom.py:lint_newline`, `mixed-line-ending` pre-commit hook, and `.editorconfig`
+- **ASCII-only** --- No non-ASCII characters (U+0080+) in source files. Enforced by `ci-custom.py:lint_ascii_only`
+- **No trailing whitespace** --- No spaces or tabs at end of lines. Enforced by `ci-custom.py:lint_trailing_whitespace` and `trailing-whitespace` pre-commit hook
+- **No tab characters** --- Use 2-space indentation only. Enforced by `ci-custom.py:lint_tabs` and `.editorconfig`
+- **End-of-file newline** --- Every file MUST end with a single newline (`\n`). Enforced by `ci-custom.py:lint_end_newline` and `end-of-file-fixer` pre-commit hook
+- **UTF-8 encoding** --- All files MUST be valid UTF-8. Enforced by `.editorconfig` (`charset = utf-8`)
 
 **⚠️ FIX COMMANDS:**
 ```bash
@@ -706,7 +706,7 @@ if (ptr + field_length > end) {  // Can overflow!
 }
 ```
 
-**✅ SAFE — pointer arithmetic:**
+**✅ SAFE --- pointer arithmetic:**
 ```cpp
 // Check overflow first, then bounds
 if (field_length > (end - ptr) || ptr + field_length > end) {
@@ -714,7 +714,7 @@ if (field_length > (end - ptr) || ptr + field_length > end) {
 }
 ```
 
-**✅ SAFE — buffer size calculations (JPEG headers, camera frames):**
+**✅ SAFE --- buffer size calculations (JPEG headers, camera frames):**
 ```cpp
 // Guarded multiplication on 32-bit ESP32 (SIZE_MAX = 4GB)
 if (w == 0 || h > SIZE_MAX / static_cast<size_t>(w)) return false;
@@ -850,7 +850,7 @@ clang-format --dry-run -Werror components/meter_reader_tflite/*.cpp
 ruff check .
 ruff format --check .
 
-# Python linting (flake8 — docstrings)
+# Python linting (flake8 --- docstrings)
 flake8 .
 
 # YAML linting
@@ -1042,7 +1042,7 @@ All files MUST use LF (Unix) line endings only (`\n`, never `\r\n` or `\r`).
 ```cpp
 // WRONG - Tab character used instead of spaces
 void setup() {
-→this->init();
+->this->init();
 }
 ```
 
@@ -1170,17 +1170,17 @@ Every file MUST end with a single newline character (`\n`). The last line should
 ### 12.4 Component Rules (Auto-Discovery)
 
 **BEFORE reviewing any component, determine its role by reading:**
-1. Its `__init__.py` — check `DEPENDENCIES`, imports, and `to_code()` for build flags
-2. Its `.h` headers — check `#include` directives for TFLite, camera, or network APIs
+1. Its `__init__.py` --- check `DEPENDENCIES`, imports, and `to_code()` for build flags
+2. Its `.h` headers --- check `#include` directives for TFLite, camera, or network APIs
 3. Then apply **ALL matching role categories** from §3:
-   - **§3.1 Universal Rules** — ALWAYS applies to EVERY component
-   - **§3.2 TFLite Consumer Rules** — if component includes `tensorflow/lite/*` or depends on `tflite_micro_helper`
-   - **§3.3 Camera Consumer Rules** — if component depends on `esp32_camera_utils` or uses `esp_camera_fb_get`
-   - **§3.4 Network Consumer Rules** — if component uses HTTP client, `defer()`, or `set_timeout()` for network
-   - **§3.5 Sensor/Output Consumer Rules** — if component publishes readings or extends `sensor::Sensor`
-   - **§3.6 Component-Specific Overrides** — additional rules for specific components
+   - **§3.1 Universal Rules** --- ALWAYS applies to EVERY component
+   - **§3.2 TFLite Consumer Rules** --- if component includes `tensorflow/lite/*` or depends on `tflite_micro_helper`
+   - **§3.3 Camera Consumer Rules** --- if component depends on `esp32_camera_utils` or uses `esp_camera_fb_get`
+   - **§3.4 Network Consumer Rules** --- if component uses HTTP client, `defer()`, or `set_timeout()` for network
+   - **§3.5 Sensor/Output Consumer Rules** --- if component publishes readings or extends `sensor::Sensor`
+   - **§3.6 Component-Specific Overrides** --- additional rules for specific components
 
-**This applies to ALL components — existing, new, and future. No exceptions.**
+**This applies to ALL components --- existing, new, and future. No exceptions.**
 No component is excluded from review. All code must be compliant.
 
 ### 12.5 Performance Dual-Target Awareness
@@ -1199,11 +1199,11 @@ No component is excluded from review. All code must be compliant.
 - No `new` without matching `delete` (RAII instead)
 - No `memcpy` without bounds checking
 
-**⚠️ ESP32/FreeRTOS exception — `xQueueReceive` + owned pointers:**
+**⚠️ ESP32/FreeRTOS exception --- `xQueueReceive` + owned pointers:**
 `xQueueReceive` performs raw `memcpy` into the destination, bypassing C++
 assignment operators and RAII destructors. The job struct MUST be declared
 OUTSIDE the while loop, and pointers MUST be manually freed + nullified
-BEFORE the next receive. This is CORRECT on ESP32 — do NOT change it.
+BEFORE the next receive. This is CORRECT on ESP32 --- do NOT change it.
 
 ```cpp
 // CORRECT on ESP32: job outside loop, manual free + nullify
@@ -1218,11 +1218,11 @@ while (xQueueReceive(queue, &job, 0) == pdTRUE) {
 ### 12.7 Anti-Pattern Detection
 
 **Immediately flag:**
-- C-style casts → Suggest `static_cast<>`
-- `#define` constants → Suggest `constexpr`
-- Missing `this->` → Suggest adding it
-- `delay()` in loop → Suggest `set_timeout()`
-- `std::regex` → Suggest string operations
+- C-style casts -> Suggest `static_cast<>`
+- `#define` constants -> Suggest `constexpr`
+- Missing `this->` -> Suggest adding it
+- `delay()` in loop -> Suggest `set_timeout()`
+- `std::regex` -> Suggest string operations
 
 ### 12.8 Configuration Validation
 
@@ -1234,8 +1234,8 @@ while (xQueueReceive(queue, &job, 0) == pdTRUE) {
 **⚠️ ESPHome config validation compatibility:**
 - Use ONLY validators available in `esphome.config_validation` (e.g. `cv.string_strict`, `cv.Length`, `cv.Range`, `cv.int_range`, `cv.float_range`, `cv.boolean`, `cv.one_of`, `cv.enum`, `cv.file_`, `cv.percentage`, `cv.Regex` is NOT available)
 - To raise `cv.Invalid` inside a lambda, use the generator expression pattern: `(_ for _ in ()).throw(cv.Invalid("..."))`
-- Do NOT use `cv.Regex` — it does not exist in ESPHome's config_validation module
-- Do NOT return `cv.Invalid(...)` from a lambda — it must be raised, not returned
+- Do NOT use `cv.Regex` --- it does not exist in ESPHome's config_validation module
+- Do NOT return `cv.Invalid(...)` from a lambda --- it must be raised, not returned
 - Prefer composing built-in validators with `cv.All()` over custom lambdas where possible
 
 ### 12.9 When Uncertain
@@ -1263,24 +1263,24 @@ following ESP32/FreeRTOS patterns as defects. They are CORRECT on this platform.
 
 **Do NOT change these patterns when flagged by static analysis:**
 
-1. **`xQueueReceive` + owned pointers** — See §12.6. Manual free + nullify is correct.
-2. **JPEG decoder handle deleter** — Use a custom deleter struct with
-   `using pointer = jpeg_dec_handle_t;` — NOT a raw function pointer type.
+1. **`xQueueReceive` + owned pointers** --- See §12.6. Manual free + nullify is correct.
+2. **JPEG decoder handle deleter** --- Use a custom deleter struct with
+   `using pointer = jpeg_dec_handle_t;` --- NOT a raw function pointer type.
    (In ESP-IDF, `jpeg_dec_handle_t` is `void*`.)
-3. **Angle normalization** — Use `fmodf(angle, 360.0f); if (rot < 0) rot += 360.0f;`
+3. **Angle normalization** --- Use `fmodf(angle, 360.0f); if (rot < 0) rot += 360.0f;`
    Never use `while` loops for angle wrapping (O(n), watchdog risk with extreme).
-4. **Python model discovery at module load** — Use a static list of directory
+4. **Python model discovery at module load** --- Use a static list of directory
    paths (without `exists()` filter). `discover_models()` checks per-scan.
-5. **Type mapping constants** — Use named enum values where available
+5. **Type mapping constants** --- Use named enum values where available
    (`kTfLiteFloat32`, `kInputTypeFloat32`) instead of raw integers.
-6. **Disabled validation gate** — When `enable_smart_validation` is `false`,
+6. **Disabled validation gate** --- When `enable_smart_validation` is `false`,
    use `max_consecutive_rejections` gating, NOT unconditional acceptance.
 
-### 12.13 PonyTail — Lazy Senior Developer Mode
+### 12.13 PonyTail --- Lazy Senior Developer Mode
 
 Lazy means efficient, not careless. The best code is the code never written.
 
-**Decision ladder** — stop at the first rung that holds:
+**Decision ladder** --- stop at the first rung that holds:
 1. **YAGNI.** Does this need to be built at all?
 2. **std lib.** Does the standard library already do this? Use it.
 3. **Platform.** Does a native platform feature cover it? Use it.
@@ -1299,11 +1299,11 @@ Lazy means efficient, not careless. The best code is the code never written.
 
 **Not lazy about:** Input validation at trust boundaries, error handling that prevents data loss, security, accessibility, the calibration real hardware needs (the platform is never the spec ideal; a clock drifts, a sensor reads off), anything explicitly requested.
 
-**One check:** Non-trivial logic leaves ONE runnable check behind — the smallest thing that fails if the logic breaks (an assert-based demo/self-check or one small test file; no frameworks, no fixtures). Trivial one-liners need no test.
+**One check:** Non-trivial logic leaves ONE runnable check behind --- the smallest thing that fails if the logic breaks (an assert-based demo/self-check or one small test file; no frameworks, no fixtures). Trivial one-liners need no test.
 
 ---
 
-### 12.14 Code Review Lessons (from PR#147–#152 fixes)
+### 12.14 Code Review Lessons (from PR#147--#152 fixes)
 
 These rules were derived from recurring bug patterns found across 8 fix commits. Each bug appeared in at least 2 PRs before being caught.
 
@@ -1313,8 +1313,8 @@ These rules were derived from recurring bug patterns found across 8 fix commits.
 - Use **named enum constants** (`kTfLiteFloat32`, `kInputTypeFloat32`) over raw integers (`0`/`1`) where both enums are accessible
 
 #### FreeRTOS / C++ Impedance
-- `xQueueReceive` uses **raw memcpy** — it bypasses C++ assignment operators and destructors
-- Struct passed through queues: mark with comment `// ESP32: xQueueReceive raw memcpy — manual free before next receive`
+- `xQueueReceive` uses **raw memcpy** --- it bypasses C++ assignment operators and destructors
+- Struct passed through queues: mark with comment `// ESP32: xQueueReceive raw memcpy --- manual free before next receive`
 - **Tasks MUST exit their loop naturally** to unwind the stack (destructors fire on scope exit); `vTaskDelete(nullptr)` only at end of task function
 - **NEVER** pass or receive **non-TriviallyCopyable** types directly via `xQueueReceive`/`xQueueSend` (raw `memcpy` bypasses C++ assignment operators)
 - When a struct is declared **outside** a while loop, `free()` + nullify pointers between iterations
@@ -1332,7 +1332,7 @@ while (xQueueReceive(this->upload_queue_, &job, 0) == pdTRUE) {
 
 #### Python Import Safety
 - **Directory paths at module level**: resolve relative to `__file__`, NOT `cwd`
-- **NEVER** filter directory lists by `exists()` at import time — directories may be created after import
+- **NEVER** filter directory lists by `exists()` at import time --- directories may be created after import
 - Defer existence checks to a runtime `discover_models()` function, not to module load
 
 #### Dead Code Hygiene
@@ -1345,8 +1345,8 @@ while (xQueueReceive(this->upload_queue_, &job, 0) == pdTRUE) {
 - Pre-allocate all column-sum and digit-bounds vectors in SSOCR `setup()`
 
 #### JPEG Decoder
-- `jpeg_dec_handle_t` is `void*` in ESP-IDF — use a custom deleter struct with `using pointer = jpeg_dec_handle_t;`
-- When decoding JPEG to a pre-allocated buffer, pass `output_buffer` directly — avoid temporary allocation + `memcpy`
+- `jpeg_dec_handle_t` is `void*` in ESP-IDF --- use a custom deleter struct with `using pointer = jpeg_dec_handle_t;`
+- When decoding JPEG to a pre-allocated buffer, pass `output_buffer` directly --- avoid temporary allocation + `memcpy`
 - Add **guarded multiplication (using `SIZE_MAX` check)** for `w * h * bpp` from JPEG header to prevent 32-bit overflow
 
 ---
