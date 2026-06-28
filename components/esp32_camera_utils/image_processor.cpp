@@ -135,7 +135,7 @@ const char *ImageProcessor::jpeg_error_to_string(jpeg_error_t error) const {
 bool ImageProcessor::get_jpeg_dimensions(const uint8_t *data, size_t size, int &width, int &height) {
   // Robust parser: walks JPEG marker segments properly, skipping entropy bytes
   // that can contain 0xFF 0xC0 as data. Handles both SOF0 (Baseline) and SOF2 (Progressive).
-  if (size < 2 || data[0] != 0xFF || data[1] != 0xD8)
+  if (!data || size < 2 || data[0] != 0xFF || data[1] != 0xD8)
     return false;
   size_t pos = 2;
   while (pos < size) {

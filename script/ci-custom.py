@@ -716,7 +716,14 @@ def lint_log_in_header(fname, line, col, content):
     )
 
 
-@lint_content_check(include=["*.h"])
+@lint_content_check(
+    include=["*.h"],
+    exclude=[
+        # X-macro file - included multiple times with different macro definitions.
+        # Adding #pragma once would break the X-macro include pattern.
+        "components/tflite_micro_helper/tflm_operators.h",
+    ],
+)
 def lint_pragma_once(fname, content):
     """Require #pragma once in header files."""
     if "#pragma once" not in content:
