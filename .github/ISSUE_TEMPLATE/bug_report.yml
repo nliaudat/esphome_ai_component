@@ -7,9 +7,9 @@ body:
   attributes:
     value: |
       Before you open a new issue, search through the existing issues to see if others have had the same problem.
-      
+
       **Please fill out all sections of this template completely.** Incomplete reports may be closed.
-      
+
       Thanks for helping us improve!
 
 - type: checkboxes
@@ -75,9 +75,9 @@ body:
     label: Reproduction Steps
     description: Exact steps to reproduce the issue
     value: |
-      1. 
-      2. 
-      3. 
+      1.
+      2.
+      3.
       ...
     placeholder: "Be as specific as possible"
   validations:
@@ -93,7 +93,7 @@ body:
     placeholder: |
       esphome:
         name: example
-      
+
       # Your component configuration here
   validations:
     required: true
