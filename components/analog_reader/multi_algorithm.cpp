@@ -144,7 +144,7 @@ void AnalogReader::remove_background(uint8_t *img, int w, int h, int cx, int cy,
 }
 
 void AnalogReader::median_filter_3x3(uint8_t *img, int w, int h) {
-  if (w < 3 || h < 3) {
+  if (img == nullptr || w < 3 || h < 3) {
     return;
   }
   // Ensure scratch buffer is sized; resize only once (avoids heap alloc per call)
