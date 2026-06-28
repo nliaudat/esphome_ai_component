@@ -21,7 +21,7 @@ Using this component instead of an AI model (`meter_reader_tflite`) offers signi
 ## ✨ Improvements (v2)
 The latest version (v2) introduces significant enhancements:
 *   **Performance**: Trigonometric LUTs (Look-Up Tables) and pre-allocated buffers reduce CPU load and heap fragmentation.
-*   **Robustness**: 
+*   **Robustness**:
     - **Sub-pixel Precision**: Parabolic interpolation provides angle measurement with precision < 1 degree.
     - **Top-Hat Filter**: Improved shadow and lighting variation handling using morphological filtering.
     - **Weighted Voting**: Improved Hough Transform using gradient magnitude as vote weight.
@@ -62,48 +62,48 @@ analog_reader:
   id: analog_main
   # Camera Reference
   camera_id: my_camera
-  
+
   # Global Settings
   update_interval: 60s
   paused: false         # Start paused?
   debug: false          # Enable ASCII dial visualization in logs
-  
+
   # Validator (recommended)
   validator: ${id_prefix}_validator
-  
+
   # The main sensor reporting the total aggregated value
   value_sensor:
     name: "Total Water Reading"
-    
+
   # List of dials to read
-  dials: 
+  dials:
     - id: dial_1
       # Location in the camera frame
       crop_x: 0
       crop_y: 0
       crop_w: 100
       crop_h: 100
-      
+
       # Scale: How much is this dial worth? (e.g. x0.1, x0.001)
-      scale: 1.0 
-      
+      scale: 1.0
+
       # Image Processing
       auto_contrast: true   # Enhances contrast before processing (Recommended)
       contrast: 1.0         # Manual contrast multiplier
       target_color: 0xFF0000 # Optional: Target needle color (e.g. Red) for Color Detection Mode
-      
+
 
       # Angle Calibration
       # min/max_angle defines the physical arc of the gauge (e.g. 0 to 360 for full circle)
       min_angle: 0
       max_angle: 360
-      
+
       # Angle Offset: Rotates the coordinate system.
       # 0   = North (12 o'clock)
       # 90  = East  (3 o'clock)
       # 180 = South (6 o'clock)
       # 270 = West  (9 o'clock)
-      angle_offset: 0 
+      angle_offset: 0
 
 ### 📐 Visual Guide: Coordinates
 The coordinate system is **Clockwise**, starting at **North (12 o'clock)**.
@@ -115,7 +115,7 @@ graph TD
     C --- E((90° East))
     C --- S((180° South))
     C --- W((270° West))
-    
+
     style N fill:#f9f,stroke:#333
     style E fill:#ccf,stroke:#333
 ```
@@ -145,13 +145,13 @@ button:
         - lambda: |-
             id(analog_main).set_dial_angle("dial_1", 45.0, 315.0);
             id(analog_main).set_dial_range("dial_1", 0.0, 50.0);
-``` 
-      
+```
+
       # Value Mapping
       # What values do the min/max angles correspond to?
       min_value: 0
       max_value: 10
-      
+
       # Algorithm Selection
       # detection_algorithm: radial_profile # Options: radial_profile, hough_transform, template_match, legacy, auto
 ```

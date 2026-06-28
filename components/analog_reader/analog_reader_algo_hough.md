@@ -19,7 +19,7 @@ The Hough Transform is a robust computer vision technique used for detecting lin
     *   The angle with the highest accumulated "mass" of votes is selected as the needle.
 
 ## Strengths & Weaknesses
-*   **Strengths**: 
+*   **Strengths**:
     *   Very robust against broken needles or needles partially obscured by text/reflections.
     *   Ignores broad lighting gradients that might confuse intensity-based methods.
 *   **Weaknesses**:

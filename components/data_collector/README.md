@@ -24,16 +24,16 @@ data_collector:
   # Target Server / Webhook
   upload_url: "http://192.168.1.50:5000/api/upload"
   debug: false
-  
+
   # Optional Authentication
   # api_key: "Bearer my-token"  # Adds Authorization header
   # OR
   # api_key: "my-key"           # Adds X-Api-Key header
-  
+
   # Basic Auth
   # username: "admin"
   # password: "password"
-  
+
   # Optional Switch to Toggle Collection from HA
   web_submit:
     name: "Allow Data Collection"
@@ -141,4 +141,3 @@ The workflow consists of six main stages:
 6. **Retraining**: Upload the visually validated dataset as a zip file to the [digit_recognizer repository](https://github.com/nliaudat/digit_recognizer) (via issues or pull requests) to contribute to the global model, or use the tooling there to retrain your own custom model locally.
 
 For full instructions, view the [Data Extractor README](data_extractor/README.md).
-

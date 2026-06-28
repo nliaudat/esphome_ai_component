@@ -1,13 +1,13 @@
-import os
-import glob
-import json
 import argparse
-import time
+import json
+import os
 import random
 import string
-from PIL import Image, ImageOps
+
 import piexif
 import piexif.helper
+from PIL import Image, ImageOps
+
 
 def extract_exif_metadata(image_path):
     try:
@@ -25,6 +25,7 @@ def extract_exif_metadata(image_path):
 
     return None
 
+
 def process_images(input_folder, output_folder):
     os.makedirs(output_folder, exist_ok=True)
 
@@ -32,7 +33,7 @@ def process_images(input_folder, output_folder):
     image_paths = []
     for root, dirs, files in os.walk(input_folder):
         for file in files:
-            if file.lower().endswith(('.jpg', '.jpeg')):
+            if file.lower().endswith((".jpg", ".jpeg")):
                 image_paths.append(os.path.join(root, file))
 
     if not image_paths:
@@ -55,8 +56,8 @@ def process_images(input_folder, output_folder):
             img = ImageOps.exif_transpose(img)
 
             # Apply AI component rotation if embedded in custom JSON metadata
-            if 'rot' in metadata:
-                rot = float(metadata['rot'])
+            if "rot" in metadata:
+                rot = float(metadata["rot"])
                 if rot != 0:
                     # PIL rotate is counter-clockwise, ESP32 rotation is generally clockwise
                     # We rotate by -rot (which means clockwise) to align with ESP32 inference logic
@@ -78,7 +79,9 @@ def process_images(input_folder, output_folder):
                     target_out_dir = os.path.join(output_folder, rel_dir)
                     os.makedirs(target_out_dir, exist_ok=True)
 
-                    random_str = ''.join(random.choices(string.ascii_lowercase + string.digits, k=3))
+                    random_str = "".join(
+                        random.choices(string.ascii_lowercase + string.digits, k=3)
+                    )
 
                     # Get original timestamp from the filename if possible, otherwise use file modified time
                     orig_name = os.path.basename(img_path)
@@ -101,12 +104,29 @@ def process_images(input_folder, output_folder):
         except Exception as e:
             print(f"Error processing {img_path}: {e}")
 
-    print(f"Done! Processed {processed_count} images, extracted {extracted_count} zones.")
+    print(
+        f"Done! Processed {processed_count} images, extracted {extracted_count} zones."
+    )
+
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Extract zones from images based on EXIF metadata")
-    parser.add_argument("--input", "-i", type=str, default="./uploads", help="Input directory containing images")
-    parser.add_argument("--output", "-o", type=str, default="extracted", help="Output directory for extracted zones")
+    parser = argparse.ArgumentParser(
+        description="Extract zones from images based on EXIF metadata"
+    )
+    parser.add_argument(
+        "--input",
+        "-i",
+        type=str,
+        default="./uploads",
+        help="Input directory containing images",
+    )
+    parser.add_argument(
+        "--output",
+        "-o",
+        type=str,
+        default="extracted",
+        help="Output directory for extracted zones",
+    )
 
     args = parser.parse_args()
     process_images(args.input, args.output)

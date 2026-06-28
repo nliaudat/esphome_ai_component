@@ -1,9 +1,9 @@
 # draw_regions.py
-import cv2
-import json
-import sys
-import os
 import argparse
+import json
+import os
+
+import cv2
 
 # Global variables
 regions = []
@@ -14,6 +14,7 @@ normalize_mode = False
 # Zoom variables
 zoom_level = 1.0
 original_image = None
+
 
 def show_help():
     """Display help information."""
@@ -55,6 +56,7 @@ Examples:
 """
     print(help_text)
 
+
 def get_display_image():
     """Get the zoomed display image."""
     global original_image, zoom_level
@@ -72,9 +74,12 @@ def get_display_image():
     new_height = int(img_height * zoom_level)
 
     # Resize the image
-    display_image = cv2.resize(original_image, (new_width, new_height), interpolation=cv2.INTER_LINEAR)
+    display_image = cv2.resize(
+        original_image, (new_width, new_height), interpolation=cv2.INTER_LINEAR
+    )
 
     return display_image
+
 
 def screen_to_image_coords(sx, sy):
     """Convert screen coordinates to original image coordinates."""
@@ -88,6 +93,7 @@ def screen_to_image_coords(sx, sy):
     img_y = int(sy / zoom_level)
 
     return img_x, img_y
+
 
 def normalize_region(x1, y1, x2, y2, reference_size=None):
     """
@@ -133,6 +139,7 @@ def normalize_region(x1, y1, x2, y2, reference_size=None):
 
     return (x1, y1, x2, y2)
 
+
 def draw_rectangle(event, x, y, flags, param):
     """Callback function to draw rectangles on the image."""
     global regions, drawing, ix, iy, normalize_mode, zoom_level
@@ -165,7 +172,9 @@ def draw_rectangle(event, x, y, flags, param):
                 reference_size = (ref_width, ref_height)
 
             # Normalize the coordinates (in image coordinates)
-            x1_img, y1_img, x2_img, y2_img = normalize_region(ix, iy, img_x, img_y, reference_size)
+            x1_img, y1_img, x2_img, y2_img = normalize_region(
+                ix, iy, img_x, img_y, reference_size
+            )
 
             # Convert back to screen coordinates for display
             if zoom_level != 1.0:
@@ -177,13 +186,22 @@ def draw_rectangle(event, x, y, flags, param):
                 x1_scr, y1_scr, x2_scr, y2_scr = x1_img, y1_img, x2_img, y2_img
 
             # Draw the rectangle
-            cv2.rectangle(temp_image, (x1_scr, y1_scr), (x2_scr, y2_scr), (0, 255, 0), 2)
+            cv2.rectangle(
+                temp_image, (x1_scr, y1_scr), (x2_scr, y2_scr), (0, 255, 0), 2
+            )
 
             # Display dimensions information
             width = x2_img - x1_img
             height = y2_img - y1_img
-            cv2.putText(temp_image, f"Size: {width}x{height}", (x1_scr, max(y1_scr-10, 10)),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+            cv2.putText(
+                temp_image,
+                f"Size: {width}x{height}",
+                (x1_scr, max(y1_scr - 10, 10)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (0, 255, 0),
+                1,
+            )
 
             # Show the updated image
             show_instructions(temp_image)
@@ -203,7 +221,9 @@ def draw_rectangle(event, x, y, flags, param):
             reference_size = (ref_width, ref_height)
 
         # Normalize the coordinates (in image coordinates)
-        x1_img, y1_img, x2_img, y2_img = normalize_region(ix, iy, img_x, img_y, reference_size)
+        x1_img, y1_img, x2_img, y2_img = normalize_region(
+            ix, iy, img_x, img_y, reference_size
+        )
 
         # Get final dimensions
         width = x2_img - x1_img
@@ -216,7 +236,9 @@ def draw_rectangle(event, x, y, flags, param):
         redraw_image()
 
         mode_info = " (Normalized)" if normalize_mode and len(regions) > 1 else ""
-        print(f"Region added: {[x1_img, y1_img, x2_img, y2_img]} (Size: {width}x{height}){mode_info}")
+        print(
+            f"Region added: {[x1_img, y1_img, x2_img, y2_img]} (Size: {width}x{height}){mode_info}"
+        )
 
     elif event == cv2.EVENT_MOUSEWHEEL:
         # Zoom with mouse wheel
@@ -226,9 +248,10 @@ def draw_rectangle(event, x, y, flags, param):
             zoom_level = min(zoom_level, 10.0)  # Max 10x zoom
         else:  # Zoom out
             zoom_level /= zoom_speed
-            zoom_level = max(zoom_level, 0.1)   # Min 0.1x zoom
+            zoom_level = max(zoom_level, 0.1)  # Min 0.1x zoom
 
         redraw_image()
+
 
 def redraw_image():
     """Redraw the main image with all regions."""
@@ -258,17 +281,29 @@ def redraw_image():
             x1_scr, y1_scr, x2_scr, y2_scr = x1_img, y1_img, x2_img, y2_img
 
         # Only draw if region is visible in viewport
-        if (x1_scr < display_image.shape[1] and x2_scr > 0 and
-            y1_scr < display_image.shape[0] and y2_scr > 0):
-
+        if (
+            x1_scr < display_image.shape[1]
+            and x2_scr > 0
+            and y1_scr < display_image.shape[0]
+            and y2_scr > 0
+        ):
             # Draw rectangle
-            cv2.rectangle(temp_image, (x1_scr, y1_scr), (x2_scr, y2_scr), (0, 255, 0), 2)
+            cv2.rectangle(
+                temp_image, (x1_scr, y1_scr), (x2_scr, y2_scr), (0, 255, 0), 2
+            )
 
             # Add dimension text
             width = x2_img - x1_img
             height = y2_img - y1_img
-            cv2.putText(temp_image, f"{width}x{height}", (x1_scr, max(y1_scr-10, 10)),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+            cv2.putText(
+                temp_image,
+                f"{width}x{height}",
+                (x1_scr, max(y1_scr - 10, 10)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (0, 255, 0),
+                1,
+            )
 
     # Show instructions and info
     show_instructions(temp_image)
@@ -276,18 +311,40 @@ def redraw_image():
     # Show zoom info
     if zoom_level != 1.0:
         info_text = f"Zoom: {zoom_level:.1f}x | Regions: {len(regions)} | Press 'f' for full size"
-        cv2.putText(temp_image, info_text, (10, temp_image.shape[0] - 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+        cv2.putText(
+            temp_image,
+            info_text,
+            (10, temp_image.shape[0] - 30),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (255, 255, 255),
+            1,
+        )
     else:
         info_text = f"Full size | Regions: {len(regions)}"
-        cv2.putText(temp_image, info_text, (10, temp_image.shape[0] - 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+        cv2.putText(
+            temp_image,
+            info_text,
+            (10, temp_image.shape[0] - 30),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (255, 255, 255),
+            1,
+        )
 
     if normalize_mode:
-        cv2.putText(temp_image, "NORMALIZE MODE", (10, temp_image.shape[0] - 10),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+        cv2.putText(
+            temp_image,
+            "NORMALIZE MODE",
+            (10, temp_image.shape[0] - 10),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (0, 255, 255),
+            1,
+        )
 
     cv2.imshow("Draw Regions", temp_image)
+
 
 def show_instructions(image):
     """
@@ -300,7 +357,7 @@ def show_instructions(image):
         "Instructions:",
         "Left drag: Draw region",
         "Wheel: Zoom  r: Reset regions",
-        "f: Full size  s: Save  q: Quit"
+        "f: Full size  s: Save  q: Quit",
     ]
 
     if normalize_mode:
@@ -308,8 +365,11 @@ def show_instructions(image):
 
     y_offset = 30
     for line in instructions:
-        cv2.putText(image, line, (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+        cv2.putText(
+            image, line, (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1
+        )
         y_offset += 20
+
 
 def validate_regions():
     """
@@ -330,42 +390,48 @@ def validate_regions():
         for i, region in enumerate(regions[1:], 1):
             current_size = (region[2] - region[0], region[3] - region[1])
             if current_size != first_size:
-                print(f"Warning: Region {i} size {current_size} doesn't match reference size {first_size}")
+                print(
+                    f"Warning: Region {i} size {current_size} doesn't match reference size {first_size}"
+                )
                 return False
 
-    print("All regions validated: dimensions are multiples of 8" +
-          (" and consistent" if normalize_mode else ""))
+    print(
+        "All regions validated: dimensions are multiples of 8"
+        + (" and consistent" if normalize_mode else "")
+    )
     return True
+
 
 def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         description="Draw rectangular regions on an image with dimensions as multiples of 8",
-        add_help=False
+        add_help=False,
     )
     parser.add_argument(
-        'image_path',
-        nargs='?',
-        default='sample.jpg',
-        help='Path to the input image (default: sample.jpg)'
+        "image_path",
+        nargs="?",
+        default="sample.jpg",
+        help="Path to the input image (default: sample.jpg)",
     )
     parser.add_argument(
-        '-o', '--output',
-        default='regions.json',
-        help='Output JSON file for regions (default: regions.json)'
+        "-o",
+        "--output",
+        default="regions.json",
+        help="Output JSON file for regions (default: regions.json)",
     )
     parser.add_argument(
-        '-n', '--normalize',
-        action='store_true',
-        help='Normalize all regions to same size (based on first region)'
+        "-n",
+        "--normalize",
+        action="store_true",
+        help="Normalize all regions to same size (based on first region)",
     )
     parser.add_argument(
-        '-h', '--help',
-        action='store_true',
-        help='Show this help message and exit'
+        "-h", "--help", action="store_true", help="Show this help message and exit"
     )
 
     return parser.parse_args()
+
 
 def main():
     global original_image, normalize_mode, zoom_level, regions
@@ -403,7 +469,9 @@ def main():
     print(f"Input image: {args.image_path}")
     print(f"Output file: {args.output}")
     print(f"Normalize mode: {'ON' if normalize_mode else 'OFF'}")
-    print(f"Image dimensions: {original_image.shape[1]}x{original_image.shape[0]} pixels")
+    print(
+        f"Image dimensions: {original_image.shape[1]}x{original_image.shape[0]} pixels"
+    )
     print("\nInteractive Controls:")
     print("  Mouse wheel: Zoom in/out")
     print("  Left mouse drag: Draw regions")
@@ -425,7 +493,7 @@ def main():
         if key == ord("q"):  # Quit
             break
 
-        elif key == ord("s"):  # Save regions
+        if key == ord("s"):  # Save regions
             if regions:
                 # Validate regions before saving
                 if validate_regions():
@@ -439,9 +507,13 @@ def main():
                         first_region = regions[0]
                         ref_width = first_region[2] - first_region[0]
                         ref_height = first_region[3] - first_region[1]
-                        print(f"All regions normalized to: {ref_width}x{ref_height} pixels")
+                        print(
+                            f"All regions normalized to: {ref_width}x{ref_height} pixels"
+                        )
                 else:
-                    print("Warning: Some regions have invalid dimensions. Save cancelled.")
+                    print(
+                        "Warning: Some regions have invalid dimensions. Save cancelled."
+                    )
             else:
                 print("No regions to save.")
 

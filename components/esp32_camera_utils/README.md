@@ -20,10 +20,10 @@ This component is responsible for image rotation and preprocessing.
 esp32_camera_utils:
   id: camera_utils
   camera_id: my_camera # ID of the esp32_camera component
-  
+
   # Global Rotation Setting
   rotation: "90"  # Options: "0", "90", "180", "270"
-  
+
   # Camera Windowing (Hardware Cropping)
   # Useful for OV2640/OV3660 to zoom in before capture
   camera_window:
@@ -31,7 +31,7 @@ esp32_camera_utils:
     offset_y: 480
     width: 448
     height: 88
-    
+
   debug: false
 ```
 

@@ -17,27 +17,27 @@ class Scaler {
    * @brief Scale RGB888 buffer to uint8 (grayscale) with resizing.
    * Uses fixed-point arithmetic for optimization.
    */
-  static bool scale_rgb888_to_uint8(const uint8_t* src, int src_w, int src_h,
-                                    uint8_t* dst, int dst_w, int dst_h, int channels);
+  static bool scale_rgb888_to_uint8(const uint8_t *src, int src_w, int src_h, uint8_t *dst, int dst_w, int dst_h,
+                                    int channels);
 
   /**
    * @brief Scale RGB888 buffer to float32 (for TensorFlow Lite) with resizing.
    * Uses fixed-point arithmetic for optimization.
    */
-  static bool scale_rgb888_to_float32(const uint8_t* src, int src_w, int src_h,
-                                      uint8_t* dst, int dst_w, int dst_h, int channels, bool normalize);
+  static bool scale_rgb888_to_float32(const uint8_t *src, int src_w, int src_h, uint8_t *dst, int dst_w, int dst_h,
+                                      int channels, bool normalize);
 
   /**
    * @brief Generic nearest-neighbor scaling for any byte buffer.
    */
-  static bool scale_nearest(const uint8_t* src, int src_w, int src_h, int src_channels,
-                            uint8_t* dst, int dst_w, int dst_h);
+  static bool scale_nearest(const uint8_t *src, int src_w, int src_h, int src_channels, uint8_t *dst, int dst_w,
+                            int dst_h);
 
   /**
    * @brief Simple bilinear scaling (software only, slower but better quality).
    */
-  static bool scale_bilinear(const uint8_t* src, int src_w, int src_h, int src_channels,
-                             uint8_t* dst, int dst_w, int dst_h);
+  static bool scale_bilinear(const uint8_t *src, int src_w, int src_h, int src_channels, uint8_t *dst, int dst_w,
+                             int dst_h);
 
  private:
   static constexpr int FIXED_POINT_SHIFT = 16;
@@ -46,4 +46,4 @@ class Scaler {
 }  // namespace esp32_camera_utils
 }  // namespace esphome
 
-#endif // USE_CAMERA_SCALER
+#endif  // USE_CAMERA_SCALER

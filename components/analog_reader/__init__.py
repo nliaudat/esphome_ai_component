@@ -1,6 +1,7 @@
 import esphome.codegen as cg
+from esphome.components import esp32, esp32_camera, sensor
 import esphome.config_validation as cv
-from esphome.components import sensor, esp32_camera, esp32
+
 try:
     from esphome.components import value_validator
 except ImportError:
@@ -61,63 +62,82 @@ CONF_CHANNEL_RED = "RED"
 CONF_CHANNEL_GREEN = "GREEN"
 CONF_CHANNEL_BLUE = "BLUE"
 
-DIAL_SCHEMA = cv.Schema({
-    cv.Required(CONF_ID): cv.string, # String ID for logs
-    cv.Optional(CONF_NEEDLE_TYPE, default=CONF_TYPE_DARK): cv.enum({
-        CONF_TYPE_DARK: analog_reader_ns.enum("NEEDLE_TYPE_DARK"),
-        CONF_TYPE_LIGHT: analog_reader_ns.enum("NEEDLE_TYPE_LIGHT"),
-    }),
-    cv.Optional(CONF_PROCESS_CHANNEL, default=CONF_CHANNEL_GRAYSCALE): cv.enum({
-        CONF_CHANNEL_GRAYSCALE: analog_reader_ns.enum("PROCESS_CHANNEL_GRAYSCALE"),
-        CONF_CHANNEL_RED: analog_reader_ns.enum("PROCESS_CHANNEL_RED"),
-        CONF_CHANNEL_GREEN: analog_reader_ns.enum("PROCESS_CHANNEL_GREEN"),
-        CONF_CHANNEL_BLUE: analog_reader_ns.enum("PROCESS_CHANNEL_BLUE"),
-    }),
-    cv.Optional(CONF_ALGORITHM, default=CONF_ALGO_RADIAL): cv.one_of(
-        CONF_ALGO_LEGACY, CONF_ALGO_RADIAL, CONF_ALGO_HOUGH, CONF_ALGO_TEMPLATE, CONF_ALGO_AUTO, lower=True
-    ),
-    cv.Optional(CONF_SCALE, default=1.0): cv.float_,
-    cv.Optional(CONF_CROP_X, default=0): cv.int_,
-    cv.Optional(CONF_CROP_Y, default=0): cv.int_,
-    cv.Optional(CONF_CROP_W, default=64): cv.int_,
-    cv.Optional(CONF_CROP_H, default=64): cv.int_,
-    cv.Optional(CONF_MIN_ANGLE, default=0): cv.float_,
-    cv.Optional(CONF_MAX_ANGLE, default=360): cv.float_,
-    cv.Optional(CONF_ANGLE_OFFSET, default=0): cv.float_,
-    cv.Optional(CONF_CLOCKWISE, default=True): cv.boolean,
-    cv.Optional(CONF_MIN_VALUE, default=0): cv.float_,
-    cv.Optional(CONF_MAX_VALUE, default=10): cv.float_,
-    cv.Optional(CONF_MIN_SCAN_RADIUS, default=0.3): cv.float_,
-    cv.Optional(CONF_MAX_SCAN_RADIUS, default=0.9): cv.float_,
-    cv.Optional(CONF_DEADZONE_DIAMETER, default=0.0): cv.float_,
-    cv.Optional(CONF_AUTO_CONTRAST, default=True): cv.boolean,
-    cv.Optional(CONF_CONTRAST, default=1.0): cv.float_,
-    cv.Optional("target_color"): cv.hex_int,
-    cv.Optional("color_tolerance", default=0.0): cv.float_,
+DIAL_SCHEMA = cv.Schema(
+    {
+        cv.Required(CONF_ID): cv.string,  # String ID for logs
+        cv.Optional(CONF_NEEDLE_TYPE, default=CONF_TYPE_DARK): cv.enum(
+            {
+                CONF_TYPE_DARK: analog_reader_ns.enum("NEEDLE_TYPE_DARK"),
+                CONF_TYPE_LIGHT: analog_reader_ns.enum("NEEDLE_TYPE_LIGHT"),
+            }
+        ),
+        cv.Optional(CONF_PROCESS_CHANNEL, default=CONF_CHANNEL_GRAYSCALE): cv.enum(
+            {
+                CONF_CHANNEL_GRAYSCALE: analog_reader_ns.enum(
+                    "PROCESS_CHANNEL_GRAYSCALE"
+                ),
+                CONF_CHANNEL_RED: analog_reader_ns.enum("PROCESS_CHANNEL_RED"),
+                CONF_CHANNEL_GREEN: analog_reader_ns.enum("PROCESS_CHANNEL_GREEN"),
+                CONF_CHANNEL_BLUE: analog_reader_ns.enum("PROCESS_CHANNEL_BLUE"),
+            }
+        ),
+        cv.Optional(CONF_ALGORITHM, default=CONF_ALGO_RADIAL): cv.one_of(
+            CONF_ALGO_LEGACY,
+            CONF_ALGO_RADIAL,
+            CONF_ALGO_HOUGH,
+            CONF_ALGO_TEMPLATE,
+            CONF_ALGO_AUTO,
+            lower=True,
+        ),
+        cv.Optional(CONF_SCALE, default=1.0): cv.float_,
+        cv.Optional(CONF_CROP_X, default=0): cv.int_,
+        cv.Optional(CONF_CROP_Y, default=0): cv.int_,
+        cv.Optional(CONF_CROP_W, default=64): cv.int_,
+        cv.Optional(CONF_CROP_H, default=64): cv.int_,
+        cv.Optional(CONF_MIN_ANGLE, default=0): cv.float_,
+        cv.Optional(CONF_MAX_ANGLE, default=360): cv.float_,
+        cv.Optional(CONF_ANGLE_OFFSET, default=0): cv.float_,
+        cv.Optional(CONF_CLOCKWISE, default=True): cv.boolean,
+        cv.Optional(CONF_MIN_VALUE, default=0): cv.float_,
+        cv.Optional(CONF_MAX_VALUE, default=10): cv.float_,
+        cv.Optional(CONF_MIN_SCAN_RADIUS, default=0.3): cv.float_,
+        cv.Optional(CONF_MAX_SCAN_RADIUS, default=0.9): cv.float_,
+        cv.Optional(CONF_DEADZONE_DIAMETER, default=0.0): cv.float_,
+        cv.Optional(CONF_AUTO_CONTRAST, default=True): cv.boolean,
+        cv.Optional(CONF_CONTRAST, default=1.0): cv.float_,
+        cv.Optional("target_color"): cv.hex_int,
+        cv.Optional("color_tolerance", default=0.0): cv.float_,
+        # Per-dial sensors
+        cv.Optional(CONF_VALUE): sensor.sensor_schema(),
+        cv.Optional(CONF_CONFIDENCE): sensor.sensor_schema(),
+        cv.Optional(CONF_ANGLE): sensor.sensor_schema(),
+        # Internal Calibration Mapping
+        cv.Optional(CONF_CALIBRATION): cv.ensure_list(
+            cv.Schema(
+                {
+                    cv.Required(CONF_RAW): cv.float_,
+                    cv.Required(CONF_MAPPED): cv.float_,
+                }
+            )
+        ),
+    }
+)
 
-    # Per-dial sensors
-    cv.Optional(CONF_VALUE): sensor.sensor_schema(),
-    cv.Optional(CONF_CONFIDENCE): sensor.sensor_schema(),
-    cv.Optional(CONF_ANGLE): sensor.sensor_schema(),
 
-    # Internal Calibration Mapping
-    cv.Optional(CONF_CALIBRATION): cv.ensure_list(cv.Schema({
-        cv.Required(CONF_RAW): cv.float_,
-        cv.Required(CONF_MAPPED): cv.float_,
-    })),
-})
-
-
-CONFIG_SCHEMA = cv.Schema({
-    cv.GenerateID(): cv.declare_id(AnalogReader),
-    cv.Optional(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator) if value_validator else cv.string,
-    cv.Required(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera),
-    cv.Optional(CONF_VALUE_SENSOR): sensor.sensor_schema(),
-    cv.Required(CONF_DIALS): cv.ensure_list(DIAL_SCHEMA),
-    cv.Optional(CONF_PAUSED, default=False): cv.boolean,
-    cv.Optional(CONF_DEBUG, default=False): cv.boolean,
-    cv.Optional(CONF_STACKED_DIGITS, default=False): cv.boolean,
-}).extend(cv.polling_component_schema("60s"))
+CONFIG_SCHEMA = cv.Schema(
+    {
+        cv.GenerateID(): cv.declare_id(AnalogReader),
+        cv.Optional(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator)
+        if value_validator
+        else cv.string,
+        cv.Required(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera),
+        cv.Optional(CONF_VALUE_SENSOR): sensor.sensor_schema(),
+        cv.Required(CONF_DIALS): cv.ensure_list(DIAL_SCHEMA),
+        cv.Optional(CONF_PAUSED, default=False): cv.boolean,
+        cv.Optional(CONF_DEBUG, default=False): cv.boolean,
+        cv.Optional(CONF_STACKED_DIGITS, default=False): cv.boolean,
+    }
+).extend(cv.polling_component_schema("60s"))
 
 
 async def to_code(config):
@@ -182,16 +202,36 @@ async def to_code(config):
             ("min_scan_radius", dial[CONF_MIN_SCAN_RADIUS]),
             ("max_scan_radius", dial[CONF_MAX_SCAN_RADIUS]),
             ("deadzone_diameter", dial[CONF_DEADZONE_DIAMETER]),
-            ("value_sensor", await sensor.new_sensor(dial[CONF_VALUE]) if CONF_VALUE in dial else None),
-            ("confidence_sensor", await sensor.new_sensor(dial[CONF_CONFIDENCE]) if CONF_CONFIDENCE in dial else None),
-            ("angle_sensor", await sensor.new_sensor(dial[CONF_ANGLE]) if CONF_ANGLE in dial else None),
+            (
+                "value_sensor",
+                await sensor.new_sensor(dial[CONF_VALUE])
+                if CONF_VALUE in dial
+                else None,
+            ),
+            (
+                "confidence_sensor",
+                await sensor.new_sensor(dial[CONF_CONFIDENCE])
+                if CONF_CONFIDENCE in dial
+                else None,
+            ),
+            (
+                "angle_sensor",
+                await sensor.new_sensor(dial[CONF_ANGLE])
+                if CONF_ANGLE in dial
+                else None,
+            ),
         )
 
         # Handle calibration mapping
         if CONF_CALIBRATION in dial:
             # Convert list of dicts to list of pairs for C++ vector<pair<float,float>>
             # Generate C++ initializer list string: {{r1, m1}, {r2, m2}, ...}
-            cal_str = ", ".join([f"{{ {item[CONF_RAW]}f, {item[CONF_MAPPED]}f }}" for item in dial[CONF_CALIBRATION]])
+            cal_str = ", ".join(
+                [
+                    f"{{ {item[CONF_RAW]}f, {item[CONF_MAPPED]}f }}"
+                    for item in dial[CONF_CALIBRATION]
+                ]
+            )
             s.args["calibration_mapping"] = cg.RawExpression(f"{{ {cal_str} }}")
 
         cg.add(var.add_dial(s))
@@ -201,8 +241,8 @@ async def to_code(config):
     substitutions = CORE.config.get("substitutions", {})
     if substitutions.get("camera_resolution"):
         res = substitutions["camera_resolution"]
-        if 'x' in res:
-            width, height = map(int, res.split('x'))
+        if "x" in res:
+            width, height = map(int, res.split("x"))
 
     pixel_format = substitutions.get("camera_pixel_format", "RGB888")
     cg.add(var.set_camera_image_format(width, height, pixel_format))

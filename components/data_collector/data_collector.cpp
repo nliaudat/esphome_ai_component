@@ -4,7 +4,7 @@
 
 // For JPEG encoding
 // #include "esphome/components/esp32_camera/camera_image.h"
-#include "img_converters.h" // ESP32 Camera Utils
+#include "img_converters.h"  // ESP32 Camera Utils
 
 // For HTTP Client
 #include "esp_http_client.h"
@@ -31,7 +31,9 @@ void DataCollector::dump_config() {
   }
 }
 
-void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, int width, int height, const std::string& format, const std::string &raw_value, float confidence, const std::string &metadata) {
+void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, int width, int height,
+                                  const std::string &format, const std::string &raw_value, float confidence,
+                                  const std::string &metadata) {
   if (!frame) {
     ESP_LOGW(TAG, "No frame provided for collection");
     return;
@@ -49,32 +51,37 @@ void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, in
   }
 
   uint32_t start_time = millis();
-  ESP_LOGI(TAG, "Starting data collection (Value: %s, Confidence: %.2f%%, Size: %dx%d, Fmt: %s)",
-           raw_value.c_str(), confidence * 100.0f, width, height, format.c_str());
+  ESP_LOGI(TAG, "Starting data collection (Value: %s, Confidence: %.2f%%, Size: %dx%d, Fmt: %s)", raw_value.c_str(),
+           confidence * 100.0f, width, height, format.c_str());
 
   // Determine format
   pixformat_t pix_fmt = PIXFORMAT_GRAYSCALE;
-  if (format == "JPEG") pix_fmt = PIXFORMAT_JPEG;
-  else if (format == "RGB565") pix_fmt = PIXFORMAT_RGB565;
-  else if (format == "RGB888") pix_fmt = PIXFORMAT_RGB888;
-  else if (format == "YUV422") pix_fmt = PIXFORMAT_YUV422;
+  if (format == "JPEG")
+    pix_fmt = PIXFORMAT_JPEG;
+  else if (format == "RGB565")
+    pix_fmt = PIXFORMAT_RGB565;
+  else if (format == "RGB888")
+    pix_fmt = PIXFORMAT_RGB888;
+  else if (format == "YUV422")
+    pix_fmt = PIXFORMAT_YUV422;
 
   // Basic JPEG encoding
   uint8_t *jpeg_buf = nullptr;
   size_t jpeg_len = 0;
 
   if (pix_fmt == PIXFORMAT_JPEG) {
-      // Already JPEG, just cast (copy might be needed if upload logic modifies it, but here we likely just send)
-      jpeg_buf = const_cast<uint8_t *>(frame->get_data_buffer());
-      jpeg_len = frame->get_data_length();
+    // Already JPEG, just cast (copy might be needed if upload logic modifies it, but here we likely just send)
+    jpeg_buf = const_cast<uint8_t *>(frame->get_data_buffer());
+    jpeg_len = frame->get_data_length();
 
-      // We don't own this buffer, so we shouldn't free it unless we copied it.
-      this->upload_image(jpeg_buf, jpeg_len, raw_value, confidence, metadata.c_str());
-      return;
+    // We don't own this buffer, so we shouldn't free it unless we copied it.
+    this->upload_image(jpeg_buf, jpeg_len, raw_value, confidence, metadata.c_str());
+    return;
   }
 
   // Convert to JPEG
-  bool converted = fmt2jpg(const_cast<uint8_t *>(frame->get_data_buffer()), frame->get_data_length(), width, height, pix_fmt, 90, &jpeg_buf, &jpeg_len);
+  bool converted = fmt2jpg(const_cast<uint8_t *>(frame->get_data_buffer()), frame->get_data_length(), width, height,
+                           pix_fmt, 90, &jpeg_buf, &jpeg_len);
 
   if (!converted || !jpeg_buf) {
     ESP_LOGE(TAG, "JPEG compression failed");
@@ -88,134 +95,138 @@ void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, in
 }
 
 // Async wrapper
-bool DataCollector::upload_image(const uint8_t *data, size_t len, const std::string &raw_value, float confidence, const char *metadata) {
-    if (!this->upload_queue_) {
-        ESP_LOGE(TAG, "Upload queue not initialized");
-        return false;
-    }
+bool DataCollector::upload_image(const uint8_t *data, size_t len, const std::string &raw_value, float confidence,
+                                 const char *metadata) {
+  if (!this->upload_queue_) {
+    ESP_LOGE(TAG, "Upload queue not initialized");
+    return false;
+  }
 
-    // Allocate copy for the queue (Prefer PSRAM for large image buffers)
-    uint8_t *copy = static_cast<uint8_t *>(heap_caps_malloc(len, MALLOC_CAP_SPIRAM));
-    if (!copy) {
-        // Fallback to internal RAM if PSRAM not available or full
-        copy = static_cast<uint8_t *>(malloc(len));
-    }
+  // Allocate copy for the queue (Prefer PSRAM for large image buffers)
+  uint8_t *copy = static_cast<uint8_t *>(heap_caps_malloc(len, MALLOC_CAP_SPIRAM));
+  if (!copy) {
+    // Fallback to internal RAM if PSRAM not available or full
+    copy = static_cast<uint8_t *>(malloc(len));
+  }
 
-    if (!copy) {
-        ESP_LOGE(TAG, "Failed to allocate memory for upload queue (%zu bytes)", len);
-        return false;
-    }
-    memcpy(copy, data, len);
+  if (!copy) {
+    ESP_LOGE(TAG, "Failed to allocate memory for upload queue (%zu bytes)", len);
+    return false;
+  }
+  memcpy(copy, data, len);
 
-    UploadJob job;
-    job.data = copy;
-    job.len = len;
+  UploadJob job;
+  job.data = copy;
+  job.len = len;
 
-    // Copy string safely
-    strncpy(job.value, raw_value.c_str(), sizeof(job.value) - 1);
-    job.value[sizeof(job.value) - 1] = '\0'; // Ensure null-termination
+  // Copy string safely
+  strncpy(job.value, raw_value.c_str(), sizeof(job.value) - 1);
+  job.value[sizeof(job.value) - 1] = '\0';  // Ensure null-termination
 
-    job.confidence = confidence;
+  job.confidence = confidence;
 
-    // Handle Metadata
-    if (metadata && strlen(metadata) > 0) {
-        job.metadata_len = strlen(metadata) + 1;
-        job.metadata = (char*)heap_caps_malloc(job.metadata_len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-        if (job.metadata) {
-            strncpy(job.metadata, metadata, job.metadata_len);
-        } else {
-             ESP_LOGW(TAG, "Failed to allocate memory for metadata (%u bytes)", job.metadata_len);
-             job.metadata = nullptr;
-             job.metadata_len = 0;
-        }
+  // Handle Metadata
+  if (metadata && strlen(metadata) > 0) {
+    job.metadata_len = strlen(metadata) + 1;
+    job.metadata = (char *) heap_caps_malloc(job.metadata_len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (job.metadata) {
+      strncpy(job.metadata, metadata, job.metadata_len);
     } else {
-        job.metadata = nullptr;
-        job.metadata_len = 0;
+      ESP_LOGW(TAG, "Failed to allocate memory for metadata (%u bytes)", job.metadata_len);
+      job.metadata = nullptr;
+      job.metadata_len = 0;
     }
-
-    // Send to queue (non-blocking or small timeout)
-    if (xQueueSend(this->upload_queue_, &job, 10 / portTICK_PERIOD_MS) != pdTRUE) {
-        ESP_LOGE(TAG, "Upload queue full! Dropping image.");
-        // job destructor handles free(data) and free(metadata) via RAII
-        return false;
-    }
-
-    // Queued successfully — release ownership so destructor doesn't free
-    job.data = nullptr;
+  } else {
     job.metadata = nullptr;
-    return true;
+    job.metadata_len = 0;
+  }
+
+  // Send to queue (non-blocking or small timeout)
+  if (xQueueSend(this->upload_queue_, &job, 10 / portTICK_PERIOD_MS) != pdTRUE) {
+    ESP_LOGE(TAG, "Upload queue full! Dropping image.");
+    // job destructor handles free(data) and free(metadata) via RAII
+    return false;
+  }
+
+  // Queued successfully — release ownership so destructor doesn't free
+  job.data = nullptr;
+  job.metadata = nullptr;
+  return true;
 }
 
 void DataCollector::start_upload_task() {
-    // Create queue for 5 items (approx 250KB if 50KB each)
-    this->upload_queue_ = xQueueCreate(5, sizeof(UploadJob));
-    if (!this->upload_queue_) {
-        ESP_LOGE(TAG, "Failed to create upload queue");
-        return;
-    }
+  // Create queue for 5 items (approx 250KB if 50KB each)
+  this->upload_queue_ = xQueueCreate(5, sizeof(UploadJob));
+  if (!this->upload_queue_) {
+    ESP_LOGE(TAG, "Failed to create upload queue");
+    return;
+  }
 
-    // Create task and store handle for cleanup
-    this->task_running_ = true;
-    xTaskCreate(DataCollector::upload_task, "upload_worker", 4096, this, tskIDLE_PRIORITY + 1, &this->upload_task_handle_);
+  // Create task and store handle for cleanup
+  this->task_running_ = true;
+  xTaskCreate(DataCollector::upload_task, "upload_worker", 4096, this, tskIDLE_PRIORITY + 1,
+              &this->upload_task_handle_);
 }
 
 void DataCollector::upload_task(void *arg) {
-    DataCollector *collector = static_cast<DataCollector*>(arg);
-    UploadJob job;
+  DataCollector *collector = static_cast<DataCollector *>(arg);
+  UploadJob job;
 
-    while (collector->task_running_.load()) {
-        // Use a timeout so we periodically check task_running_
-        if (xQueueReceive(collector->upload_queue_, &job, 1000 / portTICK_PERIOD_MS) == pdTRUE) {
-            // Process upload
-            collector->process_upload_sync(job.data, job.len, std::string(job.value), job.confidence, job.metadata);
+  while (collector->task_running_.load()) {
+    // Use a timeout so we periodically check task_running_
+    if (xQueueReceive(collector->upload_queue_, &job, 1000 / portTICK_PERIOD_MS) == pdTRUE) {
+      // Process upload
+      collector->process_upload_sync(job.data, job.len, std::string(job.value), job.confidence, job.metadata);
 
-            // Manual free required: xQueueReceive uses raw memcpy to overwrite job struct,
-            // bypassing C++ assignment operators and RAII. Previous iteration's pointers
-            // would be overwritten without freeing.
-            free(job.data);
-            job.data = nullptr;
-            if (job.metadata) {
-                free(job.metadata);
-                job.metadata = nullptr;
-            }
-        }
+      // Manual free required: xQueueReceive uses raw memcpy to overwrite job struct,
+      // bypassing C++ assignment operators and RAII. Previous iteration's pointers
+      // would be overwritten without freeing.
+      free(job.data);
+      job.data = nullptr;
+      if (job.metadata) {
+        free(job.metadata);
+        job.metadata = nullptr;
+      }
     }
-    vTaskDelete(nullptr);
+  }
+  vTaskDelete(nullptr);
 }
 
 DataCollector::~DataCollector() {
-    // Signal task to stop
-    this->task_running_ = false;
+  // Signal task to stop
+  this->task_running_ = false;
 
-    // Wait briefly for task to exit
-    if (this->upload_task_handle_) {
-        vTaskDelay(1100 / portTICK_PERIOD_MS); // Slightly longer than queue timeout
-        // If task hasn't exited yet, force delete
-        eTaskState state = eTaskGetState(this->upload_task_handle_);
-        if (state != eDeleted) {
-            vTaskDelete(this->upload_task_handle_);
-        }
-        this->upload_task_handle_ = nullptr;
+  // Wait briefly for task to exit
+  if (this->upload_task_handle_) {
+    vTaskDelay(1100 / portTICK_PERIOD_MS);  // Slightly longer than queue timeout
+    // If task hasn't exited yet, force delete
+    eTaskState state = eTaskGetState(this->upload_task_handle_);
+    if (state != eDeleted) {
+      vTaskDelete(this->upload_task_handle_);
     }
+    this->upload_task_handle_ = nullptr;
+  }
 
-    // Drain remaining queue items — manual free required (xQueueReceive raw memcpy)
-    if (this->upload_queue_) {
-        UploadJob job;
-        while (xQueueReceive(this->upload_queue_, &job, 0) == pdTRUE) {
-            free(job.data);
-            job.data = nullptr;
-            if (job.metadata) {
-                free(job.metadata);
-                job.metadata = nullptr;
-            }
-        }
-        vQueueDelete(this->upload_queue_);
-        this->upload_queue_ = nullptr;
+  // Drain remaining queue items — manual free required (xQueueReceive raw memcpy)
+  if (this->upload_queue_) {
+    UploadJob job;
+    while (xQueueReceive(this->upload_queue_, &job, 0) == pdTRUE) {
+      free(job.data);
+      job.data = nullptr;
+      if (job.metadata) {
+        free(job.metadata);
+        job.metadata = nullptr;
+      }
     }
+    vQueueDelete(this->upload_queue_);
+    this->upload_queue_ = nullptr;
+  }
 }
 
-bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, const std::string &raw_value, float confidence, const char *metadata) {
-  if (this->upload_url_.empty()) return false;
+bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, const std::string &raw_value, float confidence,
+                                        const char *metadata) {
+  if (this->upload_url_.empty())
+    return false;
 
   ESP_LOGI(TAG, "Uploading image to %s...", this->upload_url_.c_str());
 
@@ -225,9 +236,9 @@ bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, const s
   config.timeout_ms = 10000;
 
   if (!this->username_.empty()) {
-      config.username = this->username_.c_str();
-      config.password = this->password_.c_str();
-      config.auth_type = HTTP_AUTH_TYPE_BASIC;
+    config.username = this->username_.c_str();
+    config.password = this->password_.c_str();
+    config.auth_type = HTTP_AUTH_TYPE_BASIC;
   }
 
   esp_http_client_handle_t client = esp_http_client_init(&config);
@@ -240,13 +251,13 @@ bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, const s
   esp_http_client_set_header(client, "Content-Type", "image/jpeg");
 
   if (!this->api_key_.empty()) {
-       // Check if it starts with "Bearer " or just a key
-       if (this->api_key_.rfind("Bearer ", 0) == 0) {
-           esp_http_client_set_header(client, "Authorization", this->api_key_.c_str());
-       } else {
-           // Default to X-Api-Key if no Bearer token structure is detected.
-           esp_http_client_set_header(client, "X-Api-Key", this->api_key_.c_str());
-       }
+    // Check if it starts with "Bearer " or just a key
+    if (this->api_key_.rfind("Bearer ", 0) == 0) {
+      esp_http_client_set_header(client, "Authorization", this->api_key_.c_str());
+    } else {
+      // Default to X-Api-Key if no Bearer token structure is detected.
+      esp_http_client_set_header(client, "X-Api-Key", this->api_key_.c_str());
+    }
   }
 
   // Add metadata headers
@@ -258,21 +269,21 @@ bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, const s
   esp_http_client_set_header(client, "X-Meter-Confidence", buf);
 
   if (metadata) {
-       esp_http_client_set_header(client, "X-Meter-Json", metadata);
+    esp_http_client_set_header(client, "X-Meter-Json", metadata);
   }
 
-  esp_http_client_set_post_field(client, (const char *)data, len);
+  esp_http_client_set_post_field(client, (const char *) data, len);
 
   esp_err_t err = esp_http_client_perform(client);
   bool success = false;
 
   if (err == ESP_OK) {
     int status_code = esp_http_client_get_status_code(client);
-    ESP_LOGI(TAG, "HTTP POST Status = %d, content_length = %lld",
-             status_code, esp_http_client_get_content_length(client));
+    ESP_LOGI(TAG, "HTTP POST Status = %d, content_length = %lld", status_code,
+             esp_http_client_get_content_length(client));
     if (this->debug_) {
-        ESP_LOGD(TAG, "Full upload metrics: Value=%s, Conf=%.4f, Size=%zu", raw_value.c_str(), confidence, len);
-        ESP_LOGD(TAG, "Headers sent: X-Meter-Value, X-Meter-Confidence, Content-Type, Authorization");
+      ESP_LOGD(TAG, "Full upload metrics: Value=%s, Conf=%.4f, Size=%zu", raw_value.c_str(), confidence, len);
+      ESP_LOGD(TAG, "Headers sent: X-Meter-Value, X-Meter-Confidence, Content-Type, Authorization");
     }
     success = (status_code >= 200 && status_code < 300);
   } else {

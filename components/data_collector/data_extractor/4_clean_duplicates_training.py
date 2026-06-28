@@ -1,14 +1,35 @@
 import argparse
+from pathlib import Path
 import subprocess
 import sys
-from pathlib import Path
+
 
 def main():
-    parser = argparse.ArgumentParser(description='Clean duplicates from training folder based on new inference detection.')
-    parser.add_argument('--folder', default='training', help='Folder containing training images (default: training)')
-    parser.add_argument('--threshold', type=int, default=5, help='Perceptual hash threshold (default: 5)')
-    parser.add_argument('--keep', choices=['oldest', 'newest', 'first'], default='newest', help='Which file to keep (default: newest)')
-    parser.add_argument('--dry-run', action='store_true', help='Show what would be deleted without actually deleting')
+    parser = argparse.ArgumentParser(
+        description="Clean duplicates from training folder based on new inference detection."
+    )
+    parser.add_argument(
+        "--folder",
+        default="training",
+        help="Folder containing training images (default: training)",
+    )
+    parser.add_argument(
+        "--threshold",
+        type=int,
+        default=5,
+        help="Perceptual hash threshold (default: 5)",
+    )
+    parser.add_argument(
+        "--keep",
+        choices=["oldest", "newest", "first"],
+        default="newest",
+        help="Which file to keep (default: newest)",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be deleted without actually deleting",
+    )
 
     args = parser.parse_args()
 
@@ -23,10 +44,14 @@ def main():
     cmd = [
         sys.executable,
         str(dedup_script),
-        "--folder", args.folder,
-        "--threshold", str(args.threshold),
-        "--keep", args.keep,
-        "--confidence", "0.0",  # We want to deduplicate ALL training images regardless of their new confidence
+        "--folder",
+        args.folder,
+        "--threshold",
+        str(args.threshold),
+        "--keep",
+        args.keep,
+        "--confidence",
+        "0.0",  # We want to deduplicate ALL training images regardless of their new confidence
     ]
 
     if args.dry_run:
@@ -40,6 +65,7 @@ def main():
     except subprocess.CalledProcessError as e:
         print(f"Error executing deduplicate script: {e}")
         sys.exit(e.returncode)
+
 
 if __name__ == "__main__":
     main()

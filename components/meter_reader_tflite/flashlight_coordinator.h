@@ -20,8 +20,8 @@ namespace meter_reader_tflite {
 class FlashlightCoordinator {
  public:
 #ifdef USE_FLASH_LIGHT_CONTROLLER
-  void setup(Component* parent, light::LightState* legacy_light,
-             flash_light_controller::FlashLightController* controller);
+  void setup(Component *parent, light::LightState *legacy_light,
+             flash_light_controller::FlashLightController *controller);
 
   // Configuration
   void set_timing(uint32_t pre_time, uint32_t post_time);
@@ -46,25 +46,24 @@ class FlashlightCoordinator {
   void set_debug(bool debug) { this->debug_ = debug; }
 
  private:
-  Component* parent_{nullptr};
-  light::LightState* legacy_light_{nullptr};
-  flash_light_controller::FlashLightController* controller_{nullptr};
+  Component *parent_{nullptr};
+  light::LightState *legacy_light_{nullptr};
+  flash_light_controller::FlashLightController *controller_{nullptr};
 
   uint32_t pre_time_{5000};
   uint32_t post_time_{2000};
-  uint32_t update_interval_{60000}; // Default
+  uint32_t update_interval_{60000};  // Default
 
   bool scheduled_{false};
-  std::atomic<bool> auto_controlled_{false}; // If we turned it on autonomously
+  std::atomic<bool> auto_controlled_{false};  // If we turned it on autonomously
   bool debug_{false};
 
   std::function<void()> request_frame_callback_;
 
-  template<typename F>
-  void schedule_timeout(uint32_t ms, F&& f);
+  template<typename F> void schedule_timeout(uint32_t ms, F &&f);
 #else
   // Dummy implementation
-  void setup(Component* parent, light::LightState* legacy_light, void* controller) {}
+  void setup(Component *parent, light::LightState *legacy_light, void *controller) {}
   void set_timing(uint32_t pre_time, uint32_t post_time) {}
   void set_update_interval(uint32_t interval_ms) {}
   uint32_t get_pre_time() const { return 0; }
@@ -82,4 +81,4 @@ class FlashlightCoordinator {
 }  // namespace meter_reader_tflite
 }  // namespace esphome
 
-#endif // USE_METER_READER_TFLITE
+#endif  // USE_METER_READER_TFLITE

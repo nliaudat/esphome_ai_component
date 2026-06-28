@@ -34,7 +34,7 @@ class Esp32CameraUtils : public Component {
 
   // New methods for image processing and camera management
   void set_camera_image_format(int width, int height, const std::string &pixel_format);
-  void reinitialize_image_processor(const ImageProcessorConfig& config_template);
+  void reinitialize_image_processor(const ImageProcessorConfig &config_template);
   bool test_camera_after_reset();
   void basic_camera_recovery();
 
@@ -42,11 +42,11 @@ class Esp32CameraUtils : public Component {
   bool reset_window(int &width, int &height);
 
   // Expose image processor for usage
-  ImageProcessor* get_image_processor() { return this->image_processor_.get(); }
+  ImageProcessor *get_image_processor() { return this->image_processor_.get(); }
 
   // Helper to process a zone directly
-  bool process_zone(std::shared_ptr<camera::CameraImage> frame, const CropZone& zone,
-                   uint8_t* output_buffer, size_t output_size);
+  bool process_zone(std::shared_ptr<camera::CameraImage> frame, const CropZone &zone, uint8_t *output_buffer,
+                    size_t output_size);
 
   // Image rotation configuration (0, 90, 180, 270 degrees clockwise, or arbitrary)
   void set_rotation(float rotation) { this->rotation_ = rotation; }
@@ -76,14 +76,13 @@ class Esp32CameraUtils : public Component {
   void set_camera_free_psram_sensor(sensor::Sensor *s) { this->camera_free_psram_sensor_ = s; }
 #endif
 
-
  protected:
   int offset_x_{0};
   int offset_y_{0};
   int width_{0};
   int height_{0};
   bool has_config_{false};
-  float rotation_{0.0f};                          ///< Image rotation in degrees
+  float rotation_{0.0f};  ///< Image rotation in degrees
 
   int scaler_width_{0};
   int scaler_height_{0};
@@ -117,7 +116,6 @@ class Esp32CameraUtils : public Component {
   sensor::Sensor *camera_buffer_size_sensor_{nullptr};
   sensor::Sensor *camera_free_psram_sensor_{nullptr};
 #endif
-
 };
 
 }  // namespace esp32_camera_utils

@@ -2,7 +2,7 @@
 
 #include "esphome/core/component.h"
 #include "esphome/components/camera/camera.h"
-//#include "esphome/components/esp32_camera/esp32_camera.h"
+// #include "esphome/components/esp32_camera/esp32_camera.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/button/button.h"
@@ -38,12 +38,12 @@
 
 // FreeDeleter for PSRAM/internal RAM buffers (shared with value_validator pattern)
 struct FreeDeleter {
-  void operator()(uint8_t* p) const { free(p); }
+  void operator()(uint8_t *p) const { free(p); }
 };
 
 // Check for Dual Core capability
 #if !defined(CONFIG_FREERTOS_UNICORE) && (portNUM_PROCESSORS > 1)
-    #define SUPPORT_DOUBLE_BUFFERING
+#define SUPPORT_DOUBLE_BUFFERING
 #endif
 
 #ifdef SUPPORT_DOUBLE_BUFFERING
@@ -81,17 +81,17 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
   // Config Setters (Delegated)
   void set_confidence_threshold(float threshold) { this->confidence_threshold_ = threshold; }
-  void set_tensor_arena_size(size_t size_bytes); // -> TFLite
-  void set_model(const uint8_t *model, size_t length); // -> TFLite
+  void set_tensor_arena_size(size_t size_bytes);        // -> TFLite
+  void set_model(const uint8_t *model, size_t length);  // -> TFLite
 
   // Dynamic model config setters (delegated to TFLiteCoordinator)
-  void set_input_type(const std::string& t) { this->tflite_coord_.set_input_type(t); }
+  void set_input_type(const std::string &t) { this->tflite_coord_.set_input_type(t); }
   void set_input_channels(int c) { this->tflite_coord_.set_input_channels(c); }
   void set_input_width(int w) { this->tflite_coord_.set_input_width(w); }
   void set_input_height(int h) { this->tflite_coord_.set_input_height(h); }
-  void set_output_processing(const std::string& p) { this->tflite_coord_.set_output_processing(p); }
+  void set_output_processing(const std::string &p) { this->tflite_coord_.set_output_processing(p); }
   void set_scale_factor(float f) { this->tflite_coord_.set_scale_factor(f); }
-  void set_input_order(const std::string& o) { this->tflite_coord_.set_input_order(o); }
+  void set_input_order(const std::string &o) { this->tflite_coord_.set_input_order(o); }
   void set_normalize(bool n) { this->tflite_coord_.set_normalize(n); }
   void set_invert(bool i) { this->tflite_coord_.set_invert(i); }
 
@@ -105,17 +105,17 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
   void set_crop_zones(const std::string &zones_json);
   void set_crop_zones_global(globals::GlobalsComponent<std::string> *global_var) {
-      this->crop_zone_handler_.set_crop_zones_global(global_var);
+    this->crop_zone_handler_.set_crop_zones_global(global_var);
   }
 
-  void set_camera_image_format(int width, int height, const std::string &pixel_format); // -> CameraCoord & TFLite
-  void set_camera(camera::Camera *camera); // -> CameraCoord
+  void set_camera_image_format(int width, int height, const std::string &pixel_format);  // -> CameraCoord & TFLite
+  void set_camera(camera::Camera *camera);                                               // -> CameraCoord
 
   sensor::Sensor *get_value_sensor() const { return value_sensor_; }
   sensor::Sensor *get_confidence_sensor() const { return confidence_sensor_; }
 
-  void set_model_config(const std::string &model_type); // -> TFLite
-  void set_rotation(float rotation) { this->rotation_ = rotation; } // Storage, passed to TFLite late
+  void set_model_config(const std::string &model_type);              // -> TFLite
+  void set_rotation(float rotation) { this->rotation_ = rotation; }  // Storage, passed to TFLite late
 
   void set_generate_preview(bool generate);
   void set_show_crop_areas(bool show) { this->show_crop_areas_ = show; }
@@ -131,7 +131,6 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   bool request_preview_{false};
 
  public:
-
   // Debug/Reporting
   static void register_service(MeterReaderTFLite *comp) { comp->print_debug_info(); }
   void print_debug_info();
@@ -150,20 +149,19 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_update_interval(uint32_t ms);
 
   // Flashlight
-  void set_flash_light(light::LightState* flash_light);
+  void set_flash_light(light::LightState *flash_light);
 #ifdef USE_FLASH_LIGHT_CONTROLLER
-  void set_flash_controller(flash_light_controller::FlashLightController* controller);
+  void set_flash_controller(flash_light_controller::FlashLightController *controller);
 #endif
   void set_flash_pre_time(uint32_t ms);
   void set_flash_post_time(uint32_t ms);
-  void force_flash_inference(); // Service
+  void force_flash_inference();  // Service
   void set_enable_flash_calibration(bool enable) { this->enable_flash_calibration_ = enable; }
 
   // Calibration
   void start_flash_calibration();
   void update_calibration(float confidence);
   bool is_calibrating() const { return this->calibration_.state != FlashCalibrationHandler::IDLE; }
-
 
   // Window Control
   void set_camera_window_offset_x(int x);
@@ -181,12 +179,12 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
   void set_esp32_camera_utils(esp32_camera_utils::Esp32CameraUtils *utils) { this->esp32_camera_utils_ = utils; }
 
-  #ifdef USE_DATA_COLLECTOR
+#ifdef USE_DATA_COLLECTOR
   void set_data_collector(data_collector::DataCollector *collector) { this->data_collector_ = collector; }
   void set_collect_low_confidence(bool collect) { this->collect_low_confidence_ = collect; }
   void set_collect_min_global_confidence(float min_conf) { this->collect_min_global_confidence_ = min_conf; }
   void set_collect_min_digit_confidence(float min_conf) { this->collect_min_digit_confidence_ = min_conf; }
-  #endif
+#endif
 
   // Dynamic Resource Management
   void unload_resources();
@@ -215,7 +213,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 #endif
 
 #ifdef DEBUG_METER_READER_TFLITE
-  void set_debug_image(const uint8_t* data, size_t size);
+  void set_debug_image(const uint8_t *data, size_t size);
   void test_with_debug_image();
   void set_debug_mode(bool m);
   void debug_test_with_pattern();
@@ -224,9 +222,9 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
  protected:
   esp32_camera_utils::Esp32CameraUtils *esp32_camera_utils_{nullptr};
-  #ifdef USE_DATA_COLLECTOR
+#ifdef USE_DATA_COLLECTOR
   data_collector::DataCollector *data_collector_{nullptr};
-  #endif
+#endif
 
   // Coordinators
   TFLiteCoordinator tflite_coord_;
@@ -240,13 +238,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   ValueValidatorCoordinator validation_coord_;
 
   // State — Single atomic state machine
-  enum class FrameState : uint8_t {
-    IDLE,
-    REQUESTED,
-    AVAILABLE,
-    PROCESSING,
-    TIMEOUT
-  };
+  enum class FrameState : uint8_t { IDLE, REQUESTED, AVAILABLE, PROCESSING, TIMEOUT };
   std::atomic<FrameState> frame_state_{FrameState::IDLE};
   std::atomic<bool> pause_processing_{false};
   std::shared_ptr<camera::CameraImage> pending_frame_{nullptr};
@@ -270,54 +262,49 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   std::unique_ptr<uint8_t[], FreeDeleter> preview_fallback_buffer_;
   size_t preview_fallback_buffer_size_{0};
 
-  // Data Collection
-  #ifdef USE_DATA_COLLECTOR
+// Data Collection
+#ifdef USE_DATA_COLLECTOR
   bool collect_low_confidence_{true};
   float low_confidence_trigger_threshold_{0.0f};
   float collect_min_global_confidence_{0.90f};
   float collect_min_digit_confidence_{0.90f};
 
-  enum CollectionState {
-      COLLECTION_IDLE,
-      COLLECTION_WAITING_FOR_FLASH,
-      COLLECTION_WAITING_FOR_FRAME
-  };
+  enum CollectionState { COLLECTION_IDLE, COLLECTION_WAITING_FOR_FLASH, COLLECTION_WAITING_FOR_FRAME };
   std::atomic<CollectionState> collection_state_{COLLECTION_IDLE};
 
   // Storage for pending collection
   struct PendingCollection {
-      std::string value;
-      float confidence;
-      std::string extra_metadata;
+    std::string value;
+    float confidence;
+    std::string extra_metadata;
   } pending_collection_;
 
   void trigger_low_confidence_collection(const std::string &value, float confidence, const std::string &metadata = "");
   std::string serialize_inference_metadata(const std::string &value, float confidence,
-                                          const esphome::StaticVector<float, 16> &readings,
-                                          const esphome::StaticVector<float, 16> &confidences,
-                                          int width, int height);
-  #endif
+                                           const esphome::StaticVector<float, 16> &readings,
+                                           const esphome::StaticVector<float, 16> &confidences, int width, int height);
+#endif
 
   // Calibration
   struct FlashCalibrationHandler {
-      enum State { IDLE, CALIBRATING_PRE, CALIBRATING_POST, FINISHED };
+    enum State { IDLE, CALIBRATING_PRE, CALIBRATING_POST, FINISHED };
 
-      State state{IDLE};
-      uint32_t current_pre{0};
-      uint32_t current_post{0};
-      uint32_t best_pre{0};
-      uint32_t best_post{0};
-      float baseline_confidence{0.0f};
-      float best_confidence{0.0f};
-      uint32_t step_start_time{0};
+    State state{IDLE};
+    uint32_t current_pre{0};
+    uint32_t current_post{0};
+    uint32_t best_pre{0};
+    uint32_t best_post{0};
+    float baseline_confidence{0.0f};
+    float best_confidence{0.0f};
+    uint32_t step_start_time{0};
 
-      // Configuration — initialised by start_flash_calibration() from .cpp constexpr values
-      uint32_t start_pre;
-      uint32_t end_pre;
-      uint32_t step_pre;
-      uint32_t start_post;
-      uint32_t end_post;
-      uint32_t step_post;
+    // Configuration — initialised by start_flash_calibration() from .cpp constexpr values
+    uint32_t start_pre;
+    uint32_t end_pre;
+    uint32_t step_pre;
+    uint32_t start_post;
+    uint32_t end_post;
+    uint32_t step_post;
   } calibration_;
 
   void update_calibration();
@@ -347,48 +334,48 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   button::Button *unload_button_{nullptr};
   button::Button *reload_button_{nullptr};
 
-
   // Helper
   void process_available_frame();
   void process_full_image(std::shared_ptr<camera::CameraImage> frame);
 
   // Refactored: Integer-based combination (avoids heap alloc from std::string)
-  float combine_readings(const esphome::StaticVector<float, 16>& readings, std::string &out_str);
+  float combine_readings(const esphome::StaticVector<float, 16> &readings, std::string &out_str);
 
   // Consolidated: Replaces 4 copies of ImageProcessorConfig construction
   void refresh_image_processor_config(int processor_input_type);
-  bool validate_and_update_reading(float raw, float conf, float& val);
-  bool validate_and_update_reading(const esphome::StaticVector<float, 16>& digits, const esphome::StaticVector<float, 16>& confidences, float& val);
+  bool validate_and_update_reading(float raw, float conf, float &val);
+  bool validate_and_update_reading(const esphome::StaticVector<float, 16> &digits,
+                                   const esphome::StaticVector<float, 16> &confidences, float &val);
 
   // Inference result publishing
-  void publish_inference_result(const std::string& digit_str, float avg_conf, float validated_val, bool valid,
-                                const esphome::StaticVector<float, 16>& readings,
-                                const esphome::StaticVector<float, 16>& confidences);
+  void publish_inference_result(const std::string &digit_str, float avg_conf, float validated_val, bool valid,
+                                const esphome::StaticVector<float, 16> &readings,
+                                const esphome::StaticVector<float, 16> &confidences);
 
 #ifdef USE_WEB_SERVER
   web_server_base::WebServerBase *web_server_{nullptr};
 #endif
 
 #ifdef SUPPORT_DOUBLE_BUFFERING
-// Double Buffering / Multithreading
+  // Double Buffering / Multithreading
  public:
   struct InferenceJob {
-      std::shared_ptr<camera::CameraImage> frame;
-      std::vector<esp32_camera_utils::ImageProcessor::ProcessResult> crops;
-      uint32_t start_time;
-      uint32_t request_time;
+    std::shared_ptr<camera::CameraImage> frame;
+    std::vector<esp32_camera_utils::ImageProcessor::ProcessResult> crops;
+    uint32_t start_time;
+    uint32_t request_time;
   };
 
   struct InferenceResult {
-      esphome::StaticVector<float, 16> readings;
-      esphome::StaticVector<float, 16> probabilities;
-      uint32_t inference_time;
-      uint32_t total_start_time;
-      uint32_t request_time;
-      #ifdef DEBUG_METER_READER_MEMORY
-      size_t arena_used_bytes;
-      #endif
-      bool success;
+    esphome::StaticVector<float, 16> readings;
+    esphome::StaticVector<float, 16> probabilities;
+    uint32_t inference_time;
+    uint32_t total_start_time;
+    uint32_t request_time;
+#ifdef DEBUG_METER_READER_MEMORY
+    size_t arena_used_bytes;
+#endif
+    bool success;
   };
 
   QueueHandle_t input_queue_{nullptr};

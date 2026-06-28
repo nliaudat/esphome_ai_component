@@ -16,14 +16,15 @@ import sys
 import time
 
 import colorama
-from helpers import filter_changed, git_ls_files, print_error_for_file, styled
 
 sys.path.append(str(Path(__file__).parent))
+
+from helpers import filter_changed, git_ls_files, print_error_for_file, styled
 
 
 def find_all(a_str, sub):
     """Yield (line, column) tuples for each occurrence of sub in a_str."""
-    if not a_str.find(sub):
+    if not sub or sub not in a_str:
         # Optimization: If str is not in whole text, then do not try
         # on each line
         return
@@ -64,12 +65,31 @@ file_types = (
 cpp_include = ("*.h", "*.c", "*.cpp", "*.tcc")
 py_include = ("*.py",)
 ignore_types = (
-    ".ico", ".png", ".woff", ".woff2", "",
-    ".ttf", ".otf", ".pcf", ".apng", ".gif",
-    ".webp", ".bin", ".wav",
-    ".md", ".md_old", ".html", ".js", ".css",
-    ".json", ".txt", ".rst",
-    ".svg", ".jpg", ".jpeg", ".tflite",
+    ".ico",
+    ".png",
+    ".woff",
+    ".woff2",
+    "",
+    ".ttf",
+    ".otf",
+    ".pcf",
+    ".apng",
+    ".gif",
+    ".webp",
+    ".bin",
+    ".wav",
+    ".md",
+    ".md_old",
+    ".html",
+    ".js",
+    ".css",
+    ".json",
+    ".txt",
+    ".rst",
+    ".svg",
+    ".jpg",
+    ".jpeg",
+    ".tflite",
 )
 
 LINT_FILE_CHECKS = []
@@ -145,17 +165,21 @@ def _add_check(checks, func, include=None, exclude=None):
 
 def lint_file_check(**kwargs):
     """Decorator to register a file-level lint check."""
+
     def decorator(func):
         _add_check(LINT_FILE_CHECKS, func, **kwargs)
         return func
+
     return decorator
 
 
 def lint_content_check(**kwargs):
     """Decorator to register a content-level lint check."""
+
     def decorator(func):
         _add_check(LINT_CONTENT_CHECKS, func, **kwargs)
         return func
+
     return decorator
 
 
@@ -275,7 +299,20 @@ def lint_newline(fname, line, col, content):
     return "File contains Windows newline (CRLF). Please set your editor to Unix newline mode (LF)."
 
 
-@lint_content_check(exclude=["*.svg", "*.png", "*.ico", "*.woff", "*.woff2", "*.ttf", "*.otf", "*.gif", "*.webp", "*.bin"])
+@lint_content_check(
+    exclude=[
+        "*.svg",
+        "*.png",
+        "*.ico",
+        "*.woff",
+        "*.woff2",
+        "*.ttf",
+        "*.otf",
+        "*.gif",
+        "*.webp",
+        "*.bin",
+    ]
+)
 def lint_end_newline(fname, content):
     """Require file to end with a newline."""
     if content and not content.endswith("\n"):
@@ -746,7 +783,7 @@ def lint_no_raw_pin_access(fname, match):
 def relative_cpp_search_text(fname: Path, content) -> str:
     """Find absolute includes within the same component."""
     parts = fname.parts
-    if len(parts) < 3 or parts[0] != 'components':
+    if len(parts) < 3 or parts[0] != "components":
         return None
     integration = parts[1]
     return f'#include "components/{integration}'
@@ -756,7 +793,7 @@ def relative_cpp_search_text(fname: Path, content) -> str:
 def lint_relative_cpp_import(fname, line, col, content):
     """Reject absolute includes within a component (must use relative)."""
     parts = fname.parts
-    integration = parts[1] if len(parts) > 1 else ''
+    integration = parts[1] if len(parts) > 1 else ""
     return (
         "Component contains absolute import - Components must always use "
         "relative imports.\n"
@@ -770,7 +807,7 @@ def lint_relative_cpp_import(fname, line, col, content):
 def relative_py_search_text(fname: Path, content: str) -> str:
     """Find absolute Python imports within the same component."""
     parts = fname.parts
-    if len(parts) < 3 or parts[0] != 'components':
+    if len(parts) < 3 or parts[0] != "components":
         return None
     integration = parts[1]
     return f"components.{integration}"
@@ -791,7 +828,7 @@ def lint_relative_py_import(fname: Path, line, col, content):
     replacement = abspath
     # Simplify: suggest using . prefix for same-package imports
     if current.startswith("components."):
-        pkg = current[len("components."):].split(".")
+        pkg = current[len("components.") :].split(".")
         target = abspath.split(".")
         # Find common prefix and suggest relative
         i = 0
@@ -825,7 +862,7 @@ def lint_relative_py_import(fname: Path, line, col, content):
 def lint_namespace(fname: Path, content: str) -> str | None:
     """Verify C++ files have a namespace matching the integration name."""
     parts = fname.parts
-    if len(parts) < 2 or parts[0] != 'components':
+    if len(parts) < 2 or parts[0] != "components":
         return None
     expected_name = parts[1]
     # Check for both old style and C++17 nested namespace syntax

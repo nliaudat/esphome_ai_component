@@ -16,13 +16,14 @@ import argparse
 import os
 import subprocess
 import sys
-from datetime import datetime
 
 # Paths relative to this script's location
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.normpath(os.path.join(SCRIPT_DIR, ".."))
 MODELS_DIR = os.path.join(PROJECT_ROOT, "models")
-DATA_EXTRACTOR_MODELS_DIR = os.path.join(PROJECT_ROOT, "components", "data_collector", "data_extractor", "models")
+DATA_EXTRACTOR_MODELS_DIR = os.path.join(
+    PROJECT_ROOT, "components", "data_collector", "data_extractor", "models"
+)
 CHECK_SCRIPT = os.path.join(SCRIPT_DIR, "check_tflite_model.py")
 
 
@@ -64,7 +65,8 @@ def regenerate_report(tflite_path, txt_path, verbose=False):
         sys.executable,
         CHECK_SCRIPT,
         tflite_path,
-        "--output_file", txt_path,
+        "--output_file",
+        txt_path,
         "--verbose",
     ]
 
@@ -147,7 +149,7 @@ def main():
             tflite_files = [model_path]
         else:
             print(f"[ERROR] Model not found: {args.model}")
-            print(f"   Available models:")
+            print("   Available models:")
             for f in tflite_files:
                 print(f"     - {os.path.basename(f)}")
             sys.exit(1)
@@ -169,17 +171,25 @@ def main():
 
         # Check if regeneration is needed
         if not args.force and not needs_regeneration(tflite_path, txt_path):
-            print(f"[{i}/{len(tflite_files)}] [SKIP] {model_name} -> {txt_name}  (up to date)")
+            print(
+                f"[{i}/{len(tflite_files)}] [SKIP] {model_name} -> {txt_name}  (up to date)"
+            )
             stats["skipped"] += 1
             continue
 
         if args.dry_run:
-            print(f"[{i}/{len(tflite_files)}] [DRY]  {model_name} -> {txt_name}  (would regenerate)")
+            print(
+                f"[{i}/{len(tflite_files)}] [DRY]  {model_name} -> {txt_name}  (would regenerate)"
+            )
             stats["skipped"] += 1
             continue
 
         # Regenerate
-        print(f"[{i}/{len(tflite_files)}] [RUN]  {model_name} -> {txt_name} ...", end=" ", flush=True)
+        print(
+            f"[{i}/{len(tflite_files)}] [RUN]  {model_name} -> {txt_name} ...",
+            end=" ",
+            flush=True,
+        )
 
         success, error = regenerate_report(tflite_path, txt_path, verbose=args.verbose)
 
@@ -190,7 +200,7 @@ def main():
                 print(f"[OK] ({size_kb:.1f} KB)")
                 stats["regenerated"] += 1
             else:
-                print(f"[WARN] (no output file)")
+                print("[WARN] (no output file)")
                 stats["failed"] += 1
         else:
             print(f"[FAIL] {error}")

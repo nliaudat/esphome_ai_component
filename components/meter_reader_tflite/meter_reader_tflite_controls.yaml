@@ -171,7 +171,7 @@ button:
   #   on_press:
   #     - lambda: |-
   #         if (id(${id_prefix}_meter_reader) != nullptr) {
-  #           id(${id_prefix}_meter_reader)->start_flash_calibration(); 
+  #           id(${id_prefix}_meter_reader)->start_flash_calibration();
   #         }
 
   # Unload AI Components
@@ -217,7 +217,7 @@ sensor:
     accuracy_decimals: 0
     state_class: measurement
     icon: mdi:timer-outline
-    
+
   # Capture to Publish Time
   - platform: template
     id: ${id_prefix}_capture_to_publish_time

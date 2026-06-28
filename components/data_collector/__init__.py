@@ -1,7 +1,6 @@
 import esphome.codegen as cg
+from esphome.components import esp32, switch
 import esphome.config_validation as cv
-from esphome.components import switch
-from esphome.components import esp32
 from esphome.const import CONF_ID
 from esphome.core import CORE
 
@@ -32,6 +31,7 @@ CONFIG_SCHEMA = cv.Schema(
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
+
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
@@ -42,7 +42,6 @@ async def to_code(config):
         # ESPHome 2026.2.0+: IDF components are excluded by default.
         # Re-enable esp_http_client which is used by data_collector.
         esp32.include_builtin_idf_component("esp_http_client")
-
 
     if config.get("debug", False):
         cg.add(var.set_debug(True))

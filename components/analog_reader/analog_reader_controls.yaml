@@ -2,9 +2,9 @@
 # Exposes analog_reader parameters for runtime configuration
 
 # Sync on_boot removed to match meter_reader_tflite behavior
-# Controls will start with their initial/restored values but won't force-update the component 
+# Controls will start with their initial/restored values but won't force-update the component
 # until the user interacts with their controls.
-# 
+#
 # Requires substitutions:
 #   id_prefix: prefix for entity IDs (e.g. "hotwater")
 #   analog_reader_id: ID of the analog_reader component (default: ${id_prefix}_analog_reader)

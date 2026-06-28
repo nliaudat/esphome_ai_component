@@ -14,12 +14,11 @@ namespace tflite_micro_helper {
 
 class OpResolverManager {
  public:
-  template <size_t tOpCount>
+  template<size_t tOpCount>
   static bool RegisterOps(tflite::MicroMutableOpResolver<tOpCount> &resolver,
-                          const std::set<tflite::BuiltinOperator> &required_ops,
-                          const char *tag) {
+                          const std::set<tflite::BuiltinOperator> &required_ops, const char *tag) {
     for (auto op : required_ops) {
-      const char* op_name = tflite::EnumNameBuiltinOperator(op);
+      const char *op_name = tflite::EnumNameBuiltinOperator(op);
       ESP_LOGD(tag, "Registering op: %s", op_name);
 
       TfLiteStatus add_status = kTfLiteError;
@@ -62,4 +61,4 @@ class OpResolverManager {
 }  // namespace tflite_micro_helper
 }  // namespace esphome
 
-#endif // USE_TFLITE_MICRO_HELPER
+#endif  // USE_TFLITE_MICRO_HELPER
