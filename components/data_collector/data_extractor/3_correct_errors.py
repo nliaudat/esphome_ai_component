@@ -29,7 +29,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Import shared model configuration from _model_utils
-from _model_utils import (
+from _model_utils import (  # noqa: E402
     DEFAULT_MODEL,
     DEFAULT_REGIONS_FILE,
     MODELS,
@@ -565,7 +565,7 @@ Note: If --regions is not specified, the script will look for {DEFAULT_REGIONS_F
     print(help_text)
 
 
-import shutil
+import shutil  # noqa: E402
 
 
 def get_output_filename(

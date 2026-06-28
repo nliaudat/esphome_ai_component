@@ -19,7 +19,12 @@ import colorama
 
 sys.path.append(str(Path(__file__).parent))
 
-from helpers import filter_changed, git_ls_files, print_error_for_file, styled
+from helpers import (  # noqa: E402
+    filter_changed,
+    git_ls_files,
+    print_error_for_file,
+    styled,
+)
 
 
 def find_all(a_str, sub):

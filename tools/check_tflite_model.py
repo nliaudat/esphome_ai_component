@@ -1,5 +1,5 @@
 import argparse
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 import os
 import sys
 
