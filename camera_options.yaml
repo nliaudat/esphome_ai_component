@@ -123,8 +123,7 @@ select:
     optimistic: True
     on_value:
       lambda: |-
-        # if you're looking closely, you may notice that AEC uses the Enum defined for Gain_control.
-        # this is how it is defined in the component source code since they both only have "auto" & "manual"
+        // Note: AEC uses the Enum defined for Gain_control, since both have "auto" & "manual"
         id(${id_prefix}_espcam).set_aec_mode((esphome::esp32_camera::ESP32GainControlMode)id(${id_prefix}_aec).active_index().value());
         id(${id_prefix}_espcam_update) = true;
   # Option list for Gain Control Mode
