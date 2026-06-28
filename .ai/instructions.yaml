@@ -489,6 +489,17 @@ ai_instructions:
     - "STATE the specific rule being considered"
     - "ASK user to confirm"
     - "REFERENCE section number"
+  file_output_validation:
+    section: "12.15"
+    rules:
+      - "BEFORE writing ANY file content: pre-validate output"
+      - "LF-only line endings --- NO \\r characters. Convert \\r\\n to \\n."
+      - "No trailing whitespace --- Strip ALL trailing spaces/tabs from every line."
+      - "No tab characters --- Use 2-space indentation. Replace \\t with spaces."
+      - "Exactly one trailing newline at EOF --- Content ends with \\n, not \\n\\n."
+      - "ASCII-only in source files --- NO characters >= U+0080."
+    scope: "ALL write operations: new files, edits, patches, generated output"
+    note: "Non-negotiable. Matches S7.7/.editorconfig. Violations cause CI to fail."
   no_unauthorized_commits:
     - "NEVER commit without explicit human approval"
     - "Present as proposals first"
