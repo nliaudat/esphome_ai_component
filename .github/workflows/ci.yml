@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev, master]
+  pull_request:
+    branches: [main, dev, master]
+
+jobs:
+  lint:
+    name: Lint (pre-commit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git
+      - name: Install pre-commit
+        run: |
+          pip install pre-commit
+          pre-commit install
+      - name: Install lint dependencies
+        run: |
+          pip install colorama
+      - name: Run pre-commit (all files)
+        run: |
+          pre-commit run --all-files --show-diff-on-failure

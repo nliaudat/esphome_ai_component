@@ -25,6 +25,9 @@ The YAML file is the token-optimized machine-readable derivative used by `.cline
     7.3 [Field Visibility](#73-field-visibility)
     7.4 [Preprocessor Directives](#74-preprocessor-directives)
     7.4.1 [Macro Guarding](#741-macro-guarding-for-featurecode-path-control)
+    7.5 [Naming Conventions](#75-naming-conventions)
+    7.6 [Formatting & Lint Infrastructure](#76-formatting--lint-infrastructure)
+    7.7 [File Encoding & Whitespace Rules](#77-file-encoding--whitespace-rules-mandatory)
 8.  [Security & Thread Safety](#8-security--thread-safety)
 9.  [Testing Requirements](#9-testing-requirements)
 10. [Common Anti-Patterns (REJECT)](#10-common-anti-patterns-reject)
@@ -629,12 +632,66 @@ DrawingUtils::draw_rectangle(...);
 | Local constants | `lower_snake_case` | `const int max_retries = 5;` |
 | Protected/private fields | `lower_snake_case_` (trailing underscore) | `value_`, `camera_` |
 
-### 7.6 Formatting
+### 7.6 Formatting & Lint Infrastructure
 
+**✅ REQUIRED: All checks below MUST pass before merge.**
+
+The following tools are configured at the repository root and enforced via pre-commit hooks (.pre-commit-config.yaml) and CI (.github/workflows/ci.yml):
+
+| Tool | Config File | Scope | Enforced By |
+|------|------------|-------|-------------|
+| **clang-format** | `.clang-format` | C/C++ (.h/.c/.cpp/.tcc) | pre-commit, CI |
+| **clang-tidy** | `.clang-tidy` | C++ static analysis | CI (manual invocation) |
+| **ruff** | `pyproject.toml` | Python (linter + formatter) | pre-commit, CI |
+| **flake8** | `.flake8` | Python (docstrings) | pre-commit, CI |
+| **yamllint** | `.yamllint` | YAML (.yaml/.yml) | pre-commit, CI |
+| **pyupgrade** | — | Python (modern syntax) | pre-commit, CI |
+| **editorconfig** | `.editorconfig` | All files (LF, UTF-8, indent) | IDE/editor |
+| **ci-custom** | `script/ci-custom.py` | C++/Python (custom rules) | pre-commit, CI |
+
+**Formatting rules:**
 - **Indentation:** 2 spaces, NO tabs
 - **Line length:** Maximum 120 characters
 - **Braces:** Google style (opening brace on same line)
-- **Tools:** `clang-format` (.clang-format), `ruff` (Python)
+- **End-of-line:** LF (Unix), never CRLF
+- **Encoding:** UTF-8, ASCII-only in source files
+
+### 7.7 File Encoding & Whitespace Rules (MANDATORY)
+
+The following rules are enforced by `script/ci-custom.py` and `.pre-commit-config.yaml`. All files MUST comply.
+
+**✅ REQUIRED:**
+- **LF line endings only** — No CRLF (`\r` characters). Enforced by `ci-custom.py:lint_newline`, `mixed-line-ending` pre-commit hook, and `.editorconfig`
+- **ASCII-only** — No non-ASCII characters (U+0080+) in source files. Enforced by `ci-custom.py:lint_ascii_only`
+- **No trailing whitespace** — No spaces or tabs at end of lines. Enforced by `ci-custom.py:lint_trailing_whitespace` and `trailing-whitespace` pre-commit hook
+- **No tab characters** — Use 2-space indentation only. Enforced by `ci-custom.py:lint_tabs` and `.editorconfig`
+- **End-of-file newline** — Every file MUST end with a single newline (`\n`). Enforced by `ci-custom.py:lint_end_newline` and `end-of-file-fixer` pre-commit hook
+- **UTF-8 encoding** — All files MUST be valid UTF-8. Enforced by `.editorconfig` (`charset = utf-8`)
+
+**⚠️ FIX COMMANDS:**
+```bash
+# Fix trailing whitespace in all files
+pre-commit run trailing-whitespace --all-files
+
+# Fix EOF newlines in all files
+pre-commit run end-of-file-fixer --all-files
+
+# Fix LF line endings in all files
+pre-commit run mixed-line-ending --all-files
+
+# Fix all of the above at once
+pre-commit run --all-files
+
+# Check without fixing (CI mode)
+python script/ci-custom.py
+```
+
+**❌ BLOCKER:**
+- Files containing `\r` (CRLF) will be rejected
+- Files containing non-ASCII characters will be rejected
+- Files with trailing whitespace will be rejected
+- Files with tab characters will be rejected
+- Files not ending with `\n` will be rejected
 
 ---
 
@@ -777,14 +834,33 @@ tests/
 
 ### 9.2 Static Analysis
 
-**✅ MUST pass:**
+**✅ MUST pass before merge:**
+
 ```bash
-# C++ static analysis
+# Run all pre-commit checks at once
+pre-commit run --all-files
+
+# C++ static analysis (manual)
 clang-tidy components/meter_reader_tflite/*.cpp -- -std=gnu++20
 
-# Python linting
-ruff check esphome/components/meter_reader_tflite/
-black --check esphome/components/meter_reader_tflite/
+# C++ formatting check
+clang-format --dry-run -Werror components/meter_reader_tflite/*.cpp
+
+# Python linting (ruff)
+ruff check .
+ruff format --check .
+
+# Python linting (flake8 — docstrings)
+flake8 .
+
+# YAML linting
+yamllint .
+
+# Custom project-specific lint checks (trailing whitespace, CRLF, ASCII-only, etc.)
+python script/ci-custom.py
+
+# Only check changed files
+python script/ci-custom.py --changed
 ```
 
 **⚠️ REQUIRED:**
@@ -941,6 +1017,93 @@ static constexpr size_t JPEG_BUFFER_SIZE = 512;
 if (confidence > CONFIDENCE_THRESHOLD) { ... }
 std::array<uint8_t, JPEG_BUFFER_SIZE> buffer;
 ```
+
+### ❌ CRLF (Windows) Line Endings
+
+```cpp
+// WRONG - File contains \r\n line endings
+void setup() {\r\n
+  this->init();\r\n
+}\r\n
+```
+
+✅ **USE:**
+```bash
+# Fix in existing files:
+pre-commit run mixed-line-ending --all-files
+# Or globally:
+git config core.autocrlf false
+```
+
+All files MUST use LF (Unix) line endings only (`\n`, never `\r\n` or `\r`).
+
+### ❌ Tab Characters in Source
+
+```cpp
+// WRONG - Tab character used instead of spaces
+void setup() {
+→this->init();
+}
+```
+
+✅ **USE:**
+```cpp
+// CORRECT - 2-space indentation
+void setup() {
+  this->init();
+}
+```
+
+All indentation MUST use spaces (2 per level). Tab characters are forbidden.
+
+### ❌ Non-ASCII Characters
+
+```cpp
+// WRONG - Non-ASCII character in source
+const char* name = "Meter Reader";  // Contains non-breaking space (U+00A0)
+```
+
+✅ **USE:**
+```cpp
+// CORRECT - ASCII-only
+const char* name = "Meter Reader";
+```
+
+All source files MUST contain only ASCII characters (U+0000 to U+007F). Non-ASCII characters like smart quotes, em-dashes, non-breaking spaces, or accented characters are forbidden.
+
+### ❌ Trailing Whitespace
+
+```cpp
+// WRONG - Line ends with spaces   
+void setup() {    
+  this->init();    
+}
+```
+
+✅ **USE:**
+```bash
+# Fix in existing files:
+pre-commit run trailing-whitespace --all-files
+```
+
+No line in any file may end with trailing whitespace (spaces or tabs). Enforced by pre-commit hook and `ci-custom.py`.
+
+### ❌ Missing Newline at End of File
+
+```cpp
+// WRONG - File does not end with \n
+void setup() {
+  this->init();
+}
+```
+
+✅ **USE:**
+```bash
+# Fix in existing files:
+pre-commit run end-of-file-fixer --all-files
+```
+
+Every file MUST end with a single newline character (`\n`). The last line should not be blank, but the line terminator must be present.
 
 ---
 

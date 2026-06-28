@@ -29,10 +29,6 @@ AI_code_review.txt
 /fuzz_logs
 fuzz_test_*.yaml
 
-# CI
-.github/workflows/ci.yml
-.clang-format
-
 # Scripts
 analyze_heap.py
 
@@ -44,3 +40,4 @@ CLINE_RULES.md
 validate_all_configs.bat
 dropbox_ignore.ps
 .clinerules/rules.yaml
+/venv

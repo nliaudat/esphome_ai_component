@@ -1,5 +1,5 @@
 # =============================================================================
-# ESPHome AI Component — Token-Optimized Rule Database (v1.1)
+# ESPHome AI Component — Token-Optimized Rule Database (v1.2)
 # =============================================================================
 # Source: .ai/instructions.md (SINGLE SOURCE OF TRUTH — full text)
 # This file is a DERIVED ARTIFACT — regenerate when .ai/instructions.md changes.
@@ -7,7 +7,7 @@
 # For context/examples, fall back to .ai/instructions.md.
 # =============================================================================
 
-version: "1.1"
+version: "1.2"
 source: ".ai/instructions.md"
 
 # =============================================================================
@@ -288,6 +288,61 @@ cpp:
     constant: "UPPER_SNAKE_CASE"
     field: "lower_snake_case_ (trailing underscore)"
   formatting: "2-space indent, 120 char max, Google-style braces"
+  formatting_tools:
+    - tool: "clang-format"
+      config: ".clang-format"
+      scope: "C/C++ (.h/.c/.cpp/.tcc)"
+      enforced_by: ["pre-commit", "CI"]
+    - tool: "clang-tidy"
+      config: ".clang-tidy"
+      scope: "C++ static analysis"
+      enforced_by: ["manual", "CI"]
+    - tool: "ruff"
+      config: "pyproject.toml"
+      scope: "Python (linter + formatter)"
+      enforced_by: ["pre-commit", "CI"]
+    - tool: "flake8"
+      config: ".flake8"
+      scope: "Python (docstrings)"
+      enforced_by: ["pre-commit", "CI"]
+    - tool: "yamllint"
+      config: ".yamllint"
+      scope: "YAML (.yaml/.yml)"
+      enforced_by: ["pre-commit", "CI"]
+    - tool: "editorconfig"
+      config: ".editorconfig"
+      scope: "All files (LF, UTF-8, indent)"
+      enforced_by: ["IDE/editor"]
+    - tool: "ci-custom"
+      config: "script/ci-custom.py"
+      scope: "C++/Python (custom rules)"
+      enforced_by: ["pre-commit", "CI"]
+    - tool: "pyupgrade"
+      config: ""
+      scope: "Python (modern syntax)"
+      enforced_by: ["pre-commit", "CI"]
+  whitespace:
+    lf_only:
+      rule: "LF line endings only — NO CRLF"
+      enforced_by: ["ci-custom.py:lint_newline", "mixed-line-ending hook", ".editorconfig"]
+      fix: "pre-commit run mixed-line-ending --all-files"
+    ascii_only:
+      rule: "ASCII-only — NO non-ASCII (U+0080+) in source files"
+      enforced_by: ["ci-custom.py:lint_ascii_only"]
+    no_trailing_whitespace:
+      rule: "NO trailing whitespace at end of lines"
+      enforced_by: ["ci-custom.py:lint_trailing_whitespace", "trailing-whitespace hook"]
+      fix: "pre-commit run trailing-whitespace --all-files"
+    no_tabs:
+      rule: "NO tab characters — use 2-space indentation"
+      enforced_by: ["ci-custom.py:lint_tabs", ".editorconfig"]
+    eof_newline:
+      rule: "Every file MUST end with a single newline (\n)"
+      enforced_by: ["ci-custom.py:lint_end_newline", "end-of-file-fixer hook"]
+      fix: "pre-commit run end-of-file-fixer --all-files"
+    utf8:
+      rule: "All files MUST be valid UTF-8"
+      enforced_by: [".editorconfig"]
 
 # =============================================================================
 # §8 SECURITY & THREAD SAFETY
@@ -320,8 +375,14 @@ testing:
     - "Test minimal + full-feature configs"
     - "Test with and without optional dependencies"
   static_analysis:
-    - "clang-tidy for C++"
-    - "ruff + black for Python"
+    - "pre-commit run --all-files  # Run ALL checks"
+    - "clang-tidy for C++ (manual)"
+    - "clang-format --dry-run -Werror for C++ formatting"
+    - "ruff check . / ruff format --check ."
+    - "flake8 .  # docstrings"
+    - "yamllint ."
+    - "python script/ci-custom.py  # custom checks (whitespace, CRLF, ASCII, etc.)"
+    - "python script/ci-custom.py --changed  # only changed files"
   runtime:
     - "Profile heap usage before/after changes"
     - "Monitor fragmentation over 24+ hours"
@@ -358,6 +419,21 @@ anti_patterns:
   - id: AP-QUEUE-FREE
     bad: "UploadJob job; while(xQueueReceive(q,&job,0)) { }  // RAII skipped by memcpy"
     ok: "UploadJob job; while(xQueueReceive(q,&job,0)) { process(job.data); free(job.data); job.data=nullptr; }"
+  - id: AP-CRLF
+    bad: "File contains \\r\\n (CRLF) line endings"
+    ok: "LF-only line endings: pre-commit run mixed-line-ending --all-files"
+  - id: AP-TABS
+    bad: "Tab characters used for indentation"
+    ok: "2-space indentation only"
+  - id: AP-NONASCII
+    bad: "Non-ASCII characters in source (U+0080+)"
+    ok: "ASCII-only characters in source files"
+  - id: AP-TRAILWS
+    bad: "Lines ending with trailing whitespace"
+    ok: "No trailing whitespace: pre-commit run trailing-whitespace --all-files"
+  - id: AP-NO-NEWLINE
+    bad: "File does not end with \\n"
+    ok: "File ends with single newline: pre-commit run end-of-file-fixer --all-files"
 
 # =============================================================================
 # §11 REVIEW PRIORITIES
@@ -369,6 +445,7 @@ review:
     - "TOCTOU / blocking in loop / format string"
     - "Camera: bypassing TrackedBuffer"
     - "Integer overflow (CVE-2026-23833)"
+    - "CRLF line endings, tabs, non-ASCII chars, trailing whitespace, missing EOF newline"
   warning:
     - "Performance regression >10% on S3"
     - "Missing config validation bounds"
@@ -399,6 +476,11 @@ ai_instructions:
     - "Missing this-> → add it"
     - "delay() in loop → set_timeout()"
     - "std::regex → string operations"
+    - "CRLF → LF-only line endings"
+    - "Tab characters → 2-space indentation"
+    - "Non-ASCII → ASCII-only characters"
+    - "Trailing whitespace → strip it"
+    - "Missing EOF newline → add \\n"
   config_validation:
     - "Values MUST be bounds-checked with sensible defaults"
     - "Errors via cv.Invalid (must be RAISED, not returned)"
@@ -495,3 +577,21 @@ code_review_lessons:
     - "jpeg_dec_handle_t is void* in ESP-IDF — use custom deleter struct with using pointer = jpeg_dec_handle_t"
     - "When decoding JPEG to pre-allocated buffer, pass output_buffer directly — avoid temp allocation + memcpy"
     - "Add guarded multiplication (using SIZE_MAX check) for w*h*bpp from JPEG header to prevent 32-bit overflow"
+
+# =============================================================================
+# §13 CI TOOLS & LINT INFRASTRUCTURE
+# =============================================================================
+ci_tools:
+  pre_commit_config: ".pre-commit-config.yaml"
+  ci_workflow: ".github/workflows/ci.yml"
+  custom_lint_script: "script/ci-custom.py"
+  gitignore_changes:
+    - "Removed .clang-format from gitignore (now tracked)"
+    - "Removed .github/workflows/ci.yml from gitignore (now tracked)"
+  fix_commands:
+    - "pre-commit run --all-files  # Run all hooks"
+    - "pre-commit run trailing-whitespace --all-files  # Fix trailing whitespace"
+    - "pre-commit run end-of-file-fixer --all-files  # Fix EOF newlines"
+    - "pre-commit run mixed-line-ending --all-files  # Fix CRLF → LF"
+    - "python script/ci-custom.py  # Custom lint checks"
+    - "python script/ci-custom.py --changed  # Only changed files"

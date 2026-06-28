@@ -14,8 +14,12 @@ external_components:
       type: local
       path: components 
     components: [meter_reader_tflite, tflite_micro_helper, esp32_camera_utils, flash_light_controller, value_validator] # data_collector] #, ssocr_reader #, analog_reader] 
-      
-
+    # components: [meter_reader_tflite, esp32_camera_utils, flash_light_controller, value_validator] # data_collector] #, ssocr_reader #, analog_reader] 
+  # - source: 
+      # type: git
+      # url: https://github.com/nliaudat/esphome
+      # ref: tflite_micro_helper
+    # components: [tflite_micro_helper]
 
 ############## General configuration
 
