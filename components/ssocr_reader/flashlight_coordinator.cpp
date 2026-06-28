@@ -7,7 +7,7 @@ namespace ssocr_reader {
 
 static const char *const TAG = "flashlight_coordinator";
 
-void FlashlightCoordinator::setup(Component* parent, light::LightState* legacy_light, 
+void FlashlightCoordinator::setup(Component* parent, light::LightState* legacy_light,
                                   flash_light_controller::FlashLightController* controller) {
     this->parent_ = parent;
     this->legacy_light_ = legacy_light;
@@ -61,25 +61,25 @@ bool FlashlightCoordinator::update_scheduling() {
              return true;
         }
     }
-    
+
     // Legacy Logic
     if (this->legacy_light_ && !this->scheduled_) {
         uint32_t schedule_time = (this->update_interval_ > this->pre_time_) ? this->update_interval_ - this->pre_time_ : 0;
-        
+
         if (schedule_time > 0 && this->parent_) {
             ESP_LOGI(TAG, "Scheduling flash for next cycle in %u ms", schedule_time);
-            
+
             App.scheduler.set_timeout(this->parent_, "flash_on", schedule_time, [this]() {
                 this->enable_flash();
                 this->scheduled_ = true;
-                
+
                 // Then wait for pre-time to capture
                 uint32_t capture_delay = (this->pre_time_ > 500) ? this->pre_time_ - 500 : 0;
-                
+
                 App.scheduler.set_timeout(this->parent_, "flash_capture", capture_delay, [this]() {
                     if (this->request_frame_callback_) this->request_frame_callback_();
                 });
-                
+
                 // Then off
                 uint32_t off_delay = this->pre_time_ + this->post_time_;
                 App.scheduler.set_timeout(this->parent_, "flash_off", off_delay, [this]() {
@@ -90,21 +90,21 @@ bool FlashlightCoordinator::update_scheduling() {
             return true; // Scheduled
         }
     }
-    
+
     return false; // Not handled or no flash
 }
 
 void FlashlightCoordinator::force_inference(std::function<void()> frame_request_callback) {
     if (!this->legacy_light_ && !this->controller_) return;
-    
+
     ESP_LOGI(TAG, "Forcing flash inference");
     this->enable_flash();
-    
+
     if (this->parent_) {
         // Warmup 3s
         App.scheduler.set_timeout(this->parent_, "force_flash_warmup", 3000, [this, frame_request_callback]() {
              frame_request_callback();
-             
+
              // Off after 500ms safety
              App.scheduler.set_timeout(this->parent_, "force_flash_off", 500, [this]() {
                  this->disable_flash();
@@ -115,17 +115,17 @@ void FlashlightCoordinator::force_inference(std::function<void()> frame_request_
 
 void FlashlightCoordinator::capture_preview_sequence(std::function<void()> frame_request_callback) {
     this->enable_flash();
-    
+
     uint32_t warmup = this->controller_ ? this->controller_->get_flash_pre_time() : this->pre_time_;
     if (warmup < 1000) warmup = 1000;
-    
+
     if (this->parent_) {
         App.scheduler.set_timeout(this->parent_, "preview_warmup", warmup, [this, frame_request_callback]() {
             frame_request_callback();
-            
+
             uint32_t post = this->controller_ ? this->controller_->get_flash_post_time() : this->post_time_;
             App.scheduler.set_timeout(this->parent_, "preview_off", post, [this]() {
-                this->disable_flash(); 
+                this->disable_flash();
             });
         });
     }

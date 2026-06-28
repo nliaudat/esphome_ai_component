@@ -33,15 +33,15 @@ void ReadingHistory::setup() {
 
 void ReadingHistory::ensure_capacity() {
   if (this->capacity_ > 0) return;
-  
+
   // Calculate capacity based on max bytes
   size_t max_count_by_bytes = this->max_history_size_bytes_ / sizeof(HistoricalReading);
   static constexpr size_t MAX_DAY_COUNT = 1440; // 24h * 60min
-  
+
   size_t target = std::min(max_count_by_bytes, MAX_DAY_COUNT);
   static constexpr size_t MIN_HISTORY_ENTRIES = 10;
   if (target < MIN_HISTORY_ENTRIES) target = MIN_HISTORY_ENTRIES;
-  
+
   // RAII: unique_ptr with custom deleter (free for psram_alloc compatibility)
   void* raw = psram_alloc(target * sizeof(HistoricalReading));
   if (raw) {
@@ -58,12 +58,12 @@ void ReadingHistory::ensure_capacity() {
 
 void ReadingHistory::add_reading(int value, uint32_t timestamp, float confidence) {
   if (!this->buffer_ || this->capacity_ == 0) return;
-  
+
   HistoricalReading reading{value, timestamp, confidence};
-  
+
   this->buffer_[this->head_] = reading;
   this->head_ = (this->head_ + 1) % this->capacity_;
-  
+
   if (this->count_ < this->capacity_) {
       this->count_++;
   }
@@ -83,7 +83,7 @@ float ReadingHistory::get_last_confidence() const {
 
 int ReadingHistory::get_median_within_ms(uint32_t max_elapsed_ms) const {
   if (this->count_ == 0 || !this->buffer_) return 0;
-  
+
   size_t last_idx = (this->head_ + this->capacity_ - 1) % this->capacity_;
   uint32_t now = this->buffer_[last_idx].timestamp;
 
@@ -95,17 +95,17 @@ int ReadingHistory::get_median_within_ms(uint32_t max_elapsed_ms) const {
       uint32_t elapsed = now - this->buffer_[curr].timestamp;
       if (elapsed > max_elapsed_ms) break;
       values.push_back(this->buffer_[curr].value);
-      
+
       if (curr == 0) curr = this->capacity_ - 1;
       else curr--;
   }
-  
+
   if (values.empty()) return 0;
 
-  size_t size = values.size();  
+  size_t size = values.size();
   std::nth_element(values.begin(), values.begin() + size / 2, values.end());
   int median = values[size / 2];
-  
+
   if (size % 2 == 0) {
       auto max_it = std::max_element(values.begin(), values.begin() + size / 2);
       return (*max_it + median) / 2;
@@ -116,33 +116,33 @@ int ReadingHistory::get_median_within_ms(uint32_t max_elapsed_ms) const {
 std::vector<int> ReadingHistory::get_recent_readings(size_t count) const {
   std::vector<int> recent;
   if (this->count_ == 0 || !this->buffer_) return recent;
-  
+
   size_t actual_count = std::min(count, this->count_);
   recent.reserve(actual_count);
-  
+
   for (size_t k = 0; k < actual_count; k++) {
       // Chronological order: oldest first
       size_t offset = actual_count - 1 - k;
       size_t idx = (this->head_ + this->capacity_ - 1 - offset) % this->capacity_;
       recent.push_back(this->buffer_[idx].value);
   }
-  
+
   return recent;
 }
 
 std::vector<std::pair<int, float>> ReadingHistory::get_recent_readings_with_confidence(size_t count) const {
   std::vector<std::pair<int, float>> recent;
   if (this->count_ == 0 || !this->buffer_) return recent;
-  
+
   size_t actual_count = std::min(count, this->count_);
   recent.reserve(actual_count);
-  
+
   for (size_t k = 0; k < actual_count; k++) {
       size_t offset = actual_count - 1 - k;
       size_t idx = (this->head_ + this->capacity_ - 1 - offset) % this->capacity_;
       recent.push_back({this->buffer_[idx].value, this->buffer_[idx].confidence});
   }
-  
+
   return recent;
 }
 
@@ -163,10 +163,10 @@ void ValueValidator::setup() {
   this->consecutive_rejections_ = 0;
   this->rejection_confidence_sum_ = 0.0f;
   this->free_digit_history();
-  
+
   // Initialize with some capacity
   this->ensure_last_good_values_capacity(this->config_.smart_validation_window);
-  
+
   // Restore persistent state if enabled
   if (this->config_.persist_state) {
     this->pref_ = global_preferences->make_preference<int>(fnv1_hash("value_validator"));
@@ -185,18 +185,18 @@ void ValueValidator::setup() {
 
 bool ValueValidator::validate_reading(int new_reading, float confidence, int& validated_reading) {
   uint32_t current_time = millis();
-  
+
   // Publish raw reading diagnostic
   if (this->raw_reading_sensor_) {
     this->raw_reading_sensor_->publish_state(new_reading);
   }
-  
+
   // Capture last confidence before adding the new reading
   float last_confidence = this->history_.get_last_confidence();
 
   // Always add to history for tracking
   this->history_.add_reading(new_reading, current_time, confidence);
-  
+
   // First reading: require high confidence or 3 consistent readings
   if (this->first_reading_) {
     if (confidence >= this->config_.high_confidence_threshold) {
@@ -205,17 +205,17 @@ bool ValueValidator::validate_reading(int new_reading, float confidence, int& va
       this->first_reading_ = false;
       this->first_reading_count_ = 0;
       validated_reading = new_reading;
-      
+
       this->last_good_values_count_ = 0;
       this->last_good_values_head_ = 0;
       this->add_good_value(new_reading);
-      
+
       ESP_LOGI(TAG, "First reading accepted (high confidence): %d (confidence: %.2f)", new_reading, confidence);
       this->publish_diagnostics_("normal");
       this->save_state_();
       return true;
     }
-    
+
     // Low confidence — require consistency
     if (new_reading == this->first_reading_candidate_) {
       this->first_reading_count_++;
@@ -223,35 +223,35 @@ bool ValueValidator::validate_reading(int new_reading, float confidence, int& va
       this->first_reading_candidate_ = new_reading;
       this->first_reading_count_ = 1;
     }
-    
+
     if (this->first_reading_count_ >= 3) {
       // 3 consistent readings — accept
       this->last_valid_reading_ = new_reading;
       this->first_reading_ = false;
       this->first_reading_count_ = 0;
       validated_reading = new_reading;
-      
+
       this->last_good_values_count_ = 0;
       this->last_good_values_head_ = 0;
       this->add_good_value(new_reading);
-      
+
       ESP_LOGI(TAG, "First reading accepted (3 consistent): %d (confidence: %.2f)", new_reading, confidence);
       this->publish_diagnostics_("normal");
       this->save_state_();
       return true;
     }
-    
-    ESP_LOGW(TAG, "First reading %d rejected (conf: %.2f < %.2f, consistent: %d/3)", 
+
+    ESP_LOGW(TAG, "First reading %d rejected (conf: %.2f < %.2f, consistent: %d/3)",
              new_reading, confidence, this->config_.high_confidence_threshold, this->first_reading_count_);
     this->publish_diagnostics_("initializing");
     return false;
   }
-  
+
   // Apply smart validation
   validated_reading = this->apply_smart_validation(new_reading, confidence, last_confidence);
-  
+
   bool is_valid = (validated_reading == new_reading);
-  
+
   if (is_valid) {
     // Update last good values
     this->add_good_value(new_reading);
@@ -266,12 +266,12 @@ bool ValueValidator::validate_reading(int new_reading, float confidence, int& va
       this->publish_diagnostics_("rejecting");
     }
   }
-  
+
   if (this->debug_) {
-    ESP_LOGD(TAG, "Validation: %d -> %d (valid: %s, confidence: %.2f)", 
+    ESP_LOGD(TAG, "Validation: %d -> %d (valid: %s, confidence: %.2f)",
              new_reading, validated_reading, is_valid ? "yes" : "no", confidence);
   }
-  
+
   return is_valid;
 }
 
@@ -308,20 +308,20 @@ void ValueValidator::clear_dial_fraction() {
 #endif
 
 bool ValueValidator::validate_reading(std::span<const float> digits, std::span<const float> confidences, int& validated_reading) {
-  
+
   std::vector<int> current_digits;
   current_digits.reserve(digits.size());
-  
+
   for (float d : digits) {
       int digit = static_cast<int>(std::round(d));
       if (digit >= 10) digit = 0;
       if (digit < 0) digit = 0; // Clamp negatives to 0 too
       current_digits.push_back(digit);
   }
-  
+
   // --- Per-Digit History & Stability Filter ---
   this->ensure_digit_history_size(current_digits.size());
-  
+
   long long raw_val_ll = 0;
   bool overflowed = false;
   for (size_t i = 0; i < current_digits.size(); i++) {
@@ -339,7 +339,7 @@ bool ValueValidator::validate_reading(std::span<const float> digits, std::span<c
       }
   }
   int raw_val = overflowed ? 0 : static_cast<int>(raw_val_ll);
-  
+
   // Calculate average confidence for the legacy validator call
   float avg_conf = 0.0f;
   if (!confidences.empty()) {
@@ -349,7 +349,7 @@ bool ValueValidator::validate_reading(std::span<const float> digits, std::span<c
   // --- Per-Digit Filtering ---
   int filtered_val = raw_val;
   bool final_valid_check = true;
-  
+
   if (!this->first_reading_ && this->last_valid_digits_count_ != current_digits.size()) {
       ESP_LOGW(TAG, "Digit count changed: %d -> %d. Resetting digit history.",
                static_cast<int>(this->last_valid_digits_count_), static_cast<int>(current_digits.size()));
@@ -357,24 +357,24 @@ bool ValueValidator::validate_reading(std::span<const float> digits, std::span<c
   if (!this->first_reading_ && this->last_valid_digits_count_ == current_digits.size()) {
       std::string filtered_digit_string;
       bool modified = false;
-      
+
       for (size_t i = 0; i < current_digits.size(); i++) {
           int new_d = current_digits[i];
           int old_d = this->last_valid_digits_data_[i];
           float conf = (i < confidences.size()) ? confidences[i] : 0.0f;
-          
+
           if (new_d != old_d) {
-              ESP_LOGD(TAG, "Digit %d changed (%d -> %d). Conf: %.2f vs Threshold: %.2f", 
+              ESP_LOGD(TAG, "Digit %d changed (%d -> %d). Conf: %.2f vs Threshold: %.2f",
                        static_cast<int>(i), old_d, new_d, conf, this->config_.per_digit_confidence_threshold);
-                       
+
               if (conf < this->config_.per_digit_confidence_threshold) {
-                  ESP_LOGW(TAG, "Digit %d change rejected (Val: %d->%d, Conf: %.2f < %.2f)", 
+                  ESP_LOGW(TAG, "Digit %d change rejected (Val: %d->%d, Conf: %.2f < %.2f)",
                            static_cast<int>(i), old_d, new_d, conf, this->config_.per_digit_confidence_threshold);
                   filtered_digit_string += std::to_string(old_d);
                   modified = true;
               } else {
                   if (this->debug_) {
-                     ESP_LOGD(TAG, "Digit %d changed (%d -> %d) - Accepted (Conf: %.2f >= %.2f)", 
+                     ESP_LOGD(TAG, "Digit %d changed (%d -> %d) - Accepted (Conf: %.2f >= %.2f)",
                               static_cast<int>(i), old_d, new_d, conf, this->config_.per_digit_confidence_threshold);
                   }
                   filtered_digit_string += std::to_string(new_d);
@@ -384,13 +384,13 @@ bool ValueValidator::validate_reading(std::span<const float> digits, std::span<c
                  ESP_LOGD(TAG, "Digit %d unchanged (%d). Conf: %.2f", static_cast<int>(i), new_d, conf);
               }
               if (this->config_.strict_confidence_check && conf < this->config_.per_digit_confidence_threshold) {
-                  ESP_LOGW(TAG, "Digit %d unchanged but low confidence (Conf: %.2f < %.2f) - NOT rejecting (unchanged digit)", 
+                  ESP_LOGW(TAG, "Digit %d unchanged but low confidence (Conf: %.2f < %.2f) - NOT rejecting (unchanged digit)",
                            static_cast<int>(i), conf, this->config_.per_digit_confidence_threshold);
               }
               filtered_digit_string += std::to_string(new_d);
           }
       }
-      
+
       if (modified) {
           char *end;
           errno = 0;
@@ -407,7 +407,7 @@ bool ValueValidator::validate_reading(std::span<const float> digits, std::span<c
              filtered_val = raw_val;
           }
       }
-      
+
       if (this->debug_ && !modified) {
           ESP_LOGD(TAG, "Per-digit filter: No changes needed. (Raw: %d)", raw_val);
       }
@@ -429,7 +429,7 @@ bool ValueValidator::validate_reading(std::span<const float> digits, std::span<c
         ESP_LOGD(TAG, "First reading: Strict check disabled, accepting.");
       }
    }
-  
+
   if (!final_valid_check) {
       return false;
   }
@@ -479,14 +479,14 @@ bool ValueValidator::validate_reading(std::span<const float> digits, std::span<c
 #endif
     this->validated_value_sensor_->publish_state(float_result);
   }
-  
+
   if (final_valid) {
       std::string val_str = std::to_string(validated_reading);
-      
+
       if (val_str.length() < current_digits.size()) {
           val_str = std::string(current_digits.size() - val_str.length(), '0') + val_str;
       }
-      
+
       this->ensure_last_valid_digits_size(val_str.length());
       if (this->last_valid_digits_data_) {
           for (size_t i = 0; i < val_str.length(); i++) {
@@ -494,20 +494,20 @@ bool ValueValidator::validate_reading(std::span<const float> digits, std::span<c
           }
       }
   }
-  
+
   return final_valid;
 }
 
 
 bool ValueValidator::is_digit_plausible(int new_reading, int last_reading) const {
   int absolute_diff = std::abs(new_reading - last_reading);
-  
+
   if (absolute_diff > this->config_.max_absolute_diff) {
-    ESP_LOGW(TAG, "Absolute difference too large: %d (max: %d)", 
+    ESP_LOGW(TAG, "Absolute difference too large: %d (max: %d)",
              absolute_diff, this->config_.max_absolute_diff);
     return false;
   }
-  
+
   if (last_reading > 0 && this->config_.max_rate_change > 0.0f) {
     float rate = static_cast<float>(absolute_diff) / static_cast<float>(last_reading);
     if (rate > this->config_.max_rate_change) {
@@ -516,16 +516,16 @@ bool ValueValidator::is_digit_plausible(int new_reading, int last_reading) const
       return false;
     }
   }
-  
+
   if (!this->config_.allow_negative_rates && new_reading < last_reading) {
     int negative_diff = last_reading - new_reading;
     if (negative_diff > this->config_.small_negative_tolerance) {
-      ESP_LOGW(TAG, "Negative rate detected: %d -> %d (diff: %d, tolerance: %d)", 
+      ESP_LOGW(TAG, "Negative rate detected: %d -> %d (diff: %d, tolerance: %d)",
                last_reading, new_reading, negative_diff, this->config_.small_negative_tolerance);
       return false;
     }
   }
-  
+
   return true;
 }
 
@@ -559,10 +559,10 @@ int ValueValidator::apply_smart_validation(int new_reading, float confidence, fl
   // Log rate limiting: throttle ESP_LOGW to once every 5 minutes for the same rejection pattern
   static constexpr uint32_t REJECTION_LOG_INTERVAL_MS = 300000; // 5 minutes
   bool should_log = (this->last_rejection_log_time_ == 0) || (millis() - this->last_rejection_log_time_ >= REJECTION_LOG_INTERVAL_MS);
-  
+
   const size_t CONSISTENCY_COUNT = 3;
   auto recent = this->history_.get_recent_readings(CONSISTENCY_COUNT);
-  
+
   if (recent.size() >= CONSISTENCY_COUNT) {
       bool consistent = true;
       for (int val : recent) {
@@ -571,14 +571,14 @@ int ValueValidator::apply_smart_validation(int new_reading, float confidence, fl
               break;
           }
       }
-      
+
       if (consistent) {
            if (!this->config_.allow_negative_rates && new_reading < this->last_valid_reading_) {
                int negative_diff = this->last_valid_reading_ - new_reading;
                if (negative_diff <= this->config_.small_negative_tolerance) {
                    // Small fluctuation — always allowed
                } else if (this->consecutive_rejections_ >= this->config_.max_consecutive_rejections) {
-                   float avg_rejection_conf = (this->consecutive_rejections_ > 0) ? 
+                   float avg_rejection_conf = (this->consecutive_rejections_ > 0) ?
                        (this->rejection_confidence_sum_ / this->consecutive_rejections_) : 0.0f;
                    if (avg_rejection_conf >= this->config_.high_confidence_threshold) {
                        if (should_log) {
@@ -593,7 +593,7 @@ int ValueValidator::apply_smart_validation(int new_reading, float confidence, fl
                    } else {
                        if (should_log) {
                          ESP_LOGW(TAG, "Consistent negative reading rejected - avg confidence too low "
-                                  "(%.2f < %.2f): %d -> %d", 
+                                  "(%.2f < %.2f): %d -> %d",
                                   avg_rejection_conf, this->config_.high_confidence_threshold,
                                   this->last_valid_reading_, new_reading);
                          this->last_rejection_log_time_ = millis();
@@ -616,11 +616,11 @@ int ValueValidator::apply_smart_validation(int new_reading, float confidence, fl
            }
 
            if (should_log) {
-             ESP_LOGW(TAG, "Large change confirmed by %d precise consecutive readings: %d -> %d", 
+             ESP_LOGW(TAG, "Large change confirmed by %d precise consecutive readings: %d -> %d",
                        static_cast<int>(CONSISTENCY_COUNT), this->last_valid_reading_, new_reading);
              this->last_rejection_log_time_ = millis();
            }
-           
+
            if (std::abs(new_reading - this->last_valid_reading_) > (this->config_.max_absolute_diff * 5)) {
                this->last_good_values_count_ = 0;
            }
@@ -636,21 +636,21 @@ int ValueValidator::apply_smart_validation(int new_reading, float confidence, fl
   auto recent_readings = this->history_.get_recent_readings(this->config_.smart_validation_window);
   if (!recent_readings.empty()) {
     int plausible_reading = this->find_most_plausible_reading(new_reading, recent_readings);
-    
-    if (plausible_reading != new_reading && 
+
+    if (plausible_reading != new_reading &&
         this->is_digit_plausible(plausible_reading, this->last_valid_reading_)) {
-      ESP_LOGD(TAG, "Using plausible reading from history: %d (was: %d)", 
+      ESP_LOGD(TAG, "Using plausible reading from history: %d (was: %d)",
                plausible_reading, new_reading);
       this->consecutive_rejections_ = 0;
       this->rejection_confidence_sum_ = 0.0f;
       return plausible_reading;
     }
   }
-    
+
   // 2. If no good historical reading, use median of recent GOOD values
   if (this->last_good_values_count_ > 0) {
     int median = this->get_good_values_median();
-    
+
     if (std::abs(median - this->last_valid_reading_) <= this->config_.max_absolute_diff) {
       ESP_LOGD(TAG, "Using median of last good values: %d (was: %d)", median, new_reading);
       this->consecutive_rejections_ = 0;
@@ -658,13 +658,13 @@ int ValueValidator::apply_smart_validation(int new_reading, float confidence, fl
       return median;
     }
   }
-    
+
   // 3. Last resort: use last valid reading
   this->consecutive_rejections_++;
   this->rejection_confidence_sum_ += confidence;
-  
+
   if (this->consecutive_rejections_ >= this->config_.max_consecutive_rejections) {
-      float avg_conf = (this->consecutive_rejections_ > 0) ? 
+      float avg_conf = (this->consecutive_rejections_ > 0) ?
           (this->rejection_confidence_sum_ / this->consecutive_rejections_) : 0.0f;
       if (avg_conf >= this->config_.high_confidence_threshold) {
           auto recent_all = this->history_.get_recent_readings_with_confidence(this->config_.max_consecutive_rejections);
@@ -672,7 +672,7 @@ int ValueValidator::apply_smart_validation(int new_reading, float confidence, fl
               std::vector<int> unique_vals;
               std::vector<float> conf_sums;
               std::vector<int> counts;
-              
+
               for (auto& pair : recent_all) {
                   bool found = false;
                   for (size_t i = 0; i < unique_vals.size(); i++) {
@@ -689,18 +689,18 @@ int ValueValidator::apply_smart_validation(int new_reading, float confidence, fl
                       counts.push_back(1);
                   }
               }
-              
+
               int best_idx = 0;
               for (size_t i = 1; i < unique_vals.size(); i++) {
                   if (conf_sums[i] > conf_sums[best_idx]) {
                       best_idx = i;
                   }
               }
-              
+
               int best_val = unique_vals[best_idx];
               int best_count = counts[best_idx];
               float best_conf = conf_sums[best_idx];
-              
+
               ESP_LOGW(TAG, "Self-correcting via consensus: %d consecutive rejections (avg conf: %.2f >= %.2f). "
                        "Consensus value %d (seen %d/%d, total conf weight: %.1f). Was stuck at %d",
                        this->consecutive_rejections_, avg_conf, this->config_.high_confidence_threshold,
@@ -711,9 +711,9 @@ int ValueValidator::apply_smart_validation(int new_reading, float confidence, fl
           }
       }
   }
-  
+
   if (should_log) {
-    ESP_LOGW(TAG, "No plausible alternative found, keeping last valid: %d (Ignored: %d, rejections: %d/%d)", 
+    ESP_LOGW(TAG, "No plausible alternative found, keeping last valid: %d (Ignored: %d, rejections: %d/%d)",
              this->last_valid_reading_, new_reading, this->consecutive_rejections_, this->config_.max_consecutive_rejections);
     this->last_rejection_log_time_ = millis();
   }
@@ -723,31 +723,31 @@ int ValueValidator::apply_smart_validation(int new_reading, float confidence, fl
 
 int ValueValidator::find_most_plausible_reading(int new_reading, const std::vector<int>& recent_readings) {
   if (recent_readings.empty()) return new_reading;
-  
+
   int64_t sum = 0;
   for (int reading : recent_readings) {
     sum += reading;
   }
   int average = static_cast<int>(sum / static_cast<int64_t>(recent_readings.size()));
-  
+
   if (this->is_digit_plausible(average, this->last_valid_reading_)) {
     return average;
   }
-  
+
   std::vector<int> sorted_readings = recent_readings;
   std::nth_element(sorted_readings.begin(), sorted_readings.begin() + sorted_readings.size() / 2, sorted_readings.end());
   int median = sorted_readings[sorted_readings.size() / 2];
-  
+
   if (this->is_digit_plausible(median, this->last_valid_reading_)) {
     return median;
   }
-  
+
   for (auto it = recent_readings.rbegin(); it != recent_readings.rend(); ++it) {
     if (this->is_digit_plausible(*it, this->last_valid_reading_)) {
       return *it;
     }
   }
-  
+
   return new_reading;
 }
 
@@ -770,7 +770,7 @@ void ValueValidator::reset() {
 void ValueValidator::set_last_valid_reading(int value) {
   this->last_valid_reading_ = value;
   this->first_reading_ = false;
-  
+
   std::string val_str = std::to_string(value);
   this->ensure_last_valid_digits_size(val_str.length());
   if (this->last_valid_digits_data_) {
@@ -780,12 +780,12 @@ void ValueValidator::set_last_valid_reading(int value) {
   } else {
     ESP_LOGE(TAG, "Cannot store last valid digits: allocation failed");
   }
-  
+
   this->last_good_values_count_ = 0;
   for(int i=0; i<this->config_.smart_validation_window; i++) {
      this->add_good_value(value);
   }
-  
+
   this->history_.clear();
   this->consecutive_rejections_ = 0;
   this->rejection_confidence_sum_ = 0.0f;
@@ -797,7 +797,7 @@ void ValueValidator::set_last_valid_reading(const std::string &value) {
     ESP_LOGW(TAG, "Empty string passed to set_last_valid_reading, ignoring.");
     return;
   }
-  
+
   for (char c : value) {
     if (!isdigit(c)) {
       ESP_LOGE(TAG, "Invalid characters in manual value string. Only digits are allowed. Got: '%s'", value.c_str());
@@ -830,12 +830,12 @@ void ValueValidator::set_last_valid_reading(const std::string &value) {
   } else {
     ESP_LOGE(TAG, "Cannot store last valid digits: allocation failed");
   }
-  
+
   this->last_good_values_count_ = 0;
   for(int i=0; i<this->config_.smart_validation_window; i++) {
      this->add_good_value(int_val);
   }
-  
+
   this->history_.clear();
   this->consecutive_rejections_ = 0;
   this->rejection_confidence_sum_ = 0.0f;
@@ -860,9 +860,9 @@ ValueValidator::~ValueValidator() {
 
 void ValueValidator::ensure_last_valid_digits_size(size_t num_digits) {
   if (num_digits == this->last_valid_digits_count_ && this->last_valid_digits_data_) return;
-  
+
   int *new_data = static_cast<int *>(psram_alloc(num_digits * sizeof(int)));
-  
+
   if (new_data) {
       this->last_valid_digits_data_.reset(new_data);
       memset(new_data, 0, num_digits * sizeof(int));
@@ -874,9 +874,9 @@ void ValueValidator::ensure_last_valid_digits_size(size_t num_digits) {
 
 void ValueValidator::ensure_last_good_values_capacity(size_t capacity) {
   if (capacity == this->last_good_values_capacity_ && this->last_good_values_data_) return;
-  
+
   int *new_data = static_cast<int *>(psram_alloc(capacity * sizeof(int)));
-  
+
   if (new_data) {
       this->last_good_values_data_.reset(new_data);
       this->last_good_values_capacity_ = capacity;
@@ -889,7 +889,7 @@ void ValueValidator::ensure_last_good_values_capacity(size_t capacity) {
 
 void ValueValidator::add_good_value(int value) {
   if (!this->last_good_values_data_ || this->last_good_values_capacity_ == 0) return;
-  
+
   this->last_good_values_data_[this->last_good_values_head_] = value;
   this->last_good_values_head_ = (this->last_good_values_head_ + 1) % this->last_good_values_capacity_;
   if (this->last_good_values_count_ < this->last_good_values_capacity_) {
@@ -899,7 +899,7 @@ void ValueValidator::add_good_value(int value) {
 
 int ValueValidator::get_good_values_median() const {
   if (this->last_good_values_count_ == 0 || !this->last_good_values_data_) return 0;
-  
+
   std::vector<int> values;
   values.reserve(this->last_good_values_count_);
   size_t curr = (this->last_good_values_head_ + this->last_good_values_capacity_ - 1) % this->last_good_values_capacity_;
@@ -908,7 +908,7 @@ int ValueValidator::get_good_values_median() const {
       if (curr == 0) curr = this->last_good_values_capacity_ - 1;
       else curr--;
   }
-  
+
   std::nth_element(values.begin(), values.begin() + values.size() / 2, values.end());
   return values[values.size() / 2];
 }
@@ -922,15 +922,15 @@ void ValueValidator::free_digit_history() {
 
 void ValueValidator::ensure_digit_history_size(size_t num_digits) {
   if (num_digits == this->digit_history_num_digits_) return;
-  
+
   this->free_digit_history();
-  
+
   if (num_digits == 0) return;
-  
+
   int* data = static_cast<int *>(psram_alloc(num_digits * DIGIT_HISTORY_SIZE * sizeof(int)));
   uint8_t* counts = static_cast<uint8_t *>(psram_alloc(num_digits * sizeof(uint8_t)));
   uint8_t* heads = static_cast<uint8_t *>(psram_alloc(num_digits * sizeof(uint8_t)));
-  
+
   if (data && counts && heads) {
       this->digit_history_data_.reset(data);
       this->digit_history_counts_.reset(counts);
@@ -947,38 +947,38 @@ void ValueValidator::ensure_digit_history_size(size_t num_digits) {
 
 int ValueValidator::get_stable_digit(size_t digit_index, int new_digit) {
   if (digit_index >= this->digit_history_num_digits_ || !this->digit_history_data_) return new_digit;
-  
+
   int* history = &this->digit_history_data_[digit_index * DIGIT_HISTORY_SIZE];
   uint8_t& count = this->digit_history_counts_[digit_index];
   uint8_t& head = this->digit_history_heads_[digit_index];
-  
+
   history[head] = new_digit;
   head = (head + 1) % DIGIT_HISTORY_SIZE;
   if (count < DIGIT_HISTORY_SIZE) count++;
-  
+
   int digit_counts[10] = {0};
-  
+
   for (int i = 0; i < count; i++) {
       size_t idx = (head + DIGIT_HISTORY_SIZE - count + i) % DIGIT_HISTORY_SIZE;
       int val = history[idx];
-      
+
       if (val >= 0 && val < 10) {
           digit_counts[val]++;
       }
   }
-  
+
   int max_freq = 0;
   int mode_val = new_digit;
-  
+
   for (int i = 0; i < 10; i++) {
       if (digit_counts[i] > max_freq) {
           max_freq = digit_counts[i];
           mode_val = i;
       } else if (digit_counts[i] == max_freq && i == new_digit) {
-          mode_val = new_digit; 
+          mode_val = new_digit;
       }
   }
-  
+
   return mode_val;
 }
 
@@ -988,15 +988,15 @@ bool ValueValidator::is_hallucination_pattern(std::span<const float> digits) con
   int first = static_cast<int>(std::round(digits[0]));
   bool all_identical = true;
   long long val = first;
-  
+
   for (size_t i = 1; i < digits.size(); i++) {
       int d = static_cast<int>(std::round(digits[i]));
       if (d != first) all_identical = false;
       val = val * 10 + d;
   }
-  
+
   if (!all_identical) return false;
-  
+
   if (!this->first_reading_ && static_cast<int>(val) == this->last_valid_reading_) {
       return false;
   }

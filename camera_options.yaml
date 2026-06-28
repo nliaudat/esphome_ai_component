@@ -251,5 +251,3 @@ number:
       lambda: |-
         id(${id_prefix}_espcam).set_aec_value(id(${id_prefix}_ae_value).state);
         id(${id_prefix}_espcam_update) = true;
-
-

@@ -20,13 +20,13 @@ class ValueValidatorCoordinator {
  public:
 #ifdef USE_VALUE_VALIDATOR
   void set_validator(value_validator::ValueValidator *validator) { this->validator_ = validator; }
-  
+
   bool has_validator() const { return this->validator_ != nullptr; }
 
   bool validate_reading(int raw_value, float confidence, int &validated_value) {
     if (this->validator_ == nullptr) {
       validated_value = raw_value;
-      return true; 
+      return true;
     }
     return this->validator_->validate_reading(raw_value, confidence, validated_value);
   }
@@ -44,13 +44,13 @@ class ValueValidatorCoordinator {
             }
             val = val * 10 + digit;
         }
-        
+
         if (val > std::numeric_limits<int>::max()) {
             validated_value = std::numeric_limits<int>::max();
         } else {
             validated_value = static_cast<int>(val);
         }
-        return true; 
+        return true;
     }
     return this->validator_->validate_reading(digits, confidences, validated_value);
   }
@@ -76,10 +76,10 @@ class ValueValidatorCoordinator {
   // Dummy implementation & logic for when validator is missing
   void set_validator(void *validator) {}
   bool has_validator() const { return false; }
-  
+
   bool validate_reading(int raw_value, float confidence, int &validated_value) {
     validated_value = raw_value;
-    return true; 
+    return true;
   }
 
   bool validate_reading(std::span<const float> digits, std::span<const float> confidences, int &validated_value) {
@@ -97,7 +97,7 @@ class ValueValidatorCoordinator {
         } else {
             validated_value = static_cast<int>(val);
         }
-        return true; 
+        return true;
   }
 
   bool validate_reading(std::span<const float> digits, std::span<const float> confidences, float &validated_value) {

@@ -97,7 +97,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
   void set_value_sensor(sensor::Sensor *sensor) { this->value_sensor_ = sensor; }
   void set_confidence_sensor(sensor::Sensor *sensor) { this->confidence_sensor_ = sensor; }
-  
+
   // Set Validator (External)
 #ifdef USE_VALUE_VALIDATOR
   void set_validator(value_validator::ValueValidator *v) { this->validation_coord_.set_validator(v); }
@@ -180,7 +180,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void set_main_logs(text_sensor::TextSensor *main_logs) { this->main_logs_ = main_logs; }
 
   void set_esp32_camera_utils(esp32_camera_utils::Esp32CameraUtils *utils) { this->esp32_camera_utils_ = utils; }
-  
+
   #ifdef USE_DATA_COLLECTOR
   void set_data_collector(data_collector::DataCollector *collector) { this->data_collector_ = collector; }
   void set_collect_low_confidence(bool collect) { this->collect_low_confidence_ = collect; }
@@ -235,7 +235,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   DebugCoordinator debug_coord_;
 
   esp32_camera_utils::CropZoneHandler crop_zone_handler_;
-  
+
   // Refactor: Use coordinator instead of local object
   ValueValidatorCoordinator validation_coord_;
 
@@ -273,29 +273,29 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   // Data Collection
   #ifdef USE_DATA_COLLECTOR
   bool collect_low_confidence_{true};
-  float low_confidence_trigger_threshold_{0.0f}; 
+  float low_confidence_trigger_threshold_{0.0f};
   float collect_min_global_confidence_{0.90f};
   float collect_min_digit_confidence_{0.90f};
-  
+
   enum CollectionState {
       COLLECTION_IDLE,
       COLLECTION_WAITING_FOR_FLASH,
       COLLECTION_WAITING_FOR_FRAME
   };
   std::atomic<CollectionState> collection_state_{COLLECTION_IDLE};
-  
+
   // Storage for pending collection
   struct PendingCollection {
       std::string value;
       float confidence;
       std::string extra_metadata;
   } pending_collection_;
-  
+
   void trigger_low_confidence_collection(const std::string &value, float confidence, const std::string &metadata = "");
-  std::string serialize_inference_metadata(const std::string &value, float confidence, 
-                                          const esphome::StaticVector<float, 16> &readings, 
-                                          const esphome::StaticVector<float, 16> &confidences, 
-                                          int width, int height); 
+  std::string serialize_inference_metadata(const std::string &value, float confidence,
+                                          const esphome::StaticVector<float, 16> &readings,
+                                          const esphome::StaticVector<float, 16> &confidences,
+                                          int width, int height);
   #endif
 
   // Calibration
@@ -320,7 +320,7 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
       uint32_t step_post;
   } calibration_;
 
-  void update_calibration(); 
+  void update_calibration();
 
   // Sensor Refs
   sensor::Sensor *value_sensor_{nullptr};
@@ -351,10 +351,10 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   // Helper
   void process_available_frame();
   void process_full_image(std::shared_ptr<camera::CameraImage> frame);
-  
+
   // Refactored: Integer-based combination (avoids heap alloc from std::string)
   float combine_readings(const esphome::StaticVector<float, 16>& readings, std::string &out_str);
-  
+
   // Consolidated: Replaces 4 copies of ImageProcessorConfig construction
   void refresh_image_processor_config(int processor_input_type);
   bool validate_and_update_reading(float raw, float conf, float& val);

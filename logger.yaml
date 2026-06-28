@@ -13,15 +13,15 @@ logger:
     tflite_coordinator: DEBUG
     internal_temperature: ERROR
     internal_temperature.esp32: ERROR
-    
-    
-# text_sensor:  
+
+
+# text_sensor:
 #   - platform: template
 #     name: "${friendly_name} main logs"
 #     entity_category: diagnostic
 #     icon: mdi:math-log
 #     id: ${id_prefix}_main_logs
-    
+
 #   - platform: template
 #     name: "${friendly_name} inference"
 #     entity_category: diagnostic

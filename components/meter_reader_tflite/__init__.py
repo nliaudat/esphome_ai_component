@@ -96,18 +96,18 @@ def datasize_to_bytes(value):
 
 def parse_model_txt_file(model_path):
     """Parse a model .txt file to extract configuration parameters.
-    
+
     Returns a dict with auto-detected config values, or None if file not found.
     """
     txt_path = os.path.splitext(model_path)[0] + '.txt'
     if not os.path.exists(txt_path):
         return None
-    
+
     with open(txt_path, 'r') as f:
         content = f.read()
-    
+
     config = {}
-    
+
     # Parse input type and shape from INPUT/OUTPUT SUMMARY section
     # Example: "Input 0:  [ 1 32 20  3]   <class 'numpy.float32'>"
     # TFLite NHWC layout: [batch, height, width, channels]
@@ -118,7 +118,7 @@ def parse_model_txt_file(model_path):
         config['input_channels'] = int(input_match.group(3))
         dtype = input_match.group(4)
         config['input_type'] = 'float32' if dtype == 'float32' else 'uint8'
-    
+
     # Parse output shape to determine class count
     # Example: "Output 0: [ 1 10]         <class 'numpy.float32'>"
     output_match = re.search(r'Output\s+0:\s+\[\s*\d+\s+(\d+)\]', content)
@@ -131,14 +131,14 @@ def parse_model_txt_file(model_path):
             config['scale_factor'] = 10.0
         else:
             config['scale_factor'] = 1.0
-    
+
     # Parse recommended tensor_arena_size from peak analysis (if available)
     # Example: "Recommended tensor_arena_size: 42KB"
     arena_match = re.search(r'Recommended tensor_arena_size:\s+(\d+)KB', content)
     if arena_match:
         arena_kb = int(arena_match.group(1))
         config['tensor_arena_size'] = arena_kb * 1024
-    
+
     # Parse total operations count for MAX_OPERATORS
     # Example: "Total operations: 37"
     ops_match = re.search(r'Total operations:\s+(\d+)', content)
@@ -147,7 +147,7 @@ def parse_model_txt_file(model_path):
         # Add safety margin of 5 for the resolver
         config['max_operators'] = total_ops + 5
         print(f"  Auto-detected MAX_OPERATORS: {config['max_operators']} (from {total_ops} operations + 5 margin)")
-    
+
     # Detect DELEGATE ops (incompatible with TFLite Micro) - informational only
     # Use specific pattern to match only the actual warning (e.g. "Found 3 DELEGATE operation(s)!")
     # not the OK message ("No DELEGATE operations found") which also contains the word DELEGATE
@@ -156,7 +156,7 @@ def parse_model_txt_file(model_path):
         print(f"    DELEGATE ops are NOT compatible with TFLite Micro.")
         print(f"    Re-export the model with delegates disabled:")
         print(f"      converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS]")
-    
+
     # Detect output processing mode from SOFTMAX operator presence
     # If the model has a built-in SOFTMAX → use 'direct_class' (output is already probabilities)
     # If no SOFTMAX → apply C++ softmax on raw logits
@@ -185,7 +185,7 @@ def parse_model_txt_file(model_path):
     input_dtype = config.get('input_type', '')
     has_float32_io = (input_dtype == 'float32')
     has_int8_weights = bool(re.search(r"<class 'numpy\.(int8|uint8)'>", content))
-    
+
     if has_float32_io and has_int8_weights:
         # Hybrid quantization detected: float32 I/O with int8 quantized weights
         # TFLite Micro does NOT support this mixed-precision pattern on ESP32
@@ -202,7 +202,7 @@ def parse_model_txt_file(model_path):
             f"    converter.inference_input_type = tf.int8\n"
             f"    converter.inference_output_type = tf.int8"
         )
-    
+
     return config
 
 
@@ -210,7 +210,7 @@ def infer_model_config_from_filename(model_filename):
     """Infer model config from filename heuristics when no .txt file exists."""
     config = {}
     name = os.path.splitext(model_filename)[0]
-    
+
     # Detect channels from filename
     if '_GRAY' in name or '_GRAYSCALE' in name:
         config['input_channels'] = 1
@@ -224,7 +224,7 @@ def infer_model_config_from_filename(model_filename):
     else:
         config['input_channels'] = 3
         config['input_order'] = 'RGB'
-    
+
     # Detect class count from filename
     if '_10cls_' in name or name.endswith('_10cls'):
         config['scale_factor'] = 1.0
@@ -232,7 +232,7 @@ def infer_model_config_from_filename(model_filename):
         config['scale_factor'] = 10.0
     else:
         config['scale_factor'] = 1.0
-    
+
     return config
 
 
@@ -253,8 +253,8 @@ CONFIG_SCHEMA = cv.Schema({
         cv.Range(min=50 * 1024, max=1000 * 1024),
     ),
     cv.GenerateID(CONF_RAW_DATA_ID): cv.declare_id(cg.uint8),
-    cv.Optional(CONF_DEBUG, default=False): cv.boolean, 
-    cv.Optional(CONF_DEBUG_IMAGE, default=False): cv.boolean, 
+    cv.Optional(CONF_DEBUG, default=False): cv.boolean,
+    cv.Optional(CONF_DEBUG_IMAGE, default=False): cv.boolean,
     cv.Optional(CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL, default=False): cv.boolean,
     cv.Optional(CONF_DEBUG_MEMORY, default=False): cv.boolean,
     cv.Optional("debug_camera", default=False): cv.boolean,
@@ -280,7 +280,7 @@ CONFIG_SCHEMA = cv.Schema({
         cv.Length(min=5, max=12),
         lambda v: v if re.match(r'^\d+x\d+$', v) else (_ for _ in ()).throw(cv.Invalid(f"Invalid resolution format: {v} (expected e.g. 640x480)")),
     ),
-    
+
     # Dynamic model config overrides (optional - auto-detected from .txt file)
     cv.Optional(CONF_INPUT_TYPE): cv.enum({'uint8': 'uint8', 'float32': 'float32'}, lower=True),
     cv.Optional(CONF_INPUT_CHANNELS): cv.int_range(min=1, max=4),
@@ -301,7 +301,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_INPUT_ORDER): cv.enum({'RGB': 'RGB', 'BGR': 'BGR', 'GRAY': 'GRAY'}, upper=True),
     cv.Optional(CONF_NORMALIZE): cv.boolean,
     cv.Optional(CONF_INVERT): cv.boolean,
-    
+
     cv.Optional("value_sensor"): cv.use_id(sensor.Sensor),
     cv.Optional("confidence_sensor"): cv.use_id(sensor.Sensor),
     cv.Optional("inference_logs"): cv.use_id(text_sensor.TextSensor),
@@ -326,9 +326,9 @@ async def to_code(config):
 
     cg.add_global(cg.RawStatement('#include "esphome/components/meter_reader_tflite/meter_reader_tflite.h"'))
     await cg.register_component(var, config)
-    
+
     cg.add_define("USE_METER_READER_TFLITE")
-    
+
     # Register validator
     if CONF_VALIDATOR in config:
         cg.add_define("USE_VALUE_VALIDATOR")
@@ -343,34 +343,34 @@ async def to_code(config):
         cg.add_define("USE_HOST")
         # On host, we don't set a real camera object.
         pass
-    
+
     model_path = CORE.relative_config_path(config[CONF_MODEL])
     model_filename = os.path.basename(str(model_path).replace("\\", "/"))
     model_type = os.path.splitext(model_filename)[0]  # Remove .tflite extension
-       
+
     # Set model type from extracted filename
     cg.add(var.set_model_config(model_type))
-    
+
     # Read the model file as binary data
     with open(model_path, "rb") as f:
         model_data = f.read()
-        
+
     # Compute CRC32
     crc32_val = zlib.crc32(model_data) & 0xFFFFFFFF
-    cg.add_define("MODEL_CRC32", HexInt(crc32_val)) 
-    
+    cg.add_define("MODEL_CRC32", HexInt(crc32_val))
+
     # Create a progmem array for the model data
     rhs = [HexInt(x) for x in model_data]
     prog_arr = cg.progmem_array(config[CONF_RAW_DATA_ID], rhs)
-    
+
     cg.add(var.set_model(prog_arr, len(model_data)))
     cg.add(var.set_confidence_threshold(config[CONF_CONFIDENCE_THRESHOLD]))
-    
+
     # ============================================================
     # Dynamic Model Configuration (auto-detect from .txt, override from YAML)
     # ============================================================
     # Priority: YAML overrides > .txt auto-detection > filename heuristics > defaults
-    
+
     # Step 1: Try to parse .txt file for auto-detected config
     auto_config = parse_model_txt_file(model_path)
     if auto_config:
@@ -383,7 +383,7 @@ async def to_code(config):
         print(f"  No .txt file found for '{model_filename}', using filename heuristics:")
         for k, v in auto_config.items():
             print(f"    {k}: {v}")
-    
+
     # Step 3: Apply YAML overrides (user-provided values override auto-detected)
     yaml_overrides = {}
     if CONF_INPUT_TYPE in config:
@@ -404,7 +404,7 @@ async def to_code(config):
         yaml_overrides['normalize'] = config[CONF_NORMALIZE]
     if CONF_INVERT in config:
         yaml_overrides['invert'] = config[CONF_INVERT]
-    
+
     # Detect double-softmax risk: user explicitly set output_processing='softmax'
     # but the model already has a built-in SOFTMAX operator.
     if yaml_overrides.get('output_processing') == 'softmax' and auto_config.get('output_processing') == 'direct_class':
@@ -417,7 +417,7 @@ async def to_code(config):
         for k, v in yaml_overrides.items():
             print(f"    {k}: {v}")
         auto_config.update(yaml_overrides)
-    
+
     # Step 4: Set all config values on the C++ component
     # Use auto-detected values with sensible defaults for anything missing
     cg.add(var.set_input_type(auto_config.get('input_type', 'uint8')))
@@ -429,7 +429,7 @@ async def to_code(config):
     cg.add(var.set_input_order(auto_config.get('input_order', 'RGB')))
     cg.add(var.set_normalize(auto_config.get('normalize', False)))
     cg.add(var.set_invert(auto_config.get('invert', False)))
-    
+
     # Step 5: Set tensor arena size
     # Priority: YAML config > .txt peak analysis > default 100KB
     if CONF_TENSOR_ARENA_SIZE in config:
@@ -446,15 +446,15 @@ async def to_code(config):
         # Default fallback
         cg.add(var.set_tensor_arena_size(100 * 1024))
         print(f"  Tensor arena size: {100 * 1024} bytes (default)")
-    
+
     # Step 6: Set MAX_OPERATORS from .txt file analysis (with fallback)
     max_ops = auto_config.get('max_operators', 30)
     cg.add_build_flag(f"-DMAX_OPERATORS={max_ops}")
     print(f"  MAX_OPERATORS: {max_ops} (build flag)")
-    
+
     if "show_crop_areas" in config:
         cg.add(var.set_show_crop_areas(config["show_crop_areas"]))
-    
+
     # Get camera resolution from config (defaults to 640x480)
     res = config.get(CONF_CAMERA_RESOLUTION, "640x480")
     width, height = map(int, res.split('x'))
@@ -464,7 +464,7 @@ async def to_code(config):
     if pixel_format not in VALID_PIXEL_FORMATS:
         raise cv.Invalid(f"Invalid camera_pixel_format: '{pixel_format}'. Must be one of {VALID_PIXEL_FORMATS}")
     cg.add(var.set_camera_image_format(width, height, pixel_format))
-    
+
     # Find esp32_camera_utils instance to allow updating its helper sensors and for rotation detection
     camera_utils_id = None
     if 'esp32_camera_utils' in CORE.config:
@@ -472,7 +472,7 @@ async def to_code(config):
         # Handle list if multiple instances (though usually singleton or first one)
         if isinstance(conf, list) and len(conf) > 0:
             conf = conf[0]
-            
+
         if CONF_ID in conf:
             camera_utils_id = conf[CONF_ID]
 
@@ -486,38 +486,38 @@ async def to_code(config):
     if config.get(CONF_DEBUG_IMAGE, False):
         cg.add_define("DEBUG_METER_READER_TFLITE")
         cg.add(var.set_debug_mode(True))
-        
+
         cg.add(var.set_camera_image_format(640, 480, "JPEG"))
-        
+
         component_dir = os.path.dirname(os.path.abspath(__file__))
         debug_image_path = os.path.join(component_dir, "debug.jpg")
-        
+
         if not os.path.exists(debug_image_path):
             raise cv.Invalid(f"Debug image not found at {debug_image_path}")
         else:
             with open(debug_image_path, "rb") as f:
                 debug_image_data = f.read()
-        
+
         debug_image_id = f"{config[CONF_ID]}_debug_image"
         cg.add_global(
             cg.RawStatement(
                f"static const uint8_t {debug_image_id}[] = {{{', '.join(f'0x{x:02x}' for x in debug_image_data)}}};"
             )
         )
-        
+
         cg.add(
             var.set_debug_image(
                 cg.RawExpression(debug_image_id),
                 len(debug_image_data)
             )
         )
-        
+
     if config.get(CONF_DEBUG, False):
         cg.add_define("DEBUG_METER_READER_TFLITE")
         cg.add_define("DEBUG_TFLITE_MICRO_HELPER")  # Enable helper debug so debug_test_parameters() compiles in
         cg.add(var.set_debug_mode(True))
         cg.add(var.set_debug(True))
-        
+
     if config.get(CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL, False):
         cg.add_define("DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL")
 
@@ -526,11 +526,11 @@ async def to_code(config):
 
     if config.get(CONF_GENERATE_PREVIEW, False):
         cg.add(var.set_generate_preview(True))
-        
+
     if config.get(CONF_DEBUG_MEMORY, False):
         cg.add_define("DEBUG_METER_READER_MEMORY")
         cg.add(var.set_debug_memory_enabled(True))
-        
+
         # Helper to create and register a sensor
         async def create_sensor(name, unit, accuracy_decimals=0, icon="mdi:memory"):
             # Create a manual ID for the new sensor
@@ -544,10 +544,10 @@ async def to_code(config):
                 CONF_FORCE_UPDATE: False,
                 CONF_ENTITY_CATEGORY: cv.entity_category("diagnostic"),
             }
-            
+
             # sens = await sensor.new_sensor(sens_conf)
             sens = await sensor.new_sensor(sens_conf)
-            
+
             cg.add(sens.set_unit_of_measurement(unit))
             cg.add(sens.set_accuracy_decimals(accuracy_decimals))
             # Icon is set via config now
@@ -556,15 +556,15 @@ async def to_code(config):
         # Tensor Arena Size
         s = await create_sensor("tensor_arena_size", "B", 0)
         cg.add(var.set_tensor_arena_size_sensor(s))
-        
+
         # Tensor Arena Used
         s = await create_sensor("tensor_arena_used", "B", 0)
         cg.add(var.set_tensor_arena_used_sensor(s))
-        
+
         # Process Free Heap
         s = await create_sensor("process_free_heap", "B", 0)
         cg.add(var.set_process_free_heap_sensor(s))
-        
+
         # Process Free PSRAM
         s = await create_sensor("process_free_psram", "B", 0)
         cg.add(var.set_process_free_psram_sensor(s))
@@ -573,7 +573,7 @@ async def to_code(config):
     # Check for web_server component to enable preview handler
     if 'web_server' in CORE.config:
         cg.add_define("USE_WEB_SERVER")
-        
+
         # We need the WebServerBase component for add_handler
         # It is usually available as 'web_server_base' in config if web_server is used.
         if 'web_server_base' in CORE.config:
@@ -592,7 +592,7 @@ async def to_code(config):
     # Handle crop zones (either global or local)
     if CONF_CROP_ZONES in config:
         crop_global = await cg.get_variable(config[CONF_CROP_ZONES])
-        cg.add(var.set_crop_zones_global(crop_global))    
+        cg.add(var.set_crop_zones_global(crop_global))
 
     # Set flash light controller if configured (optional)
     if CONF_FLASH_LIGHT_CONTROLLER in config:
@@ -610,11 +610,11 @@ async def to_code(config):
         if CONF_COLLECT_MIN_DIGIT_CONFIDENCE in config:
             cg.add(var.set_collect_min_digit_confidence(config[CONF_COLLECT_MIN_DIGIT_CONFIDENCE]))
         cg.add_define("USE_DATA_COLLECTOR")
-    
+
     # Set timeout parameters
     if CONF_FRAME_REQUEST_TIMEOUT in config:
         cg.add(var.set_frame_request_timeout(config[CONF_FRAME_REQUEST_TIMEOUT]))
-        
+
 
     # Optional: Debug memory sensors
     sensor_keys = [
@@ -628,20 +628,20 @@ async def to_code(config):
             sens = await cg.get_variable(config[key])
             setter_name = f"set_{key}"
             cg.add(getattr(var, setter_name)(sens))
-    
-    
+
+
     if "value_sensor" in config:
         value_sensor = await cg.get_variable(config["value_sensor"])
         cg.add(var.set_value_sensor(value_sensor))
-    
+
     if "confidence_sensor" in config:
         confidence_sensor = await cg.get_variable(config["confidence_sensor"])
         cg.add(var.set_confidence_sensor(confidence_sensor))
-    
+
     if "inference_logs" in config:
         inference_logs = await cg.get_variable(config["inference_logs"])
         cg.add(var.set_inference_logs(inference_logs))
-    
+
     if "main_logs" in config:
         main_logs = await cg.get_variable(config["main_logs"])
         cg.add(var.set_main_logs(main_logs))
@@ -673,8 +673,7 @@ async def to_code(config):
     if CONF_UNLOAD_BUTTON in config:
         b = await cg.get_variable(config[CONF_UNLOAD_BUTTON])
         cg.add(var.set_unload_button(b))
-    
+
     if CONF_RELOAD_BUTTON in config:
         b = await cg.get_variable(config[CONF_RELOAD_BUTTON])
         cg.add(var.set_reload_button(b))
-

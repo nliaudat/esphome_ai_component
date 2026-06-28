@@ -16,7 +16,7 @@ void ModelHandler::unload() {
     this->tensor_arena_allocation_.data.reset();
     this->tensor_arena_allocation_.actual_size = 0;
     this->tensor_arena_size_requested_ = 0;
-    
+
     // Reset state
     this->config_ = ModelConfig{};
     this->output_size_ = 0;
@@ -24,26 +24,26 @@ void ModelHandler::unload() {
     this->model_length_ = 0;
     this->memory_manager_ = MemoryManager(); // Reset memory manager state if needed
     this->resolver_.reset();
-    
+
     ESP_LOGI(TAG, "Model unloaded and memory freed");
 }
 
 bool ModelHandler::load_model(const uint8_t *model_data, size_t model_size, const ModelConfig &config) {
     this->model_length_ = model_size;
-    
+
     // Determine tensor arena size from config (uses shared parser in MemoryManager)
     if (!config.tensor_arena_size.empty()) {
         size_t parsed = MemoryManager::parse_size_string(config.tensor_arena_size);
         if (parsed > 0) {
             this->tensor_arena_size_requested_ = parsed;
-            ESP_LOGI(TAG, "Using model-specific tensor arena size: %s (%zu bytes)", 
+            ESP_LOGI(TAG, "Using model-specific tensor arena size: %s (%zu bytes)",
                     config.tensor_arena_size.c_str(), this->tensor_arena_size_requested_);
         } else {
-            ESP_LOGW(TAG, "Failed to parse tensor arena size from config: %s", 
+            ESP_LOGW(TAG, "Failed to parse tensor arena size from config: %s",
                     config.tensor_arena_size.c_str());
         }
     }
-    
+
     if (this->tensor_arena_size_requested_ == 0) {
         this->tensor_arena_size_requested_ = 100 * 1024; // Default 100KB
         ESP_LOGW(TAG, "Using default tensor arena size: 100KB");
@@ -57,8 +57,8 @@ bool ModelHandler::load_model(const uint8_t *model_data, size_t model_size, cons
     }
 
     // Load the model using the allocated arena
-    return this->load_model_with_arena(model_data, model_size, 
-                               this->tensor_arena_allocation_.data.get(), 
+    return this->load_model_with_arena(model_data, model_size,
+                               this->tensor_arena_allocation_.data.get(),
                                this->tensor_arena_allocation_.actual_size,
                                config);
 }
@@ -80,19 +80,19 @@ bool ModelHandler::load_model_with_arena(const uint8_t *model_data, size_t model
     ESP_LOGE(TAG, "Model data pointer is NULL!");
     return false;
   }
-  
+
   if (model_size == 0) {
     ESP_LOGE(TAG, "Model data size is 0!");
     return false;
   }
-  
+
 #ifdef DEBUG_TFLITE_MICRO_HELPER
     // Check TFLite magic number
     if (model_size >= 8) {
       ESP_LOGI(TAG, "First 8 bytes: %02X %02X %02X %02X %02X %02X %02X %02X",
                model_data[0], model_data[1], model_data[2], model_data[3],
                model_data[4], model_data[5], model_data[6], model_data[7]);
-      
+
       // TFLite magic number should be: XX 00 00 00 54 46 4C 33
       if (model_data[1] == 0x00 && model_data[2] == 0x00 && model_data[3] == 0x00 &&
           model_data[4] == 0x54 && model_data[5] == 0x46 &&
@@ -101,22 +101,22 @@ bool ModelHandler::load_model_with_arena(const uint8_t *model_data, size_t model
       } else {
         ESP_LOGE(TAG, "Invalid TFLite magic number");
         // Don't return false here if we want to try anyway, but legacy returned matches this block
-        return false; 
+        return false;
       }
     }
 #endif
 
   this->config_ = config;
-  
+
     // For PROGMEM data, we need to handle it specially
     ESP_LOGI(TAG, "Loading model from PROGMEM (%zu bytes)", model_size);
-    
+
     this->tflite_model_ = tflite::GetModel(model_data);
-    
+
     // Note: If GetModel fails with PROGMEM data, the model may need to be
     // copied to RAM first. This is rare — most PROGMEM data works with GetModel.
     // If you encounter issues, ensure the model data is properly aligned.
-  
+
   if (this->tflite_model_ == nullptr) {
     ESP_LOGE(TAG, "Failed to parse model - invalid data");
     return false;
@@ -125,7 +125,7 @@ bool ModelHandler::load_model_with_arena(const uint8_t *model_data, size_t model
   if (this->tflite_model_->version() != TFLITE_SCHEMA_VERSION) {
     ESP_LOGE(TAG, "Model schema version mismatch: Model has %d, Expecting %d",
              this->tflite_model_->version(), TFLITE_SCHEMA_VERSION);
-    
+
     // Diagnostic dump to identify corrupted files
     if (model_data != nullptr && model_size >= 16) {
         ESP_LOGE(TAG, "Model Header Dump (First 16 bytes):");
@@ -149,7 +149,7 @@ bool ModelHandler::load_model_with_arena(const uint8_t *model_data, size_t model
 
   // Reset and allocate fresh resolver for this load cycle
   this->resolver_ = std::make_unique<tflite::MicroMutableOpResolver<MAX_OPERATORS>>();
-  
+
   if (this->debug_) {
       ESP_LOGD(TAG, "Operator codes found in model:");
       for (size_t i = 0; i < this->tflite_model_->operator_codes()->size(); ++i) {
@@ -158,9 +158,9 @@ bool ModelHandler::load_model_with_arena(const uint8_t *model_data, size_t model
                  tflite::EnumNameBuiltinOperator(op_code->builtin_code()));
       }
   }
-  
+
   std::set<tflite::BuiltinOperator> required_ops;
-  
+
   for (size_t i = 0; i < this->tflite_model_->operator_codes()->size(); ++i) {
     const auto *op_code = this->tflite_model_->operator_codes()->Get(i);
     required_ops.insert(op_code->builtin_code());
@@ -183,14 +183,14 @@ bool ModelHandler::load_model_with_arena(const uint8_t *model_data, size_t model
     ESP_LOGE(TAG, "  Model size: %zu bytes", this->model_length_);
     ESP_LOGE(TAG, "  Model operators: %zu", this->tflite_model_->subgraphs()->Get(0)->operators()->size());
     ESP_LOGE(TAG, "  Model operator codes: %zu", this->tflite_model_->operator_codes()->size());
-    
+
     // Log all operator codes in the model for debugging
     for (size_t i = 0; i < this->tflite_model_->operator_codes()->size(); ++i) {
         const auto *op_code = this->tflite_model_->operator_codes()->Get(i);
         ESP_LOGE(TAG, "  Op code [%zu]: builtin_code=%d (%s)", i, op_code->builtin_code(),
                  tflite::EnumNameBuiltinOperator(op_code->builtin_code()));
     }
-    
+
     // Check for DELEGATE op which is not supported by TFLite Micro
     for (size_t i = 0; i < this->tflite_model_->operator_codes()->size(); ++i) {
         const auto *op_code = this->tflite_model_->operator_codes()->Get(i);
@@ -201,21 +201,21 @@ bool ModelHandler::load_model_with_arena(const uint8_t *model_data, size_t model
             ESP_LOGE(TAG, "  *** Re-export the model with --no-xnnpack or disable delegates. ***");
         }
     }
-    
+
     // Log arena usage info if available
     #ifdef DEBUG_TFLITE_MICRO_HELPER
     size_t arena_used = this->interpreter_->arena_used_bytes();
     ESP_LOGE(TAG, "  Arena used before failure: %zu bytes", arena_used);
     #endif
-    
+
     return false;
   }
-  
+
   if (this->tflite_model_->subgraphs()->Get(0)->operators()->size() == 0) {
         ESP_LOGE(TAG, "Model has no operators!");
         return false;
     }
-  
+
   auto* input = this->input_tensor();
   if (input) {
     ESP_LOGI(TAG, "Input tensor dimensions:");
@@ -232,36 +232,36 @@ bool ModelHandler::load_model_with_arena(const uint8_t *model_data, size_t model
           size *= output->dims->data[i];
       }
       this->output_size_ = size;
-      
+
       // Note: output_processing is always set by __init__.py (defaults to "direct_class"),
       // so the auto-detection branch (when output_processing is empty) is never reached
       // at runtime. If load_model_with_arena() is called directly, ensure output_processing
       // is set explicitly in the ModelConfig before calling.
   }
-  
+
   ESP_LOGI(TAG, "Model loaded successfully");
-  
+
   return true;
 }
 
 void ModelHandler::log_input_stats() const {
     const TfLiteTensor* input = this->input_tensor();
     if (input == nullptr) return;
-    
+
     const int total_elements = this->get_input_width() * this->get_input_height() * this->get_input_channels();
     const int sample_size = std::min(20, total_elements); // Show first 20 values
-    
-    ESP_LOGD(TAG, "First %d %s inputs (%s):", sample_size, 
+
+    ESP_LOGD(TAG, "First %d %s inputs (%s):", sample_size,
              input->type == kTfLiteFloat32 ? "float32" : "uint8",
              this->config_.normalize ? "normalized" : "raw");
-    
+
     if (input->type == kTfLiteFloat32) {
         const float* data = input->data.f;
         for (int i = 0; i < sample_size; i++) {
             ESP_LOGD(TAG, "  [%d]: %.4f", i, data[i]);
             // Log channel groups for RGB/BGR
             if (this->config_.input_channels >= 3 && i % this->config_.input_channels == 2) {
-                ESP_LOGD(TAG, "    -> %s: [%.3f, %.3f, %.3f]", 
+                ESP_LOGD(TAG, "    -> %s: [%.3f, %.3f, %.3f]",
                          this->config_.input_order.c_str(),
                          data[i-2], data[i-1], data[i]);
             }
@@ -272,7 +272,7 @@ void ModelHandler::log_input_stats() const {
             ESP_LOGD(TAG, "  [%d]: %u", i, data[i]);
             // Log channel groups for RGB/BGR
             if (this->config_.input_channels >= 3 && i % this->config_.input_channels == 2) {
-                ESP_LOGD(TAG, "    -> %s: [%u, %u, %u]", 
+                ESP_LOGD(TAG, "    -> %s: [%u, %u, %u]",
                          this->config_.input_order.c_str(),
                          data[i-2], data[i-1], data[i]);
             }
@@ -283,21 +283,21 @@ void ModelHandler::log_input_stats() const {
 void ModelHandler::debug_input_pattern() const {
     const TfLiteTensor* input = this->input_tensor();
     if (!input || input->type != kTfLiteFloat32) return;
-    
+
     const float* data = input->data.f;
     const int total_elements = input->bytes / sizeof(float);
     const int channels = this->get_input_channels();
     const int height = this->get_input_height();
     const int width = this->get_input_width();
-    
+
     ESP_LOGD(TAG, "Input pattern analysis: %dx%dx%d", width, height, channels);
-    
+
     // Check if this looks like a proper image (not all zeros or uniform)
     float channel_sums[3] = {0};
     float channel_mins[3] = {std::numeric_limits<float>::max()};
     float channel_maxs[3] = {std::numeric_limits<float>::lowest()};
     int pixel_count = 0;
-    
+
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             int pos = (y * width + x) * channels;
@@ -312,25 +312,25 @@ void ModelHandler::debug_input_pattern() const {
             }
         }
     }
-    
+
     if (pixel_count > 0) {
         ESP_LOGD(TAG, "Channel statistics:");
         for (int c = 0; c < channels; c++) {
             float mean = channel_sums[c] / pixel_count;
-            ESP_LOGD(TAG, "  Channel %d: min=%.3f, max=%.3f, mean=%.3f", 
+            ESP_LOGD(TAG, "  Channel %d: min=%.3f, max=%.3f, mean=%.3f",
                      c, channel_mins[c], channel_maxs[c], mean);
         }
     }
-    
+
     // Check for common preprocessing patterns
     bool looks_normalized_0_1 = true;
     bool looks_normalized_neg1_1 = true;
-    
+
     for (int i = 0; i < total_elements; i++) {
         if (data[i] < 0.0f || data[i] > 1.0f) looks_normalized_0_1 = false;
         if (data[i] < -1.0f || data[i] > 1.0f) looks_normalized_neg1_1 = false;
     }
-    
+
     ESP_LOGD(TAG, "Data range analysis:");
     ESP_LOGD(TAG, "  Looks like 0-1 normalized: %s", looks_normalized_0_1 ? "YES" : "NO");
     ESP_LOGD(TAG, "  Looks like -1 to 1 normalized: %s", looks_normalized_neg1_1 ? "YES" : "NO");
@@ -344,24 +344,24 @@ ProcessedOutput ModelHandler::process_output(TfLiteTensor* output_tensor) const 
 
     if (output_tensor->type == kTfLiteFloat32) {
         return process_output(output_tensor->data.f);
-    } 
+    }
     else if (output_tensor->type == kTfLiteUInt8 || output_tensor->type == kTfLiteInt8) {
         // Calculate total elements
-        int count = 1; 
+        int count = 1;
         for(int i=0; i < output_tensor->dims->size; i++) {
             count *= output_tensor->dims->data[i];
         }
-        
+
         // Safety check against buffer overflow if count differs from output_size_
         // Use local vector to ensure bounds safety regardless of output_size_ member state.
         // This ensures dequantization loop is safe.
-        
+
         std::vector<float> dequantized(count);
         float scale = output_tensor->params.scale;
         int32_t zero_point = output_tensor->params.zero_point;
-        
-        if (scale == 0.0f) { 
-             scale = 1.0f; 
+
+        if (scale == 0.0f) {
+             scale = 1.0f;
              ESP_LOGW(TAG, "Output tensor has scale 0.0, assuming 1.0 — probabilities may be garbage");
         }
 
@@ -376,9 +376,9 @@ ProcessedOutput ModelHandler::process_output(TfLiteTensor* output_tensor) const 
                 dequantized[i] = (data[i] - zero_point) * scale;
             }
         }
-        
+
         return process_output(dequantized.data());
-    } 
+    }
     else {
         ESP_LOGE(TAG, "Unsupported output tensor type: %d", output_tensor->type);
         return {0.0f, 0.0f};
@@ -398,7 +398,7 @@ ProcessedOutput ModelHandler::process_output(const float *output_data) const {
   float min_val = output_data[0];
   float max_val = output_data[0];
   int max_idx = 0;
-  
+
   for (int i = 1; i < num_classes; i++) {
     float val = output_data[i];
     if (val < min_val) min_val = val;
@@ -407,7 +407,7 @@ ProcessedOutput ModelHandler::process_output(const float *output_data) const {
         max_idx = i;
     }
   }
-  
+
   float max_val_output = max_val;
   if (this->debug_) {
     ESP_LOGD(TAG, "Output range: min=%.6f, max=%.6f", min_val, max_val);
@@ -684,13 +684,13 @@ bool ModelHandler::verify_model_crc(const uint8_t *model_data, size_t length) {
 
 void ModelHandler::debug_model_architecture() const {
     if (!this->tflite_model_) return;
-    
+
     auto* subgraphs = this->tflite_model_->subgraphs();
     if (!subgraphs) return;
-    
+
     ESP_LOGD(TAG, "Model Architecture:");
     ESP_LOGD(TAG, "  Subgraphs: %d", subgraphs->size());
-    
+
     for (int i = 0; i < subgraphs->size(); i++) {
         auto* subgraph = subgraphs->Get(i);
         ESP_LOGD(TAG, "  Subgraph %d:", i);
@@ -704,13 +704,13 @@ void ModelHandler::debug_model_architecture() const {
 bool ModelHandler::validate_model_config() const {
     const TfLiteTensor* input = this->input_tensor();
     if (!input) return false;
-    
+
     // Check input dimensions
     if (input->dims->size >= 4) {
         int height = input->dims->data[1];
         int width = input->dims->data[2];
         int channels = input->dims->data[3];
-        
+
         if (this->config_.input_size.size() >= 2) {
             if (width != this->config_.input_size[0] || height != this->config_.input_size[1]) {
                 ESP_LOGW(TAG, "Model input size mismatch! Config: %dx%d, Model: %dx%d",
@@ -718,14 +718,14 @@ bool ModelHandler::validate_model_config() const {
                 return false;
             }
         }
-        
+
         if (channels != this->config_.input_channels) {
             ESP_LOGW(TAG, "Model input channels mismatch! Config: %d, Model: %d",
                      this->config_.input_channels, channels);
             return false;
         }
     }
-    
+
     return true;
 }
 

@@ -1,21 +1,24 @@
-
 # for flashing : press boot button for 2-3 seconds before the serial connection initialize
 # After OTA update, the EN (reset) button must be pressed to run firmware
-      
+
 # external_components:
-  # - source: 
+  # - source:
       # type: git
       # url: https://github.com/nliaudat/esphome_ai_component
       # ref: main
     # components: [legacy_meter_reader_tflite]
-      
-external_components:    
+
+external_components:
   - source:
       type: local
-      path: components 
-    components: [meter_reader_tflite, tflite_micro_helper, esp32_camera_utils, flash_light_controller, value_validator] # data_collector] #, ssocr_reader #, analog_reader] 
-      
-
+      path: components
+    components: [meter_reader_tflite, tflite_micro_helper, esp32_camera_utils, flash_light_controller, value_validator] # data_collector] #, ssocr_reader #, analog_reader]
+    # components: [meter_reader_tflite, esp32_camera_utils, flash_light_controller, value_validator] # data_collector] #, ssocr_reader #, analog_reader]
+  # - source:
+      # type: git
+      # url: https://github.com/nliaudat/esphome
+      # ref: tflite_micro_helper
+    # components: [tflite_micro_helper]
 
 ############## General configuration
 
@@ -27,34 +30,34 @@ substitutions:
   # name: esp-cam-2mb #no special caracters
   # friendly_name: "esp-cam-2mb"
   # id_prefix: "esp_cam_2mb" #if you have more than one board, it could be usefull to remane all the "id:prefix_xxxx" with a decicaded prefix
- 
+
   revision: "1.3"
   esphome_min_version: "2025.12.0"
 
   # Board Selection (s3_cam, aithinker)
   # board_variant: s3_cam
 
-  
+
   # Meter settings
-  meter_unit: L # Unit of measurement for the meter (e.g. m³, kWh, L) (https://developers.home-assistant.io/docs/core/entity/sensor/https://developers.home-assistant.io/docs/core/entity/sensor/)
+  meter_unit: L # Unit of measurement for the meter (e.g. m^3, kWh, L) (https://developers.home-assistant.io/docs/core/entity/sensor/https://developers.home-assistant.io/docs/core/entity/sensor/)
   meter_device_class: water # device class for the meter (e.g. water, energy, gas)
   meter_state_class: total_increasing # state class for the meter (e.g. total_increasing, total, measurement)
-  
-    
+
+
   # camera
   # NOTE: OV2640 + ESP32 camera driver cannot reliably do grayscale AND windowing at the same time.
   # Using JPEG pixel format with the camera; grayscale conversion is done in software by the ImageProcessor
   # when a grayscale model (model_channels == 1) is loaded.
   camera_pixel_format: JPEG # (cropping implementation is faster with RGB888 format) | Displays: RGB565, RGB888 | Cameras: YUV422, YUV420, RAW | Efficiency: Grayscale, YUV420, JPEG
   ### windowing not available nativelyin grayscale mode (OV2640) due to driver limitations. The image is forced JPEG and then converted to grayscale in software by the ImageProcessor
-# camera_pixel_format: GRAYSCALE 
+# camera_pixel_format: GRAYSCALE
   camera_resolution: 640x480 #800x600 #640x480 #https://esphome.io/components/esp32_camera.html
   # camera_jpeg_quality: 10 # From 10 (best) to 63 (worst). | Must be 0 if non JPEG
   camera_jpeg_quality: 10
   # camera_max_framerate: 1fps
-  camera_max_framerate: 1fps 
+  camera_max_framerate: 1fps
   camera_idle_framerate: 0.2fps
-      
+
   #time
   TZ: Europe/Zurich #timezone
   reboot_days_of_week: MON
@@ -62,10 +65,10 @@ substitutions:
   reboot_minutes: 0
   reboot_seconds: 0
 
-  
+
 preferences:
   flash_write_interval: 60min
-  
+
 
 ota:
   - platform: esphome
@@ -74,7 +77,7 @@ safe_mode:
 
 # network:
     # enable_ipv6: false
-    
+
 
 api:
   reboot_timeout: 0s # do not reboot if hassio connection is lost.
@@ -82,10 +85,10 @@ api:
 globals:
   - id: ${id_prefix}_crop_zones
     type: std::string
-    max_restore_data_length: 254 
+    max_restore_data_length: 254
     initial_value: "\"[]\""
-    
-    # #debug config 
+
+    # #debug config
     # initial_value: '"[[9, 10, 49, 74], [64, 10, 104, 74], [118, 9, 158, 81], [173, 9, 213, 81], [230, 9, 270, 81], [286, 10, 326, 82], [339, 11, 379, 83], [394, 10, 434, 82]]"'
     #    # Note: The outer quotes are escaped with single quotes + double quotes ("...")
 
@@ -97,7 +100,7 @@ esp32_camera_utils:
   camera_id: ${id_prefix}_espcam
   debug: false
   ### zoom availale for OV2640, OV3660, OV5640, SC101IOT, SC030IOT from crop zones (explicit)
-  ### windowing not available nativelyin grayscale mode (OV2640) due to driver limitations. The image is forced JPEG and then converted to grayscale in software by the ImageProcessor 
+  ### windowing not available nativelyin grayscale mode (OV2640) due to driver limitations. The image is forced JPEG and then converted to grayscale in software by the ImageProcessor
   # camera_window:  # can be set in http://[hassio]/developer-tools/action > esphome.[s3cam_tflite]_set_camera_window
   #   offset_x: 928 # multiple of 4
   #   offset_y: 480 # multiple of 4
@@ -107,19 +110,19 @@ esp32_camera_utils:
   # enable_rotation: true
   # rotation: 270 # 0, 90, 180, 270 (special case built-in "accelerated" for 90, 180, 270 )
 
-  
+
   # enable_scaler: true
   # scaler:
   #   width: 640
   #   height: 480
-    
+
   # enable_cropper: true
   # cropper:
   #   width: 320
   #   height: 240
   #   offset_x: 0
   #   offset_y: 0
-  
+
   # enable_drawing: true # enable drawing subsystem, needed if meter_reader_tflite: generate_preview: true + show_crop_areas: true
 
   debug_memory: false
@@ -131,7 +134,7 @@ flash_light_controller:
   flash_pre_time: 7000ms # 7 seconds before update (time to stabilize) (works with 5sec on my board)
   flash_post_time: 200ms # 2 seconds after update (works with 100ms on my board)
   debug: false
-  
+
 # data_collector:
 #   id: ${id_prefix}_data_collector
 #   upload_url: "http://192.168.1.53:5000/api/upload" # CHANGE ME
@@ -153,17 +156,17 @@ value_validator:
   allow_negative_rates: false          # Allow values < previous value (default: false)
   max_absolute_diff: 300               # Max allowed absolute change (default: 100)
   # max_rate_change: 0.15                # Max rate change as percentage (default: 15%)
-    
+
   # Smart Validation
   enable_smart_validation: true        # Enable adaptive validation (default: true)
   smart_validation_window: 5           # Window size for pattern analysis (default: 5)
-    
+
   # Confidence Thresholds
   high_confidence_threshold: 0.90     # Threshold for high confidence (default: 90%)
   per_digit_confidence_threshold: 0.85 # Min confidence per digit (default: 85%)
   strict_confidence_check: true       # Require all digits meet threshold (default: false)
   #first_reading_digit_threshold: 0.70
-    
+
   # Memory Management
   max_history_size: 50kB               # Max history memory usage (default: 50kB)
 
@@ -196,12 +199,12 @@ meter_reader_tflite:
   # Set to true to enable continuous updates, or false for on-demand only (via button)
   generate_preview: false # need web_server: port: 80 (wait for update_interval to be reached) + esp32_camera_utils: enable drawing subsystem
   # show_crop_areas: true # DEV (not ready for production) Draw boxes on preview
-  ## other needs : 
+  ## other needs :
     # esp32_camera_utils: enable_drawing: true
     # generate_preview: true
     # show_crop_areas: true
-    # web_server: 
-        # port: 80	# commented	uncomment
+    # web_server:
+        # port: 80  # commented  uncomment
     # - !include camera_webserver.yaml
 
 
@@ -209,20 +212,20 @@ meter_reader_tflite:
 
   crop_zones_global: ${id_prefix}_crop_zones  # Reference the global variables set in globals_AI_component.yaml | To update, use http://[hassio]/developer-tools/action >esphome.[s3cam_tflite]_set_crop_zones | to get, use the tools>draw_regions.py
   flash_light_controller: ${id_prefix}_flash_controller
-  
+
   # data_collector: ${id_prefix}_data_collector
   # collect_low_confidence: true
-  
+
   value_sensor: ${id_prefix}_meter_value
   confidence_sensor: ${id_prefix}_meter_confidence
-  
+
 
   inference_logs: ${id_prefix}_inference_logs
   main_logs: ${id_prefix}_main_logs
-  
+
   total_inference_time_sensor: ${id_prefix}_inference_time
   capture_to_publish_time_sensor: ${id_prefix}_capture_to_publish_time
-  
+
   # enable_flash_calibration: false # still in dev
 
   ### Advanced parameters
@@ -258,28 +261,28 @@ meter_reader_tflite:
 #   debug: false # Set true to see ASCII in logs
 #   value_sensor:
 #     name: "Analog Total"
-#   dials: 
+#   dials:
 #     - id: dial_1
-#       scale: 1.0 
+#       scale: 1.0
 #       crop_x: 0
 #       crop_y: 0
 #       crop_w: 100
 #       crop_h: 100
-#       
+#
 #       # Image Enhancements
 #       auto_contrast: true
 #       contrast: 1.0
-#       
+#
 #       # Color Detection (Optional)
 #       # target_color: 0xFF0000 # Red needle
-#       
+#
 #       # Geometry
 #       min_angle: 0
 #       max_angle: 360
 #       angle_offset: 0 # 0=North, 90=East
 #       min_value: 0
 #       max_value: 10
-#       
+#
 #       # Algorithm Selection (optional, default: radial_profile)
       # detection_algorithm: radial_profile # Options: radial_profile, hough_transform, template_match, legacy, auto
 
@@ -297,7 +300,7 @@ packages:
   - !include boards/board_AI-On-The-Edge-Cam_Esp32-S3.yaml
 
   # - !include debug_board.yaml
-  
+
   # Component-specific controls (comment to disable individual controls)
   - !include components/meter_reader_tflite/meter_reader_tflite_controls.yaml
   - !include components/value_validator/value_validator_controls.yaml
@@ -306,19 +309,19 @@ packages:
   # - !include components/analog_reader/analog_reader_controls.yaml
   # - !include components/value_validator/value_validator_dial_controls.yaml
 
-  
+
   # camera configs
   - !include camera_options.yaml
   - !include esp32_camera.yaml
   # - !include camera_webserver.yaml # generate_preview must be set to true is used
-  
+
   # network choice
   - !include wifi.yaml
   # - !include lan.yaml # only for AI-On-The-Edge-Cam_Esp32-S3.yaml + wifi must be disabled
-  
+
   # others
   - !include globals.yaml
   - !include switch_others.yaml
   - !include sensor_others.yaml
-  - !include logger.yaml 
+  - !include logger.yaml
   - !include time.yaml

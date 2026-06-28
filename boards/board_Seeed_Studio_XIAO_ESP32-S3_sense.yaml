@@ -19,8 +19,8 @@ esphome:
     name: "nliaudat.meter-reader"
     version: "${revision}.dev"
   platformio_options:
-    board_build.extra_flags: 
-    - -DBOARD_HAS_PSRAM 
+    board_build.extra_flags:
+    - -DBOARD_HAS_PSRAM
     - -DTF_LITE_STATIC_MEMORY # for tflite micro
     - -DTF_LITE_DISABLE_X86_NEON #for tflite micro
     - -DESP_NN  #use hardware acceleration : https://github.com/espressif/esp-nn (only if using tflite)
@@ -48,17 +48,17 @@ substitutions:
   #board and compilation
   board: seeed_xiao_esp32s3 #https://docs.platformio.org/en/latest//boards/espressif32/seeed_xiao_esp32s3.html
   framework: esp-idf
-  
+
   #Pin definition
-  
+
   # SD Card Configuration
   #https://wiki.seeedstudio.com/xiao_esp32s3_sense_filesystem/
   sdcard_clk_pin: GPIO07 #SD_SCLK
   sdcard_cmd_pin: GPIO09 #SD_MOSI
   sdcard_d0_pin: GPIO08 #SD_MISO
   sdcard_d3_pin: GPIO21 #SD_CS, CD/DAT3
-  
-  # Camera Pins 
+
+  # Camera Pins
   #https://esphome.io/components/esp32_camera/
   external_clock_pin: GPIO10
   external_clock_frequency: 20MHz
@@ -68,19 +68,19 @@ substitutions:
   vsync_pin: GPIO38
   href_pin: GPIO47
   pixel_clock_pin: GPIO13
-  
+
   # LED Pins
   status_led_pin: GPIO21
   flash_led_pin: GPIO4
-  
- 
+
+
 esp32:
-  board: ${board} 
-  # variant: esp32s3 
+  board: ${board}
+  # variant: esp32s3
   cpu_frequency: 240MHZ
   flash_size: 8MB
   framework:
-    type: ${framework} 
+    type: ${framework}
     version: recommended
     sdkconfig_options:
       # CONFIG_COMPILER_OPTIMIZATION_SIZE: y
@@ -106,13 +106,13 @@ esp32:
       #CONFIG_LOG_DEFAULT_LEVEL: 0 # prevents "ESP-IDF" Guru Meditation Error
       # CONFIG_CAMERA_TASK_STACK_SIZE: "4096"
       CONFIG_CAMERA_TASK_STACK_SIZE: "8192"
-      #### testing 
+      #### testing
       # CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: y
       CONFIG_FATFS_LFN_STACK: "y" # to support long file name in sdcard
       CONFIG_FREERTOS_HZ: "1000"
       CONFIG_ESP32S3_SPIRAM_SUPPORT: y
       CONFIG_SPIRAM_SPEED_80M: y
-      
+
       # https://github.com/espressif/esp32-camera/blob/master/examples/camera_example/sdkconfig.defaults
     # CONFIG_ESP32_DEFAULT_CPU_FREQ_240=y
     # CONFIG_ESP32S2_DEFAULT_CPU_FREQ_240=y
@@ -130,12 +130,12 @@ esp32:
     # CONFIG_ESP32S2_SPIRAM_SUPPORT=y
     # CONFIG_ESP32S3_SPIRAM_SUPPORT=y
     # CONFIG_SPIRAM_SPEED_80M=y
-      
-    
+
+
 psram:
   mode: octal
   speed: 80MHz
-    
+
 # sensor:
   # - platform: sd_mmc_card
     # type: used_space
@@ -162,14 +162,14 @@ psram:
   # - platform: sd_mmc_card
     # sd_card_type:
       # name: "SD card type"
-  
+
 light:
   - platform: binary
     output: ${id_prefix}_flash_light_output
     name: "${name} Flash LED"
     id: ${id_prefix}_flash
     icon: "mdi:alarm-light"
-  
+
   - platform: status_led
     name: "${name} Status LED"
     id: ${id_prefix}_status_led

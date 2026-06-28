@@ -18,13 +18,13 @@ void TFLiteMicroHelper::set_model(const uint8_t *model_data, size_t model_size) 
 
 bool TFLiteMicroHelper::allocate_tensor_arena_() {
     ESP_LOGI(TAG, "Allocating tensor arena: %zu bytes", this->tensor_arena_size_requested_);
-    
+
     this->tensor_arena_allocation_ = MemoryManager::allocate_tensor_arena(this->tensor_arena_size_requested_);
     if (!this->tensor_arena_allocation_) {
         ESP_LOGE(TAG, "Failed to allocate tensor arena");
         return false;
     }
-    
+
     ESP_LOGI(TAG, "Tensor arena allocated: %zu bytes", this->tensor_arena_allocation_.actual_size);
     return true;
 }

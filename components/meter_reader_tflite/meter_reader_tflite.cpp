@@ -68,13 +68,13 @@ static size_t calculate_optimal_pool_size() {
   size_t free_psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
   size_t free_internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
   size_t total_free = free_psram + free_internal;
-  
-  ESP_LOGD(TAG, "Memory available - PSRAM: %zu KB, Internal: %zu KB", 
+
+  ESP_LOGD(TAG, "Memory available - PSRAM: %zu KB, Internal: %zu KB",
            free_psram / 1024, free_internal / 1024);
-  
+
   // Each pool entry uses ~1-2KB (frame shared_ptr + crops vector + metadata)
   // Strategy: Very conservative on ESP32, moderate on ESP32-S3
-  
+
   if (free_psram > 4 * 1024 * 1024) {
     // ESP32-S3 with >4MB PSRAM - can afford larger pool
     ESP_LOGI(TAG, "High PSRAM detected, using MAX pool size");
@@ -115,7 +115,7 @@ static InferenceJobPtr allocate_inference_job() {
       }
     }
   }
-  
+
   pool_job_misses++;
   uint32_t total = pool_job_hits + pool_job_misses;
   if (total > 0 && (total % 100 == 0)) {  // Log every 100 allocations
@@ -128,7 +128,7 @@ static InferenceJobPtr allocate_inference_job() {
 
 static void free_inference_job(InferenceJob* job) {
   // Release resources immediately to free up camera framebuffer
-  job->frame.reset(); 
+  job->frame.reset();
   job->crops.clear();
 
   {
@@ -152,7 +152,7 @@ static InferenceResultPtr allocate_inference_result() {
         inference_result_used[i] = true;
         inference_result_pool[i].inference_time = 0;
         inference_result_pool[i].success = false;
-        // Force memory release by swapping with empty temporary, 
+        // Force memory release by swapping with empty temporary,
         // ensuring no hidden capacity grows indefinitely in the pool.
         inference_result_pool[i].readings = {};
         inference_result_pool[i].probabilities = {};
@@ -161,7 +161,7 @@ static InferenceResultPtr allocate_inference_result() {
       }
     }
   }
-  
+
   pool_result_misses++;
   uint32_t total = pool_result_hits + pool_result_misses;
   if (total > 0 && (total % 100 == 0)) {  // Log every 100 allocations
@@ -207,14 +207,14 @@ static constexpr uint32_t PREVIEW_FALLBACK_BUFFER_SIZE = 128 * 1024; // 128 KB
 
 void MeterReaderTFLite::setup() {
     ESP_LOGI(TAG, "Setting up Meter Reader TFLite (Refactored)...");
-    
+
     // 1. Initial Config
     if (this->camera_coord_.get_width() == 0) {
         ESP_LOGE(TAG, "Camera dimensions not set!");
         if (this->main_logs_) this->main_logs_->publish_state("CRITICAL: Camera dimensions not set!");
         this->mark_failed(); return;
     }
-    
+
 
     // 2. Load Model
     // Load model first to ensure we can retrieve input specifications for camera configuration.
@@ -226,25 +226,25 @@ void MeterReaderTFLite::setup() {
          if (!this->tflite_coord_.load_model()) {
              this->mark_failed(); return;
          }
-         
+
           // After model loaded, we have input specs. Update CameraCoord.
           auto spec = this->tflite_coord_.get_model_spec();
-          
+
           // [MOVED] Sync Rotation FIRST
           if (this->esp32_camera_utils_) {
                this->rotation_ = this->esp32_camera_utils_->get_rotation();
                ESP_LOGI(TAG, "Synced rotation from esp32_camera_utils: %.1f", this->rotation_);
                this->camera_coord_.set_rotation(this->rotation_);
           }
-          
+
           // Pass preview setting to coordinator to enable caching if needed
           this->camera_coord_.set_enable_preview(this->generate_preview_);
-          
+
           // Use consolidated helper (replaces 4 copies of ImageProcessorConfig construction)
           // Map: spec.input_type 1=FLOAT → 0=FLOAT, 0=UINT8 → 1=UINT8 (ImageProcessorInputType)
           int processor_input_type = (spec.input_type == 1) ? 0 : 1;
           this->refresh_image_processor_config(processor_input_type);
-         
+
           // Setup Web Server Preview
           #ifdef USE_WEB_SERVER
           if (this->web_server_) {
@@ -264,50 +264,50 @@ void MeterReaderTFLite::setup() {
           #ifdef DEBUG_METER_READER_TFLITE
           this->print_debug_info();
           #endif
-          
+
           // Publish static memory stats
           #ifdef DEBUG_METER_READER_MEMORY
           if (this->tensor_arena_size_sensor_) {
-              this->tensor_arena_size_sensor_->publish_state(this->tflite_coord_.get_tensor_arena_size()); 
+              this->tensor_arena_size_sensor_->publish_state(this->tflite_coord_.get_tensor_arena_size());
           }
           #endif
      });
-    
+
     // 3. Setup Validation
     // Validation is now handled by external component wrapped in coordinator
-    
+
     // 4. Setup Camera Callback
-    
+
     // 5. Setup Flashlight Coordinator Callback
     this->flashlight_coord_.set_request_frame_callback([this](){
         this->frame_state_.store(FrameState::REQUESTED);
         this->last_request_time_ = millis();
         ESP_LOGD(TAG, "Frame requested via coordinator callback");
     });
-    
-    
+
+
     #ifdef SUPPORT_DOUBLE_BUFFERING
-  
+
     // 6. Setup Inference Object Pools
     INFERENCE_POOL_SIZE.store(calculate_optimal_pool_size());
     ESP_LOGI(TAG, "Auto-configured inference pool size: %zu entries", INFERENCE_POOL_SIZE.load());
-    
+
     // Allocate pools
     inference_job_pool = std::make_unique<InferenceJob[]>(INFERENCE_POOL_SIZE.load());
     inference_result_pool = std::make_unique<InferenceResult[]>(INFERENCE_POOL_SIZE.load());
     inference_job_used = std::make_unique<bool[]>(INFERENCE_POOL_SIZE.load());
     inference_result_used = std::make_unique<bool[]>(INFERENCE_POOL_SIZE.load());
-    
+
     // Initialize used flags
     for (size_t i = 0; i < INFERENCE_POOL_SIZE.load(); ++i) {
         inference_job_used[i] = false;
         inference_result_used[i] = false;
     }
-    
+
     // 7. Setup Double Buffering Pipeline
     this->start_inference_pipeline();
     #endif
-   
+
 
     // 8. Setup Dynamic Resource Buttons
     if (this->unload_button_) {
@@ -322,7 +322,7 @@ void MeterReaderTFLite::set_camera(camera::Camera *camera) { // -> CameraCoord c
     this->camera_coord_.set_camera(static_cast<esp32_camera::ESP32Camera *>(camera));
     // Register listener
     ESP_LOGD(TAG, "Registering CameraListener for MeterReaderTFLite");
-    camera->add_listener(this); 
+    camera->add_listener(this);
 }
 
 void MeterReaderTFLite::set_debug(bool debug) {
@@ -330,7 +330,7 @@ void MeterReaderTFLite::set_debug(bool debug) {
     this->tflite_coord_.set_debug(debug);
     this->camera_coord_.set_debug(debug);
     this->flashlight_coord_.set_debug(debug);
-    
+
     // Also enable legacy debug mode if it exists but ideally we use debug_ everywhere
     #ifdef DEBUG_METER_READER_TFLITE
     this->set_debug_mode(debug);
@@ -342,7 +342,7 @@ void MeterReaderTFLite::on_camera_image(const std::shared_ptr<camera::CameraImag
     FrameState expected = FrameState::REQUESTED;
     if (this->frame_state_.compare_exchange_strong(expected, FrameState::AVAILABLE)) {
         this->pending_frame_ = image;
-        this->pending_frame_acquisition_time_ = millis(); 
+        this->pending_frame_acquisition_time_ = millis();
     }
 }
 
@@ -356,7 +356,7 @@ void MeterReaderTFLite::update() {
     if (this->esp32_camera_utils_) {
         this->esp32_camera_utils_->update_memory_sensors();
     }
-    
+
     // 2. Crop Zones Processing
     // If paused, we still might want to update preview if enabled
     if (this->pause_processing_.load() && !this->generate_preview_ && !this->request_preview_) {
@@ -369,7 +369,7 @@ void MeterReaderTFLite::update() {
         // Calibration flash itself via inference results
         return; // Skip normal processing during calibration
     }
-    
+
     // Setup Mode: Flash always on, ignore scheduling
     if (this->generate_preview_) {
         // Ensure flash is on (redundant check but safe) but do NOT run scheduler
@@ -377,8 +377,8 @@ void MeterReaderTFLite::update() {
              // In case it was turned off by something else, force it back
              this->flashlight_coord_.enable_flash();
         }
-        
-        // Trigger frame request for preview update 
+
+        // Trigger frame request for preview update
         // (Similar to continuous mode but specifically for preview)
         FrameState state = this->frame_state_.load();
         if (state == FrameState::IDLE) {
@@ -390,10 +390,10 @@ void MeterReaderTFLite::update() {
         return; // Skip standard scheduling
     }
 
-    
+
     // The flashlight coordinator returns true if it is handling the cycle (scheduling or waiting)
     bool busy = this->flashlight_coord_.update_scheduling();
-    
+
     if (!busy) {
         // Normal cycle
         FrameState state = this->frame_state_.load();
@@ -431,19 +431,19 @@ void MeterReaderTFLite::loop() {
     if (state == FrameState::AVAILABLE) {
         this->process_available_frame();
     }
-    
+
     #ifdef SUPPORT_DOUBLE_BUFFERING
     // Check for async results
     InferenceResult* res_ptr = nullptr;
     if (this->output_queue_ && xQueueReceive(this->output_queue_, &res_ptr, 0) == pdTRUE) {
         if (res_ptr) {
-            ESP_LOGD(TAG, "Async inference finished in %lu ms (Total: %lu ms)", 
+            ESP_LOGD(TAG, "Async inference finished in %lu ms (Total: %lu ms)",
                      res_ptr->inference_time, millis() - res_ptr->total_start_time);
-            
+
             // Reconstruct combined reading
             std::string digit_str;
             float final_val = this->combine_readings(res_ptr->readings, digit_str);
-            
+
             #ifdef DEBUG_METER_READER_MEMORY
             if (this->debug_memory_enabled_ && this->tensor_arena_used_sensor_) {
                   // tensor_arena_used_sensor_->publish_state(res_ptr->arena_used_bytes);
@@ -464,19 +464,19 @@ void MeterReaderTFLite::loop() {
                  for (float c : res_ptr->probabilities) sum += c;
                  avg_conf = sum / res_ptr->probabilities.size();
             }
-            
+
             float validated_val = 0.0f;
             bool valid = this->validate_and_update_reading(res_ptr->readings, res_ptr->probabilities, validated_val);
             this->publish_inference_result(digit_str, avg_conf, validated_val, valid,
                                            res_ptr->readings, res_ptr->probabilities);
             this->update_calibration(avg_conf);
-            
+
             // Publish pool efficiency statistics
             #ifdef DEBUG_METER_READER_MEMORY
             static uint32_t last_pool_stats_publish = 0;
             if (millis() - last_pool_stats_publish > 60000) {  // Every 60 seconds
                 last_pool_stats_publish = millis();
-                
+
                 if (this->pool_job_efficiency_sensor_) {
                     uint32_t hits = pool_job_hits.load();
                     uint32_t total = hits + pool_job_misses.load();
@@ -484,7 +484,7 @@ void MeterReaderTFLite::loop() {
                         this->pool_job_efficiency_sensor_->publish_state(100.0f * hits / total);
                     }
                 }
-                
+
                 if (this->pool_result_efficiency_sensor_) {
                     uint32_t hits = pool_result_hits.load();
                     uint32_t total = hits + pool_result_misses.load();
@@ -492,17 +492,17 @@ void MeterReaderTFLite::loop() {
                         this->pool_result_efficiency_sensor_->publish_state(100.0f * hits / total);
                     }
                 }
-                
+
                 // Publish arena efficiency
                 if (this->arena_efficiency_sensor_) {
                     auto arena_stats = this->tflite_coord_.get_arena_stats();
                     this->arena_efficiency_sensor_->publish_state(arena_stats.efficiency);
                 }
-                
+
                 // Publish heap fragmentation
                 if (this->heap_fragmentation_sensor_) {
                     multi_heap_info_t info;
-                    
+
                     // Check PSRAM first (if available), fallback to internal RAM
                     size_t free_psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
                     if (free_psram > 0) {
@@ -512,7 +512,7 @@ void MeterReaderTFLite::loop() {
                         // No PSRAM - measure internal RAM fragmentation
                         heap_caps_get_info(&info, MALLOC_CAP_INTERNAL);
                     }
-                    
+
                     // Calculate fragmentation: 100% - (largest_free_block / total_free * 100)
                     // Lower is better. 0% = no fragmentation, 100% = highly fragmented
                     float fragmentation = 0.0f;
@@ -520,15 +520,15 @@ void MeterReaderTFLite::loop() {
                         float efficiency = static_cast<float>(info.largest_free_block) / info.total_free_bytes;
                         fragmentation = (1.0f - efficiency) * 100.0f;
                     }
-                    
+
                     this->heap_fragmentation_sensor_->publish_state(fragmentation);
                 }
             }
             #endif
-            
+
             // Cleanup
             free_inference_result(res_ptr);
-            
+
             // Request next frame if configured.
             // Note: 'update()' triggers 'take_picture', so this maintains the loop if continuous mode is enabled.
         }
@@ -540,22 +540,22 @@ void MeterReaderTFLite::loop() {
 #ifdef USE_DATA_COLLECTOR
 void MeterReaderTFLite::trigger_low_confidence_collection(const std::string &value, float confidence, const std::string &metadata) {
     if (!this->collect_low_confidence_ || !this->data_collector_) return;
-    if (this->collection_state_ != COLLECTION_IDLE) return; 
+    if (this->collection_state_ != COLLECTION_IDLE) return;
 
     // Prevent collection during Setup Mode (Preview) or calibration
     if (this->generate_preview_ || this->is_calibrating()) {
         ESP_LOGD(TAG, "Data collection skipped (Setup Mode/Calibration active)");
         return;
-    } 
+    }
 
     ESP_LOGI(TAG, "Low confidence (%.2f%%) detected. Retaking with flash for data collection...", confidence * 100.0f);
 
     this->pending_collection_ = {value, confidence, metadata};
     this->collection_state_ = COLLECTION_WAITING_FOR_FLASH;
-    
+
     // Force Flash via Coordinator
     this->flashlight_coord_.enable_flash();
-    
+
     // Wait for stabilization
     uint32_t stabilization_delay = this->flashlight_coord_.get_pre_time();
     // Safety clamp
@@ -573,28 +573,28 @@ void MeterReaderTFLite::trigger_low_confidence_collection(const std::string &val
 
 void MeterReaderTFLite::process_available_frame() {
     this->frame_state_.store(FrameState::PROCESSING);
-    
+
     std::shared_ptr<camera::CameraImage> frame;
     {
         std::lock_guard<std::mutex> lock(this->frame_mutex_);
         frame = this->pending_frame_;
         this->pending_frame_.reset();
     }
-    
+
     // Data Collection Interception
     #ifdef USE_DATA_COLLECTOR
     if (this->collection_state_ == COLLECTION_WAITING_FOR_FRAME) {
          if (this->data_collector_) {
-             this->data_collector_->collect_image(frame, this->camera_coord_.get_width(), this->camera_coord_.get_height(), this->camera_coord_.get_format(), 
+             this->data_collector_->collect_image(frame, this->camera_coord_.get_width(), this->camera_coord_.get_height(), this->camera_coord_.get_format(),
                                                  this->pending_collection_.value, this->pending_collection_.confidence, this->pending_collection_.extra_metadata);
          }
          this->collection_state_ = COLLECTION_IDLE;
          this->flashlight_coord_.disable_flash();
          this->frame_state_.store(FrameState::IDLE);
-         return; 
+         return;
     }
     #endif
-    
+
     if (frame) {
         this->process_full_image(frame);
     }
@@ -609,14 +609,14 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
         ESP_LOGW(TAG, "Skipping frame - Model not loaded yet");
         return;
     }
-    
+
     // Check processing state
     bool pause = this->pause_processing_.load();
     bool preview_needed = this->generate_preview_ || this->request_preview_;
 
     if (pause && !preview_needed) {
         ESP_LOGI(TAG, "Setup Mode active & No Preview: Skipping.");
-        return; 
+        return;
     } else if (pause) {
         ESP_LOGI(TAG, "Setup Mode active: Processing for Preview only.");
     } else {
@@ -645,36 +645,36 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     }
     // Process frame -> buffers
     esphome::App.feed_wdt();
-    
+
     uint32_t preprocess_start = millis();
     if (this->debug_) {
         ESP_LOGD(TAG, "Processing full image: Requesting frame processing from CameraCoordinator");
     }
     auto processed_buffers = this->camera_coord_.process_frame(frame, zones);
-    
+
     // Check for debug image (last processed master)
     if (this->generate_preview_ || this->request_preview_) {
         auto preview = this->camera_coord_.get_debug_image();
         ESP_LOGD(TAG, "Checking for preview image. Ptr: %p", preview ? preview.get() : nullptr);
-        
+
         if (preview) {
              // Draw crop zones on the preview image for debugging visualization.
              if (this->show_crop_areas_) {
                  auto draw_zones = this->crop_zone_handler_.get_zones();
                  if (preview->get_data_buffer()) {
                      uint8_t* buf = preview->get_data_buffer();
-                     
+
                      // Calculate dimensions based on current camera config and rotation
                      int w = this->camera_coord_.get_width();
                      int h = this->camera_coord_.get_height();
                      if (std::abs(this->rotation_ - 90.0f) < 0.1f || std::abs(this->rotation_ - 270.0f) < 0.1f) {
                          std::swap(w, h);
                      }
-                     
+
                      auto spec = this->tflite_coord_.get_model_spec();
                      // Preview image is RGB888 (3 channels) from ImageProcessor
                      int channels = 3;
-                     
+
                      #ifdef USE_CAMERA_DRAWING
                      for (const auto& zone : draw_zones) {
                          int zone_w = zone.x2 - zone.x1;
@@ -690,7 +690,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
             // Fallback: the image processor did not cache a preview (non-JPEG format or memory pressure).
             // Copy the raw frame's JPEG data so /preview serves it directly.
             size_t len = frame->get_data_length();
-            
+
             // Use pre-allocated buffer if it's large enough, otherwise allocate (with RAII)
             uint8_t* copy_dst = nullptr;
             bool from_prealloc = false;
@@ -711,13 +711,13 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
                     this->camera_coord_.get_width(), this->camera_coord_.get_height(),
                     PIXFORMAT_JPEG);
                 this->update_preview_image(cached);
-                ESP_LOGD(TAG, "Preview: cached raw frame fallback (%u bytes, spiram=%s, prealloc=%s)", 
+                ESP_LOGD(TAG, "Preview: cached raw frame fallback (%u bytes, spiram=%s, prealloc=%s)",
                          len, is_spiram ? "yes" : "no", from_prealloc ? "yes" : "no");
             }
         }
         if (this->request_preview_) this->request_preview_ = false;
     }
-    
+
     #ifdef DEBUG_METER_READER_TIMING
     if (this->debug_timing_) {
         // Acquisition: Time from Request (last_request_time_) to Arrival (pending_frame_acquisition_time_)
@@ -726,7 +726,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
         ESP_LOGI(TAG, "Preprocessing (Crop/Scale) took %u ms", millis() - preprocess_start);
     }
     #endif
-    
+
     ESP_LOGI(TAG, "Processed Buffers Size: %d", processed_buffers.size());
 
     #ifdef SUPPORT_DOUBLE_BUFFERING
@@ -741,16 +741,16 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     if (this->pause_processing_) {
         return;
     }
-    
+
     InferenceJobPtr job = allocate_inference_job();
     ESP_LOGI(TAG, "Allocated InferenceJob. Assigning resources...");
 
     job->frame = frame; // Keep alive
     job->crops = std::move(processed_buffers);
     // Use the start_time from ScopedTimer
-    job->start_time = start_time; 
-    job->request_time = this->last_request_time_; // Pass request time for cycle calculation 
-    
+    job->start_time = start_time;
+    job->request_time = this->last_request_time_; // Pass request time for cycle calculation
+
     ESP_LOGI(TAG, "Job prepared. Enqueuing... (Preprocessing took %u ms)", millis() - start_time);
 
     // Flush data cache for any PSRAM-backed crop buffers before cross-core read.
@@ -778,16 +778,16 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     return;
 
     #endif
-    
+
     // Buffers -> Inference (Synchronous Fallback)
     ESP_LOGI(TAG, "Entering Synchronous Inference Path (Single Core Fallback)");
-    
+
     // Buffers -> Inference
-    
+
     // Capture Peak Memory State *during* processing (buffers allocated)
     #ifdef DEBUG_METER_READER_MEMORY
     if (this->debug_memory_enabled_) {
-  
+
         if (this->process_free_heap_sensor_) this->process_free_heap_sensor_->publish_state(heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
         if (this->process_free_psram_sensor_) this->process_free_psram_sensor_->publish_state(heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
 
@@ -804,7 +804,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     ESP_LOGI(TAG, "Context: %d buffers ready. Running synchronous inference...", processed_buffers.size());
     auto results = this->tflite_coord_.run_inference(processed_buffers);
     ESP_LOGI(TAG, "Synchronous inference complete. Results: %d", results.size());
-    
+
     #ifdef DEBUG_METER_READER_MEMORY
     if (this->debug_memory_enabled_ && this->tensor_arena_used_sensor_) {
           // tensor_arena_used_sensor_->publish_state(tflite_coord_.get_arena_used_bytes());
@@ -819,7 +819,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
         this->capture_to_publish_time_sensor_->publish_state(millis() - this->last_request_time_);
     }
 
-    
+
     // Collect readings
     esphome::StaticVector<float, 16> readings, confidences;
     int digit_index = 0;
@@ -831,22 +831,22 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
         } else {
              ESP_LOGW(TAG, "Digit %d: Failed to infer", digit_index);
         }
-        
+
         if (this->debug_) {
-            ESP_LOGD(TAG, "Digit %d: Val=%.2f, Conf=%.2f, Success=%s", 
+            ESP_LOGD(TAG, "Digit %d: Val=%.2f, Conf=%.2f, Success=%s",
                      digit_index, res.value, res.confidence, res.success ? "YES" : "NO");
         }
-        
+
         digit_index++;
     }
-    
+
     if (!readings.empty()) {
         // Use helper to combine readings and log details (matches legacy behavior)
         std::string digit_str;
         float final_val = this->combine_readings(readings, digit_str);
 
         float avg_conf = std::accumulate(confidences.begin(), confidences.end(), 0.0f) / confidences.size();
-        
+
         float validated_val = final_val;
         bool valid = this->validate_and_update_reading(readings, confidences, validated_val);
 
@@ -896,23 +896,23 @@ void MeterReaderTFLite::publish_inference_result(const std::string& digit_str, f
         }
         if (this->confidence_sensor_) this->confidence_sensor_->publish_state(avg_conf * 100.0f);
         if (valid) {
-            ESP_LOGI(TAG, "Result: VALID (Raw: %s, Conf: %.3f, %s)", 
+            ESP_LOGI(TAG, "Result: VALID (Raw: %s, Conf: %.3f, %s)",
                      digit_str.c_str(), avg_conf, conf_list.c_str());
             return;  // Valid with validator → no data collection needed
         }
-        ESP_LOGI(TAG, "Result: INVALID (Raw: %s, Conf: %.3f, %s)", 
+        ESP_LOGI(TAG, "Result: INVALID (Raw: %s, Conf: %.3f, %s)",
                  digit_str.c_str(), avg_conf, conf_list.c_str());
     } else
 #endif
     // No validator: gate on confidence only (existing behavior)
     if (valid && avg_conf >= this->confidence_threshold_) {
-        ESP_LOGI(TAG, "Result: VALID (Raw: %s, Conf: %.3f, %s)", 
+        ESP_LOGI(TAG, "Result: VALID (Raw: %s, Conf: %.3f, %s)",
                  digit_str.c_str(), avg_conf, conf_list.c_str());
         if (this->value_sensor_) this->value_sensor_->publish_state(validated_val);
         if (this->confidence_sensor_) this->confidence_sensor_->publish_state(avg_conf * 100.0f);
         return;
     } else {
-        ESP_LOGI(TAG, "Result: INVALID (Raw: %s, Conf: %.3f, %s)", 
+        ESP_LOGI(TAG, "Result: INVALID (Raw: %s, Conf: %.3f, %s)",
                  digit_str.c_str(), avg_conf, conf_list.c_str());
     }
 
@@ -950,7 +950,7 @@ void MeterReaderTFLite::publish_inference_result(const std::string& digit_str, f
         metadata = this->serialize_inference_metadata(digit_str, avg_conf, readings, confidences,
                                                     this->camera_coord_.get_width(), this->camera_coord_.get_height());
 
-        ESP_LOGW(TAG, "Data Collection Triggered: Reading Invalid/LowConf (Conf: %.1f%%, Suspicious: %s)", 
+        ESP_LOGW(TAG, "Data Collection Triggered: Reading Invalid/LowConf (Conf: %.1f%%, Suspicious: %s)",
                  avg_conf * 100.0f, suspicious ? "YES" : "NO");
         this->trigger_low_confidence_collection(digit_str, avg_conf, metadata);
     }
@@ -962,13 +962,13 @@ void MeterReaderTFLite::set_crop_zones(const std::string &zones_json) {
 }
 
 // Config Delegators
-void MeterReaderTFLite::set_tensor_arena_size(size_t size) { this->tflite_coord_.set_tensor_arena_size(size); } 
+void MeterReaderTFLite::set_tensor_arena_size(size_t size) { this->tflite_coord_.set_tensor_arena_size(size); }
 void MeterReaderTFLite::set_model_config(const std::string& type) { this->tflite_coord_.set_model_type(type); }
 void MeterReaderTFLite::set_model(const uint8_t *model, size_t length) { this->tflite_coord_.set_model(model, length); }
 
 void MeterReaderTFLite::set_camera_image_format(int w, int h, const std::string &fmt) {
     this->camera_coord_.set_config(w, h, fmt);
-    // Update ImageProcessor config if model is loaded 
+    // Update ImageProcessor config if model is loaded
     if (this->tflite_coord_.is_model_loaded()) {
          auto spec = this->tflite_coord_.get_model_spec();
          this->camera_coord_.update_image_processor_config(
@@ -980,7 +980,7 @@ void MeterReaderTFLite::set_camera_image_format(int w, int h, const std::string 
 void MeterReaderTFLite::set_last_valid_value(float value) {
     ESP_LOGI(TAG, "Manual override: Setting last valid value to %.1f", value);
     this->validation_coord_.set_last_valid_reading(static_cast<int>(value));
-    
+
     // Immediately publish this as the truth to the sensor
     if (this->value_sensor_) {
         this->value_sensor_->publish_state(value);
@@ -1010,12 +1010,12 @@ void MeterReaderTFLite::set_flash_controller(flash_light_controller::FlashLightC
     this->flashlight_coord_.setup(this, nullptr, c);
 }
 #endif
-void MeterReaderTFLite::set_generate_preview(bool generate) { 
-    this->generate_preview_ = generate; 
-    
+void MeterReaderTFLite::set_generate_preview(bool generate) {
+    this->generate_preview_ = generate;
+
     // Update Coordinator to enable/disable image caching dynamically
     this->camera_coord_.set_enable_preview(generate);
-    
+
     // Pre-allocate preview fallback buffer if needed (avoids heap alloc in loop())
     if (generate && !this->preview_fallback_buffer_) {
         // Prefer PSRAM for large buffers to preserve internal SRAM
@@ -1036,7 +1036,7 @@ void MeterReaderTFLite::set_generate_preview(bool generate) {
         this->preview_fallback_buffer_size_ = 0;
         ESP_LOGI(TAG, "Freed preview fallback buffer");
     }
-    
+
     // Refresh ImageProcessor config if model is loaded (uses consolidated helper)
     if (this->tflite_coord_.is_model_loaded()) {
          auto spec = this->tflite_coord_.get_model_spec();
@@ -1084,38 +1084,38 @@ void MeterReaderTFLite::set_web_server(web_server_base::WebServerBase *web_serve
 // Logic Helpers
 float MeterReaderTFLite::combine_readings(const esphome::StaticVector<float, 16>& readings, std::string &out_str) {
     std::string digit_string;
-    
+
     ESP_LOGI(TAG, "Processing %d readings:", readings.size());
-    
+
     // Convert each reading to integer digit and handle wrap-around based on Ground Truth labeling
     for (size_t i = 0; i < readings.size(); i++) {
         float reading = readings[i];
         float decimal_part = reading - std::floor(reading);
         int digit;
-        
+
         if (decimal_part >= 0.7f) {
             digit = static_cast<int>(std::ceil(reading));
         } else {
             digit = static_cast<int>(std::floor(reading));
         }
-        
+
         // Handle wrap-around for original models (like Python script)
         if (digit >= 10) {
             digit = 0;
-            ESP_LOGD(TAG, "Zone %d: Raw=%.1f -> Wrapped to 0", 
+            ESP_LOGD(TAG, "Zone %d: Raw=%.1f -> Wrapped to 0",
                     i + 1, readings[i]);
         } else {
-            ESP_LOGD(TAG, "Zone %d: Raw=%.1f -> Computed=%d", 
+            ESP_LOGD(TAG, "Zone %d: Raw=%.1f -> Computed=%d",
                     i + 1, readings[i], digit);
         }
-        
+
         digit_string += std::to_string(digit);
     }
-    
+
     ESP_LOGI(TAG, "Concatenated digit string: %s", digit_string.c_str());
     // Output the string
     out_str = digit_string;
-    
+
     std::string readings_str;
     for (const auto& reading : readings) {
       if (!readings_str.empty()) {
@@ -1126,7 +1126,7 @@ float MeterReaderTFLite::combine_readings(const esphome::StaticVector<float, 16>
       readings_str += buffer;
     }
     ESP_LOGD(TAG, "Raw readings: [%s]", readings_str.c_str());
-    
+
     float combined_value = 0.0f;
     // Guaranteed to be numeric string from logic above
     if (!digit_string.empty()) {
@@ -1152,23 +1152,23 @@ bool MeterReaderTFLite::validate_and_update_reading(const esphome::StaticVector<
 }
 
 // Window Control
-void MeterReaderTFLite::set_camera_window_offset_x(int x) { 
-    this->camera_coord_.set_window_config(x, -1, -1, -1); 
+void MeterReaderTFLite::set_camera_window_offset_x(int x) {
+    this->camera_coord_.set_window_config(x, -1, -1, -1);
     if (this->window_active_) this->camera_coord_.apply_window();
 }
-void MeterReaderTFLite::set_camera_window_offset_y(int y) { 
-    this->camera_coord_.set_window_config(-1, y, -1, -1); 
+void MeterReaderTFLite::set_camera_window_offset_y(int y) {
+    this->camera_coord_.set_window_config(-1, y, -1, -1);
     if (this->window_active_) this->camera_coord_.apply_window();
 }
-void MeterReaderTFLite::set_camera_window_width(int w) { 
-    this->camera_coord_.set_window_config(-1, -1, w, -1); 
+void MeterReaderTFLite::set_camera_window_width(int w) {
+    this->camera_coord_.set_window_config(-1, -1, w, -1);
     if (this->window_active_) this->camera_coord_.apply_window();
 }
-void MeterReaderTFLite::set_camera_window_height(int h) { 
-    this->camera_coord_.set_window_config(-1, -1, -1, h); 
+void MeterReaderTFLite::set_camera_window_height(int h) {
+    this->camera_coord_.set_window_config(-1, -1, -1, h);
     if (this->window_active_) this->camera_coord_.apply_window();
 }
-void MeterReaderTFLite::set_camera_window_configured(bool c) { 
+void MeterReaderTFLite::set_camera_window_configured(bool c) {
     this->window_active_ = c;
     if (c) {
         // Trigger window application logic now that configuration is complete.
@@ -1207,7 +1207,7 @@ MeterReaderTFLite::~MeterReaderTFLite() {
 #ifdef SUPPORT_DOUBLE_BUFFERING
     this->stop_inference_pipeline();
 #endif
-} 
+}
 
 void MeterReaderTFLite::set_update_interval(uint32_t ms) {
     ESP_LOGI(TAG, "Setting update interval: %u ms", ms);
@@ -1215,7 +1215,7 @@ void MeterReaderTFLite::set_update_interval(uint32_t ms) {
 }
 
 void MeterReaderTFLite::force_flash_inference() {
-    this->flashlight_coord_.force_inference([this](){ 
+    this->flashlight_coord_.force_inference([this](){
         this->frame_state_.store(FrameState::REQUESTED);
         this->last_request_time_ = millis();
     });
@@ -1245,7 +1245,7 @@ void MeterReaderTFLite::dump_config() {
   ESP_LOGCONFIG(TAG, "Meter Reader TFLite:");
   ESP_LOGCONFIG(TAG, "  Confidence Threshold: %.2f", this->confidence_threshold_);
   ESP_LOGCONFIG(TAG, "  Update Interval: %u ms", this->get_update_interval());
-  
+
   #ifdef SUPPORT_DOUBLE_BUFFERING
   ESP_LOGCONFIG(TAG, "  Pipeline: Double Buffering (Dual Core) ENABLED");
   #else
@@ -1263,13 +1263,13 @@ void MeterReaderTFLite::dump_config() {
 // Consolidated ImageProcessorConfig refresh — replaces 4+ copies of the same logic
 void MeterReaderTFLite::refresh_image_processor_config(int processor_input_type) {
     auto spec = this->tflite_coord_.get_model_spec();
-    
+
     // Update Camera Coordinator first
     this->camera_coord_.update_image_processor_config(
         spec.input_width, spec.input_height, spec.input_channels,
         processor_input_type, spec.normalize, spec.input_order
     );
-    
+
     // Sync Utils if present
     if (this->esp32_camera_utils_) {
         this->esp32_camera_utils_->set_camera_image_format(
@@ -1277,7 +1277,7 @@ void MeterReaderTFLite::refresh_image_processor_config(int processor_input_type)
             this->camera_coord_.get_height(),
             this->camera_coord_.get_format()
         );
-        
+
         esp32_camera_utils::ImageProcessorConfig config;
         config.camera_width = this->camera_coord_.get_width();
         config.camera_height = this->camera_coord_.get_height();
@@ -1293,7 +1293,7 @@ void MeterReaderTFLite::refresh_image_processor_config(int processor_input_type)
         config.input_type = static_cast<esp32_camera_utils::ImageProcessorInputType>(processor_input_type);
         config.normalize = spec.normalize;
         config.input_order = spec.input_order;
-        
+
         this->esp32_camera_utils_->reinitialize_image_processor(config);
     }
 }
@@ -1306,25 +1306,25 @@ using namespace esphome::meter_reader_tflite;
 void MeterReaderTFLite::inference_task(void *arg) {
     auto *self = static_cast<MeterReaderTFLite *>(arg);
     InferenceJob* job = nullptr;
-    
+
     while (self->task_running_.load()) {
         // Set inferencing flag BEFORE blocking on queue to close race window
         self->is_inferencing_ = true;
-        
+
         // Use timeout to allow periodic checking of task_running_
         if (xQueueReceive(self->input_queue_, &job, 500 / portTICK_PERIOD_MS) == pdTRUE) {
             if (!job) {
                 self->is_inferencing_ = false;
                 continue;
             }
-            
+
             ESP_LOGD(TAG, "Inference Task: Job received. Starting TFLite...");
             uint32_t start = millis();
-            
+
             // Invoke TFLite (Thread-Safe because only this task calls it)
             auto tflite_results = self->tflite_coord_.run_inference(job->crops);
             self->is_inferencing_ = false;
-            
+
             InferenceResultPtr res = allocate_inference_result();
             res->inference_time = millis() - start;
             res->total_start_time = job->start_time;
@@ -1333,15 +1333,15 @@ void MeterReaderTFLite::inference_task(void *arg) {
             res->arena_used_bytes = self->tflite_coord_.get_arena_used_bytes();
             #endif
             res->success = true;
-            
+
             for (auto& r : tflite_results) {
                 res->readings.push_back(r.value);
                 res->probabilities.push_back(r.confidence);
             }
-            
+
             // Clean up job inputs
             free_inference_job(job);
-            
+
             // Send back
             ESP_LOGD(TAG, "Inference Task: TFLite done in %u ms. Sending to output queue...", millis() - start);
             InferenceResult* res_ptr = res.get();
@@ -1366,24 +1366,24 @@ void MeterReaderTFLite::start_inference_pipeline() {
     ESP_LOGI(TAG, "Initializing Double Buffering Pipeline...");
     this->input_queue_ = xQueueCreate(1, sizeof(InferenceJob*)); // Pointer depth 1 (Backpressure)
     this->output_queue_ = xQueueCreate(2, sizeof(InferenceResult*)); // Pointer depth 2
-    
+
     if (!this->input_queue_ || !this->output_queue_) {
         ESP_LOGE(TAG, "Failed to create queues!");
         if (this->main_logs_) this->main_logs_->publish_state("CRITICAL: Failed to create queues!");
         this->mark_failed(); return;
     }
-    
+
     this->task_running_ = true;
     BaseType_t res = xTaskCreatePinnedToCore(
-        MeterReaderTFLite::inference_task, 
-        "inference_task", 
+        MeterReaderTFLite::inference_task,
+        "inference_task",
         16384, // Stack size
         this, // Pass this instance
         1,    // Priority (Low)
-        &this->inference_task_handle_, 
+        &this->inference_task_handle_,
         0     // Pin to Core 0 (Main Loop is usually Core 1)
     );
-    
+
     if (res != pdPASS) {
         ESP_LOGE(TAG, "Failed to create inference task!");
         if (this->main_logs_) this->main_logs_->publish_state("CRITICAL: Failed to create inference task!");
@@ -1398,7 +1398,7 @@ void MeterReaderTFLite::stop_inference_pipeline() {
 
     ESP_LOGI(TAG, "Stopping Inference Pipeline...");
     this->task_running_ = false;
-    
+
     // Wait for task to exit
     // Give it 2 seconds to finish current job and exit loop
     uint32_t start = millis();
@@ -1411,24 +1411,24 @@ void MeterReaderTFLite::stop_inference_pipeline() {
         vTaskDelay(pdMS_TO_TICKS(10));
     }
     this->inference_task_handle_ = nullptr;
-    
+
     // Drain input queue to free InferenceJob pointers
     InferenceJob* leaked_job = nullptr;
     while (xQueueReceive(this->input_queue_, &leaked_job, 0) == pdTRUE) {
         if (leaked_job) free_inference_job(leaked_job);
     }
-    
+
     // Drain output queue
     InferenceResult* res_ptr = nullptr;
     while (xQueueReceive(this->output_queue_, &res_ptr, 0) == pdTRUE) {
         if (res_ptr) free_inference_result(res_ptr);
     }
-    
+
     vQueueDelete(this->input_queue_);
     vQueueDelete(this->output_queue_);
     this->input_queue_ = nullptr;
     this->output_queue_ = nullptr;
-    
+
     ESP_LOGI(TAG, "Inference Pipeline Stopped");
 }
 
@@ -1447,10 +1447,10 @@ void MeterReaderTFLite::start_flash_calibration() {
 
     // Initialize/Reset Calibration State (single source of truth from .cpp constexpr)
     this->calibration_.state = FlashCalibrationHandler::CALIBRATING_PRE;
-    this->calibration_.start_pre = CALIBRATION_START_PRE_MS; 
-    this->calibration_.end_pre = CALIBRATION_END_PRE_MS;   
+    this->calibration_.start_pre = CALIBRATION_START_PRE_MS;
+    this->calibration_.end_pre = CALIBRATION_END_PRE_MS;
     this->calibration_.step_pre = CALIBRATION_STEP_PRE_MS;
-    
+
     this->calibration_.start_post = CALIBRATION_START_POST_MS;
     this->calibration_.end_post = CALIBRATION_END_POST_MS;
     this->calibration_.step_post = CALIBRATION_STEP_POST_MS;
@@ -1459,10 +1459,10 @@ void MeterReaderTFLite::start_flash_calibration() {
     this->calibration_.current_post = this->calibration_.start_post;
     this->calibration_.baseline_confidence = 0.0f;
     this->calibration_.best_confidence = 0.0f;
-    
+
     // Set initial timing
     this->flashlight_coord_.set_timing(this->calibration_.current_pre, this->calibration_.current_post);
-    
+
     // Trigger first inference
     this->force_flash_inference();
 }
@@ -1473,13 +1473,13 @@ void MeterReaderTFLite::update_calibration(float confidence) {
 
     char log_msg[100];
     bool next_step = false;
-    
+
     // 1. Establish Baseline (First run of Pre-Phase)
     if (this->calibration_.baseline_confidence == 0.0f) {
         this->calibration_.baseline_confidence = confidence;
         this->calibration_.best_pre = this->calibration_.current_pre;
         this->calibration_.best_post = this->calibration_.current_post;
-        this->calibration_.best_confidence = confidence; 
+        this->calibration_.best_confidence = confidence;
         snprintf(log_msg, sizeof(log_msg), "Baseline Conf: %.1f%%. Testing Pre: %u", confidence * 100.0f, this->calibration_.current_pre);
         next_step = true;
     } else {
@@ -1500,7 +1500,7 @@ void MeterReaderTFLite::update_calibration(float confidence) {
             }
         } else {
             // Good result, store as best and continue
-            this->calibration_.best_confidence = confidence; 
+            this->calibration_.best_confidence = confidence;
             if (this->calibration_.state == FlashCalibrationHandler::CALIBRATING_PRE) {
                 this->calibration_.best_pre = this->calibration_.current_pre;
                 snprintf(log_msg, sizeof(log_msg), "Pre-Time %ums OK (Wait 1s...)", this->calibration_.current_pre);
@@ -1512,11 +1512,11 @@ void MeterReaderTFLite::update_calibration(float confidence) {
             }
         }
     }
-    
+
     ESP_LOGI(TAG, "%s", log_msg);
     if (this->main_logs_) this->main_logs_->publish_state(log_msg);
     if (this->inference_logs_) this->inference_logs_->publish_state(log_msg);
-    
+
     if (this->calibration_.state != FlashCalibrationHandler::FINISHED && next_step) {
         // Advance parameters
         if (this->calibration_.state == FlashCalibrationHandler::CALIBRATING_PRE) {
@@ -1537,41 +1537,41 @@ void MeterReaderTFLite::update_calibration(float confidence) {
         }
     }
 
-    if (this->calibration_.state != FlashCalibrationHandler::FINISHED) { 
-        this->flashlight_coord_.set_timing(this->calibration_.current_pre, this->calibration_.current_post); 
-        this->set_timeout(1000, [this](){ 
-            this->force_flash_inference(); 
-        }); 
-    } else { 
-        // Finished, do final logging 
+    if (this->calibration_.state != FlashCalibrationHandler::FINISHED) {
+        this->flashlight_coord_.set_timing(this->calibration_.current_pre, this->calibration_.current_post);
+        this->set_timeout(1000, [this](){
+            this->force_flash_inference();
+        });
+    } else {
+        // Finished, do final logging
         char fin[100];
         snprintf(fin, sizeof(fin), "Done. Optimal: Pre=%ums, Post=%ums", this->calibration_.best_pre, this->calibration_.best_post);
         if (this->main_logs_) this->main_logs_->publish_state(fin);
         if (this->inference_logs_) this->inference_logs_->publish_state(fin);
 
-        this->calibration_.state = FlashCalibrationHandler::IDLE; 
+        this->calibration_.state = FlashCalibrationHandler::IDLE;
     }
 }
 
 void MeterReaderTFLite::unload_resources() {
     ESP_LOGI(TAG, "Unloading MeterReaderTFLite resources...");
-    
+
     // 1. Pause processing
     this->pause_processing_.store(true);
-    
+
     // 2. Stop Flashlight (stop timers/sequences)
     this->flashlight_coord_.disable_flash();
 
     #ifdef SUPPORT_DOUBLE_BUFFERING
     this->stop_inference_pipeline();
     #endif
-    
+
     // 3. Unload TFLite Model & Arena
     this->tflite_coord_.unload_model();
-    
+
     // 4. Unload Camera ImageProcessor
     this->camera_coord_.unload();
-    
+
     #ifdef SUPPORT_DOUBLE_BUFFERING
     // 5. Free Object Pools
     inference_job_pool.reset();
@@ -1589,7 +1589,7 @@ void MeterReaderTFLite::unload_resources() {
 
 void MeterReaderTFLite::reload_resources() {
     ESP_LOGI(TAG, "Reloading MeterReaderTFLite resources...");
-    
+
     #ifdef SUPPORT_DOUBLE_BUFFERING
     // 1. Re-allocate Pools
     INFERENCE_POOL_SIZE.store(calculate_optimal_pool_size());
@@ -1597,7 +1597,7 @@ void MeterReaderTFLite::reload_resources() {
     inference_result_pool = std::make_unique<InferenceResult[]>(INFERENCE_POOL_SIZE.load());
     inference_job_used = std::make_unique<bool[]>(INFERENCE_POOL_SIZE.load());
     inference_result_used = std::make_unique<bool[]>(INFERENCE_POOL_SIZE.load());
-    
+
     for (size_t i = 0; i < INFERENCE_POOL_SIZE.load(); ++i) {
         inference_job_used[i] = false;
         inference_result_used[i] = false;
@@ -1613,12 +1613,12 @@ void MeterReaderTFLite::reload_resources() {
              ESP_LOGE(TAG, "Failed to reload model!");
              return;
          }
-         
+
          // Use consolidated helper (replaces duplicated ImageProcessorConfig construction)
          auto spec = this->tflite_coord_.get_model_spec();
          int processor_input_type = (spec.input_type == 1) ? 0 : 1;
          this->refresh_image_processor_config(processor_input_type);
-         
+
          // Resume processing
          this->pause_processing_.store(false);
          ESP_LOGI(TAG, "Resources reloaded and processing resumed.");
@@ -1627,18 +1627,18 @@ void MeterReaderTFLite::reload_resources() {
 
 #ifdef USE_DATA_COLLECTOR
 // Data Collection Helper to serialize inference results to JSON
-std::string MeterReaderTFLite::serialize_inference_metadata(const std::string &value, float confidence, 
-                                                           const esphome::StaticVector<float, 16> &readings, 
-                                                           const esphome::StaticVector<float, 16> &confidences, 
+std::string MeterReaderTFLite::serialize_inference_metadata(const std::string &value, float confidence,
+                                                           const esphome::StaticVector<float, 16> &readings,
+                                                           const esphome::StaticVector<float, 16> &confidences,
                                                            int width, int height) {
     // Simple JSON construction
     // Format: {"val":"VALUE","conf":0.95,"w":WIDTH,"h":HEIGHT,"digits":[{"val":1,"conf":0.99,"box":[x,y,w,h]},...]}
-    
+
     std::string json;
-    json.reserve(512); 
-    
+    json.reserve(512);
+
     char buffer[128];
-    snprintf(buffer, sizeof(buffer), "{\"val\":\"%s\",\"conf\":%.3f,\"w\":%d,\"h\":%d", 
+    snprintf(buffer, sizeof(buffer), "{\"val\":\"%s\",\"conf\":%.3f,\"w\":%d,\"h\":%d",
              value.c_str(), confidence, width, height);
     json += buffer;
 
@@ -1653,35 +1653,35 @@ std::string MeterReaderTFLite::serialize_inference_metadata(const std::string &v
     if (this->crop_zone_handler_.get_zones().size() > 0) {
          zones = this->crop_zone_handler_.get_zones();
     }
-    
+
     for (size_t i = 0; i < readings.size(); i++) {
         if (i > 0) json += ",";
-        
+
         // Find crop zone for this index
         int x = 0, y = 0, w = 0, h = 0;
         if (i < zones.size()) {
-             x = zones[i].x1; 
-             y = zones[i].y1; 
-             w = zones[i].x2 - zones[i].x1; 
+             x = zones[i].x1;
+             y = zones[i].y1;
+             w = zones[i].x2 - zones[i].x1;
              h = zones[i].y2 - zones[i].y1;
         }
-        
+
         float digit_val = 0.0f;
         if (i < readings.size()) {
             digit_val = readings[i];
             if (digit_val >= 9.99f && digit_val <= 10.01f) {
-                digit_val = 0.0f; 
+                digit_val = 0.0f;
             }
         }
-        
+
         float conf = 0.0f;
         if (i < confidences.size()) conf = confidences[i];
-        
+
         snprintf(buffer, sizeof(buffer), "{\"val\":%g,\"conf\":%.3f,\"box\":[%d,%d,%d,%d]}",
                  digit_val, conf, x, y, w, h);
         json += buffer;
     }
-    
+
     json += "]}";
     return json;
 }

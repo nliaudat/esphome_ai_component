@@ -20,11 +20,11 @@ namespace meter_reader_tflite {
 class DebugCoordinator {
  public:
   void set_debug_image(const uint8_t* data, size_t size, int width, int height);
-  
+
   // Logic
   void run_debug_tests(TFLiteCoordinator& tflite_coord);
   void test_with_pattern(TFLiteCoordinator& tflite_coord);
-  
+
   void print_info(const TFLiteCoordinator& tflite_coord, int cam_w, int cam_h, const std::string& fmt);
 
   bool is_debug_mode() const { return debug_mode_; }

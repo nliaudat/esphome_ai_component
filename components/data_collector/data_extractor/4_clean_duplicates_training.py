@@ -13,7 +13,7 @@ def main():
     args = parser.parse_args()
 
     dedup_script = Path(__file__).parent / "2_deduplicate.py"
-    
+
     if not dedup_script.exists():
         print(f"Error: Could not find {dedup_script}")
         sys.exit(1)
@@ -28,7 +28,7 @@ def main():
         "--keep", args.keep,
         "--confidence", "0.0",  # We want to deduplicate ALL training images regardless of their new confidence
     ]
-    
+
     if args.dry_run:
         cmd.append("--dry-run")
     else:

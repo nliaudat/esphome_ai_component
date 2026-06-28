@@ -21,7 +21,7 @@ struct ImageView {
     int height;
     int stride;    // Bytes per row in the original source
     int channels;
-    
+
     // Check if the view is valid
     bool is_valid() const { return data != nullptr && width > 0 && height > 0; }
 };
@@ -30,7 +30,7 @@ class Cropper {
  public:
   /**
    * @brief Get a zero-copy view of a crop zone within a larger image.
-   * 
+   *
    * @param src Source image buffer.
    * @param src_w Source image width.
    * @param src_h Source image height.
@@ -38,12 +38,12 @@ class Cropper {
    * @param zone The crop zone definition.
    * @return ImageView pointing to the start of the crop, with appropriate stride.
    */
-  static ImageView get_crop_view(const uint8_t* src, int src_w, int src_h, int channels, 
+  static ImageView get_crop_view(const uint8_t* src, int src_w, int src_h, int channels,
                                  const CropZone& zone);
 
   /**
    * @brief Copy a crop zone to a packed buffer (removing stride).
-   * 
+   *
    * @param view The partial view/crop.
    * @param dst Destination buffer (must be large enough: w*h*c).
    */

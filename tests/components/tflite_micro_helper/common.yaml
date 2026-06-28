@@ -1,0 +1,13 @@
+# ESPHome build test: tflite_micro_helper common config
+logger:
+  level: DEBUG
+
+external_components:
+  - source:
+      type: local
+      path: ../../../components
+    components: [tflite_micro_helper]
+
+tflite_micro_helper:
+  id: test_tflite
+  debug: true

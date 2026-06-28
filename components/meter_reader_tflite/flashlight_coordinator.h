@@ -20,22 +20,22 @@ namespace meter_reader_tflite {
 class FlashlightCoordinator {
  public:
 #ifdef USE_FLASH_LIGHT_CONTROLLER
-  void setup(Component* parent, light::LightState* legacy_light, 
+  void setup(Component* parent, light::LightState* legacy_light,
              flash_light_controller::FlashLightController* controller);
 
   // Configuration
   void set_timing(uint32_t pre_time, uint32_t post_time);
   void set_update_interval(uint32_t interval_ms);
   uint32_t get_pre_time() const { return this->pre_time_; }
-  
+
   // Logic
-  bool update_scheduling(); 
-  
+  bool update_scheduling();
+
   // Actions
   void enable_flash();
   void disable_flash();
   void force_inference(std::function<void()> frame_request_callback);
-  
+
   // Helpers
   void capture_preview_sequence(std::function<void()> frame_request_callback);
   bool is_active() const { return this->scheduled_ || (this->controller_ && this->controller_->is_active()); }
@@ -49,17 +49,17 @@ class FlashlightCoordinator {
   Component* parent_{nullptr};
   light::LightState* legacy_light_{nullptr};
   flash_light_controller::FlashLightController* controller_{nullptr};
-  
+
   uint32_t pre_time_{5000};
   uint32_t post_time_{2000};
   uint32_t update_interval_{60000}; // Default
-  
+
   bool scheduled_{false};
   std::atomic<bool> auto_controlled_{false}; // If we turned it on autonomously
   bool debug_{false};
-  
+
   std::function<void()> request_frame_callback_;
-  
+
   template<typename F>
   void schedule_timeout(uint32_t ms, F&& f);
 #else

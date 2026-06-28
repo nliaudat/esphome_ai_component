@@ -1,6 +1,6 @@
 # Understanding Crop Zones and Loop Time Performance
 
-When configuring your water or energy meters, you might notice that two identical ESP32 boards running the exact same AI model can have vastly different **Loop Times**. 
+When configuring your water or energy meters, you might notice that two identical ESP32 boards running the exact same AI model can have vastly different **Loop Times**.
 
 For example, a "Cold Water" meter configuration might take **~524ms** per loop, while an identical "Hot Water" setup might take only **~203ms**.
 
@@ -15,16 +15,16 @@ The bigger the `camera_window`, the more pixels have to be processed.
 **Less Optimized Example (e.g., 524ms Loop Time):**
 ```yaml
   camera_window:
-    width: 240 
-    height: 736 
+    width: 240
+    height: 736
 ```
 *Total Area = **176,640 pixels***
 
 **Highly Optimized Example (e.g., 203ms Loop Time):**
 ```yaml
   camera_window:
-    width: 96 
-    height: 496 
+    width: 96
+    height: 496
 ```
 *Total Area = **47,616 pixels***
 
@@ -34,7 +34,7 @@ In this scenario, the less optimized configuration is forcing the ESP32 to crunc
 
 After the main image buffer is acquired, the ESP32 iterates over each of your defined digits in the `crop_zones` string. It extracts these smaller rectangles from the main image buffer and scales them to fit the TFLite model's input tensor size (which is usually a smaller fixed size).
 
-If your bounding boxes for each digit are drawn loosely, the ESP32 must copy and mathematically scale a significantly higher number of pixels for *each* digit. 
+If your bounding boxes for each digit are drawn loosely, the ESP32 must copy and mathematically scale a significantly higher number of pixels for *each* digit.
 
 For example:
 * **Large Crop Zone:** `[6, 43, 67, 161]` -> A crop size of **61 x 118** (7,198 pixels per digit to extract and scale).

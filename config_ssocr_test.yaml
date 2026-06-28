@@ -1,21 +1,20 @@
-
 # for flashing : press boot button for 2-3 seconds before the serial connection initialize
 # After OTA update, the EN (reset) button must be pressed to run firmware
-      
+
 # external_components:
-  # - source: 
+  # - source:
       # type: git
       # url: https://github.com/nliaudat/esphome_ai_component
       # ref: main
     # components: [legacy_meter_reader_tflite]
-      
-external_components:    
+
+external_components:
   - source:
       type: local
-      path: components 
-    #components: [meter_reader_tflite, tflite_micro_helper, esp32_camera_utils, flash_light_controller] #, ssocr_reader] 
+      path: components
+    #components: [meter_reader_tflite, tflite_micro_helper, esp32_camera_utils, flash_light_controller] #, ssocr_reader]
     components: [ssocr_reader, esp32_camera_utils, flash_light_controller, value_validator]
-      
+
 
 
 ############## General configuration
@@ -28,28 +27,28 @@ substitutions:
   # name: esp-cam-2mb #no special caracters
   # friendly_name: "esp-cam-2mb"
   # id_prefix: "esp_cam_2mb" #if you have more than one board, it could be usefull to remane all the "id:prefix_xxxx" with a decicaded prefix
- 
+
   revision: "1.2"
   esphome_min_version: "2025.12.0"
 
   # Board Selection (s3_cam, aithinker)
   # board_variant: s3_cam
 
-  
+
   # Meter settings
-  meter_unit: L # Unit of measurement for the meter (e.g. m³, kWh, L) (https://developers.home-assistant.io/docs/core/entity/sensor/https://developers.home-assistant.io/docs/core/entity/sensor/)
+  meter_unit: L # Unit of measurement for the meter (e.g. m^3, kWh, L) (https://developers.home-assistant.io/docs/core/entity/sensor/https://developers.home-assistant.io/docs/core/entity/sensor/)
   meter_device_class: water # device class for the meter (e.g. water, energy, gas)
   meter_state_class: total_increasing # state class for the meter (e.g. total_increasing, total, measurement)
-  
+
   # camera
   camera_pixel_format: JPEG # (cropping implementation is faster with RGB888 format) | Displays: RGB565, RGB888 | Cameras: YUV422, YUV420, RAW | Efficiency: Grayscale, YUV420, JPEG
-  # camera_pixel_format: GRAYSCALE 
+  # camera_pixel_format: GRAYSCALE
   camera_resolution: 640x480 #800x600 #640x480 #https://esphome.io/components/esp32_camera.html
   # camera_jpeg_quality: 10 # From 10 (best) to 63 (worst). | Must be 0 if non JPEG
   camera_jpeg_quality: 10
   camera_max_framerate: 1fps
   camera_idle_framerate: 0.2fps
-      
+
   #time
   TZ: Europe/Zurich #timezone
   reboot_days_of_week: MON
@@ -57,10 +56,10 @@ substitutions:
   reboot_minutes: 0
   reboot_seconds: 0
 
-  
+
 preferences:
   flash_write_interval: 60min
-  
+
 
 ota:
   - platform: esphome
@@ -69,7 +68,7 @@ safe_mode:
 
 # network:
     # enable_ipv6: false
-    
+
 
 api:
   reboot_timeout: 0s # do not reboot if hassio connection is lost.
@@ -92,8 +91,8 @@ api:
 # globals:
 #   - id: ${id_prefix}_crop_zones
 #     type: std::string
-#     # restore_value: true 
-#     max_restore_data_length: 254 
+#     # restore_value: true
+#     max_restore_data_length: 254
 #     # initial_value: "\"[]\""
 #     initial_value: '"[[0,19,40,91],[64,16,104,96],[129,16,169,96],[192,13,232,93],[254,11,294,91],[320,13,360,93],[380,10,420,90],[447,10,487,90]]"'
 
@@ -112,19 +111,19 @@ esp32_camera_utils:
   # enable_rotation: true
   # rotation: 270 # 0, 90, 180, 270 (special case built-in "accelerated" for 90, 180, 270 )
 
-  
+
   # enable_scaler: true
   # scaler:
   #   width: 640
   #   height: 480
-    
+
   # enable_cropper: true
   # cropper:
   #   width: 320
   #   height: 240
   #   offset_x: 0
   #   offset_y: 0
-  
+
   # enable_drawing: true
 
   # debug_memory: true
@@ -167,13 +166,13 @@ flash_light_controller:
 
 #   value_sensor: ${id_prefix}_meter_value
 #   confidence_sensor: ${id_prefix}_meter_confidence
-  
+
 
 #   inference_logs: ${id_prefix}_inference_logs
 #   main_logs: ${id_prefix}_main_logs
-  
-  
-  
+
+
+
 #   enable_flash_calibration: false # still in dev
 
 #   ### Advanced parameters
@@ -223,9 +222,9 @@ ssocr_reader: #seven segment reader (dev) / do not if using meter_reader_tflite
 #   camera_id: ${id_prefix}_espcam
 #   value_sensor:
 #     name: "Analog Total"
-#   dials: 
+#   dials:
 #     - id: dial_1
-#       scale: 1.0 
+#       scale: 1.0
 #       crop_x: 0
 #       crop_y: 0
 #       crop_w: 100
@@ -250,7 +249,7 @@ packages:
   # - !include boards/board_AI-On-The-Edge-Cam_Esp32-S3.yaml
 
   # - !include debug_board.yaml
-  
+
   # Component-specific controls (uncomment to disable individual controls)
   # - !include components/meter_reader_tflite/meter_reader_tflite_controls.yaml
   - !include components/value_validator/value_validator_controls.yaml
@@ -260,16 +259,16 @@ packages:
   - !include camera_options.yaml
   - !include esp32_camera.yaml
   # - !include camera_webserver.yaml
-  
+
   # network choice
   - !include wifi.yaml
   # - !include lan.yaml # only for AI-On-The-Edge-Cam_Esp32-S3.yaml + wifi must be disabled
-  
+
   # others
   - !include globals.yaml
   - !include switch_others.yaml
   - !include sensor_others.yaml
-  - !include logger.yaml 
+  - !include logger.yaml
   - !include time.yaml
 
 debug:
@@ -291,17 +290,10 @@ sensor:
   - platform: internal_temperature
     name: "${id_prefix} CPU Temperature"
     id: ${id_prefix}_cpu_temperature
-    unit_of_measurement: "°C"
+    unit_of_measurement: "degC"
     accuracy_decimals: 1
     device_class: temperature
     state_class: measurement
     icon: "mdi:thermometer"
     update_interval: 5s
     entity_category: diagnostic
-
-
-
-
-
-
-

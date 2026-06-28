@@ -69,7 +69,7 @@ The OV2640 allows the user to define window size or region of interest (ROI), as
 
 ### Zooming and Panning Mode
 The OV2640 provides zooming and panning modes. The user can select this mode under SVGA/CIF mode timing.
-*   **Zoom Ratios**: 
+*   **Zoom Ratios**:
     *   **2:1** of UXGA for SVGA.
     *   **4:1** of UXGA for CIF.
 *   **Registers**:
@@ -84,4 +84,3 @@ The OV2640 can be programmed to output **800 x 600 (SVGA)** sized images for app
 
 #### CIF Mode
 The OV2640 can also operate at a higher frame rate to output **400 x 296** sized images. This involves sub-sampling in both horizontal and vertical directions for CIF mode.
-

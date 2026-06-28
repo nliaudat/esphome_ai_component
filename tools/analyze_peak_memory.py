@@ -27,7 +27,7 @@ def analyze_peak_memory(model_path):
     peak_memory = 0
     peak_op = -1
     memory_by_op = []
-    
+
     for op_idx in range(len(ops_details)):
         active_memory = 0
         for t_idx, tensor in enumerate(tensor_details):
@@ -54,7 +54,7 @@ def analyze_peak_memory(model_path):
     print(f"Input shape: {tensor_details[0]['shape']}")
     print(f"Number of tensors: {len(tensor_details)}")
     print(f"Number of ops: {len(ops_details)}")
-    
+
     # Check for DELEGATE operations (not supported by TFLite Micro)
     delegate_ops = [op for op in ops_details if op['op_name'] == 'DELEGATE']
     if delegate_ops:
@@ -68,7 +68,7 @@ def analyze_peak_memory(model_path):
     print(f"TFLite Micro arena estimate (1.5x peak): {tflm_estimate / 1024:.2f} KB")
     print(f"")
     print(f"Recommended tensor_arena_size: {int(np.ceil(tflm_estimate / 1024)) + 1}KB")
-    
+
     # Show top memory tensors
     print(f"\nTop tensors by memory:")
     tensor_mem = []
@@ -80,7 +80,7 @@ def analyze_peak_memory(model_path):
                 num_elements *= dim
         mem = dtype_size * num_elements
         tensor_mem.append((mem, t_idx, tensor['name'], tensor['shape'], tensor['dtype']))
-    
+
     tensor_mem.sort(reverse=True)
     for mem, t_idx, name, shape, dtype in tensor_mem[:15]:
         print(f"  [{t_idx:2d}] {mem/1024:8.2f} KB  {str(shape):20s}  {str(dtype):20s}  {name}")

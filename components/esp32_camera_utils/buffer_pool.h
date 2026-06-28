@@ -11,7 +11,7 @@ namespace esp32_camera_utils {
 
 /**
  * @brief Thread-safe buffer pool for frequently allocated fixed-size buffers.
- * 
+ *
  * Reduces heap allocation churn by reusing buffers for model inputs.
  * Automatically expands up to MAX_POOL_ENTRIES as needed.
  */
@@ -29,31 +29,31 @@ class BufferPool {
    * @return Buffer structure (check data != nullptr for success)
    */
   [[nodiscard]] Buffer acquire(size_t size);
-  
+
   /**
    * @brief Return a buffer to the pool or free it.
    * @param buffer Buffer to release (will be reset to nullptr)
    */
   void release(Buffer& buffer);
-  
+
   /**
    * @brief Get pool hit rate as percentage.
    * @return Hit rate 0-100%
    */
   size_t get_hit_rate() const;
-  
+
   /**
    * @brief Get total number of allocations requested.
    * @return Total allocations (hits + misses)
    */
   size_t get_total_allocations() const;
-  
+
   /**
    * @brief Get number of heap allocations caused by pool saturation.
    * @return Number of misses due to MAX_POOL_ENTRIES reached
    */
   size_t get_saturation_misses() const;
-  
+
   /**
    * @brief Get current pool size.
    * @return Number of buffers currently in pool
@@ -66,11 +66,11 @@ class BufferPool {
     size_t size{0};
     bool in_use{false};
   };
-  
+
   static constexpr size_t MAX_POOL_ENTRIES = 16;
   std::vector<PoolSlot> pool_;
   mutable std::mutex mutex_;
-  
+
   std::atomic<size_t> hits_{0};
   std::atomic<size_t> misses_{0};
   std::atomic<size_t> saturation_misses_{0};

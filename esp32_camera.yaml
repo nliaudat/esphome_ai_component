@@ -5,18 +5,18 @@ i2c:
   scl: ${i2c_pins_scl}
   id: ${id_prefix}_bus_camera
 
-esp32_camera: 
-  id: ${id_prefix}_espcam 
-  name: ${friendly_name}_camera 
+esp32_camera:
+  id: ${id_prefix}_espcam
+  name: ${friendly_name}_camera
   external_clock:
     pin: ${external_clock_pin}
     frequency: ${external_clock_frequency}
   i2c_id: ${id_prefix}_bus_camera
-  data_pins: ${data_pins} 
-  vsync_pin: ${vsync_pin} 
-  href_pin: ${href_pin} 
-  pixel_clock_pin: ${pixel_clock_pin} 
-  
+  data_pins: ${data_pins}
+  vsync_pin: ${vsync_pin}
+  href_pin: ${href_pin}
+  pixel_clock_pin: ${pixel_clock_pin}
+
   # reset_pin: ${camera_reset_pin}
   # power_down_pin: ${camera_pwdn_pin} # needed for AiThinker ESP32-CAM
   # Image Settings
@@ -32,7 +32,7 @@ esp32_camera:
   #     - and it cannot be de-initialized once it is set
   #   Therefore, changing these parameters on the fly will have no effect
   #   Perhaps this will get changed at some point
-  #resolution: 800x600 
+  #resolution: 800x600
   resolution: ${camera_resolution} #${camera_width}X${camera_height}    #320X240 # for testing, quicker screen reactions
   jpeg_quality: ${camera_jpeg_quality} #10 #40 #12
   # Frame Settings
@@ -42,14 +42,14 @@ esp32_camera:
   idle_framerate: ${camera_idle_framerate} #0.1fps # 10sec
   # frame_buffer_count: 2  # Double buffering at driver level
   frame_buffer_location: PSRAM # DRAM # available in the release 2025.8.0
-  
+
   ## new with https://github.com/esphome/esphome/pull/9496
   # NOTE: OV2640 + ESP32 camera driver cannot reliably do grayscale AND windowing at the same time.
   # When using camera_window in esp32_camera_utils, keep pixel_format as JPEG and let the
   # ImageProcessor handle grayscale conversion in software for grayscale models.
-  pixel_format: JPEG #pixel_format: ${camera_pixel_format} 
+  pixel_format: JPEG #pixel_format: ${camera_pixel_format}
   # frame_buffer_location: PSRAM # only if new camera component
-  
+
   # task_stack_size: 8192
   # frame_size: 8  # Reduced from default 16
 

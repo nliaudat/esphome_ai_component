@@ -40,15 +40,15 @@ class ReadingHistory {
   void setup();
   void add_reading(int value, uint32_t timestamp, float confidence);
   void set_max_history_size_bytes(size_t size) { this->max_history_size_bytes_ = size; }
-  
+
   int get_last_reading() const;
   float get_last_confidence() const;
   int get_median_within_ms(uint32_t max_elapsed_ms) const;
   std::vector<int> get_recent_readings(size_t count) const;
   std::vector<std::pair<int, float>> get_recent_readings_with_confidence(size_t count) const;
-  
+
   size_t get_day_count() const { return this->count_; }
-  
+
   void clear();
 
  private:
@@ -57,9 +57,9 @@ class ReadingHistory {
   size_t capacity_{0};
   size_t head_{0}; // Write index (points to next free slot)
   size_t count_{0}; // Current number of elements
-  
+
   size_t max_history_size_bytes_{51200};
-  
+
   void ensure_capacity();
 };
 
@@ -83,7 +83,7 @@ class ValueValidator : public Component {
     int max_consecutive_rejections{10}; // Self-correct after N consecutive high-confidence rejections
     int small_negative_tolerance{5}; // Allow negative changes up to this many units
     bool persist_state{false}; // Persist last_valid_reading_ across reboots
-    
+
     // Dial-aware correction (used when analog_reader provides dial fraction)
     bool enable_dial_correction{true};
     float dial_correction_high_threshold{0.80f}; // Above this fraction → subtract 1 from integer reading
@@ -99,10 +99,10 @@ class ValueValidator : public Component {
   bool validate_reading(int new_reading, float confidence, int& validated_reading);
   // Per-digit validation (returns int)
   bool validate_reading(std::span<const float> digits, std::span<const float> confidences, int& validated_reading);
-  
+
   void set_config(const ValidationConfig& config) { this->config_ = config; }
   const ValidationConfig& get_config() const { return this->config_; }
-  
+
   // Setters for configuration
   void set_allow_negative_rates(bool v) { this->config_.allow_negative_rates = v; }
   void set_max_absolute_diff(int v) { this->config_.max_absolute_diff = v; }
@@ -130,7 +130,7 @@ class ValueValidator : public Component {
   int get_last_valid_reading() const { return this->last_valid_reading_; }
   int get_consecutive_rejections() const { return this->consecutive_rejections_; }
   const ReadingHistory& get_history() const { return this->history_; }
-  
+
   void reset();
   void set_debug(bool debug) { this->debug_ = debug; }
   void set_last_valid_reading(int value);
@@ -148,7 +148,7 @@ class ValueValidator : public Component {
   ReadingHistory history_;
   bool debug_{false};
   int last_valid_reading_{0};
-  
+
   // Last valid digits (PSRAM array) — RAII via unique_ptr with FreeDeleter
   std::unique_ptr<int[], FreeDeleter> last_valid_digits_data_;
   size_t last_valid_digits_count_{0};
@@ -163,20 +163,20 @@ class ValueValidator : public Component {
   bool first_reading_{true};
   int first_reading_count_{0}; // Count of consistent first readings
   int first_reading_candidate_{0}; // Candidate first reading value
-  
+
   // Self-correction tracking
   int consecutive_rejections_{0};
   float rejection_confidence_sum_{0.0f};
-  
+
   // Diagnostic sensors (optional)
   sensor::Sensor *rejection_count_sensor_{nullptr};
   sensor::Sensor *raw_reading_sensor_{nullptr};
   sensor::Sensor *validated_value_sensor_{nullptr};
   text_sensor::TextSensor *validator_state_sensor_{nullptr};
-  
+
   // Persistent state
   ESPPreferenceObject pref_;
-  
+
   // Recent good values ring buffer (PSRAM) — RAII
   std::unique_ptr<int[], FreeDeleter> last_good_values_data_;
   size_t last_good_values_capacity_{0};
@@ -203,7 +203,7 @@ class ValueValidator : public Component {
   int get_good_values_median() const;
   void publish_diagnostics_(const char* state);
   void save_state_();
-  
+
   void free_digit_history();
   void free_resources();
 };

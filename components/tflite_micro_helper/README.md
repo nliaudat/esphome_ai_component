@@ -21,8 +21,8 @@ tflite_micro_helper:
 ## 📦 Dependencies
 
 This component pulls in the necessary IDF components:
-- `espressif/esp-tflite-micro` (v1.3.4)
-- `espressif/esp-nn` (~1.1.2)
+- `espressif/esp-tflite-micro` (v1.3.7)
+- `espressif/esp-nn` (1.2.3)
 
 It also applies the necessary build flags:
 - `-DTF_LITE_STATIC_MEMORY`

@@ -22,7 +22,7 @@ class CropZoneHandler {
   const std::vector<CropZone>& get_zones() const { return zones_; }
   void set_default_zone(int width, int height);
   void set_debug_zones();
-  
+
   // Global variable management
   void set_crop_zones_global(globals::GlobalsComponent<std::string> *global_var) {
       crop_zones_global_ = global_var;
@@ -35,11 +35,11 @@ class CropZoneHandler {
           }
       }
   }
-  
+
   globals::GlobalsComponent<std::string>* get_crop_zones_global() const {
       return crop_zones_global_;
   }
-  
+
   // Update global variable with new zones
   void update_global_zones(const std::string &zones_json) {
       if (crop_zones_global_) {
@@ -48,11 +48,11 @@ class CropZoneHandler {
           ESP_LOGI(TAG, "Updated global crop zones variable");
       }
   }
-  
+
   // Check if global variable has changed
   bool has_global_zones_changed() {
       if (!crop_zones_global_) return false;
-      
+
       std::string current_global = crop_zones_global_->value();
       if (current_global != last_global_value_) {
           last_global_value_ = current_global;
@@ -60,7 +60,7 @@ class CropZoneHandler {
       }
       return false;
   }
-  
+
   // Apply zones from global variable
   void apply_global_zones() {
       if (crop_zones_global_) {
@@ -73,14 +73,14 @@ class CropZoneHandler {
           }
       }
   }
-  
+
   // Method to update zones from any source (text sensor, API, etc.)
   void update_zones(const std::string &zones_json) {
     parse_zones(zones_json);
-    
+
     // Also update the global variable to keep them in sync
     update_global_zones(zones_json);
-    
+
     if (on_zones_changed_) {
       on_zones_changed_();
     }
@@ -98,7 +98,7 @@ class CropZoneHandler {
 
  protected:
   std::vector<CropZone> zones_;
-  std::function<void()> on_zones_changed_; 
+  std::function<void()> on_zones_changed_;
 };
 
 }  // namespace esp32_camera_utils

@@ -1,4 +1,3 @@
-
 time:
 - platform: sntp
   timezone : ${TZ}
@@ -7,7 +6,7 @@ time:
   - seconds: ${reboot_seconds}
     minutes: ${reboot_minutes}
     hours: ${reboot_hours}
-    days_of_week: ${reboot_days_of_week} 
+    days_of_week: ${reboot_days_of_week}
     then:
       - switch.toggle: ${id_prefix}_ctrl_reboot
 

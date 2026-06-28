@@ -10,7 +10,7 @@ def parse_zone_analysis(log_text):
     current_pixel = None
     zone_coordinates = {}  # Store zone coordinates by zone number
     zone_counter = {}  # Counter for zones with the same name
-    
+
     for line in log_text.split('\n'):
         # Check for zone processing header
         zone_process_match = re.search(r'Processing zone (\d+): \[(\d+),(\d+),(\d+),(\d+)\]', line)
@@ -25,12 +25,12 @@ def parse_zone_analysis(log_text):
                 'height': int(y2) - int(y1)
             }
             continue
-        
+
         # Check for zone header
         zone_match = re.search(r'ZONE_ANALYSIS:([^:]+):(\d+)x(\d+)x(\d+):normalized=(\w+)', line)
         if zone_match:
             name, width, height, channels, normalized = zone_match.groups()
-            
+
             # Handle duplicate zone names by adding a counter
             if name in zone_counter:
                 zone_counter[name] += 1
@@ -38,7 +38,7 @@ def parse_zone_analysis(log_text):
             else:
                 zone_counter[name] = 1
                 unique_name = name
-            
+
             current_zone = {
                 'name': name,
                 'unique_name': unique_name,
@@ -54,19 +54,19 @@ def parse_zone_analysis(log_text):
             zones[unique_name] = current_zone
             current_pixel = None
             continue
-        
+
         # Check for pixel header
         pixel_match = re.search(r'Pixel\[(\d+),(\d+)\]:', line)
         if pixel_match and current_zone:
             x, y = int(pixel_match.group(1)), int(pixel_match.group(2))
             current_pixel = {
-                'x': x, 
-                'y': y, 
+                'x': x,
+                'y': y,
                 'channels': {}
             }
             current_zone['pixels'].append(current_pixel)
             continue
-        
+
         # Check for channel data
         channel_match = re.search(r'Channel (\d+): ([\d.]+)', line)
         if channel_match and current_zone and current_pixel is not None:
@@ -74,7 +74,7 @@ def parse_zone_analysis(log_text):
             value = float(channel_match.group(2))
             current_pixel['channels'][channel] = value
             continue
-        
+
         # Check for stats line (make sure it's for the current zone)
         stats_match = re.search(r'Stats: min=([\d.]+), max=([\d.]+), mean=([\d.]+)', line)
         if stats_match and current_zone:
@@ -86,7 +86,7 @@ def parse_zone_analysis(log_text):
                     'mean': float(stats_match.group(3))
                 }
             continue
-        
+
         # Reset current zone if we encounter a line that indicates end of zone analysis
         # Match lines that indicate the end of zone processing
         if current_zone and (
@@ -98,7 +98,7 @@ def parse_zone_analysis(log_text):
         ):
             current_zone = None
             current_pixel = None
-    
+
     # Try to match zone coordinates with zone names
     for zone_name, zone_data in zones.items():
         # Try to extract zone number from name (e.g., "zone1" -> "1")
@@ -112,34 +112,34 @@ def parse_zone_analysis(log_text):
             # If there's only one zone coordinate, assign it to the final output
             if len(zone_coordinates) == 1:
                 zone_data['coordinates'] = next(iter(zone_coordinates.values()))
-    
+
     return zones
 
 def print_analysis(zones):
     """Print formatted analysis of all zones"""
     print(f"Found {len(zones)} zones:")
-    
+
     for zone_unique_name, zone_data in zones.items():
         print(f"\n=== {zone_data['name']} ({zone_data['dimensions']}, normalized={zone_data['normalized']}) ===")
-        
+
         if zone_data['coordinates']:
             coords = zone_data['coordinates']
             print(f"  Coordinates: [{coords['x1']},{coords['y1']},{coords['x2']},{coords['y2']}] "
                   f"(W:{coords['width']}, H:{coords['height']})")
-        
+
         if zone_data['stats']:
             print(f"  Reported Stats: min={zone_data['stats']['min']:.6f}, max={zone_data['stats']['max']:.6f}, mean={zone_data['stats']['mean']:.6f}")
         else:
             print("  No reported stats available")
-        
+
         print(f"  Total pixels: {len(zone_data['pixels'])}")
-        
+
         # Show first few pixels as sample
         sample_pixels = min(5, len(zone_data['pixels']))
         for i in range(sample_pixels):
             pixel = zone_data['pixels'][i]
             print(f"  Pixel[{pixel['x']},{pixel['y']}]: {pixel['channels']}")
-        
+
         if len(zone_data['pixels']) > sample_pixels:
             print(f"  ... and {len(zone_data['pixels']) - sample_pixels} more pixels")
 
@@ -149,7 +149,7 @@ def reconstruct_image(zones):
         if zone_data['pixels']:
             # Create empty image array
             img_array = np.zeros((zone_data['height'], zone_data['width'], zone_data['channels']), dtype=np.uint8)
-            
+
             # Fill with pixel data
             for pixel in zone_data['pixels']:
                 x, y = pixel['x'], pixel['y']
@@ -162,7 +162,7 @@ def reconstruct_image(zones):
                                 img_array[y, x, channel] = int(round(value * 255.0))
                             else:
                                 img_array[y, x, channel] = int(round(value))
-            
+
             # Create and save image
             if zone_data['channels'] == 1:
                 img = Image.fromarray(img_array[:, :, 0], 'L')
@@ -171,7 +171,7 @@ def reconstruct_image(zones):
             else:
                 print(f"Warning: Unsupported number of channels ({zone_data['channels']}) for {zone_unique_name}")
                 continue
-            
+
             # Use unique name for filename to avoid overwriting
             filename = f"{zone_unique_name}.png"
             img.save(filename)
@@ -185,7 +185,7 @@ def calculate_zone_stats(zones):
             for pixel in zone_data['pixels']:
                 for value in pixel['channels'].values():
                     all_values.append(value)
-            
+
             if all_values:
                 zone_data['calculated_stats'] = {
                     'min': min(all_values),

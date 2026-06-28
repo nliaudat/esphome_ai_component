@@ -1,4 +1,3 @@
-
 wifi:
   id: ${id_prefix}_wifi_component
   #use_address: floor-heating-controller-v2.local  #use if you want to change device name once.
@@ -20,7 +19,7 @@ wifi:
   ap:
     ssid: "${name} Flbck"
     password: !secret fallback_hotspot_password
-    
+
 # captive_portal:
 
 sensor:
@@ -31,4 +30,3 @@ sensor:
     id: ${id_prefix}_wifi_signal_db
     # web_server:
       # sorting_group_id: sorting_group_sensors
-

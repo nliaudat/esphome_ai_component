@@ -35,27 +35,27 @@ CONFIG_SCHEMA = cv.Schema(
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
-    
+
     cg.add_define("USE_DATA_COLLECTOR")
-    
+
     if CORE.is_esp32:
         # ESPHome 2026.2.0+: IDF components are excluded by default.
         # Re-enable esp_http_client which is used by data_collector.
         esp32.include_builtin_idf_component("esp_http_client")
 
-    
+
     if config.get("debug", False):
         cg.add(var.set_debug(True))
 
     if CONF_UPLOAD_URL in config:
         cg.add(var.set_upload_url(config[CONF_UPLOAD_URL]))
-    
+
     if CONF_USERNAME in config:
         cg.add(var.set_auth(config[CONF_USERNAME], config.get(CONF_PASSWORD, "")))
-        
+
     if CONF_API_KEY in config:
         cg.add(var.set_api_key(config[CONF_API_KEY]))
-    
+
     if CONF_WEB_SUBMIT in config:
         sens = await switch.new_switch(config[CONF_WEB_SUBMIT])
         cg.add(var.set_web_submit_switch(sens))

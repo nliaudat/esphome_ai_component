@@ -1,22 +1,21 @@
-
-## Setup : 
+## Setup :
 
 
 ### Prerequisites
 - Python ([python.org](https://python.org))
 - Esphome (pip install esphome)
 
-### Download 
-Download full repo or git clone 
+### Download
+Download full repo or git clone
 
 ## Adapt for your needs
-### config.yaml : 
+### config.yaml :
  - [ ] [optional] change the name in the substitutions section
  - [ ] [optional] change the timezone
  - [ ] meter_reader_tflite :
  Start with a minimal config with no camera_window (zoom)
  Copy the model you choose from ./model to the config.yaml directory
- set it's name in model: "digit_recognizer_v4_10cls_RGB.tflite" 
+ set it's name in model: "digit_recognizer_v4_10cls_RGB.tflite"
   - [ ] packages :
  Select the board by commenting or not the board include
 
