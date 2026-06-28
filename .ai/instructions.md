@@ -1001,301 +1001,233 @@ if (std::regex_match(str, re)) { ... }
 if (str.find_first_not_of("0123456789") == std::string::npos) { ... }
 ```
 
-### ❌ Hardcoded Magic Numbers
+### ❌ CRLF Line Endings
 
-```cpp
-// WRONG - Why 512? Why 0.85?
-if (confidence > 0.85) { ... }
-uint8_t buffer[512];
+```
+// WRONG - Windows line endings (\r\n)
+File contains \r\n
 ```
 
 ✅ **USE:**
-```cpp
-// CORRECT - Named constants
-static constexpr float CONFIDENCE_THRESHOLD = 0.85;
-static constexpr size_t JPEG_BUFFER_SIZE = 512;
-if (confidence > CONFIDENCE_THRESHOLD) { ... }
-std::array<uint8_t, JPEG_BUFFER_SIZE> buffer;
 ```
-
-### ❌ CRLF (Windows) Line Endings
-
-```cpp
-// WRONG - File contains \r\n line endings
-void setup() {\r\n
-  this->init();\r\n
-}\r\n
-```
-
-✅ **USE:**
-```bash
-# Fix in existing files:
+// CORRECT - Unix line endings (\n)
 pre-commit run mixed-line-ending --all-files
-# Or globally:
-git config core.autocrlf false
 ```
 
-All files MUST use LF (Unix) line endings only (`\n`, never `\r\n` or `\r`).
+### ❌ Tab Characters
 
-### ❌ Tab Characters in Source
-
-```cpp
-// WRONG - Tab character used instead of spaces
-void setup() {
-->this->init();
-}
+```
+// WRONG - Tab indentation
+\tint x = 5;
 ```
 
 ✅ **USE:**
-```cpp
-// CORRECT - 2-space indentation
-void setup() {
-  this->init();
-}
 ```
-
-All indentation MUST use spaces (2 per level). Tab characters are forbidden.
+// CORRECT - 2-space indentation
+  int x = 5;
+```
 
 ### ❌ Non-ASCII Characters
 
-```cpp
-// WRONG - Non-ASCII character in source
-const char* name = "Meter Reader";  // Contains non-breaking space (U+00A0)
+```
+// WRONG - Non-ASCII characters (U+0080+) in source
+int value = 42;  // Note: 42 ← this is a non-breaking space U+00A0
 ```
 
 ✅ **USE:**
-```cpp
-// CORRECT - ASCII-only
-const char* name = "Meter Reader";
 ```
-
-All source files MUST contain only ASCII characters (U+0000 to U+007F). Non-ASCII characters like smart quotes, em-dashes, non-breaking spaces, or accented characters are forbidden.
+// CORRECT - ASCII-only characters
+int value = 42;
+```
 
 ### ❌ Trailing Whitespace
 
-```cpp
-// WRONG - Line ends with spaces
-void setup() {
-  this->init();
-}
+```
+// WRONG - Trailing spaces at end of line
+int x = 5;␣␣␣
 ```
 
 ✅ **USE:**
-```bash
-# Fix in existing files:
-pre-commit run trailing-whitespace --all-files
+```
+// CORRECT - No trailing whitespace
+int x = 5;
 ```
 
-No line in any file may end with trailing whitespace (spaces or tabs). Enforced by pre-commit hook and `ci-custom.py`.
+### ❌ Missing End-of-File Newline
 
-### ❌ Missing Newline at End of File
-
-```cpp
-// WRONG - File does not end with \n
-void setup() {
-  this->init();
-}
+```
+// WRONG - File does not end with newline
+int x = 5;
 ```
 
 ✅ **USE:**
-```bash
-# Fix in existing files:
-pre-commit run end-of-file-fixer --all-files
+```
+// CORRECT - File ends with single newline (\n)
+int x = 5;
+[EOF]
 ```
 
-Every file MUST end with a single newline character (`\n`). The last line should not be blank, but the line terminator must be present.
+### ❌ Magic Numbers
+
+```cpp
+// WRONG - Why 0.85?
+if (confidence > 0.85) { ... }
+```
+
+✅ **USE:**
+```cpp
+// CORRECT - Named constant
+static constexpr float CONFIDENCE_THRESHOLD = 0.85;
+```
+
+### ❌ FreeRTOS Queue Item Free
+
+```cpp
+// WRONG - RAII skipped by xQueueReceive raw memcpy
+UploadJob job;
+while (xQueueReceive(q, &job, 0) == pdTRUE) {
+  process(job.data);
+}  // Destructor only fires for LAST item!
+```
+
+✅ **USE:**
+```cpp
+// CORRECT - Manual free + nullify between iterations
+UploadJob job;
+while (xQueueReceive(q, &job, 0) == pdTRUE) {
+  process(job.data);
+  free(job.data);
+  job.data = nullptr;
+}
+```
 
 ---
 
 ## 11. REVIEW PRIORITIES
 
-### 🔴 BLOCKER (Must fix, reject PR)
+### 🔴 BLOCKER (Must fix before merge)
+- Memory leaks, buffer overflows, camera buffer mismanagement
+- C-style casts, `#define` constants, missing `this->`
+- TOCTOU, blocking in `loop()`, format string vulnerabilities
+- Camera: direct `esp_camera_fb_get()` without `TrackedBuffer`
+- Integer overflow (CVE-2026-23833 pattern)
+- **CRLF line endings, tab characters, non-ASCII characters, trailing whitespace, missing EOF newline**
 
-1.  **License violations** (Apache 2.0 OR MIT)
-2.  **Memory leaks** (any unfreed allocation)
-3.  **Buffer overflows** (unbounded memcpy, strcpy)
-4.  **Integer overflow** in pointer arithmetic (CVE-2026-23833)
-5.  **Camera buffer mismanagement** (bypassing TrackedBuffer)
-6.  **Blocking operations** in main loop (`delay()`, sync HTTP)
-7.  **C-style casts** (use `static_cast<>`)
-8.  **`#define` constants** (use `constexpr`)
-9.  **Missing `this->`** on member access
-10. **TOCTOU race conditions** (check-then-act)
+### 🟠 WARNING (Should fix before merge)
+- Performance regression >10% on ESP32-S3
+- Missing config validation bounds
+- Heap allocation in `loop()`, large stack allocations
+- Magic numbers (use named constants)
 
-### 🟠 WARNING (Must fix, not necessarily reject)
-
-1.  **Performance regression** (>10% slower on S3)
-2.  **Missing configuration validation** (bounds not checked)
-3.  **Heap allocation in `loop()`** (allocate in `setup()`)
-4.  **Large stack allocations** (>1KB local arrays)
-5.  **Missing debug logging** (silent failures)
-6.  **Inefficient data structures** (std::set for n<10)
-7.  **Unprotected shared state** (missing mutex)
-8.  **Magic numbers** (should be named constants)
-
-### 🟡 INFO (Recommend, non-blocking)
-
-1.  **Const correctness** (missing `const` on read-only methods)
-2.  **Naming convention violations**
-3.  **Missing comments** for non-obvious logic
-4.  **Dead code** (unused functions/variables)
-5.  **Include-what-you-use** (unnecessary includes)
+### 🟡 INFO (Nice to fix)
+- Const correctness, naming consistency
+- Dead code, commented-out code
+- Include-what-you-use violations
 
 ---
 
 ## 12. AI-SPECIFIC INSTRUCTIONS
 
-**This section is DIRECT COMMANDS to AI assistants analyzing this repository.**
-
 ### 12.1 Mandatory Pre-Read
 
-**BEFORE analyzing any code, you MUST read this entire document.**
-**BEFORE making any suggestion, you MUST check if it violates any rule above.**
+**BEFORE any analysis or code generation, the AI agent MUST read this entire file.**
+**BEFORE any suggestion, the AI agent MUST verify no rule is violated.**
 
-### 12.2 License Enforcement
+### 12.2 License & Copyright
 
-**License: Apache 2.0 OR MIT (dual license)**
+**No copyleft dependencies without explicit discussion.**
 
-- This project is dual-licensed under Apache 2.0 and MIT. Users may choose either license.
-- Contributions are accepted under the same dual-license terms.
-- Always verify that third-party dependencies have compatible licenses (Apache 2.0, MIT, BSD, or similar permissive licenses).
-- Flag any PRs that would change the license or introduce copyleft-licensed dependencies without explicit discussion.
+### 12.3 C++ Version
 
-### 12.3 C++ Version Awareness
+**C++20 is allowed and expected.** Do NOT flag C++20 features as "too modern" or "incompatible with Arduino".
 
-- **C++20 IS ALLOWED AND EXPECTED**
-- **DO NOT** suggest "upgrading to C++17" or "avoiding C++20"
-- **DO NOT** flag `std::span`, `std::bit_cast`, `consteval` as "too modern"
+### 12.4 Component Role Detection
 
-### 12.4 Component Rules (Auto-Discovery)
+To determine which component roles apply:
+1. Read the component's `__init__.py` (`DEPENDENCIES`, `import` statements, `MULTI_CONF`)
+2. Read the component's C++ headers (includes, base classes)
+3. Apply ALL matching role categories from §3
+4. This applies to ALL components --- no exceptions
 
-**BEFORE reviewing any component, determine its role by reading:**
-1. Its `__init__.py` --- check `DEPENDENCIES`, imports, and `to_code()` for build flags
-2. Its `.h` headers --- check `#include` directives for TFLite, camera, or network APIs
-3. Then apply **ALL matching role categories** from §3:
-   - **§3.1 Universal Rules** --- ALWAYS applies to EVERY component
-   - **§3.2 TFLite Consumer Rules** --- if component includes `tensorflow/lite/*` or depends on `tflite_micro_helper`
-   - **§3.3 Camera Consumer Rules** --- if component depends on `esp32_camera_utils` or uses `esp_camera_fb_get`
-   - **§3.4 Network Consumer Rules** --- if component uses HTTP client, `defer()`, or `set_timeout()` for network
-   - **§3.5 Sensor/Output Consumer Rules** --- if component publishes readings or extends `sensor::Sensor`
-   - **§3.6 Component-Specific Overrides** --- additional rules for specific components
+**`legacy_meter_reader_tflite` is EXCLUDED from review (frozen/deprecated). Do not refactor or extend it.**
 
-**This applies to ALL components --- existing, new, and future. No exceptions.**
-No component is excluded from review. All code must be compliant.
+### 12.5 Dual-Target Awareness
 
-### 12.5 Performance Dual-Target Awareness
+All changes MUST consider:
+- **ESP32-S3**: Optimize for **SPEED** (<270ms pipeline). 1MB tensor arena available.
+- **ESP32 (classic)**: Optimize for **MEMORY** (512KB arena max). Slower CPU, less PSRAM.
 
-**ALWAYS consider BOTH targets:**
-- ESP32-S3: Optimize for SPEED (<270ms target)
-- ESP32: Optimize for MEMORY (512KB arena limit)
+When suggesting changes, specify which target benefits and whether the other target is affected.
 
-**NEVER suggest optimizations that work on S3 but break on classic ESP32 without explicit check.**
+### 12.6 Anti-Pattern Detection
 
-### 12.6 Memory Safety
+The AI agent MUST actively scan for and flag:
+- C-style casts → `static_cast<>`
+- `#define` for constants → `constexpr` or `enum`
+- Missing `this->` in member access → add it
+- `delay()` in `loop()` → `set_timeout()` or `defer()`
+- `std::regex` → simple string operations
+- CRLF line endings → LF-only
+- Tab characters → 2-space indentation
+- Non-ASCII characters → ASCII-only
+- Trailing whitespace → strip it
+- Missing EOF newline → add `\n`
 
-**ALWAYS verify:**
-- Camera buffers use `TrackedBuffer` pattern
-- TFLite arena uses `std::unique_ptr` or `std::array`
-- No `new` without matching `delete` (RAII instead)
-- No `memcpy` without bounds checking
+### 12.7 Configuration Validation
 
-**⚠️ ESP32/FreeRTOS exception --- `xQueueReceive` + owned pointers:**
-`xQueueReceive` performs raw `memcpy` into the destination, bypassing C++
-assignment operators and RAII destructors. The job struct MUST be declared
-OUTSIDE the while loop, and pointers MUST be manually freed + nullified
-BEFORE the next receive. This is CORRECT on ESP32 --- do NOT change it.
+- All user-provided values MUST be bounds-checked
+- Schemas MUST provide sensible defaults
+- Errors MUST be reported via `cv.Invalid` (which must be **raised**, not returned)
+- Use `cv.All()` over custom validation lambdas where possible
 
-```cpp
-// CORRECT on ESP32: job outside loop, manual free + nullify
-UploadJob job;
-while (xQueueReceive(queue, &job, 0) == pdTRUE) {
-    process(job.data);
-    free(job.data);  job.data = nullptr;
-    free(job.metadata);  job.metadata = nullptr;
-}
-```
+### 12.8 Config Bounds-Checking
 
-### 12.7 Anti-Pattern Detection
-
-**Immediately flag:**
-- C-style casts -> Suggest `static_cast<>`
-- `#define` constants -> Suggest `constexpr`
-- Missing `this->` -> Suggest adding it
-- `delay()` in loop -> Suggest `set_timeout()`
-- `std::regex` -> Suggest string operations
-
-### 12.8 Configuration Validation
-
-**ALWAYS check:**
-- Are user-provided values bounds-checked?
-- Are there sensible defaults?
-- Are errors reported clearly with `cv.Invalid`?
-
-**⚠️ ESPHome config validation compatibility:**
-- Use ONLY validators available in `esphome.config_validation` (e.g. `cv.string_strict`, `cv.Length`, `cv.Range`, `cv.int_range`, `cv.float_range`, `cv.boolean`, `cv.one_of`, `cv.enum`, `cv.file_`, `cv.percentage`, `cv.Regex` is NOT available)
-- To raise `cv.Invalid` inside a lambda, use the generator expression pattern: `(_ for _ in ()).throw(cv.Invalid("..."))`
-- Do NOT use `cv.Regex` --- it does not exist in ESPHome's config_validation module
-- Do NOT return `cv.Invalid(...)` from a lambda --- it must be raised, not returned
-- Prefer composing built-in validators with `cv.All()` over custom lambdas where possible
+Every configuration parameter that accepts numeric values, strings, or enums MUST be validated at the schema level using `cv.int_range`, `cv.float_range`, `cv.one_of`, etc.
 
 ### 12.9 When Uncertain
 
-**If you are unsure whether a suggestion follows these rules:**
-1.  **STATE** the specific rule you are considering
-2.  **ASK** the user to confirm before proceeding
-3.  **REFERENCE** the section number from this document
+- **STATE the specific rule being considered**
+- **ASK the user to confirm**
+- **REFERENCE the section number**
 
 ### 12.10 No Unauthorized Commits
 
-- **NEVER** commit, push, or create any files in the repository without explicit human acknowledgment and approval.
-- Present changes as proposals first. Wait for the user to confirm before writing any files or making commits.
-- This rule applies to ALL files including documentation, proposals, and code changes.
+**NEVER commit changes without explicit human approval.** Present changes as proposals first. Let the user review and approve before making commits.
 
-### 12.11 Communication Style Directive
+### 12.11 Communication Style
 
-- **DO NOT** add "open questions" sections in code comments.
-- Keep review output focused on findings, fixes, and actionable recommendations only.
+Output only findings and fixes. Do NOT end with open questions in code comments.
 
-### 12.12 ESP32 Patterns vs Static Analysis Tools
+### 12.12 ESP32 Patterns (Static Analysis False Positives)
 
-Automated code review tools (Gemini Code Assist, Greptile) regularly flag the
-following ESP32/FreeRTOS patterns as defects. They are CORRECT on this platform.
+The following patterns are CORRECT on ESP32 and must NOT be flagged:
 
-**Do NOT change these patterns when flagged by static analysis:**
+| Pattern ID | What | Why |
+|-----------|------|-----|
+| **SUP-QUEUE-FREE** | `xQueueReceive` + owned pointers: manual `free()`+nullify outside while() | `xQueueReceive` raw memcpy bypasses C++ RAII |
+| **SUP-JPEG-DELETER** | `jpeg_dec_handle_t` custom deleter with `using pointer =` | ESP-IDF handle type is `void*`, requires custom deleter struct |
+| **SUP-FMODF** | `fmodf(angle, 360.0f)` for angle normalization | `while(rot<0) rot+=360` loops are O(n), watchdog risk |
+| **SUP-MODEL-DIRS** | Static `MODELS_DIRS` list without `exists()` filter | `discover_models()` checks existence per-scan; dirs may be created late |
+| **SUP-TYPE-CAST** | Raw int (0/1) for type mapping where enum values unavailable | Named constants preferred but raw int valid when enums differ across components |
+| **SUP-VALIDATE-GATE** | `max_consecutive_rejections` gating when `smart_validation` disabled | Allows rollovers 99999→00001 while rejecting single glitches |
+| **SUP-BUF-MULTIPLY** | Guarded multiplication: `if (h > SIZE_MAX/w) return` | 32-bit ESP32 overflow risk; correct 3-line guard pattern |
 
-1. **`xQueueReceive` + owned pointers** --- See §12.6. Manual free + nullify is correct.
-2. **JPEG decoder handle deleter** --- Use a custom deleter struct with
-   `using pointer = jpeg_dec_handle_t;` --- NOT a raw function pointer type.
-   (In ESP-IDF, `jpeg_dec_handle_t` is `void*`.)
-3. **Angle normalization** --- Use `fmodf(angle, 360.0f); if (rot < 0) rot += 360.0f;`
-   Never use `while` loops for angle wrapping (O(n), watchdog risk with extreme).
-4. **Python model discovery at module load** --- Use a static list of directory
-   paths (without `exists()` filter). `discover_models()` checks per-scan.
-5. **Type mapping constants** --- Use named enum values where available
-   (`kTfLiteFloat32`, `kInputTypeFloat32`) instead of raw integers.
-6. **Disabled validation gate** --- When `enable_smart_validation` is `false`,
-   use `max_consecutive_rejections` gating, NOT unconditional acceptance.
+### 12.13 Ponytail --- Lazy Senior Developer Mode
 
-### 12.13 PonyTail --- Lazy Senior Developer Mode
-
-Lazy means efficient, not careless. The best code is the code never written.
-
-**Decision ladder** --- stop at the first rung that holds:
-1. **YAGNI.** Does this need to be built at all?
-2. **std lib.** Does the standard library already do this? Use it.
-3. **Platform.** Does a native platform feature cover it? Use it.
-4. **Existing dep.** Does an already-installed dependency solve it? Use it.
-5. **One line.** Can this be one line? Make it one line.
+**Decision ladder (apply in order):**
+1. **YAGNI** — Does this need to be built at all?
+2. **std lib** — Does the standard library already do this?
+3. **Platform** — Does a native platform feature cover it?
+4. **Existing dep** — Does an already-installed dependency solve it?
+5. **One line** — Can this be one line? Make it one line.
 6. **Write the minimum code that works.**
 
 **Rules:**
-- No abstractions that weren't explicitly requested.
-- No new dependency if it can be avoided.
-- No boilerplate nobody asked for.
-- Deletion over addition. Boring over clever. Fewest files possible.
-- Question complex requests: "Do you actually need X, or does Y cover it?"
-- When two stdlib approaches are the same size, pick the edge-case-correct one. Lazy means less code, not the flimsier algorithm.
-- Mark intentional simplifications with a `ponytail:` comment. If the shortcut has a known ceiling (global lock, O(n²) scan, naive heuristic), the comment names the ceiling and the upgrade path.
+- No abstractions not explicitly requested
+- No new dependency if avoidable
+- No boilerplate nobody asked for
+- Deletion over addition. Boring over clever. Fewest files.
+- Mark intentional simplifications with `ponytail:` comment
 
 **Not lazy about:** Input validation at trust boundaries, error handling that prevents data loss, security, accessibility, the calibration real hardware needs (the platform is never the spec ideal; a clock drifts, a sensor reads off), anything explicitly requested.
 
@@ -1349,6 +1281,18 @@ while (xQueueReceive(this->upload_queue_, &job, 0) == pdTRUE) {
 - When decoding JPEG to a pre-allocated buffer, pass `output_buffer` directly --- avoid temporary allocation + `memcpy`
 - Add **guarded multiplication (using `SIZE_MAX` check)** for `w * h * bpp` from JPEG header to prevent 32-bit overflow
 
+### 12.15 File Output Validation (AI Agent — MANDATORY)
+
+**BEFORE writing ANY file content, the AI agent MUST pre-validate the output:**
+
+1. **LF-only line endings** — NO `\r` (CR) characters. If the content contains `\r\n`, convert to `\n`.
+2. **No trailing whitespace** — Strip ALL trailing spaces and tabs from every line.
+3. **No tab characters** — Use 2-space indentation only. Replace `\t` with spaces.
+4. **Exactly one trailing newline at EOF** — Content MUST end with `\n` and NOT `\n\n` (double newlines at EOF are also invalid).
+5. **ASCII-only in source files** — NO characters ≥ U+0080.
+
+This applies to ALL write operations: new files, edits, patches, and any generated output. These checks are non-negotiable and match §7.7 / `.editorconfig`. Violations cause CI to fail (`ci-custom.py` and pre-commit hooks).
+
 ---
 
 ## 📌 SUMMARY: NON-NEGOTIABLE RULES (Cheat Sheet)
@@ -1364,6 +1308,7 @@ while (xQueueReceive(this->upload_queue_, &job, 0) == pdTRUE) {
 | **Camera buffers** | `TrackedBuffer` | Never direct `fb_get` |
 | **Blocking** | `defer()` / `set_timeout()` | Never `delay()` in `loop()` |
 | **Regex** | String operations | Never `std::regex` |
+| **File encoding** | LF-only, ASCII, no trailing WS, EOF newline | None |
 | **License** | Apache 2.0 OR MIT | Copyleft dependencies require review |
 
 ---
@@ -1375,4 +1320,3 @@ while (xQueueReceive(this->upload_queue_, &job, 0) == pdTRUE) {
 
 **⚠️ Maintenance:** When editing this file, also sync `.ai/instructions.yaml`
 (token-optimized derivative for `.clinerules/` and `.greptile/` consumption).
-```
