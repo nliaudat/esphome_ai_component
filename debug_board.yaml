@@ -15,8 +15,6 @@ sensor:
     free:
       name: "Heap Free"
       entity_category: diagnostic
-    # fragmentation:
-      # name: "Heap Fragmentation"
     block:
       name: "Heap Max Block"
       entity_category: diagnostic
