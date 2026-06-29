@@ -24,10 +24,10 @@ esphome:
     version: "${revision}.dev"
   platformio_options:
     board_build.extra_flags:
-    - -DBOARD_HAS_PSRAM
-    - -DTF_LITE_STATIC_MEMORY  # for tflite micro
-    - -DTF_LITE_DISABLE_X86_NEON  #for tflite micro
-    - -DESP_NN  #use hardware acceleration : https://github.com/espressif/esp-nn (only if using tflite)
+      - -DBOARD_HAS_PSRAM
+      - -DTF_LITE_STATIC_MEMORY  # for tflite micro
+      - -DTF_LITE_DISABLE_X86_NEON  #for tflite micro
+      - -DESP_NN  #use hardware acceleration : https://github.com/espressif/esp-nn (only if using tflite)
     # build_flags: -DBOARD_HAS_PSRAM -DCORE_DEBUG_LEVEL=0
     # board_build.f_cpu: 240000000L
     # board_build.f_flash: 80000000L
@@ -134,15 +134,15 @@ light:
     id: ${id_prefix}_flash
 
     effects:
-        - addressable_scan:
+      - addressable_scan:
           name: "Scan Effect"
           move_interval: 100ms
           scan_width: 1
-        - addressable_rainbow:
+      - addressable_rainbow:
           name: "Rainbow Effect"
           speed: 10
           width: 50
-        - pulse:
+      - pulse:
           name: "Slow Pulse"
           transition_length: 500ms
           update_interval: 2s

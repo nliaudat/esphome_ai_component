@@ -14,6 +14,7 @@ ignore: |
   test.yaml
   /venv
   *.yml
+  /tests
 
 rules:
   document-start: disable

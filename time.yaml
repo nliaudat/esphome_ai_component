@@ -11,6 +11,6 @@ time:
           - switch.toggle: ${id_prefix}_ctrl_reboot
 
 # interval:
-  # - interval: ${maintenance_interval}
-    # then:
-      # - script.execute: maintenance
+#   - interval: ${maintenance_interval}
+#     then:
+#       - script.execute: maintenance

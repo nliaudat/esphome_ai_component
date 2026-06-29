@@ -3,7 +3,6 @@
 # Comment out sections you don't need to reduce Home Assistant entity count
 
 switch:
-  # Enable Rotation
   # - platform: template
   #   name: "Enable Rotation"
   #   id: ${id_prefix}_enable_rotation
@@ -40,7 +39,6 @@ switch:
   #   restore_mode: RESTORE_DEFAULT_ON
 
 number:
-  # ===== Camera Window Controls (comment out if not using camera window) =====
   # Camera Window - Offset X
   # - platform: template
   #   name: "Camera Window Offset X"
