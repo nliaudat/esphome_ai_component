@@ -24,10 +24,10 @@ sensor:
                 (to_string(seconds) + "s")
               ).c_str();
     # web_server:
-      # sorting_group_id: sorting_group_sensors
+    #   sorting_group_id: sorting_group_sensors
 
-  # - platform: internal_temperature
-    # name: "${friendly_name} Internal Temperature"
+# - platform: internal_temperature
+#   name: "${friendly_name} Internal Temperature"
 
 text_sensor:
   - platform: template
@@ -35,4 +35,4 @@ text_sensor:
     id: ${id_prefix}_uptime_human
     icon: mdi:clock-start
     # web_server:
-      # sorting_group_id: sorting_group_sensors
+    #   sorting_group_id: sorting_group_sensors

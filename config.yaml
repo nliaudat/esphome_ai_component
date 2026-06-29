@@ -2,31 +2,31 @@
 # After OTA update, the EN (reset) button must be pressed to run firmware
 
 # external_components:
-  # - source:
-      # type: git
-      # url: https://github.com/nliaudat/esphome_ai_component
-      # ref: main
-    # components: [legacy_meter_reader_tflite]
+#   - source:
+#       type: git
+#       url: https://github.com/nliaudat/esphome_ai_component
+#       ref: main
+#     components: [legacy_meter_reader_tflite]
 
 external_components:
   - source:
       type: local
       path: components
-    components: [meter_reader_tflite, tflite_micro_helper, esp32_camera_utils, flash_light_controller, value_validator] # data_collector] #, ssocr_reader #, analog_reader]
-    # components: [meter_reader_tflite, esp32_camera_utils, flash_light_controller, value_validator] # data_collector] #, ssocr_reader #, analog_reader]
+    components: [meter_reader_tflite, tflite_micro_helper, esp32_camera_utils, flash_light_controller, value_validator]  # data_collector] #, ssocr_reader #, analog_reader]
+    # components: [meter_reader_tflite, esp32_camera_utils, flash_light_controller, value_validator]  # data_collector] #, ssocr_reader #, analog_reader]
   # - source:
-      # type: git
-      # url: https://github.com/nliaudat/esphome
-      # ref: tflite_micro_helper
-    # components: [tflite_micro_helper]
+  #     type: git
+  #     url: https://github.com/nliaudat/esphome
+  #     ref: tflite_micro_helper
+  #   components: [tflite_micro_helper]
 
 ############## General configuration
 
 substitutions:
 
-  name: s3cam-tflite #no special caracters
+  name: s3cam-tflite  # no special caracters
   friendly_name: "S3 camera tflite"
-  id_prefix: "s3_cam_tflite" #if you have more than one board, it could be usefull to remane all the "id:prefix_xxxx" with a decicaded prefix
+  id_prefix: "s3_cam_tflite"  # if you have more than one board, it could be usefull to remane all the "id:prefix_xxxx" with a decicaded prefix
   # name: esp-cam-2mb #no special caracters
   # friendly_name: "esp-cam-2mb"
   # id_prefix: "esp_cam_2mb" #if you have more than one board, it could be usefull to remane all the "id:prefix_xxxx" with a decicaded prefix
@@ -37,38 +37,34 @@ substitutions:
   # Board Selection (s3_cam, aithinker)
   # board_variant: s3_cam
 
-
   # Meter settings
-  meter_unit: L # Unit of measurement for the meter (e.g. m^3, kWh, L) (https://developers.home-assistant.io/docs/core/entity/sensor/https://developers.home-assistant.io/docs/core/entity/sensor/)
-  meter_device_class: water # device class for the meter (e.g. water, energy, gas)
-  meter_state_class: total_increasing # state class for the meter (e.g. total_increasing, total, measurement)
-
+  meter_unit: L  # Unit of measurement for the meter (e.g. m^3, kWh, L) (https://developers.home-assistant.io/docs/core/entity/sensor/https://developers.home-assistant.io/docs/core/entity/sensor/)
+  meter_device_class: water  # device class for the meter (e.g. water, energy, gas)
+  meter_state_class: total_increasing  # state class for the meter (e.g. total_increasing, total, measurement)
 
   # camera
   # NOTE: OV2640 + ESP32 camera driver cannot reliably do grayscale AND windowing at the same time.
   # Using JPEG pixel format with the camera; grayscale conversion is done in software by the ImageProcessor
   # when a grayscale model (model_channels == 1) is loaded.
-  camera_pixel_format: JPEG # (cropping implementation is faster with RGB888 format) | Displays: RGB565, RGB888 | Cameras: YUV422, YUV420, RAW | Efficiency: Grayscale, YUV420, JPEG
+  camera_pixel_format: JPEG  # (cropping implementation is faster with RGB888 format) | Displays: RGB565, RGB888 | Cameras: YUV422, YUV420, RAW | Efficiency: Grayscale, YUV420, JPEG
   ### windowing not available nativelyin grayscale mode (OV2640) due to driver limitations. The image is forced JPEG and then converted to grayscale in software by the ImageProcessor
-# camera_pixel_format: GRAYSCALE
-  camera_resolution: 640x480 #800x600 #640x480 #https://esphome.io/components/esp32_camera.html
+  # camera_pixel_format: GRAYSCALE
+  camera_resolution: 640x480  # 800x600 #640x480 #https://esphome.io/components/esp32_camera.html
   # camera_jpeg_quality: 10 # From 10 (best) to 63 (worst). | Must be 0 if non JPEG
   camera_jpeg_quality: 10
   # camera_max_framerate: 1fps
   camera_max_framerate: 1fps
   camera_idle_framerate: 0.2fps
 
-  #time
-  TZ: Europe/Zurich #timezone
+  # time
+  TZ: Europe/Zurich  # timezone
   reboot_days_of_week: MON
   reboot_hours: 5
   reboot_minutes: 0
   reboot_seconds: 0
 
-
 preferences:
   flash_write_interval: 60min
-
 
 ota:
   - platform: esphome
@@ -77,7 +73,6 @@ safe_mode:
 
 # network:
     # enable_ipv6: false
-
 
 api:
   reboot_timeout: 0s # do not reboot if hassio connection is lost.
@@ -109,7 +104,6 @@ esp32_camera_utils:
 
   # enable_rotation: true
   # rotation: 270 # 0, 90, 180, 270 (special case built-in "accelerated" for 90, 180, 270 )
-
 
   # enable_scaler: true
   # scaler:
@@ -148,8 +142,6 @@ flash_light_controller:
   #   id: ${id_prefix}_allow_collection
   #   icon: "mdi:cloud-upload"
 
-
-
 value_validator:
   id: ${id_prefix}_validator
   # Basic Validation
@@ -169,7 +161,6 @@ value_validator:
 
   # Memory Management
   max_history_size: 50kB               # Max history memory usage (default: 50kB)
-
 
 meter_reader_tflite:
   id: ${id_prefix}_meter_reader
@@ -194,7 +185,6 @@ meter_reader_tflite:
   debug_memory: false
   debug_timing: false
 
-
   # Preview of what the AI sees (Rotated Live Cam)
   # Set to true to enable continuous updates, or false for on-demand only (via button)
   generate_preview: false # need web_server: port: 80 (wait for update_interval to be reached) + esp32_camera_utils: enable drawing subsystem
@@ -207,9 +197,6 @@ meter_reader_tflite:
         # port: 80  # commented  uncomment
     # - !include camera_webserver.yaml
 
-
-
-
   crop_zones_global: ${id_prefix}_crop_zones  # Reference the global variables set in globals_AI_component.yaml | To update, use http://[hassio]/developer-tools/action >esphome.[s3cam_tflite]_set_crop_zones | to get, use the tools>draw_regions.py
   flash_light_controller: ${id_prefix}_flash_controller
 
@@ -218,7 +205,6 @@ meter_reader_tflite:
 
   value_sensor: ${id_prefix}_meter_value
   confidence_sensor: ${id_prefix}_meter_confidence
-
 
   inference_logs: ${id_prefix}_inference_logs
   main_logs: ${id_prefix}_main_logs
@@ -308,7 +294,6 @@ packages:
   - !include components/esp32_camera_utils/esp32_camera_utils_controls.yaml
   # - !include components/analog_reader/analog_reader_controls.yaml
   # - !include components/value_validator/value_validator_dial_controls.yaml
-
 
   # camera configs
   - !include camera_options.yaml

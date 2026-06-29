@@ -1,7 +1,20 @@
 ---
 extends: default
 
-ignore-from-file: .gitignore
+ignore: |
+  /.esphome/
+  **/.pioenvs/
+  **/.piolibdeps/
+  **/lib/
+  **/src/
+  **/platformio.ini
+  *.pyc
+  .vscode/
+  secrets.yaml
+  test.yaml
+  /venv
+  *.yml
+  /tests
 
 rules:
   document-start: disable

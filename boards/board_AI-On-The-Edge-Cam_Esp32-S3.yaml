@@ -40,10 +40,10 @@ esphome:
     board_build.psram_type: opi
     board_upload.maximum_size: 16777216
     board_build.extra_flags:
-    - -DBOARD_HAS_PSRAM
-    - -DTF_LITE_STATIC_MEMORY  # for tflite micro
-    - -DTF_LITE_DISABLE_X86_NEON  #for tflite micro
-    - -DESP_NN  #use hardware acceleration : https://github.com/espressif/esp-nn (only if using tflite)
+      - -DBOARD_HAS_PSRAM
+      - -DTF_LITE_STATIC_MEMORY  # for tflite micro
+      - -DTF_LITE_DISABLE_X86_NEON  #for tflite micro
+      - -DESP_NN  #use hardware acceleration : https://github.com/espressif/esp-nn (only if using tflite)
     board_name: AI-On-The-Edge-Cam Esp32-S3 (N16R8)  #https://www.tindie.com/products/allexok/ai-on-the-edge-cam-esp32-s3-with-poe-sd-camera/
 
 substitutions:
@@ -151,15 +151,15 @@ light:
     id: ${id_prefix}_flash
 
     effects:
-        - addressable_scan:
+      - addressable_scan:
           name: "Scan Effect"
           move_interval: 100ms
           scan_width: 1
-        - addressable_rainbow:
+      - addressable_rainbow:
           name: "Rainbow Effect"
           speed: 10
           width: 50
-        - pulse:
+      - pulse:
           name: "Slow Pulse"
           transition_length: 500ms
           update_interval: 2s
@@ -187,20 +187,20 @@ switch:
     id: ${id_prefix}_eth_power_switch
     icon: "mdi:ethernet"
     turn_on_action:
-        - output.turn_on: ${id_prefix}_eth_power
-        - delay: 500ms
+      - output.turn_on: ${id_prefix}_eth_power
+      - delay: 500ms
     turn_off_action:
-        - output.turn_off: ${id_prefix}_eth_power
+      - output.turn_off: ${id_prefix}_eth_power
 
   - platform: template
     name: "Peripheral Power"
     id: ${id_prefix}_periph_power_switch
     icon: "mdi:camera"
     turn_on_action:
-        - output.turn_on: ${id_prefix}_periph_power
-        - delay: 1000ms
+      - output.turn_on: ${id_prefix}_periph_power
+      - delay: 1000ms
     turn_off_action:
-        - output.turn_off: ${id_prefix}_periph_power
+      - output.turn_off: ${id_prefix}_periph_power
 
 # # only if wifi.yaml is enabled
   # - platform: template

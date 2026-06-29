@@ -12,10 +12,10 @@ esphome:
     # board_build.partitions: huge_app.csv
     board_name: ESP32 Wrover Kit
     board_build.extra_flags:
-    - -DBOARD_HAS_PSRAM
-    - -DTF_LITE_STATIC_MEMORY  # for tflite micro
-    - -DTF_LITE_DISABLE_X86_NEON  #for tflite micro
-    - -DESP_NN  #use hardware acceleration : https://github.com/espressif/esp-nn (only if using tflite)
+      - -DBOARD_HAS_PSRAM
+      - -DTF_LITE_STATIC_MEMORY  # for tflite micro
+      - -DTF_LITE_DISABLE_X86_NEON  #for tflite micro
+      - -DESP_NN  #use hardware acceleration : https://github.com/espressif/esp-nn (only if using tflite)
 
 substitutions:
   board: esp-wrover-kit

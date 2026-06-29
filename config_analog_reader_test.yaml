@@ -15,8 +15,6 @@ external_components:
     #components: [meter_reader_tflite, tflite_micro_helper, esp32_camera_utils, flash_light_controller] #, ssocr_reader]
     components: [meter_reader_tflite, analog_reader, tflite_micro_helper, esp32_camera_utils, flash_light_controller, value_validator]
 
-
-
 ############## General configuration
 
 substitutions:
@@ -33,7 +31,6 @@ substitutions:
 
   # Board Selection (s3_cam, aithinker)
   # board_variant: s3_cam
-
 
   # Meter settings
   meter_unit: L # Unit of measurement for the meter (e.g. m^3, kWh, L) (https://developers.home-assistant.io/docs/core/entity/sensor/https://developers.home-assistant.io/docs/core/entity/sensor/)
@@ -56,10 +53,8 @@ substitutions:
   reboot_minutes: 0
   reboot_seconds: 0
 
-
 preferences:
   flash_write_interval: 60min
-
 
 ota:
   - platform: esphome
@@ -74,7 +69,6 @@ globals:
     type: std::string
     max_restore_data_length: 254
     initial_value: '"[[6,43,67,161],[110,48,169,166],[209,47,264,167],[306,50,364,171],[400,53,453,171],[495,53,552,172],[585,58,644,174],[680,62,733,173]]"'
-
 
 api:
   reboot_timeout: 0s # do not reboot if hassio connection is lost.
@@ -113,10 +107,8 @@ esp32_camera_utils:
   #   width: 112 # multiple of 4 or 16 if rotation enabled #Enforcement: 4:3 Aspect Ratio (W/H = 160/120)
   #   height: 512 # multiple of 4 or 16 if rotation enabled
 
-
   # enable_rotation: true
   # rotation: 270 # 0, 90, 180, 270 (special case built-in "accelerated" for 90, 180, 270 )
-
 
   # enable_scaler: true
   # scaler:
@@ -142,7 +134,6 @@ flash_light_controller:
   flash_post_time: 200ms # 2 seconds after update (works with 100ms on my board)
   # debug: true
 
-
 # meter_reader_tflite:
 #   id: ${id_prefix}_meter_reader
 #   camera_id: ${id_prefix}_espcam
@@ -162,8 +153,6 @@ flash_light_controller:
 #   # generate_preview: true
 #   # show_crop_areas: true # Draw boxes on preview
 
-
-
 #   crop_zones_global: ${id_prefix}_crop_zones  # local
 #   flash_light_controller: ${id_prefix}_flash_controller
 #   ### Enhanced validation parameters
@@ -173,11 +162,8 @@ flash_light_controller:
 #   value_sensor: ${id_prefix}_meter_value
 #   confidence_sensor: ${id_prefix}_meter_confidence
 
-
 #   inference_logs: ${id_prefix}_inference_logs
 #   main_logs: ${id_prefix}_main_logs
-
-
 
 #   enable_flash_calibration: false # still in dev
 
@@ -231,14 +217,11 @@ meter_reader_tflite:
   # model: "models/digit_recognizer_v16_quantized_integer_quant_uint8.tflite" # 99.46% acc | inference in 4150ms | 263.76 KB memory footprint
   # model: "models/digit_recognizer_v3_quantized_integer_quant_uint8.tflite" # 97.95% acc | inference in 1500ms | 153.83 KB memory footprint
 
-
-
   update_interval: 60s
   # Data collection requires data_collector component to be loaded
   # collect_low_confidence: true
   # collect_min_global_confidence: 0.90
   # collect_min_digit_confidence: 0.90
-
 
   # debug: true
   # debug_image: false # static embedded image (debug.jpg)
@@ -251,8 +234,6 @@ meter_reader_tflite:
   # generate_preview: true
   # show_crop_areas: true # Draw boxes on preview
 
-
-
   crop_zones_global: ${id_prefix}_crop_zones  # local
   flash_light_controller: ${id_prefix}_flash_controller
   # data_collector: ${id_prefix}_data_collector  # Commented out: data_collector component not loaded
@@ -264,14 +245,11 @@ meter_reader_tflite:
   value_sensor: ${id_prefix}_meter_value
   confidence_sensor: ${id_prefix}_meter_confidence
 
-
   inference_logs: ${id_prefix}_inference_logs
   main_logs: ${id_prefix}_main_logs
 
   total_inference_time_sensor: ${id_prefix}_inference_time
   capture_to_publish_time_sensor: ${id_prefix}_capture_to_publish_time
-
-
 
   enable_flash_calibration: false # still in dev
 
@@ -288,7 +266,6 @@ meter_reader_tflite:
 
   unload_button: ${id_prefix}_unload_btn
   reload_button: ${id_prefix}_reload_btn
-
 
 value_validator:
   id: ${id_prefix}_validator
