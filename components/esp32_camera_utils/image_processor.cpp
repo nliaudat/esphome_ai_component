@@ -36,17 +36,6 @@ BufferPool ImageProcessor::buffer_pool_;
 // Initialize static member
 std::atomic<int32_t> ImageProcessor::TrackedBuffer::active_instances{0};
 
-// RAII ScopedTimer -- replaces DURATION_START/DURATION_END macros
-class ScopedTimer {
- public:
-  ScopedTimer(const char *func) : name_(func), start_(millis()) {}
-  ~ScopedTimer() { ESP_LOGD(TAG, "%s duration: %lums", this->name_, millis() - this->start_); }
-
- private:
-  const char *name_;
-  uint32_t start_;
-};
-
 // Consolidate rotation normalization logic (replaces 5 copies of identical code)
 // Returns the best hardware-supported JPEG rotation and sets needs_software=true for fine angles.
 static jpeg_rotate_t normalize_rotation(float rotation, bool &needs_software) {

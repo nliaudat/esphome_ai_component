@@ -132,18 +132,20 @@ void AnalogReader::setup() {
     size_t rgb_size = 0;
     size_t gray_size = 0;
     {
-      if (this->img_width_ > 0 && this->img_height_ > 0 &&
-          static_cast<uint64_t>(this->img_height_) <= SIZE_MAX / static_cast<size_t>(this->img_width_)) {
-        const size_t pixels = static_cast<size_t>(this->img_width_) * static_cast<size_t>(this->img_height_);
-        if (pixels <= SIZE_MAX / 3u)
-          rgb_size = pixels * 3u;
-        if (pixels <= SIZE_MAX / 1u)
-          gray_size = pixels * 1u;
+      if (this->img_width_ <= 0 || this->img_height_ <= 0 ||
+          static_cast<uint64_t>(this->img_height_) > SIZE_MAX / static_cast<size_t>(this->img_width_)) {
+        ESP_LOGE(TAG, "Invalid dimensions or overflow computing buffer size for %dx%d", this->img_width_, this->img_height_);
+        this->mark_failed();
+        return;
       }
-      if (rgb_size == 0 && this->img_width_ > 0 && this->img_height_ > 0) {
-        // Fallback: report error but don't crash
-        ESP_LOGE(TAG, "Overflow computing buffer size for %dx%d", this->img_width_, this->img_height_);
+      const size_t pixels = static_cast<size_t>(this->img_width_) * static_cast<size_t>(this->img_height_);
+      if (pixels > SIZE_MAX / 3u) {
+        ESP_LOGE(TAG, "Overflow computing RGB buffer size for %dx%d", this->img_width_, this->img_height_);
+        this->mark_failed();
+        return;
       }
+      rgb_size = pixels * 3u;
+      gray_size = pixels;  // ×1 can never overflow
     }
     bool sufficient_psram_for_rgb = free_psram > (rgb_size + 1536 * 1024);
 

@@ -17,6 +17,7 @@ from esphome.const import (
     CONF_MODEL,
     CONF_NAME,
     CONF_ROTATION,
+    CONF_UNIT_OF_MEASUREMENT,
 )
 from esphome.core import CORE, HexInt
 
@@ -623,12 +624,12 @@ async def to_code(config):
                 CONF_ICON: icon,
                 CONF_FORCE_UPDATE: False,
                 CONF_ENTITY_CATEGORY: cv.entity_category("diagnostic"),
+                CONF_UNIT_OF_MEASUREMENT: unit,
             }
 
             # sens = await sensor.new_sensor(sens_conf)
             sens = await sensor.new_sensor(sens_conf)
 
-            cg.add(sens.set_unit_of_measurement(unit))
             cg.add(sens.set_accuracy_decimals(accuracy_decimals))
             # Icon is set via config now
             return sens

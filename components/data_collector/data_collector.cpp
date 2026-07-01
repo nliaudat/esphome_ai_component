@@ -50,6 +50,13 @@ void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, in
     return;
   }
 
+  // Check rate limit early to avoid expensive JPEG conversion
+  uint32_t now = millis();
+  if (now - this->last_upload_time_ < MIN_UPLOAD_INTERVAL_MS) {
+    ESP_LOGD(TAG, "Rate limited: skipping image collection");
+    return;
+  }
+
   uint32_t start_time = millis();
   ESP_LOGI(TAG, "Starting data collection (Value: %s, Confidence: %.2f%%, Size: %dx%d, Fmt: %s)", raw_value.c_str(),
            confidence * 100.0f, width, height, format.c_str());
@@ -99,13 +106,8 @@ bool DataCollector::upload_image(const uint8_t *data, size_t len, const std::str
     return false;
   }
 
-  // Rate limiting: max 1 upload per 60 seconds (§3.4)
+  // Record timestamp for rate-limiting after successful queue
   uint32_t now = millis();
-  if (now - this->last_upload_time_ < MIN_UPLOAD_INTERVAL_MS) {
-    ESP_LOGD(TAG, "Rate limited: %u ms since last upload (min %u ms)", now - this->last_upload_time_, MIN_UPLOAD_INTERVAL_MS);
-    return false;
-  }
-  this->last_upload_time_ = now;
 
   // Allocate copy for the queue (Prefer PSRAM for large image buffers)
   uint8_t *copy = static_cast<uint8_t *>(heap_caps_malloc(len, MALLOC_CAP_SPIRAM));
@@ -153,7 +155,8 @@ bool DataCollector::upload_image(const uint8_t *data, size_t len, const std::str
     return false;
   }
 
-  // Queued successfully -- release ownership so destructor doesn't free
+  // Queued successfully -- update rate limit timestamp and release ownership
+  this->last_upload_time_ = now;
   job.data = nullptr;
   job.metadata = nullptr;
   return true;

@@ -10,23 +10,29 @@
 // RAII timer replaces DURATION_START/END macros (ง7.4).
 // Zero-cost when DEBUG_DURATION is not defined.
 #ifdef DEBUG_DURATION
+namespace esphome {
+namespace esp32_camera_utils {
 class ScopedTimer {
  public:
   explicit ScopedTimer(const char *name) : name_(name), start_(esphome::millis()) {}
-  ~ScopedTimer() { ESP_LOGD("rotator", "%s took %ums", name_, millis() - start_); }
+  ~ScopedTimer() { ESP_LOGD("rotator", "%s took %ums", name_, esphome::millis() - start_); }
   uint32_t start_time() const { return start_; }
  private:
   const char *name_;
   uint32_t start_;
 };
+}  // namespace esp32_camera_utils
+}  // namespace esphome
 #else
+namespace esphome {
+namespace esp32_camera_utils {
 class ScopedTimer {
  public:
-  explicit ScopedTimer(const char *) : start_(esphome::millis()) {}
-  uint32_t start_time() const { return start_; }
- private:
-  uint32_t start_;
+  explicit ScopedTimer(const char *) {}  // true no-op — no millis() call
+  uint32_t start_time() const { return 0; }
 };
+}  // namespace esp32_camera_utils
+}  // namespace esphome
 #endif
 
 #ifdef USE_CAMERA_ROTATOR
@@ -87,6 +93,10 @@ inline void Rotator::get_rotated_dimensions(int src_w, int src_h, float angle_de
 inline bool Rotator::perform_rotation(const uint8_t *input, uint8_t *output, int src_w, int src_h, int channels,
                                       float angle_deg, int out_w, int out_h) {
   if (!input || !output)
+    return false;
+
+  // Guard against int overflow in rotation index arithmetic (§8.1 B1)
+  if (static_cast<int64_t>(src_w) * src_h * channels > INT_MAX)
     return false;
 
   // RAII timer records start time and logs duration on scope exit
