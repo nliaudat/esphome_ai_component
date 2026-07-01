@@ -11,6 +11,7 @@ from esphome.const import (
     CONF_NAME,
     CONF_OFFSET_X,
     CONF_OFFSET_Y,
+    CONF_UNIT_OF_MEASUREMENT,
     CONF_WIDTH,
 )
 from esphome.core import CORE
@@ -155,10 +156,10 @@ async def to_code(config):
                 CONF_INTERNAL: False,
                 CONF_ICON: icon,
                 CONF_FORCE_UPDATE: False,
+                CONF_UNIT_OF_MEASUREMENT: unit,
             }
 
             sens = await sensor.new_sensor(sens_conf)
-            cg.add(sens.set_unit_of_measurement(unit))
             cg.add(sens.set_accuracy_decimals(accuracy_decimals))
             return sens
 

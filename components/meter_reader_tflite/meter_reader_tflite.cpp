@@ -199,7 +199,7 @@ static constexpr uint32_t CALIBRATION_END_POST_MS = 100;
 static constexpr uint32_t CALIBRATION_STEP_POST_MS = 100;
 
 // Maximum preview JPEG size for pre-allocated fallback buffer
-static constexpr uint32_t PREVIEW_FALLBACK_BUFFER_SIZE = 128 * 1024;  // 128 KB
+static constexpr uint32_t PREVIEW_FALLBACK_BUFFER_SIZE = 256 * 1024;  // 256 KB
 
 void MeterReaderTFLite::setup() {
   ESP_LOGI(TAG, "Setting up Meter Reader TFLite (Refactored)...");
@@ -627,6 +627,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
   auto zones = this->crop_zone_handler_.get_zones();
   ESP_LOGI(TAG, "Processing Image: Found %d crop zones", zones.size());
   // Always log zones JSON at INFO for debugging (crop zone positions change per board)
+#ifdef DEBUG_METER_READER_TFLITE
   {
     std::string zones_json = "[";
     for (size_t i = 0; i < zones.size(); i++) {
@@ -639,6 +640,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
     zones_json += "]";
     ESP_LOGI(TAG, "Crop zones: %s", zones_json.c_str());
   }
+#endif
 
   // C++20: Range-based for loop
   for (const auto &zone : zones) {

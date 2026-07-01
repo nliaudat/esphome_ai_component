@@ -36,17 +36,6 @@ BufferPool ImageProcessor::buffer_pool_;
 // Initialize static member
 std::atomic<int32_t> ImageProcessor::TrackedBuffer::active_instances{0};
 
-// RAII ScopedTimer -- replaces DURATION_START/DURATION_END macros
-class ScopedTimer {
- public:
-  ScopedTimer(const char *func) : name_(func), start_(millis()) {}
-  ~ScopedTimer() { ESP_LOGD(TAG, "%s duration: %lums", this->name_, millis() - this->start_); }
-
- private:
-  const char *name_;
-  uint32_t start_;
-};
-
 // Consolidate rotation normalization logic (replaces 5 copies of identical code)
 // Returns the best hardware-supported JPEG rotation and sets needs_software=true for fine angles.
 static jpeg_rotate_t normalize_rotation(float rotation, bool &needs_software) {
@@ -284,7 +273,7 @@ ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t *data, s
       }
   } else if (output_format == JPEG_PIXEL_FORMAT_RGB565_LE || output_format == JPEG_PIXEL_FORMAT_RGB565_BE) {
       // Fix for RGB565 as well
-      uint16_t* pixels = (uint16_t*)out_buf.get();
+      auto* pixels = reinterpret_cast<uint16_t*>(out_buf.get());
       size_t count = out_size / 2;
       for (size_t i = 0; i < count; i++) {
            uint16_t p = pixels[i];

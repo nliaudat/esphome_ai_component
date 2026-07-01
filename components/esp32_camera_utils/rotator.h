@@ -1,9 +1,5 @@
 #pragma once
 
-#define USE_CAMERA_ROTATOR
-
-#ifdef USE_CAMERA_ROTATOR
-
 #include <cstdint>
 #include <algorithm>
 #include <cmath>
@@ -11,14 +7,35 @@
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
 
-// Define profiling macros locally to avoid dependency on tflite_micro_helper
+// RAII timer replaces DURATION_START/END macros (ง7.4).
+// Zero-cost when DEBUG_DURATION is not defined.
 #ifdef DEBUG_DURATION
-#define DURATION_START() uint32_t duration_start_ = millis()
-#define DURATION_END(func) ESP_LOGD(TAG, "%s duration: %lums", func, millis() - duration_start_)
+namespace esphome {
+namespace esp32_camera_utils {
+class ScopedTimer {
+ public:
+  explicit ScopedTimer(const char *name) : name_(name), start_(esphome::millis()) {}
+  ~ScopedTimer() { ESP_LOGD("rotator", "%s took %ums", name_, esphome::millis() - start_); }
+  uint32_t start_time() const { return start_; }
+ private:
+  const char *name_;
+  uint32_t start_;
+};
+}  // namespace esp32_camera_utils
+}  // namespace esphome
 #else
-#define DURATION_START()
-#define DURATION_END(func)
+namespace esphome {
+namespace esp32_camera_utils {
+class ScopedTimer {
+ public:
+  explicit ScopedTimer(const char *) {}  // true no-op — no millis() call
+  uint32_t start_time() const { return 0; }
+};
+}  // namespace esp32_camera_utils
+}  // namespace esphome
 #endif
+
+#ifdef USE_CAMERA_ROTATOR
 namespace esphome {
 namespace esp32_camera_utils {
 
@@ -78,16 +95,12 @@ inline bool Rotator::perform_rotation(const uint8_t *input, uint8_t *output, int
   if (!input || !output)
     return false;
 
-  // We only log non-trivial rotations to avoid spam on pass-through
-  bool is_trivial = (std::abs(angle_deg) < 0.1f || std::abs(angle_deg - 360.0f) < 0.1f);
-  if (!is_trivial) {
-    DURATION_START();
-  } else {
-// Still define start to avoid compilation errors if macro expands freely
-#ifdef DURATION_START
-    DURATION_START();
-#endif
-  }
+  // Guard against int overflow in rotation index arithmetic (§8.1 B1)
+  if (static_cast<int64_t>(src_w) * src_h * channels > INT_MAX)
+    return false;
+
+  // RAII timer records start time and logs duration on scope exit
+  ScopedTimer timer("perform_rotation");
 
   // Sanity check to prevent infinite loop
   if (!std::isfinite(angle_deg)) {
@@ -103,16 +116,18 @@ inline bool Rotator::perform_rotation(const uint8_t *input, uint8_t *output, int
 
   // 0 degrees (Copy)
   if (rot < 0.1f || rot > 359.9f) {
-    size_t size = src_w * src_h * channels;
+    // Guarded multiplication per ยง8.1 (CVE-2026-23833 pattern)
+    if (src_w <= 0 || src_h <= 0 || channels <= 0)
+      return false;
+    if (static_cast<uint64_t>(src_h) > SIZE_MAX / static_cast<size_t>(src_w))
+      return false;
+    const size_t pixels = static_cast<size_t>(src_w) * static_cast<size_t>(src_h);
+    if (pixels > SIZE_MAX / static_cast<size_t>(channels))
+      return false;
+    size_t size = pixels * static_cast<size_t>(channels);
     memcpy(output, input, size);
-    if (!is_trivial)
-      DURATION_END("perform_rotation_0");
-    else
-      DURATION_END("perform_rotation_0_trivial");
     return true;
   }
-
-  static const char *TAG = "rotator";  // Needed for ESP_LOGD inside macro if not globally defined here
 
   // 90 degrees
   if (std::abs(rot - 90.0f) < 0.1f) {
@@ -133,7 +148,6 @@ inline bool Rotator::perform_rotation(const uint8_t *input, uint8_t *output, int
         }
       }
     }
-    DURATION_END("perform_rotation_90");
     return true;
   }
 
@@ -156,7 +170,6 @@ inline bool Rotator::perform_rotation(const uint8_t *input, uint8_t *output, int
         }
       }
     }
-    DURATION_END("perform_rotation_180");
     return true;
   }
 
@@ -179,7 +192,6 @@ inline bool Rotator::perform_rotation(const uint8_t *input, uint8_t *output, int
         }
       }
     }
-    DURATION_END("perform_rotation_270");
     return true;
   }
 
@@ -221,7 +233,6 @@ inline bool Rotator::perform_rotation(const uint8_t *input, uint8_t *output, int
       }
     }
   }
-  DURATION_END("perform_rotation_arbitrary");
   return true;
 }
 
