@@ -70,16 +70,13 @@ void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, in
   size_t jpeg_len = 0;
 
   if (pix_fmt == PIXFORMAT_JPEG) {
-    // Already JPEG, just cast (copy might be needed if upload logic modifies it, but here we likely just send)
-    jpeg_buf = const_cast<uint8_t *>(frame->get_data_buffer());
-    jpeg_len = frame->get_data_length();
-
-    // We don't own this buffer, so we shouldn't free it unless we copied it.
-    this->upload_image(jpeg_buf, jpeg_len, raw_value, confidence, metadata.c_str());
+    // Already JPEG — pass const pointer to upload_image which copies internally
+    // Avoids const_cast on the shared CameraImage buffer which other consumers may read.
+    this->upload_image(frame->get_data_buffer(), frame->get_data_length(), raw_value, confidence, metadata.c_str());
     return;
   }
 
-  // Convert to JPEG
+  // Convert to JPEG — fmt2jpg allocates a new buffer, does not modify input
   bool converted = fmt2jpg(const_cast<uint8_t *>(frame->get_data_buffer()), frame->get_data_length(), width, height,
                            pix_fmt, 90, &jpeg_buf, &jpeg_len);
 
@@ -101,6 +98,14 @@ bool DataCollector::upload_image(const uint8_t *data, size_t len, const std::str
     ESP_LOGE(TAG, "Upload queue not initialized");
     return false;
   }
+
+  // Rate limiting: max 1 upload per 60 seconds (§3.4)
+  uint32_t now = millis();
+  if (now - this->last_upload_time_ < MIN_UPLOAD_INTERVAL_MS) {
+    ESP_LOGD(TAG, "Rate limited: %u ms since last upload (min %u ms)", now - this->last_upload_time_, MIN_UPLOAD_INTERVAL_MS);
+    return false;
+  }
+  this->last_upload_time_ = now;
 
   // Allocate copy for the queue (Prefer PSRAM for large image buffers)
   uint8_t *copy = static_cast<uint8_t *>(heap_caps_malloc(len, MALLOC_CAP_SPIRAM));
@@ -128,7 +133,7 @@ bool DataCollector::upload_image(const uint8_t *data, size_t len, const std::str
   // Handle Metadata
   if (metadata && strlen(metadata) > 0) {
     job.metadata_len = strlen(metadata) + 1;
-    job.metadata = (char *) heap_caps_malloc(job.metadata_len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    job.metadata = static_cast<char *>(heap_caps_malloc(job.metadata_len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
     if (job.metadata) {
       strncpy(job.metadata, metadata, job.metadata_len);
     } else {
@@ -233,7 +238,7 @@ bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, const s
   esp_http_client_config_t config = {};
   config.url = this->upload_url_.c_str();
   config.method = HTTP_METHOD_POST;
-  config.timeout_ms = 10000;
+  config.timeout_ms = 5000;  // §3.4: default timeout must be 5s
 
   if (!this->username_.empty()) {
     config.username = this->username_.c_str();
@@ -272,7 +277,7 @@ bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, const s
     esp_http_client_set_header(client, "X-Meter-Json", metadata);
   }
 
-  esp_http_client_set_post_field(client, (const char *) data, len);
+  esp_http_client_set_post_field(client, reinterpret_cast<const char *>(data), len);
 
   esp_err_t err = esp_http_client_perform(client);
   bool success = false;

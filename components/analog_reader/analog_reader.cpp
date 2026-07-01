@@ -128,8 +128,23 @@ void AnalogReader::setup() {
       }
     }
 
-    size_t rgb_size = this->img_width_ * this->img_height_ * 3;
-    size_t gray_size = this->img_width_ * this->img_height_ * 1;
+    // Guarded multiplication per §8.1 (CVE-2026-23833 pattern)
+    size_t rgb_size = 0;
+    size_t gray_size = 0;
+    {
+      if (this->img_width_ > 0 && this->img_height_ > 0 &&
+          static_cast<uint64_t>(this->img_height_) <= SIZE_MAX / static_cast<size_t>(this->img_width_)) {
+        const size_t pixels = static_cast<size_t>(this->img_width_) * static_cast<size_t>(this->img_height_);
+        if (pixels <= SIZE_MAX / 3u)
+          rgb_size = pixels * 3u;
+        if (pixels <= SIZE_MAX / 1u)
+          gray_size = pixels * 1u;
+      }
+      if (rgb_size == 0 && this->img_width_ > 0 && this->img_height_ > 0) {
+        // Fallback: report error but don't crash
+        ESP_LOGE(TAG, "Overflow computing buffer size for %dx%d", this->img_width_, this->img_height_);
+      }
+    }
     bool sufficient_psram_for_rgb = free_psram > (rgb_size + 1536 * 1024);
 
     if (this->requires_color_ || sufficient_psram_for_rgb) {
@@ -302,7 +317,16 @@ static void apply_contrast(uint8_t *data, int size, float contrast) {
 class DecodedImage : public esphome::camera::CameraImage {
  public:
   DecodedImage(esphome::esp32_camera_utils::ImageProcessor::JpegBufferPtr &&data, size_t width, size_t height)
-      : data_(std::move(data)), width_(width), height_(height), size_(width * height * 3) {}
+      : data_(std::move(data)), width_(width), height_(height) {
+    // Guarded multiplication per §8.1
+    if (width > 0 && height > 0 &&
+        static_cast<uint64_t>(height) <= SIZE_MAX / static_cast<size_t>(width) &&
+        (static_cast<size_t>(width) * static_cast<size_t>(height)) <= SIZE_MAX / 3u) {
+      this->size_ = static_cast<size_t>(width) * static_cast<size_t>(height) * 3u;
+    } else {
+      this->size_ = 0;
+    }
+  }
 
   uint8_t *get_data_buffer() override { return this->data_.get(); }
   size_t get_data_length() override { return this->size_; }

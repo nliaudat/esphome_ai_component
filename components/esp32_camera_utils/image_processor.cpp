@@ -284,7 +284,7 @@ ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t *data, s
       }
   } else if (output_format == JPEG_PIXEL_FORMAT_RGB565_LE || output_format == JPEG_PIXEL_FORMAT_RGB565_BE) {
       // Fix for RGB565 as well
-      uint16_t* pixels = (uint16_t*)out_buf.get();
+      auto* pixels = reinterpret_cast<uint16_t*>(out_buf.get());
       size_t count = out_size / 2;
       for (size_t i = 0; i < count; i++) {
            uint16_t p = pixels[i];
