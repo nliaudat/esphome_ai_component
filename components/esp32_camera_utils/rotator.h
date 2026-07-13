@@ -106,6 +106,24 @@ inline bool Rotator::perform_rotation(const uint8_t *input, uint8_t *output, int
   if (out_w > INT_MAX / out_h || (out_w * out_h) > INT_MAX / channels)
     return false;
 
+  // Validate that output dimensions are compatible with the rotation angle
+  // to prevent out-of-bounds writes in fast paths (heap overflow prevention)
+  if (std::isfinite(angle_deg)) {
+    float norm_rot = angle_deg;
+    while (norm_rot < 0.0f)
+      norm_rot += 360.0f;
+    while (norm_rot >= 360.0f)
+      norm_rot -= 360.0f;
+
+    if (std::abs(norm_rot - 90.0f) < 0.1f || std::abs(norm_rot - 270.0f) < 0.1f) {
+      if (out_w < src_h || out_h < src_w)
+        return false;
+    } else if (std::abs(norm_rot - 180.0f) < 0.1f || norm_rot < 0.1f || norm_rot > 359.9f) {
+      if (out_w < src_w || out_h < src_h)
+        return false;
+    }
+  }
+
   // RAII timer records start time and logs duration on scope exit
   ScopedTimer timer("perform_rotation");
 

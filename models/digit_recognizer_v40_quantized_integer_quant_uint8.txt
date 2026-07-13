@@ -3,7 +3,7 @@
 TFLITE MODEL COMPREHENSIVE INSPECTION REPORT
 ================================================================================
 Model: C:\Users\nl\Dropbox\home_automation\esphome_ai_component\models\digit_recognizer_v40_quantized_integer_quant_uint8.tflite
-Timestamp: 2026-07-12 17:44:55
+Timestamp: 2026-07-13 17:12:29
 TensorFlow Version: 2.20.0
 File Size: 50.38 KB
 
