@@ -109,11 +109,9 @@ inline bool Rotator::perform_rotation(const uint8_t *input, uint8_t *output, int
   // Validate that output dimensions are compatible with the rotation angle
   // to prevent out-of-bounds writes in fast paths (heap overflow prevention)
   if (std::isfinite(angle_deg)) {
-    float norm_rot = angle_deg;
-    while (norm_rot < 0.0f)
+    float norm_rot = std::fmod(angle_deg, 360.0f);
+    if (norm_rot < 0.0f)
       norm_rot += 360.0f;
-    while (norm_rot >= 360.0f)
-      norm_rot -= 360.0f;
 
     if (std::abs(norm_rot - 90.0f) < 0.1f || std::abs(norm_rot - 270.0f) < 0.1f) {
       if (out_w < src_h || out_h < src_w)
@@ -133,11 +131,9 @@ inline bool Rotator::perform_rotation(const uint8_t *input, uint8_t *output, int
   }
 
   // Normalize rotation
-  float rot = angle_deg;
-  while (rot < 0)
+  float rot = std::fmod(angle_deg, 360.0f);
+  if (rot < 0)
     rot += 360.0f;
-  while (rot >= 360.0f)
-    rot -= 360.0f;
 
   // 0 degrees (Copy)
   if (rot < 0.1f || rot > 359.9f) {

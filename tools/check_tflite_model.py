@@ -784,7 +784,7 @@ def inspect_tflite_model(
         safe_print(report)
 
         if output_file:
-            report_clean = "\n".join(line.rstrip() for line in report.split("\n"))
+            report_clean = "\n".join(line.rstrip() for line in report.split("\n")).rstrip("\n") + "\n"
             with open(output_file, "w") as f:
                 f.write(report_clean)
             safe_print(f"\n[SAVE] Comprehensive report saved to: {output_file}")
