@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <climits>
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
 
