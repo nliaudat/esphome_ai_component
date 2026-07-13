@@ -7,7 +7,7 @@
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
 
-// RAII timer replaces DURATION_START/END macros (§7.4).
+// RAII timer replaces DURATION_START/END macros (section 7.4).
 // Zero-cost when DEBUG_DURATION is not defined.
 #ifdef DEBUG_DURATION
 namespace esphome {
@@ -28,7 +28,7 @@ namespace esphome {
 namespace esp32_camera_utils {
 class ScopedTimer {
  public:
-  explicit ScopedTimer(const char *) {}  // true no-op — no millis() call
+  explicit ScopedTimer(const char *) {}  // true no-op -- no millis() call
   uint32_t start_time() const { return 0; }
 };
 }  // namespace esp32_camera_utils
@@ -95,9 +95,10 @@ inline bool Rotator::perform_rotation(const uint8_t *input, uint8_t *output, int
   if (!input || !output)
     return false;
 
-  // Guard against invalid dimensions and int overflow in rotation index arithmetic (§8.1 B1)
+  // Guard against invalid dimensions and int overflow in rotation index arithmetic (section 8.1 B1)
   if (src_w <= 0 || src_h <= 0 || channels <= 0 || out_w <= 0 || out_h <= 0 ||
-      static_cast<int64_t>(src_w) * src_h * channels > INT_MAX)
+      static_cast<int64_t>(src_w) * src_h * channels > INT_MAX ||
+      static_cast<int64_t>(out_w) * out_h * channels > INT_MAX)
     return false;
 
   // RAII timer records start time and logs duration on scope exit
@@ -117,7 +118,7 @@ inline bool Rotator::perform_rotation(const uint8_t *input, uint8_t *output, int
 
   // 0 degrees (Copy)
   if (rot < 0.1f || rot > 359.9f) {
-    // Guarded multiplication per §8.1 (CVE-2026-23833 pattern)
+    // Guarded multiplication per section 8.1 (CVE-2026-23833 pattern)
     if (static_cast<uint64_t>(src_h) > SIZE_MAX / static_cast<size_t>(src_w))
       return false;
     const size_t pixels = static_cast<size_t>(src_w) * static_cast<size_t>(src_h);
