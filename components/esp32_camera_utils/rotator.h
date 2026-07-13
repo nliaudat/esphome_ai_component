@@ -96,9 +96,13 @@ inline bool Rotator::perform_rotation(const uint8_t *input, uint8_t *output, int
     return false;
 
   // Guard against invalid dimensions and int overflow in rotation index arithmetic (section 8.1 B1)
-  if (src_w <= 0 || src_h <= 0 || channels <= 0 || out_w <= 0 || out_h <= 0 ||
-      static_cast<int64_t>(src_w) * src_h * channels > INT_MAX ||
-      static_cast<int64_t>(out_w) * out_h * channels > INT_MAX)
+  if (src_w <= 0 || src_h <= 0 || channels <= 0 || out_w <= 0 || out_h <= 0)
+    return false;
+
+  if (src_w > INT_MAX / src_h || (src_w * src_h) > INT_MAX / channels)
+    return false;
+
+  if (out_w > INT_MAX / out_h || (out_w * out_h) > INT_MAX / channels)
     return false;
 
   // RAII timer records start time and logs duration on scope exit
