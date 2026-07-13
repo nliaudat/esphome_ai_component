@@ -1,10 +1,11 @@
+
 ================================================================================
 TFLITE MODEL COMPREHENSIVE INSPECTION REPORT
 ================================================================================
 Model: C:\Users\nl\Dropbox\home_automation\esphome_ai_component\models\digit_recognizer_v23_quantized_integer_quant_uint8.tflite
-Timestamp: 2026-06-27 11:59:48
+Timestamp: 2026-07-13 17:21:25
 TensorFlow Version: 2.20.0
-File Size: 61.76 KB
+File Size: 61.66 KB
 
 ================================================================================
 MODEL SUMMARY: TFLite Model
@@ -46,19 +47,19 @@ tfl.pseudo_qconst5             [56  3  3 48]        <class 'numpy.int8'> 24,192 
                                [  1   8   5 432]    <class 'numpy.int8'> 17,280       16.88
 tfl.pseudo_qconst7             [48  3  3 36]        <class 'numpy.int8'> 15,552       15.19
                                [  1   8   5 324]    <class 'numpy.int8'> 12,960       12.66
-model_94/tf.nn.relu6_324/Rel   [ 1 32 20 20]        <class 'numpy.int8'> 12,800       12.50
+model_4/tf.nn.relu6/Relu6;mo   [ 1 32 20 20]        <class 'numpy.int8'> 12,800       12.50
 tfl.pseudo_qconst9             [36  3  3 20]        <class 'numpy.int8'> 6,480        6.33
-model_94/tf.nn.relu6_325/Rel   [ 1 16 10 36]        <class 'numpy.int8'> 5,760        5.62
+model_4/tf.nn.relu6_1/Relu6;   [ 1 16 10 36]        <class 'numpy.int8'> 5,760        5.62
                                [ 1 32 20  9]        <class 'numpy.int8'> 5,760        5.62
 tfl.pseudo_qconst3             [64 56]              <class 'numpy.int8'> 3,584        3.50
-model_94/tf.nn.max_pool2d_18   [ 1 16 10 20]        <class 'numpy.int8'> 3,200        3.12
-model_94/tf.nn.relu6_327/Rel   [ 1  8  5 56]        <class 'numpy.int8'> 2,240        2.19
+model_4/tf.nn.max_pool2d/Max   [ 1 16 10 20]        <class 'numpy.int8'> 3,200        3.12
+model_4/tf.nn.relu6_3/Relu6;   [ 1  8  5 56]        <class 'numpy.int8'> 2,240        2.19
 serving_default_input:0        [ 1 32 20  3]        <class 'numpy.uint8'> 1,920        1.88
 tfl.quantize                   [ 1 32 20  3]        <class 'numpy.int8'> 1,920        1.88
-model_94/tf.nn.relu6_326/Rel   [ 1  8  5 48]        <class 'numpy.int8'> 1,920        1.88
-model_94/tf.nn.max_pool2d_19   [ 1  8  5 36]        <class 'numpy.int8'> 1,440        1.41
+model_4/tf.nn.relu6_2/Relu6;   [ 1  8  5 48]        <class 'numpy.int8'> 1,920        1.88
+model_4/tf.nn.max_pool2d_1/M   [ 1  8  5 36]        <class 'numpy.int8'> 1,440        1.41
 tfl.pseudo_qconst1             [10 64]              <class 'numpy.int8'> 640          0.62
-model_94/tf.nn.convolution_3   [ 1 32 20  1]        <class 'numpy.int8'> 640          0.62
+model_4/tf.nn.convolution/co   [ 1 32 20  1]        <class 'numpy.int8'> 640          0.62
 tfl.pseudo_qconst2             [64]                 <class 'numpy.int32'> 64           0.25
 tfl.pseudo_qconst4             [56]                 <class 'numpy.int32'> 56           0.22
 --------------------------------------------------------------------------------
@@ -82,9 +83,9 @@ Top tensors by memory:
   [ 34]    16.88 KB  [  1   8   5 432]         <class 'numpy.int8'>
   [ 10]    15.19 KB  [48  3  3 36]             <class 'numpy.int8'> tfl.pseudo_qconst7
   [ 33]    12.66 KB  [  1   8   5 324]         <class 'numpy.int8'>
-  [ 19]    12.50 KB  [ 1 32 20 20]             <class 'numpy.int8'> model_94/tf.nn.relu6_324/Relu6;model_94/tf.math.ad
+  [ 19]    12.50 KB  [ 1 32 20 20]             <class 'numpy.int8'> model_4/tf.nn.relu6/Relu6;model_4/tf.math.add/Add;
   [ 12]     6.33 KB  [36  3  3 20]             <class 'numpy.int8'> tfl.pseudo_qconst9
-  [ 21]     5.62 KB  [ 1 16 10 36]             <class 'numpy.int8'> model_94/tf.nn.relu6_325/Relu6;model_94/tf.math.ad
+  [ 21]     5.62 KB  [ 1 16 10 36]             <class 'numpy.int8'> model_4/tf.nn.relu6_1/Relu6;model_4/tf.math.add_1/
   [ 31]     5.62 KB  [ 1 32 20  9]             <class 'numpy.int8'>
   [  6]     3.50 KB  [64 56]                   <class 'numpy.int8'> tfl.pseudo_qconst3
 

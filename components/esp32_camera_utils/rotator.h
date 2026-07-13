@@ -4,10 +4,11 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <climits>
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
 
-// RAII timer replaces DURATION_START/END macros (ง7.4).
+// RAII timer replaces DURATION_START/END macros (section 7.4).
 // Zero-cost when DEBUG_DURATION is not defined.
 #ifdef DEBUG_DURATION
 namespace esphome {
@@ -28,7 +29,7 @@ namespace esphome {
 namespace esp32_camera_utils {
 class ScopedTimer {
  public:
-  explicit ScopedTimer(const char *) {}  // true no-op — no millis() call
+  explicit ScopedTimer(const char *) {}  // true no-op -- no millis() call
   uint32_t start_time() const { return 0; }
 };
 }  // namespace esp32_camera_utils
@@ -95,9 +96,31 @@ inline bool Rotator::perform_rotation(const uint8_t *input, uint8_t *output, int
   if (!input || !output)
     return false;
 
-  // Guard against int overflow in rotation index arithmetic (§8.1 B1)
-  if (static_cast<int64_t>(src_w) * src_h * channels > INT_MAX)
+  // Guard against invalid dimensions and int overflow in rotation index arithmetic (section 8.1 B1)
+  if (src_w <= 0 || src_h <= 0 || channels <= 0 || out_w <= 0 || out_h <= 0)
     return false;
+
+  if (src_w > INT_MAX / src_h || (src_w * src_h) > INT_MAX / channels)
+    return false;
+
+  if (out_w > INT_MAX / out_h || (out_w * out_h) > INT_MAX / channels)
+    return false;
+
+  // Validate that output dimensions are compatible with the rotation angle
+  // to prevent out-of-bounds writes in fast paths (heap overflow prevention)
+  if (std::isfinite(angle_deg)) {
+    float norm_rot = std::fmod(angle_deg, 360.0f);
+    if (norm_rot < 0.0f)
+      norm_rot += 360.0f;
+
+    if (std::abs(norm_rot - 90.0f) < 0.1f || std::abs(norm_rot - 270.0f) < 0.1f) {
+      if (out_w < src_h || out_h < src_w)
+        return false;
+    } else if (std::abs(norm_rot - 180.0f) < 0.1f || norm_rot < 0.1f || norm_rot > 359.9f) {
+      if (out_w < src_w || out_h < src_h)
+        return false;
+    }
+  }
 
   // RAII timer records start time and logs duration on scope exit
   ScopedTimer timer("perform_rotation");
@@ -108,17 +131,13 @@ inline bool Rotator::perform_rotation(const uint8_t *input, uint8_t *output, int
   }
 
   // Normalize rotation
-  float rot = angle_deg;
-  while (rot < 0)
+  float rot = std::fmod(angle_deg, 360.0f);
+  if (rot < 0)
     rot += 360.0f;
-  while (rot >= 360.0f)
-    rot -= 360.0f;
 
   // 0 degrees (Copy)
   if (rot < 0.1f || rot > 359.9f) {
-    // Guarded multiplication per ยง8.1 (CVE-2026-23833 pattern)
-    if (src_w <= 0 || src_h <= 0 || channels <= 0)
-      return false;
+    // Guarded multiplication per section 8.1 (CVE-2026-23833 pattern)
     if (static_cast<uint64_t>(src_h) > SIZE_MAX / static_cast<size_t>(src_w))
       return false;
     const size_t pixels = static_cast<size_t>(src_w) * static_cast<size_t>(src_h);
