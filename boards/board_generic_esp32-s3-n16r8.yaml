@@ -50,6 +50,7 @@ substitutions:
 
 esp32:
   board: ${board}
+  toolchain: platformio
   # variant: esp32s3
   cpu_frequency: 240MHZ
   flash_size: 8MB
