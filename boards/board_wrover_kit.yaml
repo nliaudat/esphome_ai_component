@@ -47,6 +47,7 @@ substitutions:
 
 esp32:
   board: ${board}
+  toolchain: platformio
   flash_size: 4MB
   framework:
     type: ${framework}
