@@ -81,6 +81,11 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
   // Config Setters (Delegated)
   void set_confidence_threshold(float threshold) { this->confidence_threshold_ = threshold; }
+
+  // New mode: set a reference to an externally-managed TFLiteMicroHelper
+  void set_tflite(tflite_micro_helper::TFLiteMicroHelper *tflite) { this->tflite_coord_.set_tflite(tflite); }
+
+  // Legacy mode: set model data directly
   void set_tensor_arena_size(size_t size_bytes);        // -> TFLite
   void set_model(const uint8_t *model, size_t length);  // -> TFLite
 
