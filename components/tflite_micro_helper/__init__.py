@@ -381,15 +381,10 @@ async def _configure_image_model(entry, var, model_path, model_data):
             print(f"    {k}: {v}")
     yaml_overrides = {}
     for yaml_key, auto_key in [
-        (CONF_INPUT_TYPE, "input_type"),
-        (CONF_INPUT_CHANNELS, "input_channels"),
-        (CONF_INPUT_WIDTH, "input_width"),
-        (CONF_INPUT_HEIGHT, "input_height"),
-        (CONF_OUTPUT_PROCESSING, "output_processing"),
-        (CONF_SCALE_FACTOR, "scale_factor"),
-        (CONF_INPUT_ORDER, "input_order"),
-        (CONF_NORMALIZE, "normalize"),
-        (CONF_INVERT, "invert"),
+        (CONF_INPUT_TYPE, "input_type"), (CONF_INPUT_CHANNELS, "input_channels"),
+        (CONF_INPUT_WIDTH, "input_width"), (CONF_INPUT_HEIGHT, "input_height"),
+        (CONF_OUTPUT_PROCESSING, "output_processing"), (CONF_SCALE_FACTOR, "scale_factor"),
+        (CONF_INPUT_ORDER, "input_order"), (CONF_NORMALIZE, "normalize"), (CONF_INVERT, "invert"),
     ]:
         if yaml_key in entry:
             yaml_overrides[auto_key] = entry[yaml_key]
@@ -412,12 +407,7 @@ async def _configure_image_model(entry, var, model_path, model_data):
 
 async def _configure_audio_model(entry, var, model_path, model_data):
     cg.add_define("USE_TFLITE_STREAMING")
-    model_filename = os.path.basename(str(model_path).replace("\\", "/"))
     auto_config = _parse_audio_config(model_path) or {}
-    if auto_config:
-        print(f"  Auto-detected audio config from '{model_filename}.txt':")
-        for k, v in auto_config.items():
-            print(f"    {k}: {v}")
     if CONF_TENSOR_ARENA_SIZE in entry:
         cg.add(var.set_tensor_arena_size(entry[CONF_TENSOR_ARENA_SIZE]))
     elif "tensor_arena_size" in auto_config:
@@ -454,9 +444,6 @@ def _parse_audio_config(model_path):
     arena_match = re.search(r"Recommended tensor_arena_size:\s+(\d+)KB", content)
     if arena_match:
         config["tensor_arena_size"] = int(arena_match.group(1)) * 1024
-    ops_match = re.search(r"Total operations:\s+(\d+)", content)
-    if ops_match:
-        config["max_operators"] = int(ops_match.group(1)) + 5
     prob_match = re.search(r"probability_cutoff:\s*([\d.]+)", content)
     if prob_match:
         config["probability_cutoff"] = float(prob_match.group(1))
