@@ -237,65 +237,57 @@ struct AudioModelConfig {
 };
 ```
 
-### New `StreamingModel` Class (inspired by `micro_wake_word/streaming_model`)
+### `ModelHandler` — Optional MRV Parameter (No Separate StreamingModel Class)
+
+**Decision: Avoid creating a separate `StreamingModel` class entirely.**
+Instead, add an optional `MicroResourceVariables*` parameter to `ModelHandler::load_model_with_arena()`. This avoids duplicating all the load/unload/resolver/interpreter logic.
 
 ```cpp
-// streaming_model.h (NEW FILE)
+// model_handler.h — one new parameter (default nullptr = existing behavior)
+bool load_model_with_arena(
+    const uint8_t *model_data, size_t model_size,
+    uint8_t *tensor_arena, size_t tensor_arena_size,
+    const ModelConfig &config,
+    tflite::MicroResourceVariables *mrv = nullptr);
+```
 
-class StreamingModel {
- public:
-  // Lifecycle
-  bool load_model(const uint8_t *model_data, size_t model_size,
-                  const AudioModelConfig &config,
-                  tflite::MicroMutableOpResolver<MAX_OPERATORS> &op_resolver);
-  void unload_model();
-  
-  // Streaming inference (stateful)
-  // Returns true if a new probability was generated (stride completed)
-  bool perform_streaming_inference(const int8_t *features);
-  
-  // Detection
-  DetectionEvent determine_detected();
-  void reset_probabilities();
-  
-  bool is_loaded() const;
-  bool is_enabled() const;
-  void enable();
-  void disable();
-  
-  // Access
-  uint8_t get_probability_cutoff() const;
-  void set_probability_cutoff(uint8_t cutoff);
-  bool get_unprocessed_probability_status() const;
+When `mrv` is non-null (audio/streaming mode):
+- Interpreter is constructed with 5-arg `MicroInterpreter(model, resolver, arena, size, mrv)` 
+- `MicroResourceVariables` enables persistent state via `ReadVariable`/`AssignVariable` ops
+- The variable arena (1024 bytes) and `MicroResourceVariables` are managed by the **consumer component** (e.g., a future wake-word component), not by a `StreamingModel` wrapper
 
- private:
-  bool load_model_();
-  size_t probe_arena_size_();
+When `mrv` is null (default, existing image models):
+- Interpreter constructed with 4-arg `MicroInterpreter(model, resolver, arena, size)` — no change in behavior
+
+**Strided input + sliding window logic** — these are the only truly streaming-specific features. They live in the **consumer component** that owns the `TFLiteMicroHelper` instance:
+
+```cpp
+// Consumer component (e.g., wake_word_detector) — NOT in tflite_micro_helper
+class WakeWordDetector : public Component {
+  TFLiteMicroHelper tflite_;
+  AudioModelConfig audio_config_;
   
-  // Streaming infrastructure
-  uint8_t *tensor_arena_{nullptr};
-  uint8_t *var_arena_{nullptr};
-  size_t tensor_arena_size_{0};
-  static const uint32_t STREAMING_VARIABLE_ARENA_SIZE = 1024;
+  // Streaming state
+  uint8_t var_arena_[1024];
+  MicroResourceVariables *mrv_;
+  uint8_t current_stride_step_;
+  std::vector<uint8_t> sliding_window_probs_;
   
-  std::unique_ptr<tflite::MicroInterpreter> interpreter_;
-  tflite::MicroAllocator *ma_{nullptr};
-  tflite::MicroResourceVariables *mrv_{nullptr};
-  
-  const uint8_t *model_start_{nullptr};
-  bool loaded_{false};
-  bool enabled_{true};
-  
-  // Sliding window probability tracking
-  size_t sliding_window_size_{10};
-  uint8_t default_probability_cutoff_{128};
-  uint8_t probability_cutoff_{128};
-  size_t last_n_index_{0};
-  std::vector<uint8_t> recent_probabilities_;
-  bool unprocessed_probability_status_{false};
-  uint8_t current_stride_step_{0};
+  bool feed_feature(const int8_t *features) {
+    // 1. Strided memmove into input tensor
+    // 2. Conditional Invoke when stride full
+    // 3. Store output in sliding window
+    // 4. Check average vs cutoff
+  }
 };
 ```
+
+**Benefits:**
+- Zero duplication of ModelHandler's load/unload/resolver code
+- No new .h/.cpp files needed in `tflite_micro_helper`
+- The `use_tflite_streaming` build flag is still available for consumer components
+- Consumer components own their own variable arena + MRV lifecycle
+- Existing image models completely unaffected (nullptr default) 
 
 ### `TFLiteMicroHelper` API (Mode-Aware)
 
