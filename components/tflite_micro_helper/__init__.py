@@ -257,7 +257,8 @@ PER_MODEL_SCHEMA = cv.Schema({
     cv.Optional(CONF_DEBUG, default=False): cv.boolean,
 })
 
-CONFIG_SCHEMA = cv.Schema({cv.Optional(DOMAIN): cv.ensure_list(PER_MODEL_SCHEMA)})
+MULTI_CONF = True
+CONFIG_SCHEMA = PER_MODEL_SCHEMA
 
 DEPENDENCIES = ["esp32"] if CORE.target_platform == "esp32" else []
 
@@ -320,51 +321,41 @@ def _load_http_file(config):
 
 
 async def to_code(config):
-    entries = config.get(DOMAIN, [])
-    if not entries:
-        return
-    if CORE.target_platform != "esp32":
-        return
-    global_max_ops = 0
-    for entry in entries:
-        model_type = entry[CONF_MODEL_TYPE]
-        model_path, model_data = resolve_model_source(entry)
-        cg.add_define("USE_TFLITE_MICRO_HELPER")
-        var = cg.new_Pvariable(entry[CONF_ID])
-        rhs = [HexInt(x) for x in model_data]
-        prog_arr = cg.progmem_array(entry[CONF_RAW_DATA_ID], rhs)
-        cg.add(var.set_model(prog_arr, len(model_data)))
-        crc32_val = zlib.crc32(model_data) & 0xFFFFFFFF
-        cg.add_define("MODEL_CRC32", HexInt(crc32_val))
-        cg.add(var.set_model_type(model_type))
-        cg.add_build_flag("-DTF_LITE_STATIC_MEMORY")
-        cg.add_build_flag("-DTF_LITE_DISABLE_X86_NEON")
-        cg.add_build_flag("-DESP_NN")
-        cg.add_build_flag("-DOPTIMIZED_KERNEL=esp_nn")
-        if entry.get(CONF_DEBUG, False):
-            cg.add_define("DEBUG_TFLITE_MICRO_HELPER")
-            cg.add(var.set_debug(True))
-        if model_type == "image":
-            await _configure_image_model(entry, var, model_path, model_data)
-        elif model_type == "audio":
-            await _configure_audio_model(entry, var, model_path, model_data)
-        txt_path = os.path.splitext(model_path)[0] + ".txt"
-        if os.path.exists(txt_path):
-            with open(txt_path) as f:
-                txt_content = f.read()
-            ops_match = re.search(r"Total operations:\s+(\d+)", txt_content)
-            if ops_match:
-                model_ops = int(ops_match.group(1)) + 5
-                global_max_ops = max(global_max_ops, model_ops)
-    if global_max_ops == 0:
-        global_max_ops = 30
-    cg.add_build_flag(f"-DMAX_OPERATORS={global_max_ops}")
+    model_type = config[CONF_MODEL_TYPE]
+    model_path, model_data = resolve_model_source(config)
+    cg.add_define("USE_TFLITE_MICRO_HELPER")
+    var = cg.new_Pvariable(config[CONF_ID])
+    rhs = [HexInt(x) for x in model_data]
+    prog_arr = cg.progmem_array(config[CONF_RAW_DATA_ID], rhs)
+    cg.add(var.set_model(prog_arr, len(model_data)))
+    crc32_val = zlib.crc32(model_data) & 0xFFFFFFFF
+    cg.add_define("MODEL_CRC32", HexInt(crc32_val))
+    cg.add(var.set_model_type(model_type))
+    cg.add_build_flag("-DTF_LITE_STATIC_MEMORY")
+    cg.add_build_flag("-DTF_LITE_DISABLE_X86_NEON")
+    cg.add_build_flag("-DESP_NN")
+    cg.add_build_flag("-DOPTIMIZED_KERNEL=esp_nn")
+    if config.get(CONF_DEBUG, False):
+        cg.add_define("DEBUG_TFLITE_MICRO_HELPER")
+        cg.add(var.set_debug(True))
+    if model_type == "image":
+        await _configure_image_model(config, var, model_path, model_data)
+    elif model_type == "audio":
+        await _configure_audio_model(config, var, model_path, model_data)
+    txt_path = os.path.splitext(model_path)[0] + ".txt"
+    if os.path.exists(txt_path):
+        with open(txt_path) as f:
+            txt_content = f.read()
+        ops_match = re.search(r"Total operations:\s+(\d+)", txt_content)
+        if ops_match:
+            model_ops = int(ops_match.group(1)) + 5
+            cg.add_build_flag(f"-DMAX_OPERATORS={model_ops}")
+    else:
+        cg.add_build_flag("-DMAX_OPERATORS=30")
     esp32.add_idf_component(name="espressif/esp-tflite-micro", ref="1.3.7")
     esp32.add_idf_component(name="espressif/esp-nn", ref="1.2.3")
-    for entry in entries:
-        if entry[CONF_MODEL_TYPE] == "audio":
-            esp32.add_idf_component(name="esphome/esp-micro-speech-features", ref="1.2.3")
-            break
+    if model_type == "audio":
+        esp32.add_idf_component(name="esphome/esp-micro-speech-features", ref="1.2.3")
 
 
 async def _configure_image_model(entry, var, model_path, model_data):

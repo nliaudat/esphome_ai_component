@@ -27,6 +27,7 @@ except ImportError:
     value_validator = None
 
 from esphome.components import esp32_camera, globals
+from esphome.components.tflite_micro_helper import TFLiteMicroHelper
 from esphome.cpp_generator import RawExpression
 
 try:
@@ -266,7 +267,10 @@ def infer_model_config_from_filename(model_filename):
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(MeterReaderTFLite),
-        cv.Required(CONF_MODEL): cv.file_,
+        cv.Required(CONF_MODEL): cv.Any(
+            cv.use_id(TFLiteMicroHelper),  # New: ID reference to tflite_micro_helper
+            cv.file_,                       # Legacy: direct file path
+        ),
         cv.Optional(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator)
         if value_validator
         else cv.invalid(

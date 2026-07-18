@@ -65,6 +65,8 @@ class TFLiteCoordinator {
   }
   size_t get_model_size_bytes() const { return this->tflite_ ? this->tflite_->get_model_size_bytes() : 0; }
   size_t get_arena_used_bytes() const { return this->tflite_ ? this->tflite_->get_arena_used_bytes() : 0; }
+  size_t get_arena_peak_bytes() const { return this->tflite_ ? this->tflite_->get_arena_stats().used_bytes : 0; }
+  tflite_micro_helper::ModelSpec get_model_spec() const { return this->tflite_ ? this->tflite_->get_model_spec() : tflite_micro_helper::ModelSpec{}; }
   tflite_micro_helper::ArenaStats get_arena_stats() const {
     return this->tflite_ ? this->tflite_->get_arena_stats() : tflite_micro_helper::ArenaStats{};
   }
