@@ -209,7 +209,7 @@ def _process_http_source(config):
     json_path = path / "manifest.json"
     json_contents = external_files.download_content(url, json_path)
     manifest_data = json.loads(json_contents)
-    model_file = manifest_data.get("model", "")
+    model_file = os.path.basename(manifest_data.get("model", ""))
     model_url = url.rsplit("/", 1)[0] + "/" + model_file if "/" in url else model_file
     model_path = path / model_file
     external_files.download_content(str(model_url), model_path)
@@ -312,6 +312,7 @@ def _load_http_file(config):
     model_file = manifest_data.get("model")
     if not model_file:
         raise cv.Invalid(f"Manifest at {url} does not specify a model file")
+    model_file = os.path.basename(model_file)
     model_url = url.rsplit("/", 1)[0] + "/" + model_file
     model_path = path / model_file
     external_files.download_content(str(model_url), model_path)
@@ -328,8 +329,8 @@ async def to_code(config):
     rhs = [HexInt(x) for x in model_data]
     prog_arr = cg.progmem_array(config[CONF_RAW_DATA_ID], rhs)
     cg.add(var.set_model(prog_arr, len(model_data)))
-    crc32_val = zlib.crc32(model_data) & 0xFFFFFFFF
-    cg.add_define("MODEL_CRC32", HexInt(crc32_val))
+    # MULTI_CONF-safe: CRC verification is runtime-only (compute-and-log in model_handler.cpp).
+    # The model data is embedded and fixed at build time, so compile-time CRC was redundant.
     cg.add(var.set_model_type(model_type))
     cg.add_build_flag("-DTF_LITE_STATIC_MEMORY")
     cg.add_build_flag("-DTF_LITE_DISABLE_X86_NEON")

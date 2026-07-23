@@ -55,24 +55,51 @@ class TFLiteCoordinator {
   void set_normalize(bool n);
   void set_invert(bool i);
 
-  // -- Accessors (delegate to TFLiteMicroHelper) ---------------------
-  int get_input_width() const { return this->tflite_ ? this->tflite_->get_input_width() : 0; }
-  int get_input_height() const { return this->tflite_ ? this->tflite_->get_input_height() : 0; }
-  int get_input_channels() const { return this->tflite_ ? this->tflite_->get_input_channels() : 0; }
-  size_t get_tensor_arena_size() const { return this->tflite_ ? this->tflite_->get_tensor_arena_size() : 0; }
-  size_t get_tensor_arena_size_actual() const {
-    return this->tflite_ ? this->tflite_->get_tensor_arena_size_actual() : 0;
+  // -- Accessors (delegate to active TFLiteMicroHelper) --------------
+  int get_input_width() const {
+    const auto *t = this->active_tflite();
+    return t ? t->get_input_width() : 0;
   }
-  size_t get_model_size_bytes() const { return this->tflite_ ? this->tflite_->get_model_size_bytes() : 0; }
-  size_t get_arena_used_bytes() const { return this->tflite_ ? this->tflite_->get_arena_used_bytes() : 0; }
-  size_t get_arena_peak_bytes() const { return this->tflite_ ? this->tflite_->get_arena_stats().used_bytes : 0; }
-  tflite_micro_helper::ModelSpec get_model_spec() const { return this->tflite_ ? this->tflite_->get_model_spec() : tflite_micro_helper::ModelSpec{}; }
+  int get_input_height() const {
+    const auto *t = this->active_tflite();
+    return t ? t->get_input_height() : 0;
+  }
+  int get_input_channels() const {
+    const auto *t = this->active_tflite();
+    return t ? t->get_input_channels() : 0;
+  }
+  size_t get_tensor_arena_size() const {
+    const auto *t = this->active_tflite();
+    return t ? t->get_tensor_arena_size() : 0;
+  }
+  size_t get_tensor_arena_size_actual() const {
+    const auto *t = this->active_tflite();
+    return t ? t->get_tensor_arena_size_actual() : 0;
+  }
+  size_t get_model_size_bytes() const {
+    const auto *t = this->active_tflite();
+    return t ? t->get_model_size_bytes() : 0;
+  }
+  size_t get_arena_used_bytes() const {
+    const auto *t = this->active_tflite();
+    return t ? t->get_arena_used_bytes() : 0;
+  }
+  size_t get_arena_peak_bytes() const {
+    const auto *t = this->active_tflite();
+    return t ? t->get_arena_stats().used_bytes : 0;
+  }
+  tflite_micro_helper::ModelSpec get_model_spec() const {
+    const auto *t = this->active_tflite();
+    return t ? t->get_model_spec() : tflite_micro_helper::ModelSpec{};
+  }
   tflite_micro_helper::ArenaStats get_arena_stats() const {
-    return this->tflite_ ? this->tflite_->get_arena_stats() : tflite_micro_helper::ArenaStats{};
+    const auto *t = this->active_tflite();
+    return t ? t->get_arena_stats() : tflite_micro_helper::ArenaStats{};
   }
   void report_memory_status() {
-    if (this->tflite_)
-      this->tflite_->report_memory_status();
+    auto *t = this->active_tflite();
+    if (t)
+      t->report_memory_status();
   }
 #if defined(DEBUG_TFLITE_MICRO_HELPER) && defined(USE_TFLITE_MICRO_HELPER)
   void debug_test_parameters(const std::vector<std::vector<uint8_t>> &zone_data);
@@ -83,6 +110,11 @@ class TFLiteCoordinator {
   std::vector<InferenceResult> run_inference(std::span<const ProcessResult> processed_zones);
 
  private:
+  /** @brief Return the active helper: tflite_ (external) or legacy_tflite_ (owned). */
+  tflite_micro_helper::TFLiteMicroHelper *active_tflite() const {
+    return this->tflite_ ? this->tflite_ : this->legacy_tflite_.get();
+  }
+
   // Pointer to externally-owned TFLiteMicroHelper (or nullptr for legacy mode)
   tflite_micro_helper::TFLiteMicroHelper *tflite_{nullptr};
 

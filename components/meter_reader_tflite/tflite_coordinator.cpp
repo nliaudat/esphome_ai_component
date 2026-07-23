@@ -90,10 +90,12 @@ bool TFLiteCoordinator::load_model() {
 }
 
 void TFLiteCoordinator::unload_model() {
+  if (this->tflite_) {
+    this->tflite_->unload_model();
+  }
   if (this->legacy_tflite_) {
     this->legacy_tflite_->unload_model();
   }
-  this->tflite_ = nullptr;
 }
 
 bool TFLiteCoordinator::is_model_loaded() const {
