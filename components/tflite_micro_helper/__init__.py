@@ -363,8 +363,8 @@ async def to_code(config):
     rhs = [HexInt(x) for x in model_data]
     prog_arr = cg.progmem_array(config[CONF_RAW_DATA_ID], rhs)
     cg.add(var.set_model(prog_arr, len(model_data)))
-    # MULTI_CONF-safe: CRC verification is runtime-only (compute-and-log in model_handler.cpp).
-    # The model data is embedded and fixed at build time, so compile-time CRC was redundant.
+    crc32_val = zlib.crc32(model_data) & 0xFFFFFFFF
+    cg.add_build_flag(f"-DMODEL_CRC32=0x{crc32_val:08X}")
     cg.add(var.set_model_type(model_type))
     cg.add_build_flag("-DTF_LITE_STATIC_MEMORY")
     cg.add_build_flag("-DTF_LITE_DISABLE_X86_NEON")
