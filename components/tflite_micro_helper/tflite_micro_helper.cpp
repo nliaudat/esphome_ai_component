@@ -125,7 +125,7 @@ bool TFLiteMicroHelper::load_model() {
     return false;
   }
 
-  if (!this->model_handler_.verify_model_crc(this->model_data_, this->model_length_)) {
+  if (!this->model_handler_.verify_model_crc(this->model_data_, this->model_length_, this->expected_crc32_)) {
     ESP_LOGE(TAG, "Model CRC32 verification failed");
     return false;
   }

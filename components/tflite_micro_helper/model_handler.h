@@ -131,7 +131,7 @@ class ModelHandler {
 
   // CRC32 verification
   static uint32_t calculate_crc32(const uint8_t *data, size_t length);
-  bool verify_model_crc(const uint8_t *model_data, size_t length);
+  bool verify_model_crc(const uint8_t *model_data, size_t length, uint32_t expected_crc = 0);
   void debug_model_architecture() const;
   bool validate_model_config() const;
 

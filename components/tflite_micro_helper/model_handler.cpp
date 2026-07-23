@@ -592,20 +592,19 @@ uint32_t ModelHandler::calculate_crc32(const uint8_t *data, size_t length) {
   return ~crc;
 }
 
-bool ModelHandler::verify_model_crc(const uint8_t *model_data, size_t length) {
+bool ModelHandler::verify_model_crc(const uint8_t *model_data, size_t length, uint32_t expected_crc) {
   uint32_t crc = calculate_crc32(model_data, length);
-  ESP_LOGI(TAG, "Model CRC32: 0x%08X", crc);
-#ifdef MODEL_CRC32
-  if (crc != MODEL_CRC32) {
-    ESP_LOGE(TAG, "Model CRC32 mismatch! Expected: 0x%08X, Got: 0x%08X", MODEL_CRC32, crc);
+  ESP_LOGI(TAG, "Computed CRC32: 0x%08X", crc);
+  if (expected_crc == 0) {
+    ESP_LOGW(TAG, "No expected CRC32 provided -- skipping verification");
+    return true;
+  }
+  if (crc != expected_crc) {
+    ESP_LOGE(TAG, "Model CRC32 mismatch! Expected: 0x%08X, Got: 0x%08X", expected_crc, crc);
     return false;
   }
   ESP_LOGI(TAG, "Model CRC32 verification passed");
   return true;
-#else
-  ESP_LOGW(TAG, "MODEL_CRC32 not defined -- skipping verification");
-  return true;
-#endif
 }
 
 void ModelHandler::debug_model_architecture() const {

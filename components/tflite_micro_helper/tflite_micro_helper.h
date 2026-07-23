@@ -77,6 +77,9 @@ class TFLiteMicroHelper {
   void set_features_step_size(uint8_t ms);
   void set_feature_count(size_t n);
 
+  // -- Model Integrity ------------------------------------------------
+  void set_expected_crc32(uint32_t crc) { this->expected_crc32_ = crc; }
+
   // -- Lifecycle ------------------------------------------------------
   bool load_model();
   void unload_model();
@@ -152,6 +155,9 @@ class TFLiteMicroHelper {
 
   // State
   std::atomic<bool> model_loaded_{false};
+
+  // Expected CRC32 (0 = skip verification, set from __init__.py)
+  uint32_t expected_crc32_{0};
 
   // Internals
   bool allocate_tensor_arena_();
