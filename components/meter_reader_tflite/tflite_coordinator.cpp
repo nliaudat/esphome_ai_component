@@ -90,6 +90,7 @@ bool TFLiteCoordinator::load_model() {
 }
 
 void TFLiteCoordinator::unload_model() {
+  std::lock_guard<std::mutex> lock(this->model_mutex_);
   if (this->tflite_) {
     this->tflite_->unload_model();
   }
