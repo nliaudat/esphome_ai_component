@@ -252,7 +252,7 @@ bool load_model_with_arena(
 ```
 
 When `mrv` is non-null (audio/streaming mode):
-- Interpreter is constructed with 5-arg `MicroInterpreter(model, resolver, arena, size, mrv)` 
+- Interpreter is constructed with 5-arg `MicroInterpreter(model, resolver, arena, size, mrv)`
 - `MicroResourceVariables` enables persistent state via `ReadVariable`/`AssignVariable` ops
 - The variable arena (1024 bytes) and `MicroResourceVariables` are managed by the **consumer component** (e.g., a future wake-word component), not by a `StreamingModel` wrapper
 
@@ -266,13 +266,13 @@ When `mrv` is null (default, existing image models):
 class WakeWordDetector : public Component {
   TFLiteMicroHelper tflite_;
   AudioModelConfig audio_config_;
-  
+
   // Streaming state
   uint8_t var_arena_[1024];
   MicroResourceVariables *mrv_;
   uint8_t current_stride_step_;
   std::vector<uint8_t> sliding_window_probs_;
-  
+
   bool feed_feature(const int8_t *features) {
     // 1. Strided memmove into input tensor
     // 2. Conditional Invoke when stride full
@@ -287,7 +287,7 @@ class WakeWordDetector : public Component {
 - No new .h/.cpp files needed in `tflite_micro_helper`
 - The `use_tflite_streaming` build flag is still available for consumer components
 - Consumer components own their own variable arena + MRV lifecycle
-- Existing image models completely unaffected (nullptr default) 
+- Existing image models completely unaffected (nullptr default)
 
 ### `TFLiteMicroHelper` API (Mode-Aware)
 
@@ -301,11 +301,11 @@ class TFLiteMicroHelper {
   void set_output_processing(const std::string &p);
   void set_scale_factor(float f);
   void set_debug(bool d);
-  
+
   bool load_model();
   void unload_model();
   bool is_model_loaded() const;
-  
+
   // === Image mode ===
   void set_input_type(const std::string &t);
   void set_input_channels(int c);
@@ -314,24 +314,24 @@ class TFLiteMicroHelper {
   void set_input_order(const std::string &o);
   void set_normalize(bool n);
   void set_invert(bool i);
-  
+
   bool run_inference_on_buffer(const uint8_t *src, size_t size);
   ProcessedOutput run_inference(const uint8_t *src, size_t size);
   ModelSpec get_model_spec() const;
-  
+
   // === Audio / streaming mode ===
   void set_probability_cutoff(float f);    // 0.0-1.0
   void set_sliding_window_size(size_t n);
   void set_features_step_size(uint8_t ms);
   void set_feature_count(size_t n);
-  
+
 #ifdef USE_TFLITE_STREAMING
   bool perform_streaming_inference(const int8_t *features);
   DetectionEvent determine_detected();
   void reset_probabilities();
   bool get_unprocessed_probability_status() const;
 #endif
-  
+
   // === Memory ===
   size_t get_arena_used_bytes() const;
   size_t get_tensor_arena_size() const;
@@ -340,23 +340,23 @@ class TFLiteMicroHelper {
 
  private:
   std::string model_type_{"image"};
-  
+
   // Common
   const uint8_t *model_data_{nullptr};
   size_t model_length_{0};
   size_t tensor_arena_size_requested_{100 * 1024};
-  
+
   // Image path
   ModelHandler model_handler_;
   ImageModelConfig image_config_;
-  
+
   // Audio path
 #ifdef USE_TFLITE_STREAMING
   std::unique_ptr<StreamingModel> streaming_model_;
   AudioModelConfig audio_config_;
   tflite::MicroMutableOpResolver<MAX_OPERATORS> *shared_resolver_{nullptr};
 #endif
-  
+
   // Memory
   MemoryManager::AllocationResult tensor_arena_allocation_;
   std::atomic<bool> model_loaded_{false};
@@ -431,19 +431,19 @@ async def to_code(config):
     for model_entry in config.get(DOMAIN, []):
         var = cg.new_Pvariable(model_entry[CONF_ID])
         model_type = model_entry[CONF_MODEL_TYPE]
-        
+
         # 1. Resolve model source → get .tflite data + config
         model_data, model_len, model_config = resolve_model(model_entry)
-        
+
         # 2. Create PROGMEM array
         rhs = [HexInt(x) for x in model_data]
         prog_arr = cg.progmem_array(model_entry[CONF_RAW_DATA_ID], rhs)
         cg.add(var.set_model(prog_arr, model_len))
-        
+
         # 3. CRC32
         crc32_val = zlib.crc32(model_data) & 0xFFFFFFFF
         cg.add_define("MODEL_CRC32", HexInt(crc32_val))
-        
+
         # 4. Common IDF components & build flags
         esp32.add_idf_component("espressif/esp-tflite-micro", ref="1.3.7")
         esp32.add_idf_component("espressif/esp-nn", ref="1.2.3")
@@ -451,7 +451,7 @@ async def to_code(config):
         cg.add_build_flag("-DTF_LITE_DISABLE_X86_NEON")
         cg.add_build_flag("-DESP_NN")
         cg.add_build_flag("-DOPTIMIZED_KERNEL=esp_nn")
-        
+
         # 5. Model-type-specific setup
         if model_type == "image":
             cg.add(var.set_model_type("image"))
@@ -460,7 +460,7 @@ async def to_code(config):
             # MAX_OPERATORS
             max_ops = model_config.get("max_operators", 30)
             cg.add_build_flag(f"-DMAX_OPERATORS={max_ops}")
-            
+
         elif model_type == "audio":
             cg.add(var.set_model_type("audio"))
             cg.add_define("USE_TFLITE_STREAMING")
@@ -475,7 +475,7 @@ async def to_code(config):
 def resolve_model(model_entry):
     """Resolves model source → (data, length, config_dict)."""
     model_spec = model_entry[CONF_MODEL]
-    
+
     if isinstance(model_spec, str):
         # Shorthand resolution
         if is_model_name(model_spec):
@@ -489,7 +489,7 @@ def resolve_model(model_entry):
             return resolve_github_shorthand(model_spec)
         else:
             raise cv.Invalid(f"Cannot resolve model source: {model_spec}")
-    
+
     elif isinstance(model_spec, dict):
         source_type = model_spec.get(CONF_TYPE, "local")
         if source_type == "local":
@@ -624,11 +624,11 @@ tflite_micro_helper:
   - id: cold_model
     model_type: image
     model: "models/cold_water_v40.tflite"
-  
+
   - id: hot_model
     model_type: image
     model: "models/hot_water_v40.tflite"
-  
+
   - id: wake_model
     model_type: audio
     model: okay_nabu
@@ -672,12 +672,12 @@ tflite_micro_helper:
 WARNING: Deprecated model configuration in meter_reader_tflite.
   The 'model: "file.tflite"' syntax is deprecated.
   Please move model configuration to the tflite_micro_helper section:
-  
+
   tflite_micro_helper:
     - id: my_model
       model_type: image
       model: "file.tflite"
-  
+
   meter_reader_tflite:
     model: my_model
 ```

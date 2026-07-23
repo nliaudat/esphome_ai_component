@@ -30,4 +30,3 @@ class MemoryManager {
 
 }  // namespace meter_reader_tflite
 }  // namespace esphome
-

@@ -74,6 +74,7 @@ def _compute_local_file_path(url):
     h.update(url.encode())
     key = h.hexdigest()[:8]
     from esphome import external_files
+
     base_dir = external_files.compute_local_file_dir(DOMAIN)
     return base_dir / key
 
@@ -159,8 +160,13 @@ def _validate_source_shorthand(value):
         return MODEL_SOURCE_SCHEMA({CONF_TYPE: TYPE_LOCAL, CONF_PATH: value})
     if value.startswith("github://"):
         from esphome import git
+
         git_file = git.GitFile.from_shorthand(value)
-        conf = {CONF_TYPE: TYPE_GIT, CONF_URL: git_file.git_url, CONF_FILE: git_file.filename}
+        conf = {
+            CONF_TYPE: TYPE_GIT,
+            CONF_URL: git_file.git_url,
+            CONF_FILE: git_file.filename,
+        }
         if git_file.ref:
             conf[CONF_REF] = git_file.ref
         try:
@@ -182,6 +188,7 @@ if isinstance(CV_GIT_SCHEMA, dict):
 
 def _process_git_source(config):
     from esphome import git
+
     repo_dir, _ = git.clone_or_update(
         url=config[CONF_URL],
         ref=config.get(CONF_REF),
@@ -194,10 +201,14 @@ def _process_git_source(config):
 
 
 GIT_SCHEMA = cv.All(
-    CV_GIT_SCHEMA.extend({
-        cv.Required(CONF_FILE): cv.string,
-        cv.Optional(CONF_REFRESH, default="1d"): cv.All(cv.string, cv.source_refresh),
-    }),
+    CV_GIT_SCHEMA.extend(
+        {
+            cv.Required(CONF_FILE): cv.string,
+            cv.Optional(CONF_REFRESH, default="1d"): cv.All(
+                cv.string, cv.source_refresh
+            ),
+        }
+    ),
     _process_git_source,
 )
 
@@ -206,6 +217,7 @@ def _process_http_source(config):
     url = config[CONF_URL]
     path = _compute_local_file_path(url)
     from esphome import external_files
+
     json_path = path / "manifest.json"
     json_contents = external_files.download_content(url, json_path)
     manifest_data = json.loads(json_contents)
@@ -222,40 +234,60 @@ LOCAL_SCHEMA = cv.Schema({cv.Required(CONF_PATH): cv.All(cv.file_, cv.string)})
 
 MODEL_SOURCE_SCHEMA = cv.Any(
     _validate_source_shorthand,
-    cv.typed_schema({
-        TYPE_GIT: GIT_SCHEMA,
-        TYPE_LOCAL: LOCAL_SCHEMA,
-        TYPE_HTTP: HTTP_SCHEMA,
-    }),
+    cv.typed_schema(
+        {
+            TYPE_GIT: GIT_SCHEMA,
+            TYPE_LOCAL: LOCAL_SCHEMA,
+            TYPE_HTTP: HTTP_SCHEMA,
+        }
+    ),
     msg="Not a valid model path, github:// shorthand, or http(s):// URL",
 )
 
-PER_MODEL_SCHEMA = cv.Schema({
-    cv.GenerateID(): cv.declare_id(TFLiteMicroHelper),
-    cv.Required(CONF_MODEL_TYPE): cv.enum({"image": "image", "audio": "audio"}, lower=True),
-    cv.Required(CONF_MODEL): MODEL_SOURCE_SCHEMA,
-    cv.GenerateID(CONF_RAW_DATA_ID): cv.declare_id(cg.uint8),
-    cv.Optional(CONF_TENSOR_ARENA_SIZE): cv.All(datasize_to_bytes, cv.Range(min=8 * 1024, max=2000 * 1024)),
-    cv.Optional(CONF_INPUT_TYPE): cv.enum({"uint8": "uint8", "float32": "float32"}, lower=True),
-    cv.Optional(CONF_INPUT_CHANNELS): cv.int_range(min=1, max=4),
-    cv.Optional(CONF_INPUT_WIDTH): cv.int_range(min=8, max=512),
-    cv.Optional(CONF_INPUT_HEIGHT): cv.int_range(min=8, max=512),
-    cv.Optional(CONF_OUTPUT_PROCESSING): cv.enum({
-        "direct_class": "direct_class", "softmax": "softmax", "argmax": "argmax",
-        "logits": "logits", "qat_quantized": "qat_quantized",
-        "experimental_scale": "experimental_scale", "logits_jomjol": "logits_jomjol",
-        "softmax_jomjol": "softmax_jomjol", "auto_detect": "auto_detect",
-    }, lower=True),
-    cv.Optional(CONF_SCALE_FACTOR): cv.float_range(min=0.1, max=100.0),
-    cv.Optional(CONF_INPUT_ORDER): cv.enum({"RGB": "RGB", "BGR": "BGR", "GRAY": "GRAY"}, upper=True),
-    cv.Optional(CONF_NORMALIZE): cv.boolean,
-    cv.Optional(CONF_INVERT): cv.boolean,
-    cv.Optional(CONF_PROBABILITY_CUTOFF): cv.percentage,
-    cv.Optional(CONF_SLIDING_WINDOW_SIZE): cv.positive_int,
-    cv.Optional(CONF_FEATURES_STEP_SIZE): cv.int_range(min=0, max=30),
-    cv.Optional(CONF_FEATURE_COUNT): cv.int_range(min=10, max=80),
-    cv.Optional(CONF_DEBUG, default=False): cv.boolean,
-})
+PER_MODEL_SCHEMA = cv.Schema(
+    {
+        cv.GenerateID(): cv.declare_id(TFLiteMicroHelper),
+        cv.Required(CONF_MODEL_TYPE): cv.enum(
+            {"image": "image", "audio": "audio"}, lower=True
+        ),
+        cv.Required(CONF_MODEL): MODEL_SOURCE_SCHEMA,
+        cv.GenerateID(CONF_RAW_DATA_ID): cv.declare_id(cg.uint8),
+        cv.Optional(CONF_TENSOR_ARENA_SIZE): cv.All(
+            datasize_to_bytes, cv.Range(min=8 * 1024, max=2000 * 1024)
+        ),
+        cv.Optional(CONF_INPUT_TYPE): cv.enum(
+            {"uint8": "uint8", "float32": "float32"}, lower=True
+        ),
+        cv.Optional(CONF_INPUT_CHANNELS): cv.int_range(min=1, max=4),
+        cv.Optional(CONF_INPUT_WIDTH): cv.int_range(min=8, max=512),
+        cv.Optional(CONF_INPUT_HEIGHT): cv.int_range(min=8, max=512),
+        cv.Optional(CONF_OUTPUT_PROCESSING): cv.enum(
+            {
+                "direct_class": "direct_class",
+                "softmax": "softmax",
+                "argmax": "argmax",
+                "logits": "logits",
+                "qat_quantized": "qat_quantized",
+                "experimental_scale": "experimental_scale",
+                "logits_jomjol": "logits_jomjol",
+                "softmax_jomjol": "softmax_jomjol",
+                "auto_detect": "auto_detect",
+            },
+            lower=True,
+        ),
+        cv.Optional(CONF_SCALE_FACTOR): cv.float_range(min=0.1, max=100.0),
+        cv.Optional(CONF_INPUT_ORDER): cv.enum(
+            {"RGB": "RGB", "BGR": "BGR", "GRAY": "GRAY"}, upper=True
+        ),
+        cv.Optional(CONF_NORMALIZE): cv.boolean,
+        cv.Optional(CONF_INVERT): cv.boolean,
+        cv.Optional(CONF_PROBABILITY_CUTOFF): cv.percentage,
+        cv.Optional(CONF_SLIDING_WINDOW_SIZE): cv.positive_int,
+        cv.Optional(CONF_FEATURES_STEP_SIZE): cv.int_range(min=0, max=30),
+        cv.Optional(CONF_FEATURE_COUNT): cv.int_range(min=10, max=80),
+        cv.Optional(CONF_DEBUG, default=False): cv.boolean,
+    }
+)
 
 MULTI_CONF = True
 CONFIG_SCHEMA = PER_MODEL_SCHEMA
@@ -270,9 +302,9 @@ def resolve_model_source(entry_config):
     source_type = model_spec.get(CONF_TYPE, "local")
     if source_type == "local":
         return _load_local_file(model_spec[CONF_PATH])
-    elif source_type == "git":
+    if source_type == "git":
         return _load_git_file(model_spec)
-    elif source_type == "http":
+    if source_type == "http":
         return _load_http_file(model_spec)
     raise cv.Invalid(f"Unknown model source type: {source_type}")
 
@@ -288,6 +320,7 @@ def _load_local_file(path):
 
 def _load_git_file(config):
     from esphome import git
+
     repo_dir, _ = git.clone_or_update(
         url=config[CONF_URL],
         ref=config.get(CONF_REF),
@@ -304,6 +337,7 @@ def _load_git_file(config):
 
 def _load_http_file(config):
     from esphome import external_files
+
     url = config[CONF_URL]
     path = _compute_local_file_path(url)
     manifest_path = path / "manifest.json"
@@ -368,15 +402,22 @@ async def _configure_image_model(entry, var, model_path, model_data):
             print(f"    {k}: {v}")
     else:
         auto_config = infer_model_config_from_filename(model_filename)
-        print(f"  No .txt file found, using filename heuristics for '{model_filename}':")
+        print(
+            f"  No .txt file found, using filename heuristics for '{model_filename}':"
+        )
         for k, v in auto_config.items():
             print(f"    {k}: {v}")
     yaml_overrides = {}
     for yaml_key, auto_key in [
-        (CONF_INPUT_TYPE, "input_type"), (CONF_INPUT_CHANNELS, "input_channels"),
-        (CONF_INPUT_WIDTH, "input_width"), (CONF_INPUT_HEIGHT, "input_height"),
-        (CONF_OUTPUT_PROCESSING, "output_processing"), (CONF_SCALE_FACTOR, "scale_factor"),
-        (CONF_INPUT_ORDER, "input_order"), (CONF_NORMALIZE, "normalize"), (CONF_INVERT, "invert"),
+        (CONF_INPUT_TYPE, "input_type"),
+        (CONF_INPUT_CHANNELS, "input_channels"),
+        (CONF_INPUT_WIDTH, "input_width"),
+        (CONF_INPUT_HEIGHT, "input_height"),
+        (CONF_OUTPUT_PROCESSING, "output_processing"),
+        (CONF_SCALE_FACTOR, "scale_factor"),
+        (CONF_INPUT_ORDER, "input_order"),
+        (CONF_NORMALIZE, "normalize"),
+        (CONF_INVERT, "invert"),
     ]:
         if yaml_key in entry:
             yaml_overrides[auto_key] = entry[yaml_key]
@@ -386,7 +427,9 @@ async def _configure_image_model(entry, var, model_path, model_data):
     cg.add(var.set_input_channels(auto_config.get("input_channels", 3)))
     cg.add(var.set_input_width(auto_config.get("input_width", 32)))
     cg.add(var.set_input_height(auto_config.get("input_height", 20)))
-    cg.add(var.set_output_processing(auto_config.get("output_processing", "direct_class")))
+    cg.add(
+        var.set_output_processing(auto_config.get("output_processing", "direct_class"))
+    )
     cg.add(var.set_scale_factor(auto_config.get("scale_factor", 1.0)))
     cg.add(var.set_input_order(auto_config.get("input_order", "RGB")))
     cg.add(var.set_normalize(auto_config.get("normalize", False)))
@@ -429,7 +472,9 @@ def _parse_audio_config(model_path):
     with open(txt_path) as f:
         content = f.read()
     config = {}
-    input_match = re.search(r"Input\s+0:\s+\[\s*\d+\s+(\d+)\s+(\d+)\].*?numpy\.(\w+)", content)
+    input_match = re.search(
+        r"Input\s+0:\s+\[\s*\d+\s+(\d+)\s+(\d+)\].*?numpy\.(\w+)", content
+    )
     if input_match:
         config["sliding_window_size"] = int(input_match.group(1))
         config["feature_count"] = int(input_match.group(2))

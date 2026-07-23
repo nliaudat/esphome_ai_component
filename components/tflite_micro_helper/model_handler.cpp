@@ -247,8 +247,8 @@ void ModelHandler::log_input_stats() const {
       ESP_LOGD(TAG, "  [%d]: %.4f", i, data[i]);
       // Log channel groups for RGB/BGR
       if (this->image_config_.input_channels >= 3 && i % this->image_config_.input_channels == 2) {
-        ESP_LOGD(TAG, "    -> %s: [%.3f, %.3f, %.3f]", this->image_config_.input_order.c_str(), data[i - 2], data[i - 1],
-                 data[i]);
+        ESP_LOGD(TAG, "    -> %s: [%.3f, %.3f, %.3f]", this->image_config_.input_order.c_str(), data[i - 2],
+                 data[i - 1], data[i]);
       }
     }
   } else {
@@ -257,7 +257,8 @@ void ModelHandler::log_input_stats() const {
       ESP_LOGD(TAG, "  [%d]: %u", i, data[i]);
       // Log channel groups for RGB/BGR
       if (this->image_config_.input_channels >= 3 && i % this->image_config_.input_channels == 2) {
-        ESP_LOGD(TAG, "    -> %s: [%u, %u, %u]", this->image_config_.input_order.c_str(), data[i - 2], data[i - 1], data[i]);
+        ESP_LOGD(TAG, "    -> %s: [%u, %u, %u]", this->image_config_.input_order.c_str(), data[i - 2], data[i - 1],
+                 data[i]);
       }
     }
   }
@@ -648,7 +649,8 @@ bool ModelHandler::validate_model_config() const {
     }
 
     if (channels != this->image_config_.input_channels) {
-      ESP_LOGW(TAG, "Model input channels mismatch! Config: %d, Model: %d", this->image_config_.input_channels, channels);
+      ESP_LOGW(TAG, "Model input channels mismatch! Config: %d, Model: %d", this->image_config_.input_channels,
+               channels);
       return false;
     }
   }
@@ -661,9 +663,8 @@ void ModelHandler::report_memory_status() {
   if (effective_arena_size == 0) {
     effective_arena_size = this->tensor_arena_size_requested_;
   }
-  this->memory_manager_.report_memory_status(this->tensor_arena_size_requested_,
-                                             effective_arena_size, this->get_arena_used_bytes(),
-                                             this->model_length_);
+  this->memory_manager_.report_memory_status(this->tensor_arena_size_requested_, effective_arena_size,
+                                             this->get_arena_used_bytes(), this->model_length_);
 }
 
 size_t ModelHandler::probe_arena_size_(const uint8_t *model_start, size_t initial_size,
@@ -674,13 +675,13 @@ size_t ModelHandler::probe_arena_size_(const uint8_t *model_start, size_t initia
     return 0;
   }
 
-  size_t attempt_sizes[] = {(initial_size + 15) & ~15,
-                            (initial_size * 3 / 2 + 15) & ~15,
+  size_t attempt_sizes[] = {(initial_size + 15) & ~15, (initial_size * 3 / 2 + 15) & ~15,
                             (initial_size * 2 + 15) & ~15};
 
   for (size_t attempt_size : attempt_sizes) {
     uint8_t *probe_arena = static_cast<uint8_t *>(heap_caps_aligned_alloc(16, attempt_size, MALLOC_CAP_8BIT));
-    if (probe_arena == nullptr) continue;
+    if (probe_arena == nullptr)
+      continue;
 
     auto probe_interpreter = std::make_unique<tflite::MicroInterpreter>(model, resolver, probe_arena, attempt_size);
     if (probe_interpreter->AllocateTensors() != kTfLiteOk) {

@@ -137,4 +137,3 @@ class CameraWindowControl {
 }  // namespace camera_control
 }  // namespace meter_reader_tflite
 }  // namespace esphome
-

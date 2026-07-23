@@ -73,11 +73,11 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   void on_camera_image(const std::shared_ptr<camera::CameraImage> &image) override;
 
   // CameraImageReader
-  void set_image(std::shared_ptr<camera::CameraImage> image) override {};
+  void set_image(std::shared_ptr<camera::CameraImage> image) override{};
   size_t available() const override { return 0; };
   uint8_t *peek_data_buffer() override { return nullptr; };
-  void consume_data(size_t consumed) override {};
-  void return_image() override {};
+  void consume_data(size_t consumed) override{};
+  void return_image() override{};
 
   // Config Setters (Delegated)
   void set_confidence_threshold(float threshold) { this->confidence_threshold_ = threshold; }

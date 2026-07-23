@@ -269,7 +269,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.GenerateID(): cv.declare_id(MeterReaderTFLite),
         cv.Required(CONF_MODEL): cv.Any(
             cv.use_id(TFLiteMicroHelper),  # New: ID reference to tflite_micro_helper
-            cv.file_,                       # Legacy: direct file path
+            cv.file_,  # Legacy: direct file path
         ),
         cv.Optional(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator)
         if value_validator
@@ -418,13 +418,11 @@ async def to_code(config):
     model_value = config[CONF_MODEL]
     if isinstance(model_value, str) and model_value.endswith(".tflite"):
         # Legacy mode: read model file directly (deprecated)
+        print("WARNING: Deprecated model configuration in meter_reader_tflite.")
+        print("  The 'model: \"<file>.tflite\"' syntax is deprecated.")
         print(
-            "WARNING: Deprecated model configuration in meter_reader_tflite."
+            "  Please move model configuration to the tflite_micro_helper section instead."
         )
-        print(
-            "  The 'model: \"<file>.tflite\"' syntax is deprecated."
-        )
-        print("  Please move model configuration to the tflite_micro_helper section instead.")
 
         model_path = CORE.relative_config_path(model_value)
         model_filename = os.path.basename(str(model_path).replace("\\", "/"))
@@ -450,16 +448,23 @@ async def to_code(config):
                 print(f"    {k}: {v}")
         else:
             auto_config = infer_model_config_from_filename(model_filename)
-            print(f"  No .txt file found for '{model_filename}', using filename heuristics:")
+            print(
+                f"  No .txt file found for '{model_filename}', using filename heuristics:"
+            )
             for k, v in auto_config.items():
                 print(f"    {k}: {v}")
 
         yaml_overrides = {}
         for yaml_key, auto_key in [
-            ("input_type", "input_type"), ("input_channels", "input_channels"),
-            ("input_width", "input_width"), ("input_height", "input_height"),
-            ("output_processing", "output_processing"), ("scale_factor", "scale_factor"),
-            ("input_order", "input_order"), ("normalize", "normalize"), ("invert", "invert"),
+            ("input_type", "input_type"),
+            ("input_channels", "input_channels"),
+            ("input_width", "input_width"),
+            ("input_height", "input_height"),
+            ("output_processing", "output_processing"),
+            ("scale_factor", "scale_factor"),
+            ("input_order", "input_order"),
+            ("normalize", "normalize"),
+            ("invert", "invert"),
         ]:
             if yaml_key in config:
                 yaml_overrides[auto_key] = config[yaml_key]
@@ -470,7 +475,11 @@ async def to_code(config):
         cg.add(var.set_input_channels(auto_config.get("input_channels", 3)))
         cg.add(var.set_input_width(auto_config.get("input_width", 32)))
         cg.add(var.set_input_height(auto_config.get("input_height", 20)))
-        cg.add(var.set_output_processing(auto_config.get("output_processing", "direct_class")))
+        cg.add(
+            var.set_output_processing(
+                auto_config.get("output_processing", "direct_class")
+            )
+        )
         cg.add(var.set_scale_factor(auto_config.get("scale_factor", 1.0)))
         cg.add(var.set_input_order(auto_config.get("input_order", "RGB")))
         cg.add(var.set_normalize(auto_config.get("normalize", False)))

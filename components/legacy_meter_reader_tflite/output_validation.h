@@ -90,4 +90,3 @@ class OutputValidator {
 
 }  // namespace meter_reader_tflite
 }  // namespace esphome
-
