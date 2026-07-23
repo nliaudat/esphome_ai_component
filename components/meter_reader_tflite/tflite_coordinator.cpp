@@ -77,7 +77,10 @@ void TFLiteCoordinator::set_invert(bool i) {
 
 bool TFLiteCoordinator::load_model() {
   if (this->tflite_ != nullptr) {
-    return this->tflite_->is_model_loaded();
+    if (!this->tflite_->is_model_loaded()) {
+      return this->tflite_->load_model();
+    }
+    return true;
   }
   if (this->legacy_tflite_) {
     return this->legacy_tflite_->load_model();
