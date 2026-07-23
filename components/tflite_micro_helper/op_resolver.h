@@ -23,9 +23,9 @@ class OpResolverManager {
 
       TfLiteStatus add_status = kTfLiteError;
 
-      // X-Macro: generate case statements from tflm_operators.h
-      // For available operators: call resolver.AddXxx()
-      // For unavailable operators: log warning and return false
+      // X-Macro: generates case statements from tflm_operators.h
+      // For available operators: calls resolver.AddXxx()
+      // For unavailable operators: logs warning and returns false
       switch (op) {
 #define TFLM_OP_AVAILABLE(op_name, method) \
   case tflite::BuiltinOperator_##op_name: \
