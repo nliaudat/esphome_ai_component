@@ -2,46 +2,74 @@
 
 `meter_reader_tflite` is the core component that orchestrates the AI meter reading process. It integrates the camera, TFLite model, and image processing to deliver sensor readings.
 
+Model configuration is now handled by the **`tflite_micro_helper`** component. You define the model in a `tflite_micro_helper` entry and reference it by ID from `meter_reader_tflite`.
+
+> **Note:** The legacy `model: "file.tflite"` syntax still works but is deprecated and prints a warning. See [Backward Compatibility](#-backward-compatibility) below.
+
 ## ⚙️ Configuration
 
-```yaml
-value_validator:
-  id: ${id_prefix}_validator
-  allow_negative_rates: false
-  max_absolute_diff: 300
-  strict_confidence_check: true
-  per_digit_confidence_threshold: 0.95
+### Recommended Setup (tflite_micro_helper)
 
+```yaml
+# 1. Define the model in tflite_micro_helper
+tflite_micro_helper:
+  - id: my_digit_model
+    model_type: image
+    model: "digit_recognizer_v40_quantized_integer_quant_uint8.tflite"
+    # All config auto-detected from .txt file
+    # Optional overrides:
+    # tensor_arena_size: "110KB"
+    # input_width: 32
+    # input_height: 20
+
+# 2. Reference the model by ID in meter_reader_tflite
 meter_reader_tflite:
   id: my_meter_reader
-
-  # Required
-  model: "digit_recognizer.tflite"  # Model file in config directory
+  model: my_digit_model            # ← ID reference to tflite_micro_helper entry
   camera_id: my_camera             # ID of esp32_camera component
 
   # Validator (optional but recommended)
-  validator: ${id_prefix}_validator
+  validator: my_validator
 
   # Optional Settings
   update_interval: 60s             # How often to process images
-  # confidence_threshold: 0.85        # Used if validator is NOT set (0.0 - 1.0)
-  # tensor_arena_size: 512KB         # Memory for TFLite (default: 512KB)
+  confidence_threshold: 0.85       # Minimum confidence to publish
 
   # Debugging
   debug: false                     # Enable verbose logging
   debug_image: false               # Use embedded static image for testing
-  debug_image_out_serial: false    # Dump processed image to serial (very slow!)
-  rotation: "0"                    # Image rotation in degrees ("0", "90", "180", "270").
+  rotation: "0"                    # Image rotation ("0", "90", "180", "270")
 
   # Sensors
-  value_sensor: my_value_sensor             # Sensor to publish reading
-  confidence_sensor: my_confidence_sensor   # Sensor to publish confidence
-  inference_logs: my_log_sensor             # Text sensor for inference details
+  value_sensor: my_value_sensor
+  confidence_sensor: my_confidence_sensor
 
   # Integration
-  flash_light_controller: my_flash # Link to flash controller
-  crop_zones_global: my_zones      # Link to global crop zone variable
+  flash_light_controller: my_flash
+  crop_zones_global: my_zones
+  data_collector: my_collector
 ```
+
+### Legacy Setup (Deprecated)
+
+```yaml
+value_validator:
+  id: my_validator
+  allow_negative_rates: false
+  max_absolute_diff: 300
+
+meter_reader_tflite:
+  id: my_meter_reader
+  model: "digit_recognizer.tflite"  # Direct file path (deprecated)
+  camera_id: my_camera
+  validator: my_validator
+  update_interval: 60s
+  debug: false
+  rotation: "0"
+```
+
+> [!WARNING]
+> The `model: "file.tflite"` syntax is **deprecated**. It will print a warning at compile time. Please migrate to the `tflite_micro_helper` approach.
 
 ### Image Rotation
 

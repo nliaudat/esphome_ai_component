@@ -23,7 +23,7 @@ Unlike other solutions that are standalone firmwares, this is a **native ESPHome
 ### 🚀 Reusable AI Core & Technical Excellence
 Beyond just a meter reader, this project provides a robust foundation for **any** ESP32 AI project:
 
-*   **`tflite_micro_helper`**: A standalone, reusable component that makes running **any** TFLite model easy. No more boilerplate!
+*   **`tflite_micro_helper`**: A standalone, reusable TFLite Micro model loader supporting **image** (single-shot) and **audio** (streaming) model types, with local/remote model fetching, CRC32 verification, and auto-detection from `.txt` reports. Used by `meter_reader_tflite` and `micro_wake_word`.
 *   **Memory Safe & Optimized**: Written in modern **Safe C++**. We use `std::span`, zero-copy buffers, and `esp-nn` hardware acceleration to squeeze every drop of performance while preventing crashes and memory leaks.
 *   **Production Ready**: Designed for 24/7 operation with robust error handling and watchdog protections.
 
@@ -45,7 +45,7 @@ The repository allows you to use specific components based on your needs:
 |-----------|-------------|
 | **[value_validator](./components/value_validator)** | Robust validation engine for meter readings. Eliminates outliers, tracks history, prevents impossible value jumps, and supports dial-aware digit correction when combined with `analog_reader`. Outputs float values when analog_reader is active. Publishes a separate `validated_value_sensor` (only on accept) while the raw value_sensor always shows raw digits. |
 | **[esp32_camera_utils](./components/esp32_camera_utils)** | Powerful image processing utilities. Handles cropping, scaling, rotation (JPEG/Raw), and format conversion using `esp_new_jpeg` library. |
-| **[tflite_micro_helper](./components/tflite_micro_helper)** | Wrapper for TensorFlow Lite Micro runtime (checking model CRC32, etc..) and `esp-nn` optimizations. Manages tensor arena and model loading. |
+| **[tflite_micro_helper](./components/tflite_micro_helper)** | Self-contained TFLite Micro model loader and runtime wrapper. Supports **image** and **audio** model types, model source resolution (local, `github://`, `http(s)://`), CRC32 verification, auto-detection from `.txt` reports, and ESP-NN hardware acceleration. Required by `meter_reader_tflite` and `micro_wake_word`. |
 | **[flash_light_controller](./components/flash_light_controller)** | Manages flash light timing for optimal image capture conditions. |
 | **[data_collector](./components/data_collector)** | **Active Learning** tool. Automatically collects "hard" images (low confidence) and uploads them to a server for training set improvement. |
 
