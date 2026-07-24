@@ -87,6 +87,8 @@ external_components:
 
 #### Option A: AI-Powered Meter Reader (TFLite)
 
+Model configuration is now handled by the dedicated **`tflite_micro_helper`** component — define the model there and reference it by ID:
+
 ```yaml
 esp32_camera:
   name: "My Camera"
@@ -98,16 +100,18 @@ value_validator:
   allow_negative_rates: false
   max_absolute_diff: 300
 
+# 1. Define the model (auto-detected from .txt report)
+tflite_micro_helper:
+  - id: my_digit_model
+    model_type: image
+    model: "digit_recognizer.tflite"
+
+# 2. Reference the model by ID from consumer component
 meter_reader_tflite:
   id: my_meter_reader
-  model: "digit_recognizer.tflite"
+  model: my_digit_model          # ← ID reference
   camera_id: my_camera
-  # Optional: Validator
   validator: my_validator
-
-  # If no validator is set, use simple threshold:
-  # confidence_threshold: 0.85
-
   update_interval: 60s
 
   # Optional: Link to other components
@@ -116,11 +120,9 @@ meter_reader_tflite:
 
   # Image Rotation (Dev)
   rotation: "90" # Options: "0", "90", "180", "270"
-
-  # Data Collection Thresholds
-  collect_min_global_confidence: 0.90
-  collect_min_digit_confidence: 0.90
 ```
+
+> **Note:** The legacy `model: "file.tflite"` syntax inside `meter_reader_tflite` still works for backward compatibility, but prints a deprecation warning. See the [meter_reader_tflite README](./components/meter_reader_tflite) for details.
 
 #### Option B: Seven-Segment OCR Reader (No AI)
 
@@ -226,10 +228,13 @@ These entities normally appear under the device in Home Assistant.
 
 **❌ Model loading fails**
 - **Cause**: Tensor arena size is too small.
-- **Solution**: Increase `tensor_arena_size` in `meter_reader_tflite` config.
+- **Solution**: Increase `tensor_arena_size` in the `tflite_micro_helper` config (auto-detected from `.txt` report by default).
 ```yaml
-meter_reader_tflite:
-  tensor_arena_size: 768KB  # Default is 512KB
+tflite_micro_helper:
+  - id: my_digit_model
+    model_type: image
+    model: "digit_recognizer.tflite"
+    tensor_arena_size: "768KB"
 ```
 
 **❌ Poor inference results**
