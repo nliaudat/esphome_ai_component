@@ -5,14 +5,13 @@
 #include "tensorflow/lite/c/common.h"
 #include "esphome/core/log.h"
 
-namespace esphome {
-namespace tflite_micro_helper {
+namespace esphome::tflite_micro_helper {
 
 /**
  * @brief Debug utilities for TFLite Micro Helper
  *
  * Provides debug logging and profiling functions.
- * Function bodies are in debug_utils.cpp to avoid ESP_LOG* in headers.
+ * Function bodies are in debug_utils.cpp to avoid logging macros in headers.
  */
 namespace debug_utils {
 
@@ -46,5 +45,4 @@ inline const char *tflite_type_to_string(TfLiteType type) {
   }
 }
 
-}  // namespace tflite_micro_helper
-}  // namespace esphome
+}  // namespace esphome::tflite_micro_helper
