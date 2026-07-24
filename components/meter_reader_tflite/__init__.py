@@ -27,6 +27,7 @@ except ImportError:
     value_validator = None
 
 from esphome.components import esp32_camera, globals
+from esphome.components.tflite_micro_helper import TFLiteMicroHelper
 from esphome.cpp_generator import RawExpression
 
 try:
@@ -266,7 +267,10 @@ def infer_model_config_from_filename(model_filename):
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(MeterReaderTFLite),
-        cv.Required(CONF_MODEL): cv.file_,
+        cv.Required(CONF_MODEL): cv.Any(
+            cv.use_id(TFLiteMicroHelper),  # New: ID reference to tflite_micro_helper
+            cv.file_,  # Legacy: direct file path
+        ),
         cv.Optional(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator)
         if value_validator
         else cv.invalid(
@@ -408,128 +412,96 @@ async def to_code(config):
         cg.add_define("USE_HOST")
         # On host, we don't set a real camera object.
 
-    model_path = CORE.relative_config_path(config[CONF_MODEL])
-    model_filename = os.path.basename(str(model_path).replace("\\", "/"))
-    model_type = os.path.splitext(model_filename)[0]  # Remove .tflite extension
-
-    # Set model type from extracted filename
-    cg.add(var.set_model_config(model_type))
-
-    # Read the model file as binary data
-    with open(model_path, "rb") as f:
-        model_data = f.read()
-
-    # Compute CRC32
-    crc32_val = zlib.crc32(model_data) & 0xFFFFFFFF
-    cg.add_define("MODEL_CRC32", HexInt(crc32_val))
-
-    # Create a progmem array for the model data
-    rhs = [HexInt(x) for x in model_data]
-    prog_arr = cg.progmem_array(config[CONF_RAW_DATA_ID], rhs)
-
-    cg.add(var.set_model(prog_arr, len(model_data)))
     cg.add(var.set_confidence_threshold(config[CONF_CONFIDENCE_THRESHOLD]))
 
-    # ============================================================
-    # Dynamic Model Configuration (auto-detect from .txt, override from YAML)
-    # ============================================================
-    # Priority: YAML overrides > .txt auto-detection > filename heuristics > defaults
+    # Check if model config is a tflite_micro_helper ID reference
+    model_value = config[CONF_MODEL]
+    if isinstance(model_value, str) and model_value.endswith(".tflite"):
+        # Legacy mode: read model file directly (deprecated)
+        print("WARNING: Deprecated model configuration in meter_reader_tflite.")
+        print("  The 'model: \"<file>.tflite\"' syntax is deprecated.")
+        print(
+            "  Please move model configuration to the tflite_micro_helper section instead."
+        )
 
-    # Step 1: Try to parse .txt file for auto-detected config
-    auto_config = parse_model_txt_file(model_path)
-    if auto_config:
-        print(f"  Auto-detected model config from '{model_filename}.txt':")
-        for k, v in auto_config.items():
-            print(f"    {k}: {v}")
+        model_path = CORE.relative_config_path(model_value)
+        model_filename = os.path.basename(str(model_path).replace("\\", "/"))
+        model_type = os.path.splitext(model_filename)[0]
+
+        cg.add(var.set_model_config(model_type))
+
+        with open(model_path, "rb") as f:
+            model_data = f.read()
+
+        crc32_val = zlib.crc32(model_data) & 0xFFFFFFFF
+        cg.add_define("MODEL_CRC32", HexInt(crc32_val))
+
+        rhs = [HexInt(x) for x in model_data]
+        prog_arr = cg.progmem_array(config[CONF_RAW_DATA_ID], rhs)
+
+        cg.add(var.set_model(prog_arr, len(model_data)))
+
+        auto_config = parse_model_txt_file(model_path)
+        if auto_config:
+            print(f"  Auto-detected model config from '{model_filename}.txt':")
+            for k, v in auto_config.items():
+                print(f"    {k}: {v}")
+        else:
+            auto_config = infer_model_config_from_filename(model_filename)
+            print(
+                f"  No .txt file found for '{model_filename}', using filename heuristics:"
+            )
+            for k, v in auto_config.items():
+                print(f"    {k}: {v}")
+
+        yaml_overrides = {}
+        for yaml_key, auto_key in [
+            ("input_type", "input_type"),
+            ("input_channels", "input_channels"),
+            ("input_width", "input_width"),
+            ("input_height", "input_height"),
+            ("output_processing", "output_processing"),
+            ("scale_factor", "scale_factor"),
+            ("input_order", "input_order"),
+            ("normalize", "normalize"),
+            ("invert", "invert"),
+        ]:
+            if yaml_key in config:
+                yaml_overrides[auto_key] = config[yaml_key]
+        if yaml_overrides:
+            auto_config.update(yaml_overrides)
+
+        cg.add(var.set_input_type(auto_config.get("input_type", "uint8")))
+        cg.add(var.set_input_channels(auto_config.get("input_channels", 3)))
+        cg.add(var.set_input_width(auto_config.get("input_width", 32)))
+        cg.add(var.set_input_height(auto_config.get("input_height", 20)))
+        cg.add(
+            var.set_output_processing(
+                auto_config.get("output_processing", "direct_class")
+            )
+        )
+        cg.add(var.set_scale_factor(auto_config.get("scale_factor", 1.0)))
+        cg.add(var.set_input_order(auto_config.get("input_order", "RGB")))
+        cg.add(var.set_normalize(auto_config.get("normalize", False)))
+        cg.add(var.set_invert(auto_config.get("invert", False)))
+
+        if CONF_TENSOR_ARENA_SIZE in config:
+            arena_size = config[CONF_TENSOR_ARENA_SIZE]
+            if isinstance(arena_size, str):
+                arena_size = datasize_to_bytes(arena_size)
+            cg.add(var.set_tensor_arena_size(arena_size))
+        elif "tensor_arena_size" in auto_config:
+            cg.add(var.set_tensor_arena_size(auto_config["tensor_arena_size"]))
+        else:
+            cg.add(var.set_tensor_arena_size(100 * 1024))
+
+        max_ops = auto_config.get("max_operators", 30)
+        cg.add_build_flag(f"-DMAX_OPERATORS={max_ops}")
     else:
-        # Step 2: Fallback to filename heuristics
-        auto_config = infer_model_config_from_filename(model_filename)
-        print(
-            f"  No .txt file found for '{model_filename}', using filename heuristics:"
-        )
-        for k, v in auto_config.items():
-            print(f"    {k}: {v}")
-
-    # Step 3: Apply YAML overrides (user-provided values override auto-detected)
-    yaml_overrides = {}
-    if CONF_INPUT_TYPE in config:
-        yaml_overrides["input_type"] = config[CONF_INPUT_TYPE]
-    if CONF_INPUT_CHANNELS in config:
-        yaml_overrides["input_channels"] = config[CONF_INPUT_CHANNELS]
-    if CONF_INPUT_WIDTH in config:
-        yaml_overrides["input_width"] = config[CONF_INPUT_WIDTH]
-    if CONF_INPUT_HEIGHT in config:
-        yaml_overrides["input_height"] = config[CONF_INPUT_HEIGHT]
-    if CONF_OUTPUT_PROCESSING in config:
-        yaml_overrides["output_processing"] = config[CONF_OUTPUT_PROCESSING]
-    if CONF_SCALE_FACTOR in config:
-        yaml_overrides["scale_factor"] = config[CONF_SCALE_FACTOR]
-    if CONF_INPUT_ORDER in config:
-        yaml_overrides["input_order"] = config[CONF_INPUT_ORDER]
-    if CONF_NORMALIZE in config:
-        yaml_overrides["normalize"] = config[CONF_NORMALIZE]
-    if CONF_INVERT in config:
-        yaml_overrides["invert"] = config[CONF_INVERT]
-
-    # Detect double-softmax risk: user explicitly set output_processing='softmax'
-    # but the model already has a built-in SOFTMAX operator.
-    if (
-        yaml_overrides.get("output_processing") == "softmax"
-        and auto_config.get("output_processing") == "direct_class"
-    ):
-        print(
-            "  WARNING: output_processing overridden to 'softmax' but model has built-in SOFTMAX."
-        )
-        print(
-            "      This will apply softmax TWICE (model + C++), producing incorrect confidence scores."
-        )
-        print(
-            "      Recommended: remove output_processing from YAML, or set to 'direct_class'."
-        )
-
-    if yaml_overrides:
-        print("  YAML overrides applied:")
-        for k, v in yaml_overrides.items():
-            print(f"    {k}: {v}")
-        auto_config.update(yaml_overrides)
-
-    # Step 4: Set all config values on the C++ component
-    # Use auto-detected values with sensible defaults for anything missing
-    cg.add(var.set_input_type(auto_config.get("input_type", "uint8")))
-    cg.add(var.set_input_channels(auto_config.get("input_channels", 3)))
-    cg.add(var.set_input_width(auto_config.get("input_width", 32)))
-    cg.add(var.set_input_height(auto_config.get("input_height", 20)))
-    cg.add(
-        var.set_output_processing(auto_config.get("output_processing", "direct_class"))
-    )
-    cg.add(var.set_scale_factor(auto_config.get("scale_factor", 1.0)))
-    cg.add(var.set_input_order(auto_config.get("input_order", "RGB")))
-    cg.add(var.set_normalize(auto_config.get("normalize", False)))
-    cg.add(var.set_invert(auto_config.get("invert", False)))
-
-    # Step 5: Set tensor arena size
-    # Priority: YAML config > .txt peak analysis > default 100KB
-    if CONF_TENSOR_ARENA_SIZE in config:
-        arena_size = config[CONF_TENSOR_ARENA_SIZE]
-        # If it's a string (like "110KB"), parse it
-        if isinstance(arena_size, str):
-            arena_size = datasize_to_bytes(arena_size)
-        cg.add(var.set_tensor_arena_size(arena_size))
-        print(f"  Tensor arena size: {arena_size} bytes (from YAML config)")
-    elif "tensor_arena_size" in auto_config:
-        cg.add(var.set_tensor_arena_size(auto_config["tensor_arena_size"]))
-        print(
-            f"  Tensor arena size: {auto_config['tensor_arena_size']} bytes (from .txt peak analysis)"
-        )
-    else:
-        # Default fallback
-        cg.add(var.set_tensor_arena_size(100 * 1024))
-        print(f"  Tensor arena size: {100 * 1024} bytes (default)")
-
-    # Step 6: Set MAX_OPERATORS from .txt file analysis (with fallback)
-    max_ops = auto_config.get("max_operators", 30)
-    cg.add_build_flag(f"-DMAX_OPERATORS={max_ops}")
-    print(f"  MAX_OPERATORS: {max_ops} (build flag)")
+        # New mode: model is a tflite_micro_helper ID reference
+        tflite_var = await cg.get_variable(config[CONF_MODEL])
+        cg.add(var.set_tflite(tflite_var))
+        print("  Using tflite_micro_helper model reference")
 
     if "show_crop_areas" in config:
         cg.add(var.set_show_crop_areas(config["show_crop_areas"]))

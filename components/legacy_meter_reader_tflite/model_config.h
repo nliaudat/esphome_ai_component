@@ -13,9 +13,9 @@ static const std::unordered_map<std::string, ModelConfig> MODEL_CONFIGS = {
          .description = "dig-class100-0180",
          .tensor_arena_size = "512KB",  // check_tflite_model.py reports : Total Arena Size: 415.08 KB
          .output_processing =
-             "softmax_jomjol",  // logits_jomjol is the good mathematical way to calcultate the confidence, but
-                                // softmax_jomjol give a greater confidence. //"softmax_jomjol", //"softmax",//
-                                // "logits_jomjol", //model trained with from_logits=True
+             "softmax_jomjol",     // logits_jomjol is the good mathematical way to calcultate the confidence, but
+                                   // softmax_jomjol give a greater confidence. //"softmax_jomjol", //"softmax",//
+                                   // "logits_jomjol", //model trained with from_logits=True
          .scale_factor = 10.0f,    // For 100-class models (0.0-9.9)
          .input_type = "float32",  //"uint8", // Model is float32, not quantized!
          .input_channels = 3,
@@ -128,4 +128,3 @@ static const std::unordered_map<std::string, ModelConfig> MODEL_CONFIGS = {
 
 }  // namespace meter_reader_tflite
 }  // namespace esphome
-

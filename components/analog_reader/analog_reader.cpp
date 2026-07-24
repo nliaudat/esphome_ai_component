@@ -134,7 +134,8 @@ void AnalogReader::setup() {
     {
       if (this->img_width_ <= 0 || this->img_height_ <= 0 ||
           static_cast<uint64_t>(this->img_height_) > SIZE_MAX / static_cast<size_t>(this->img_width_)) {
-        ESP_LOGE(TAG, "Invalid dimensions or overflow computing buffer size for %dx%d", this->img_width_, this->img_height_);
+        ESP_LOGE(TAG, "Invalid dimensions or overflow computing buffer size for %dx%d", this->img_width_,
+                 this->img_height_);
         this->mark_failed();
         return;
       }
@@ -321,8 +322,7 @@ class DecodedImage : public esphome::camera::CameraImage {
   DecodedImage(esphome::esp32_camera_utils::ImageProcessor::JpegBufferPtr &&data, size_t width, size_t height)
       : data_(std::move(data)), width_(width), height_(height) {
     // Guarded multiplication per §8.1
-    if (width > 0 && height > 0 &&
-        static_cast<uint64_t>(height) <= SIZE_MAX / static_cast<size_t>(width) &&
+    if (width > 0 && height > 0 && static_cast<uint64_t>(height) <= SIZE_MAX / static_cast<size_t>(width) &&
         (static_cast<size_t>(width) * static_cast<size_t>(height)) <= SIZE_MAX / 3u) {
       this->size_ = static_cast<size_t>(width) * static_cast<size_t>(height) * 3u;
     } else {

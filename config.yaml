@@ -91,7 +91,10 @@ globals:
     #    # Note: The outer quotes are escaped with single quotes + double quotes ("...")
 
 tflite_micro_helper:
-  debug: false
+  - id: ${id_prefix}_digit_model
+    model_type: image
+    model: "models/digit_recognizer_v40_quantized_integer_quant_uint8.tflite"
+    debug: false
 
 esp32_camera_utils:
   id: ${id_prefix}_camera_utils
@@ -170,12 +173,7 @@ meter_reader_tflite:
   validator: ${id_prefix}_validator
   # confidence_threshold: 0.85 # Only if validator is disabled
   camera_id: ${id_prefix}_espcam
-  # model: "models/digit_recognizer_v3_quantized_integer_quant_uint8.tflite"  # best performance / accuracy
-  # model: "models/digit_recognizer_v24_quantized_integer_quant_uint8.tflite" # 98.86% acc | inference in 2600ms | 135.29 KB memory footprint ## old best
-  # model: "models/digit_recognizer_v16_quantized_integer_quant_uint8.tflite" # 99.46% acc | inference in 4150ms | 263.76 KB memory footprint
-  # model: "models/digit_recognizer_v3_quantized_integer_quant_uint8.tflite" # 97.95% acc | inference in 1500ms | 153.83 KB memory footprint
-  # model: "models/digit_recognizer_v23_quantized_integer_quant_uint8.tflite" # 97.87% acc | inference in 2300ms | 262.33 KB memory footprint | good with very bad images
-  model: "models/digit_recognizer_v40_quantized_integer_quant_uint8.tflite" # 99.06 acc | inference in 1300ms | 105.91 KB memory footprint
+  model: ${id_prefix}_digit_model # 99.06 acc | inference in 1300ms | 105.91 KB memory footprint
 
   update_interval: 60s
 

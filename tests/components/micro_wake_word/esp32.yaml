@@ -1,0 +1,60 @@
+# ESPHome build test: micro_wake_word on ESP32
+esphome:
+  name: test-mww-esp32
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESP32_SPIRAM_SUPPORT: y
+
+psram:
+
+logger:
+  level: DEBUG
+
+external_components:
+  - source:
+      type: local
+      path: ../../../components
+    components:
+      - micro_wake_word
+      - tflite_micro_helper
+
+# Minimal I2S audio config for build validation
+i2s_audio:
+  i2s_lrclk_pin: GPIO25
+  i2s_bclk_pin: GPIO26
+
+microphone:
+  - platform: i2s_audio
+    id: test_mic
+    i2s_din_pin: GPIO27
+    channel: left
+    pdm: false
+    bits_per_sample: 16bit
+    adc_type: external
+
+micro_wake_word:
+  id: test_mww
+  models:
+    - tflite_model: test_tflite
+      wake_word: "Test"
+      trained_languages: ["en"]
+      probability_cutoff: 0.5
+      sliding_window_size: 10
+  on_wake_word_detected:
+    then:
+      - lambda: |-
+          ESP_LOGD("test_mww", "Detected: %s", wake_word.c_str());
+  stop_after_detection: true
+
+tflite_micro_helper:
+  - id: test_tflite
+    model_type: audio
+    model: https://github.com/esphome/micro-wake-word-models/raw/main/models/v2/okay_nabu.json
+    probability_cutoff: 0.5
+    sliding_window_size: 10
+    features_step_size: 20
+    feature_count: 40

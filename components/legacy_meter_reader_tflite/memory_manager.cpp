@@ -75,4 +75,3 @@ static void log_current_memory_usage(const char *context) {
 
 }  // namespace meter_reader_tflite
 }  // namespace esphome
-

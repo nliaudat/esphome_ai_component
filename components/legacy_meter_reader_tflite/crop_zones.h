@@ -94,4 +94,3 @@ class CropZoneHandler {
 
 }  // namespace meter_reader_tflite
 }  // namespace esphome
-

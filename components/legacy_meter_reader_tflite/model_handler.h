@@ -169,4 +169,3 @@ class ModelHandler {
 
 }  // namespace meter_reader_tflite
 }  // namespace esphome
-
