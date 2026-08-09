@@ -1419,7 +1419,7 @@ void MeterReaderTFLite::stop_inference_pipeline() {
       ESP_LOGW(TAG, "Timeout (3s) waiting for inference task to exit. Force deleting.");
       if (this->is_inferencing_.load()) {
         ESP_LOGE(TAG, "Task force-deleted mid-inference -- pool slots and job owned on its stack "
-                       "ARE LEAKED (repeated unload/reload may exhaust the pool)");
+                      "ARE LEAKED (repeated unload/reload may exhaust the pool)");
       }
       vTaskDelete(this->inference_task_handle_);
       break;
