@@ -97,6 +97,14 @@ void CropZoneHandler::parse_zones(const std::string &zones_json) {
     }
 
     if (coords.size() == 4) {
+      // E10: reject malformed zones where x1>=x2 or y1>=y2 -- they would produce
+      // zero/negative crops and flow silently to processing.
+      if (coords[0] >= coords[2] || coords[1] >= coords[3]) {
+        ESP_LOGE(TAG, "Invalid zone [%d,%d,%d,%d] ignored (x1>=x2 or y1>=y2)", coords[0], coords[1], coords[2],
+                 coords[3]);
+        pos = end + 1;
+        continue;
+      }
       // E8: cap the number of zones -- the readers use StaticVector<float,16>,
       // so more zones would be silently truncated during inference.
       if (this->zones_.size() >= this->MAX_CROP_ZONES) {
