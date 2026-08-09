@@ -692,8 +692,7 @@ size_t ModelHandler::probe_arena_size(const uint8_t *model_start, size_t initial
 
     // Binary-search down to the smallest size that still allocates.
     while (lower < upper) {
-      auto test_interpreter =
-          std::make_unique<tflite::MicroInterpreter>(model, *local_resolver, probe_arena, lower);
+      auto test_interpreter = std::make_unique<tflite::MicroInterpreter>(model, *local_resolver, probe_arena, lower);
       bool ok = test_interpreter->AllocateTensors() == kTfLiteOk;
       test_interpreter.reset();
       if (ok) {
