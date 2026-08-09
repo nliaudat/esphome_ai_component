@@ -3,10 +3,9 @@
 #include "esphome/core/hal.h"  // For millis()
 #include "esphome/core/log.h"
 
-// E9: RAII ScopedDuration, zero-cost when DEBUG_DURATION is not defined
-// (mirrors rotator.h's ScopedTimer pattern). Prevents an unconditional
-// millis() call per object even when timing logs are compiled out.
-#ifdef DEBUG_DURATION
+// E9: RAII ScopedDuration, active when the component's debug option is enabled
+// (DEBUG_ESP32_CAMERA_UTILS). Zero-cost (no millis() call) otherwise.
+#ifdef DEBUG_ESP32_CAMERA_UTILS
 namespace esphome {
 namespace esp32_camera_utils {
 
@@ -28,7 +27,7 @@ class ScopedDuration {
 }  // namespace esp32_camera_utils
 }  // namespace esphome
 #else
-// Zero-cost no-op when DEBUG_DURATION is not defined.
+// Zero-cost no-op when DEBUG_ESP32_CAMERA_UTILS is not defined.
 //
 // Note: the _dur variable in crop_zone_handler.cpp is still instantiated, but
 // this trivial type has no members, no constructor work, and no destructor --
@@ -40,4 +39,4 @@ struct ScopedDuration {
 };
 }  // namespace esp32_camera_utils
 }  // namespace esphome
-#endif  // DEBUG_DURATION
+#endif  // DEBUG_ESP32_CAMERA_UTILS
