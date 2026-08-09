@@ -191,7 +191,7 @@ bool TFLiteMicroHelper::load_model() {
   return true;
 }
 
-void TFLiteMicroHelper::unload_model() {
+void TFLiteMicroHelper::unload_model(bool reset_config) {
   ESP_LOGI(TAG, "Unloading model and freeing arena");
   this->model_handler_.unload();
 
@@ -201,14 +201,48 @@ void TFLiteMicroHelper::unload_model() {
   this->tensor_arena_allocation_.actual_size = 0;
 
   // E3: reset runtime state (stats cache + load state). Config fields (model data,
-  // size, CRC, input/audio config) are intentionally preserved: the consumer reload
-  // path (meter_reader_tflite::reload_resources) calls unload_model() then
-  // load_model() without re-issuing set_model()/set_expected_crc32().
+  // size, CRC, input/audio config) are intentionally preserved by default: the
+  // consumer reload path (meter_reader_tflite::reload_resources) calls
+  // unload_model() then load_model() without re-issuing set_model()/
+  // set_expected_crc32().
+  //
+  // P1: when switching to a *different* model, call unload_model(true) to also
+  // reset_config() -- otherwise the previous model's arena size, dimensions,
+  // preprocessing, and audio config leak into the next load_model(), causing
+  // incorrect inference or tensor-allocation failure.
   {
     std::scoped_lock<std::mutex> lock(this->arena_stats_mutex_);
     this->cached_arena_stats_ = ArenaStats{};
   }
+
+  if (reset_config) {
+    this->reset_config();
+  }
+
   this->state_.store(LoadState::UNLOADED);
+}
+
+void TFLiteMicroHelper::reset_config() {
+  ESP_LOGI(TAG, "Resetting model configuration to defaults");
+
+  this->model_data_ = nullptr;
+  this->model_length_ = 0;
+  this->tensor_arena_size_requested_ = 100 * 1024;
+  this->expected_crc32_ = 0;
+
+  this->model_type_ = "default";
+  this->input_type_ = "uint8";
+  this->input_channels_ = 3;
+  this->input_width_ = 32;
+  this->input_height_ = 20;
+  this->output_processing_ = "direct_class";
+  this->scale_factor_ = 1.0f;
+  this->input_order_ = "RGB";
+  this->normalize_ = false;
+  this->invert_ = false;
+
+  this->image_config_ = ImageModelConfig{};
+  this->audio_config_ = AudioModelConfig{};
 }
 
 ModelSpec TFLiteMicroHelper::get_model_spec() const {

@@ -89,13 +89,13 @@ bool TFLiteCoordinator::load_model() {
   return false;
 }
 
-void TFLiteCoordinator::unload_model() {
+void TFLiteCoordinator::unload_model(bool reset_config) {
   std::lock_guard<std::mutex> lock(this->model_mutex_);
   if (this->tflite_) {
-    this->tflite_->unload_model();
+    this->tflite_->unload_model(reset_config);
   }
   if (this->legacy_tflite_) {
-    this->legacy_tflite_->unload_model();
+    this->legacy_tflite_->unload_model(reset_config);
   }
 }
 

@@ -38,7 +38,12 @@ class TFLiteCoordinator {
   /// @brief Legacy: load model from raw data (for backward compat with old __init__.py)
   void set_model(const uint8_t *model, size_t length);
   [[nodiscard]] bool load_model();
-  void unload_model();
+
+  /// @brief Unload the active model (and its arena).
+  /// @param reset_config If true, also reset the underlying TFLiteMicroHelper's
+  ///   model configuration to defaults (P1). Use when switching to a *different*
+  ///   model -- re-issue set_model() and all relevant setters before load_model().
+  void unload_model(bool reset_config = false);
   [[nodiscard]] bool is_model_loaded() const;
 
   // Legacy: config setters (delegate to legacy instance, used by old __init__.py)

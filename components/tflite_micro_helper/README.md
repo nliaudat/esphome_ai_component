@@ -172,6 +172,46 @@ micro_wake_word:
       sliding_window_size: 10
 ```
 
+## 🔄 Model Lifecycle (C++ API)
+
+The helper supports unloading and reloading models at runtime for dynamic resource management.
+
+### Same-model reload (preserves config)
+
+The `meter_reader_tflite::reload_resources()` path calls `unload_model()` followed by `load_model()`
+**without** re-issuing `set_model()` / `set_expected_crc32()`. This is the default behavior:
+
+```cpp
+// Config is preserved -- reload uses the same model_data_, arena size, dimensions, etc.
+tflite->unload_model();           // reset_config defaults to false
+tflite->load_model();
+```
+
+### Switching to a different model (P1: reset stale config)
+
+When a consumer unloads one model and assigns a **different** model without overwriting every
+setting, `unload_model()` would otherwise retain the previous model's arena size, input
+dimensions, preprocessing, and audio configuration -- causing incorrect inference or
+tensor-allocation failure on the next `load_model()`.
+
+Call `unload_model(true)` (or `reset_config()`) before configuring the new model:
+
+```cpp
+// Switch to a completely different model:
+tflite->unload_model(true);       // also calls reset_config()
+tflite->set_model(new_data, new_size);
+tflite->set_expected_crc32(new_crc);
+// ... re-issue all relevant setters ...
+tflite->load_model();
+```
+
+`reset_config()` clears every model-config field to its type-safe default (matching the
+initial state defined in `tflite_micro_helper.h`): model data pointer/length, arena size,
+expected CRC, image config, and audio config.
+
+> **Note:** `TFLiteCoordinator::unload_model(bool reset_config = false)` delegates the same
+> flag through to the underlying `TFLiteMicroHelper`.
+
 ## ⚡ ESP-NN Optimizations
 
 The component automatically enables hardware acceleration:
