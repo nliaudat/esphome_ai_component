@@ -353,7 +353,7 @@ void MeterReaderTFLite::update() {
 
   // 2. Crop Zones Processing
   // If paused, we still might want to update preview if enabled
-  if (this->pause_processing_.load() && !this->generate_preview_ && !this->request_preview_) {
+  if (this->pause_processing_.load() && !this->generate_preview_ && !this->request_preview_.load()) {
     ESP_LOGD(TAG, "Processing paused, skipping update");
     return;
   }
@@ -612,7 +612,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
 
   // Check processing state
   bool pause = this->pause_processing_.load();
-  bool preview_needed = this->generate_preview_ || this->request_preview_;
+  bool preview_needed = this->generate_preview_ || this->request_preview_.load();
 
   if (pause && !preview_needed) {
     ESP_LOGI(TAG, "Setup Mode active & No Preview: Skipping.");
@@ -656,7 +656,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
   auto processed_buffers = this->camera_coord_.process_frame(frame, zones);
 
   // Check for debug image (last processed master)
-  if (this->generate_preview_ || this->request_preview_) {
+  if (this->generate_preview_ || this->request_preview_.load()) {
     auto preview = this->camera_coord_.get_debug_image();
     ESP_LOGD(TAG, "Checking for preview image. Ptr: %p", preview ? preview.get() : nullptr);
 
@@ -717,8 +717,8 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
                  is_spiram ? "yes" : "no", from_prealloc ? "yes" : "no");
       }
     }
-    if (this->request_preview_)
-      this->request_preview_ = false;
+    if (this->request_preview_.load())
+      this->request_preview_.store(false);
   }
 
 #ifdef DEBUG_METER_READER_TIMING
@@ -1064,7 +1064,7 @@ void MeterReaderTFLite::set_flash_post_time(uint32_t ms) { this->flashlight_coor
 // Preview
 void MeterReaderTFLite::take_preview_image() { this->capture_preview(); }
 void MeterReaderTFLite::capture_preview() {
-  this->request_preview_ = true;
+  this->request_preview_.store(true);
   this->flashlight_coord_.capture_preview_sequence([this]() {
     this->frame_state_.store(FrameState::REQUESTED);
     this->last_request_time_ = millis();
@@ -1300,15 +1300,23 @@ void MeterReaderTFLite::inference_task(void *arg) {
   InferenceJob *job = nullptr;
 
   while (self->task_running_.load()) {
-    // Set inferencing flag BEFORE blocking on queue to close race window
-    self->is_inferencing_ = true;
+    // Idle until a job arrives (or shutdown is signalled via a poison pill).
+    // is_inferencing_ is only true during actual inference so
+    // stop_inference_pipeline() can distinguish "waiting for a job" (safe to
+    // cleanly stop) from "mid-inference" (pool slots + job owned on this stack).
+    self->is_inferencing_ = false;
+    job = nullptr;
 
     // Use timeout to allow periodic checking of task_running_
     if (xQueueReceive(self->input_queue_, &job, 500 / portTICK_PERIOD_MS) == pdTRUE) {
-      if (!job) {
-        self->is_inferencing_ = false;
-        continue;
+      if (job == nullptr) {
+        // Poison pill received -- clean shutdown. The task deletes itself below,
+        // so stack-local destructors (InferenceResultPtr, job) run and pool slots
+        // are released instead of leaked by a force-delete.
+        break;
       }
+
+      self->is_inferencing_ = true;
 
       ESP_LOGD(TAG, "Inference Task: Job received. Starting TFLite...");
       uint32_t start = millis();
@@ -1395,12 +1403,24 @@ void MeterReaderTFLite::stop_inference_pipeline() {
   ESP_LOGI(TAG, "Stopping Inference Pipeline...");
   this->task_running_ = false;
 
-  // Wait for task to exit
-  // Give it 2 seconds to finish current job and exit loop
+  // Poison pill: a nullptr InferenceJob* wakes a blocked inference task and tells
+  // it to exit cleanly via vTaskDelete(nullptr). Stack destructors (InferenceResultPtr,
+  // InferenceJob*) run, releasing pool slots instead of leaking them.
+  InferenceJob *poison = nullptr;
+  xQueueSend(this->input_queue_, &poison, 0);
+
+  // Wait for the task to exit via the poison-pill path (clean, no pool-slot leak).
+  // Give it 3 seconds to finish a possibly in-flight inference and observe the pill.
   uint32_t start = millis();
   while (eTaskGetState(this->inference_task_handle_) != eDeleted) {
-    if (millis() - start > 2000) {
-      ESP_LOGW(TAG, "Timeout waiting for inference task to exit. Force deleting.");
+    if (millis() - start > 3000) {
+      // Last resort: force-delete. This only happens if the task is stuck mid-inference
+      // (e.g. extreme PSRAM fragmentation stalling heap_caps_aligned_alloc for >3s).
+      ESP_LOGW(TAG, "Timeout (3s) waiting for inference task to exit. Force deleting.");
+      if (this->is_inferencing_.load()) {
+        ESP_LOGE(TAG, "Task force-deleted mid-inference -- pool slots and job owned on its stack "
+                       "ARE LEAKED (repeated unload/reload may exhaust the pool)");
+      }
       vTaskDelete(this->inference_task_handle_);
       break;
     }
