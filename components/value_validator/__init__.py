@@ -1,3 +1,5 @@
+import hashlib
+
 import esphome.codegen as cg
 from esphome.components import sensor, text_sensor
 import esphome.config_validation as cv
@@ -95,6 +97,17 @@ async def to_code(config):
     for conf in config:
         var = cg.new_Pvariable(conf[CONF_ID])
         await cg.register_component(var, conf)
+
+        # E1: per-instance persistent-state key. Derive a stable 32-bit salt from the
+        # user's YAML id so multiple persist_state validators (cold/hot meter) are
+        # saved to independent NVS slots instead of colliding on one shared key.
+        instance_name = str(
+            conf[CONF_ID].id if hasattr(conf[CONF_ID], "id") else conf[CONF_ID]
+        )
+        pref_salt = int.from_bytes(
+            hashlib.sha256(instance_name.encode("utf-8")).digest()[:4], "little"
+        )
+        cg.add(var.set_pref_key_salt(pref_salt))
 
         # Construct config struct
         cg.add(var.set_allow_negative_rates(conf[CONF_ALLOW_NEGATIVE_RATES]))

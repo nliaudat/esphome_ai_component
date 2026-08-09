@@ -113,14 +113,17 @@ int ReadingHistory::get_median_within_ms(uint32_t max_elapsed_ms) const {
     return 0;
 
   size_t size = values.size();
-  std::nth_element(values.begin(), values.begin() + size / 2, values.end());
-  int median = values[size / 2];
-
   if (size % 2 == 0) {
-    auto max_it = std::max_element(values.begin(), values.begin() + size / 2);
-    return (*max_it + median) / 2;
+    // E4: exact median for even counts = average of the two middle elements.
+    // Use nth_element twice for the two middle positions (O(n) amortized).
+    auto mid = values.begin() + size / 2;
+    std::nth_element(values.begin(), mid - 1, values.end());
+    int lower_mid = values[size / 2 - 1];
+    int upper_mid = *std::min_element(mid, values.end());
+    return (lower_mid + upper_mid) / 2;
   }
-  return median;
+  std::nth_element(values.begin(), values.begin() + size / 2, values.end());
+  return values[size / 2];
 }
 
 std::vector<int> ReadingHistory::get_recent_readings(size_t count) const {
@@ -181,7 +184,10 @@ void ValueValidator::setup() {
 
   // Restore persistent state if enabled
   if (this->config_.persist_state) {
-    this->pref_ = global_preferences->make_preference<int>(fnv1_hash("value_validator"));
+    // E1: per-instance key -- XOR the base key with the instance salt so multiple
+    // persist_state validators (cold/hot meter) do NOT collide on one NVS slot.
+    uint32_t key = fnv1_hash("value_validator") ^ this->pref_key_salt_;
+    this->pref_ = global_preferences->make_preference<int>(key);
     int restored = 0;
     if (this->pref_.load(&restored) && restored > 0) {
       this->last_valid_reading_ = restored;
@@ -788,13 +794,24 @@ void ValueValidator::reset() {
 }
 
 void ValueValidator::set_last_valid_reading(int value) {
+  this->set_last_valid_reading(value, 0);  // default: infer digit count from value
+}
+
+void ValueValidator::set_last_valid_reading(int value, size_t num_digits) {
   this->last_valid_reading_ = value;
   this->first_reading_ = false;
 
+  // E3: preserve leading-zero digit count for fixed-width meters.
+  size_t len = num_digits > 0 ? num_digits : 0;
   std::string val_str = std::to_string(value);
-  this->ensure_last_valid_digits_size(val_str.length());
+  if (len == 0 || val_str.length() >= len) {
+    len = val_str.length();
+  } else {
+    val_str = std::string(len - val_str.length(), '0') + val_str;
+  }
+  this->ensure_last_valid_digits_size(len);
   if (this->last_valid_digits_data_) {
-    for (size_t i = 0; i < val_str.length(); i++) {
+    for (size_t i = 0; i < len; i++) {
       this->last_valid_digits_data_[i] = val_str[i] - '0';
     }
   } else {
@@ -809,7 +826,8 @@ void ValueValidator::set_last_valid_reading(int value) {
   this->history_.clear();
   this->consecutive_rejections_ = 0;
   this->rejection_confidence_sum_ = 0.0f;
-  ESP_LOGW(TAG, "Manually set last valid reading to: %d", value);
+  ESP_LOGW(TAG, "Manually set last valid reading to: %d (Digits: %d, Str: %s)", value, static_cast<int>(len),
+           val_str.c_str());
 }
 
 void ValueValidator::set_last_valid_reading(const std::string &value) {
@@ -1030,7 +1048,8 @@ bool ValueValidator::is_hallucination_pattern(std::span<const float> digits) con
   if (!all_identical)
     return false;
 
-  if (!this->first_reading_ && static_cast<int>(val) == this->last_valid_reading_) {
+  // E5: compare as long long -- a 10-digit reading (up to 9_999_999_999) overflows int.
+  if (!this->first_reading_ && val == static_cast<long long>(this->last_valid_reading_)) {
     return false;
   }
 
