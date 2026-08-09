@@ -1,0 +1,35 @@
+# ESPHome build test: meter_reader_tflite on ESP32-S3 (ESP-IDF)
+esphome:
+  name: test-meter-reader-s3
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESP32S3_DATA_CACHE_64KB: y
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+logger:
+  level: DEBUG
+
+esp32_camera:
+  id: test_camera
+  name: Test Camera
+  external_clock:
+    pin: GPIO10
+    frequency: 20MHz
+  i2c_pins:
+    sda: GPIO40
+    scl: GPIO39
+  data_pins: [GPIO15, GPIO17, GPIO18, GPIO16, GPIO14, GPIO12, GPIO11, GPIO48]
+  vsync_pin: GPIO38
+  href_pin: GPIO47
+  pixel_clock_pin: GPIO13
+  resolution: 640x480
+  pixel_format: JPEG
+
+<<: !include common.yaml

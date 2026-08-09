@@ -1,0 +1,20 @@
+# ESPHome build test: micro_wake_word on ESP32-S3 (ESP-IDF)
+substitutions:
+  i2s_lrclk_pin: GPIO04
+  i2s_bclk_pin: GPIO05
+  mic_din_pin: GPIO06
+
+esphome:
+  name: test-mww-esp32s3
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESP32S3_DATA_CACHE_64KB: y
+
+logger:
+  level: DEBUG
+
+<<: !include common.yaml
