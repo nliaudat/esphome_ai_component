@@ -42,9 +42,9 @@ esphome:
     board_build.extra_flags:
       - -DBOARD_HAS_PSRAM
       - -DTF_LITE_STATIC_MEMORY  # for tflite micro
-      - -DTF_LITE_DISABLE_X86_NEON  #for tflite micro
-      - -DESP_NN  #use hardware acceleration : https://github.com/espressif/esp-nn (only if using tflite)
-    board_name: AI-On-The-Edge-Cam Esp32-S3 (N16R8)  #https://www.tindie.com/products/allexok/ai-on-the-edge-cam-esp32-s3-with-poe-sd-camera/
+      - -DTF_LITE_DISABLE_X86_NEON  # for tflite micro
+      - -DESP_NN  # use hardware acceleration : https://github.com/espressif/esp-nn (only if using tflite)
+    board_name: AI-On-The-Edge-Cam Esp32-S3 (N16R8)  # https://www.tindie.com/products/allexok/ai-on-the-edge-cam-esp32-s3-with-poe-sd-camera/
 
 substitutions:
   # board and compilation
@@ -64,10 +64,10 @@ substitutions:
   eth_int_pin: GPIO38
 
   # SD Card Configuration
-  sdcard_clk_pin: GPIO40  #SD_SCLK
-  sdcard_cmd_pin: GPIO42  #SD_MOSI
-  sdcard_d0_pin: GPIO41  #SD_MISO
-  sdcard_d3_pin: GPIO3  #SD_CS, CD/DAT3
+  sdcard_clk_pin: GPIO40  # SD_SCLK
+  sdcard_cmd_pin: GPIO42  # SD_MOSI
+  sdcard_d0_pin: GPIO41  # SD_MISO
+  sdcard_d3_pin: GPIO3  # SD_CS, CD/DAT3
 
   # Camera Pins
   camera_pwdn_pin: GPIO44  # Not used on this board, dummy valid pin
@@ -218,20 +218,20 @@ switch:
 # ####### SD Card Configuration
 
 # # need external_components in config.yaml
-# # as of 23.07.2025, the PR #26 must be called as it fixes changes in esphome 2025.7
+# # as of 23.07.2025, the PR # 26 must be called as it fixes changes in esphome 2025.7
   # - source:
       # type: git
       # url: https://github.com/n-serrette/esphome_sd_card
-      # ref: refs/pull/26/head  # Specific reference to PR #26
+      # ref: refs/pull/26/head  # Specific reference to PR # 26
     # components: [sd_mmc_card]
 
 # sd_mmc_card:
   # id: sdcard
   # mode_1bit: true  # Required for SPI mode
-  # clk_pin: ${sdcard_clk_pin} #SD_SCLK
-  # cmd_pin: ${sdcard_cmd_pin}  #SD_MOSI
-  # data0_pin: ${sdcard_d0_pin}  #SD_MISO
-  # data3_pin: ${sdcard_d3_pin} #SD_CS, CD/DAT3
+  # clk_pin: ${sdcard_clk_pin} # SD_SCLK
+  # cmd_pin: ${sdcard_cmd_pin}  # SD_MOSI
+  # data0_pin: ${sdcard_d0_pin}  # SD_MISO
+  # data3_pin: ${sdcard_d3_pin} # SD_CS, CD/DAT3
 
 # sensor:
   # - platform: sd_mmc_card

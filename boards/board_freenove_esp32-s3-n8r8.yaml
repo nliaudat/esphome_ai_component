@@ -26,8 +26,8 @@ esphome:
     board_build.extra_flags:
       - -DBOARD_HAS_PSRAM
       - -DTF_LITE_STATIC_MEMORY  # for tflite micro
-      - -DTF_LITE_DISABLE_X86_NEON  #for tflite micro
-      - -DESP_NN  #use hardware acceleration : https://github.com/espressif/esp-nn (only if using tflite)
+      - -DTF_LITE_DISABLE_X86_NEON  # for tflite micro
+      - -DESP_NN  # use hardware acceleration : https://github.com/espressif/esp-nn (only if using tflite)
     # build_flags: -DBOARD_HAS_PSRAM -DCORE_DEBUG_LEVEL=0
     # board_build.f_cpu: 240000000L
     # board_build.f_flash: 80000000L
@@ -49,8 +49,8 @@ esphome:
 
 substitutions:
   # board and compilation
-  board: freenove_esp32_s3_wroom  #esp32-s3-devkitc-1 #seeed_xiao_esp32s3 #esp32-s3-devkitc-1 # https://github.com/esphome/issues/issues/4492
-  framework: esp-idf  #arduino #esp-idf/arduino
+  board: freenove_esp32_s3_wroom  # esp32-s3-devkitc-1 # seeed_xiao_esp32s3 # esp32-s3-devkitc-1 # https://github.com/esphome/issues/issues/4492
+  framework: esp-idf  # arduino # esp-idf/arduino
 
   # Pin definition
   external_clock_pin: GPIO15
@@ -128,7 +128,7 @@ psram:
 light:
   - platform: esp32_rmt_led_strip
     rgb_order: GRB
-    pin: ${flash_led_pin}  #GPIO48
+    pin: ${flash_led_pin}  # GPIO48
     num_leds: 1
     chipset: ws2812
     name: "${name} Flash LED"

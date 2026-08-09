@@ -813,13 +813,20 @@ if (this->has_state(val)) {   // Validate the value, not the flag
 ```
 tests/
 ├── test_build_components/
-│   └── test_meter_reader_tflite.yaml
 ├── components/
 │   └── meter_reader_tflite/
-│       ├── common.yaml
-│       ├── esp32.yaml
-│       └── esp32-s3.yaml
+│       ├── common.yaml              ← component config only (no top-level blocks)
+│       ├── test.esp32-idf.yaml      ← esphome: + esp32: + <<: !include common.yaml
+│       └── test.esp32-s3-idf.yaml   ← same for S3
 ```
+
+**File naming:** Tests follow the `D:\esphome\tests\components\` convention
+(`test.<platform>.yaml`). Platform files define `esphome:`, `esp32:`, `logger:`,
+and platform-specific peripherals (camera pins, I2S substitutions), then
+`<<: !include common.yaml`. `common.yaml` holds only component-level config —
+no top-level `esphome:` or `esp32:` blocks. This matches how
+`get_component_test_files()` discovers tests in the ESPHome build framework and
+enables the grouped test runner to merge common configs.
 
 **Test requirements:**
 - Test compiles for both ESP32 and ESP32-S3
@@ -863,8 +870,38 @@ python script/ci-custom.py
 python script/ci-custom.py --changed
 ```
 
+### 9.2.1 Unified Lint Runner
+
+**`python script/run_lint.py` runs ALL pre-commit lint checks in sequence:**
+
+| Mode | Command | Action |
+|------|---------|--------|
+| **Check** | `python script/run_lint.py` | Read-only full scan (ci-custom + clang-format + ruff + flake8 + yamllint) |
+| **Changed** | `python script/run_lint.py --changed` | Only git-changed files |
+| **Fix** | `python script/run_lint.py --fix` | Auto-correct CRLF, trailing WS, ruff, clang-format |
+| **CI** | `python script/run_lint.py --ci` | Exit on first failure |
+
+This is the **single command developers MUST run before merge**. It wraps
+`ci-custom.py`, `clang-format`, `ruff`, `flake8`, and `yamllint` (when installed).
+
 **⚠️ REQUIRED:**
-All new `cg.add_define()` calls MUST be added to `esphome/core/defines.h`
+- All new `cg.add_define()` calls MUST be added to `esphome/core/defines.h`
+- After **batch file creation** (`write_to_file` / `replace_in_file` on Windows),
+  re-run `python script/run_lint.py` and fix any CRLF / trailing-newline
+  regressions before merging.
+- **`.gitignore` MUST match the latest `dev` branch.** Do NOT add new ignore
+  entries to silence lint findings.
+- **Fix files, never add lint exceptions.** When a lint check (ci-custom,
+  yamllint, clang-format, ruff, flake8) flags a file, correct the file itself —
+  do NOT add the file/directory to a lint config's `ignore:` list or disable
+  a rule to make the check pass. Exceptions require explicit human approval.
+- Generated artifacts created during development (e.g. `.esphome/` model
+  caches) MUST be deleted before merging, not added to ignore lists.
+- **IMPORTANT: DO NOT change the checking and validation rules** (lint
+  configs, `.ai/instructions`, CI checks, schemas, thresholds) unless a
+  human explicitly asks for that change. Fix the flagged files instead.
+  If a rule change is truly required, present it as a proposal and wait for
+  human approval before applying.
 
 ### 9.3 Runtime Testing
 
@@ -1292,6 +1329,15 @@ while (xQueueReceive(this->upload_queue_, &job, 0) == pdTRUE) {
 5. **ASCII-only in source files** — NO characters ≥ U+0080.
 
 This applies to ALL write operations: new files, edits, patches, and any generated output. These checks are non-negotiable and match §7.7 / `.editorconfig`. Violations cause CI to fail (`ci-custom.py` and pre-commit hooks).
+
+**⚠️ Post-write verification:** After **batch file creation** (`write_to_file` /
+`replace_in_file` on Windows), the editor may introduce CRLF line endings or
+strip the trailing newline. ALWAYS re-run `python script/run_lint.py` after
+creating or editing files, and fix any CRLF / trailing-newline regressions
+before merging.
+
+**⚠️ Maintenance:** When this file changes, `.ai/instructions.yaml` MUST be
+regenerated (token-optimized derivative for `.clinerules/` and `.greptile/`).
 
 ---
 

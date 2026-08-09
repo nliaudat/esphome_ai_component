@@ -22,8 +22,8 @@ esphome:
     board_build.extra_flags:
       - -DBOARD_HAS_PSRAM
       - -DTF_LITE_STATIC_MEMORY  # for tflite micro
-      - -DTF_LITE_DISABLE_X86_NEON  #for tflite micro
-      - -DESP_NN  #use hardware acceleration : https://github.com/espressif/esp-nn (only if using tflite)
+      - -DTF_LITE_DISABLE_X86_NEON  # for tflite micro
+      - -DESP_NN  # use hardware acceleration : https://github.com/espressif/esp-nn (only if using tflite)
     # build_flags: -DBOARD_HAS_PSRAM -DCORE_DEBUG_LEVEL=0
     # board_build.f_cpu: 240000000L
     board_build.f_flash: 80000000L
@@ -45,17 +45,17 @@ esphome:
 
 substitutions:
   # board and compilation
-  board: seeed_xiao_esp32s3  #https://docs.platformio.org/en/latest//boards/espressif32/seeed_xiao_esp32s3.html
+  board: seeed_xiao_esp32s3  # https://docs.platformio.org/en/latest//boards/espressif32/seeed_xiao_esp32s3.html
   framework: esp-idf
 
   # Pin definition
 
   # SD Card Configuration
   # https://wiki.seeedstudio.com/xiao_esp32s3_sense_filesystem/
-  sdcard_clk_pin: GPIO07  #SD_SCLK
-  sdcard_cmd_pin: GPIO09  #SD_MOSI
-  sdcard_d0_pin: GPIO08  #SD_MISO
-  sdcard_d3_pin: GPIO21  #SD_CS, CD/DAT3
+  sdcard_clk_pin: GPIO07  # SD_SCLK
+  sdcard_cmd_pin: GPIO09  # SD_MOSI
+  sdcard_d0_pin: GPIO08  # SD_MISO
+  sdcard_d3_pin: GPIO21  # SD_CS, CD/DAT3
 
   # Camera Pins
   # https://esphome.io/components/esp32_camera/
