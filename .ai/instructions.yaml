@@ -371,9 +371,27 @@ security:
 # =============================================================================
 testing:
   yaml_tests:
-    - "Every component: tests/components/<name>/esp32.yaml + esp32-s3.yaml"
+    - "Every component: tests/components/<name>/test.esp32-idf.yaml + test.esp32-s3-idf.yaml"
+    - "Platform files define esphome: + esp32: + <<: !include common.yaml (D:\\esphome convention)"
+    - "common.yaml holds component config only --- no top-level esphome:/esp32: blocks"
     - "Test minimal + full-feature configs"
     - "Test with and without optional dependencies"
+  lint_runner:
+    command: "python script/run_lint.py"
+    modes:
+      check: "python script/run_lint.py  # read-only full scan"
+      changed: "python script/run_lint.py --changed  # git-changed only"
+      fix: "python script/run_lint.py --fix  # auto-correct CRLF, WS, ruff, clang-format"
+      ci: "python script/run_lint.py --ci  # exit on first failure"
+    wraps: ["ci-custom", "clang-format", "ruff", "flake8", "yamllint"]
+    note: "SINGLE pre-merge command developers MUST run"
+  policy:
+    - "IMPORTANT: DO NOT change the checking and validation rules (lint configs, .ai/instructions, CI checks, schemas, thresholds) unless a human explicitly asks. Fix the flagged files instead; rule changes require human approval."
+    - ".gitignore MUST match the latest dev branch --- do NOT add ignore entries to silence lint findings"
+    - "Fix files, never add lint exceptions --- when a lint check flags a file, correct the file itself"
+    - "Do NOT add files/dirs to a lint config ignore: list or disable a rule to make checks pass"
+    - "Lint exceptions require explicit human approval"
+    - "Generated artifacts (.esphome/ model caches) MUST be deleted before merging, not ignored"
   static_analysis:
     - "pre-commit run --all-files  # Run ALL checks"
     - "clang-tidy for C++ (manual)"
@@ -383,6 +401,7 @@ testing:
     - "yamllint ."
     - "python script/ci-custom.py  # custom checks (whitespace, CRLF, ASCII, etc.)"
     - "python script/ci-custom.py --changed  # only changed files"
+    - "python script/run_lint.py  # unified runner (see lint_runner above)"
   runtime:
     - "Profile heap usage before/after changes"
     - "Monitor fragmentation over 24+ hours"
@@ -596,9 +615,14 @@ ci_tools:
   pre_commit_config: ".pre-commit-config.yaml"
   ci_workflow: ".github/workflows/ci.yml"
   custom_lint_script: "script/ci-custom.py"
+  unified_lint_runner: "script/run_lint.py  # runs ci-custom + clang-format + ruff + flake8 + yamllint"
+  post_write:
+    - "Files written by write_to_file/replace_in_file on Windows may have CRLF/stripped newlines"
+    - "ALWAYS re-run 'python script/run_lint.py' after batch file creation before merging"
   gitignore_changes:
     - "Removed .clang-format from gitignore (now tracked)"
     - "Removed .github/workflows/ci.yml from gitignore (now tracked)"
+    - "Added **/.esphome/ (model-cache dirs created by esphome config)"
   fix_commands:
     - "pre-commit run --all-files  # Run all hooks"
     - "pre-commit run trailing-whitespace --all-files  # Fix trailing whitespace"
@@ -606,3 +630,5 @@ ci_tools:
     - "pre-commit run mixed-line-ending --all-files  # Fix CRLF -> LF"
     - "python script/ci-custom.py  # Custom lint checks"
     - "python script/ci-custom.py --changed  # Only changed files"
+    - "python script/run_lint.py  # Unified lint runner (all checks)"
+    - "python script/run_lint.py --fix  # Auto-correct CRLF, WS, ruff, clang-format"

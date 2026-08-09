@@ -77,13 +77,13 @@ void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, in
   size_t jpeg_len = 0;
 
   if (pix_fmt == PIXFORMAT_JPEG) {
-    // Already JPEG — pass const pointer to upload_image which copies internally
+    // Already JPEG - pass const pointer to upload_image which copies internally
     // Avoids const_cast on the shared CameraImage buffer which other consumers may read.
     this->upload_image(frame->get_data_buffer(), frame->get_data_length(), raw_value, confidence, metadata.c_str());
     return;
   }
 
-  // Convert to JPEG — fmt2jpg allocates a new buffer, does not modify input
+  // Convert to JPEG - fmt2jpg allocates a new buffer, does not modify input
   bool converted = fmt2jpg(const_cast<uint8_t *>(frame->get_data_buffer()), frame->get_data_length(), width, height,
                            pix_fmt, 90, &jpeg_buf, &jpeg_len);
 
@@ -241,7 +241,7 @@ bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, const s
   esp_http_client_config_t config = {};
   config.url = this->upload_url_.c_str();
   config.method = HTTP_METHOD_POST;
-  config.timeout_ms = 5000;  // §3.4: default timeout must be 5s
+  config.timeout_ms = 5000;  // 3.4: default timeout must be 5s
 
   if (!this->username_.empty()) {
     config.username = this->username_.c_str();

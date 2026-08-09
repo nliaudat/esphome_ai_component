@@ -13,7 +13,7 @@ void TFLiteCoordinator::set_model(const uint8_t *model, size_t length) {
   this->legacy_tflite_->set_model(model, length);
 }
 
-// Legacy setters — delegate to legacy instance (or create one)
+// Legacy setters - delegate to legacy instance (or create one)
 void TFLiteCoordinator::set_model_type(const std::string &t) {
   if (!this->legacy_tflite_)
     this->legacy_tflite_ = std::make_unique<tflite_micro_helper::TFLiteMicroHelper>();

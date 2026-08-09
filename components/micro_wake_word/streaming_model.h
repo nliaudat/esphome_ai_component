@@ -66,7 +66,7 @@ class StreamingModel {
   /// @return The required arena size rounded up to 16-byte alignment, or 0 on failure.
   size_t probe_arena_size_();
 
-  /// @brief Registration helper for probe — registers streaming ops into a local resolver.
+  /// @brief Registration helper for probe - registers streaming ops into a local resolver.
   /// Does NOT modify any member state.
   static bool register_probe_ops_(tflite::MicroMutableOpResolver<20> &op_resolver);
 

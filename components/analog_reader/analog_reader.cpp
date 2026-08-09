@@ -128,7 +128,7 @@ void AnalogReader::setup() {
       }
     }
 
-    // Guarded multiplication per §8.1 (CVE-2026-23833 pattern)
+    // Guarded multiplication per 8.1 (CVE-2026-23833 pattern)
     size_t rgb_size = 0;
     size_t gray_size = 0;
     {
@@ -146,7 +146,7 @@ void AnalogReader::setup() {
         return;
       }
       rgb_size = pixels * 3u;
-      gray_size = pixels;  // ×1 can never overflow
+      gray_size = pixels;  // x1 can never overflow
     }
     bool sufficient_psram_for_rgb = free_psram > (rgb_size + 1536 * 1024);
 
@@ -321,7 +321,7 @@ class DecodedImage : public esphome::camera::CameraImage {
  public:
   DecodedImage(esphome::esp32_camera_utils::ImageProcessor::JpegBufferPtr &&data, size_t width, size_t height)
       : data_(std::move(data)), width_(width), height_(height) {
-    // Guarded multiplication per §8.1
+    // Guarded multiplication per 8.1
     if (width > 0 && height > 0 && static_cast<uint64_t>(height) <= SIZE_MAX / static_cast<size_t>(width) &&
         (static_cast<size_t>(width) * static_cast<size_t>(height)) <= SIZE_MAX / 3u) {
       this->size_ = static_cast<size_t>(width) * static_cast<size_t>(height) * 3u;

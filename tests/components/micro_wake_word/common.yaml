@@ -1,18 +1,5 @@
-# ESPHome build test: micro_wake_word on ESP32
-esphome:
-  name: test-mww-esp32
-
-esp32:
-  board: esp32dev
-  framework:
-    type: esp-idf
-    sdkconfig_options:
-      CONFIG_ESP32_SPIRAM_SUPPORT: y
-
-psram:
-
-logger:
-  level: DEBUG
+# ESPHome build test: micro_wake_word (common)
+# Audio model via ID reference to tflite_micro_helper entry.
 
 external_components:
   - source:
@@ -23,14 +10,15 @@ external_components:
       - tflite_micro_helper
 
 # Minimal I2S audio config for build validation
+# Pins are provided per-platform via substitutions in test.<platform>.yaml.
 i2s_audio:
-  i2s_lrclk_pin: GPIO25
-  i2s_bclk_pin: GPIO26
+  i2s_lrclk_pin: ${i2s_lrclk_pin}
+  i2s_bclk_pin: ${i2s_bclk_pin}
 
 microphone:
   - platform: i2s_audio
     id: test_mic
-    i2s_din_pin: GPIO27
+    i2s_din_pin: ${mic_din_pin}
     channel: left
     pdm: false
     bits_per_sample: 16bit

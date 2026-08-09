@@ -85,7 +85,7 @@ class DataCollector : public Component {
     UploadJob() = default;
   };
 
-  // Rate limiting: max 1 upload per 60 seconds (§3.4)
+  // Rate limiting: max 1 upload per 60 seconds (3.4)
   static constexpr uint32_t MIN_UPLOAD_INTERVAL_MS = 60000;
   uint32_t last_upload_time_{0u - MIN_UPLOAD_INTERVAL_MS};  // Ensures first upload is always permitted
 
