@@ -348,7 +348,6 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
   // Consolidated: Replaces 4 copies of ImageProcessorConfig construction
   void refresh_image_processor_config(int processor_input_type);
-  bool validate_and_update_reading(float raw, float conf, float &val);
   bool validate_and_update_reading(const esphome::StaticVector<float, 16> &digits,
                                    const esphome::StaticVector<float, 16> &confidences, float &val);
 

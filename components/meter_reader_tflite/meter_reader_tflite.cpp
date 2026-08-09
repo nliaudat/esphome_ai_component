@@ -1109,7 +1109,10 @@ float MeterReaderTFLite::combine_readings(const esphome::StaticVector<float, 16>
       ESP_LOGD(TAG, "Zone %d: Raw=%.1f -> Computed=%d", i + 1, readings[i], digit);
     }
 
-    digit_string += std::to_string(digit);
+    // E7: avoid std::string += std::to_string(digit) heap allocs in the hot path.
+    char digit_buf[8];
+    snprintf(digit_buf, sizeof(digit_buf), "%d", digit);
+    digit_string += digit_buf;
   }
 
   ESP_LOGI(TAG, "Concatenated digit string: %s", digit_string.c_str());
@@ -1134,14 +1137,6 @@ float MeterReaderTFLite::combine_readings(const esphome::StaticVector<float, 16>
   }
   ESP_LOGI(TAG, "Final combined value: %.0f", combined_value);
   return combined_value;
-}
-
-bool MeterReaderTFLite::validate_and_update_reading(float raw, float conf, float &val) {
-  int ival = static_cast<int>(raw);
-  int oval = ival;
-  bool valid = this->validation_coord_.validate_reading(ival, conf, oval);
-  val = static_cast<float>(oval);
-  return valid;
 }
 
 bool MeterReaderTFLite::validate_and_update_reading(const esphome::StaticVector<float, 16> &digits,
@@ -1251,6 +1246,13 @@ void MeterReaderTFLite::dump_config() {
 #else
   ESP_LOGCONFIG(TAG, "  Pipeline: Single Core (Sequential)");
 #endif
+
+  // E10: report model + camera state so diagnostics reflect the running config.
+  ESP_LOGCONFIG(TAG, "  Model Loaded: %s", this->tflite_coord_.is_model_loaded() ? "YES" : "NO");
+  ESP_LOGCONFIG(TAG, "  Camera: %dx%d %s, Rotation: %.1f", this->camera_coord_.get_width(),
+                this->camera_coord_.get_height(), this->camera_coord_.get_format().c_str(), this->rotation_);
+  ESP_LOGCONFIG(TAG, "  Window: %s", this->camera_coord_.is_window_configured() ? "configured" : "not configured");
+  ESP_LOGCONFIG(TAG, "  Preview: %s", this->generate_preview_ ? "enabled" : "disabled");
 
   if (this->is_failed()) {
     ESP_LOGE(TAG, "  Component FAILED to setup");
@@ -1676,11 +1678,9 @@ std::string MeterReaderTFLite::serialize_inference_metadata(const std::string &v
 
   json += ",\"digits\":[";
 
-  // Get zones
-  std::vector<esp32_camera_utils::CropZone> zones;
-  if (this->crop_zone_handler_.get_zones().size() > 0) {
-    zones = this->crop_zone_handler_.get_zones();
-  }
+  // E5: bind the handler's zones by const-ref -- avoids a heap std::vector copy
+  // (this path only runs on a collection trigger, but the copy is trivially avoidable).
+  const auto &zones = this->crop_zone_handler_.get_zones();
 
   for (size_t i = 0; i < readings.size(); i++) {
     if (i > 0)

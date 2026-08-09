@@ -101,25 +101,6 @@ void CameraCoordinator::basic_recovery() {
   // but mostly this just logs and maybe allows the system to try again next loop.
 }
 
-// Legacy function -- kept for API compatibility but no longer called.
-// The component now uses the unified FrameState enum (meter_reader_tflite.h)
-// instead of separate std::atomic<bool> flags for frame management.
-bool CameraCoordinator::test_camera_after_reset(std::atomic<bool> &frame_available,
-                                                std::atomic<bool> &frame_requested) {
-  frame_requested.store(true);
-  uint32_t start = millis();
-  while (millis() - start < 5000) {
-    if (frame_available.load()) {
-      frame_available.store(false);
-      frame_requested.store(false);
-      return true;
-    }
-    vTaskDelay(pdMS_TO_TICKS(100));
-  }
-  frame_requested.store(false);
-  return false;
-}
-
 void CameraCoordinator::unload() {
   this->image_processor_.reset();
   ESP_LOGI(TAG, "ImageProcessor unloaded");

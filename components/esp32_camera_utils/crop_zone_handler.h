@@ -18,6 +18,9 @@ struct CropZone {
 
 class CropZoneHandler {
  public:
+  /// Max zones the readers can process (StaticVector<float,16> in meter_reader_tflite).
+  static constexpr size_t MAX_CROP_ZONES = 16;
+
   void parse_zones(const std::string &zones_json);
   const std::vector<CropZone> &get_zones() const { return zones_; }
   void set_default_zone(int width, int height);
