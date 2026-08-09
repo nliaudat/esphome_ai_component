@@ -86,7 +86,22 @@ class TFLiteMicroHelper {
 
   // -- Lifecycle ------------------------------------------------------
   bool load_model();
-  void unload_model();
+
+  /// @brief Unload the model and free the arena.
+  /// @param reset_config If true, also clear all model-config fields via
+  ///   reset_config() so a subsequent load_model() starts from clean defaults.
+  ///   Use this when switching to a *different* model -- the consumer must then
+  ///   re-issue set_model() and all relevant setters before load_model().
+  ///   Keep false (default) for same-model reload where config is preserved
+  ///   (e.g. meter_reader_tflite::reload_resources).
+  void unload_model(bool reset_config = false);
+
+  /// @brief Reset all configuration fields to type-safe defaults (P1).
+  /// Prevents a stale arena size, input dimensions, preprocessing, or audio
+  /// configuration from leaking into the next load_model() when a consumer
+  /// switches to a different model. Must be followed by fresh setters +
+  /// set_model() before load_model().
+  void reset_config();
 
   /// @brief Returns true only when the model has been fully loaded (READY).
   /// Uses a single atomic state machine: no check-then-act across multiple flags.
