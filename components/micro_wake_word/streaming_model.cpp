@@ -62,7 +62,7 @@ bool StreamingModel::load_model_() {
 
   // Delegate model loading to tflite_micro_helper::ModelHandler with MRV support.
   // Model size is passed as tensor_arena_size_ (placeholder) since the model FlatBuffer
-  // doesn't need a size to load — tflite::GetModel() reads the buffer directly.
+  // doesn't need a size to load - tflite::GetModel() reads the buffer directly.
   // model_size is only used for logging/validation in ModelHandler; the tensor arena size
   // is a non-zero placeholder that satisfies the existence check.
   model_config_.description = "micro_wake_word";

@@ -349,7 +349,7 @@ MODEL_SCHEMA = cv.Schema(
 def _validate_model_entry(value):
     """Validate a model entry, supporting either string shorthand or dict with
     `model:` (manifest-based) or `tflite_model:` (tflite_micro_helper reference)."""
-    # Handle shorthand string: "okay_nabu" → {model: "okay_nabu"} via MODEL_SOURCE_SCHEMA
+    # Handle shorthand string: "okay_nabu" -> {model: "okay_nabu"} via MODEL_SOURCE_SCHEMA
     if isinstance(value, str):
         return MODEL_SCHEMA({CONF_MODEL: MODEL_SOURCE_SCHEMA(value)})
 
@@ -540,7 +540,7 @@ def _feature_step_size_validate(config):
         if CONF_TFLITE_MODEL in model_parameters:
             # For tflite_model refs, read step size from the config or YAML entry.
             # If CORE.config is not yet available (FINAL_VALIDATE_SCHEMA called before
-            # CORE.config is populated), skip validation — to_code() handles it.
+            # CORE.config is populated), skip validation - to_code() handles it.
             tflite_id = model_parameters[CONF_TFLITE_MODEL]
             tflite_cfg = _find_tflite_config(tflite_id)
             if tflite_cfg is None:

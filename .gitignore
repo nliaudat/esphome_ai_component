@@ -2,6 +2,7 @@
 
 # Core & Build
 /.esphome/
+**/.esphome/
 **/.pioenvs/
 **/.piolibdeps/
 **/lib/
@@ -41,3 +42,6 @@ validate_all_configs.bat
 dropbox_ignore.ps
 .clinerules/rules.yaml
 /venv
+/tests/components/meter_reader_tflite/.esphome
+/tests/components/micro_wake_word/.esphome
+/tests/components/meter_reader_tflite/.esphome
