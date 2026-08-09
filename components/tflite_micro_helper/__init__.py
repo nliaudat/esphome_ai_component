@@ -4,6 +4,7 @@ Supports image (single-shot) and audio (streaming) model types,
 with local file, github shorthand, and http URL model sources.
 """
 
+from contextlib import suppress
 import hashlib
 import json
 from pathlib import Path
@@ -26,6 +27,7 @@ from esphome.const import (
     CONF_REFRESH,
     CONF_TYPE,
     CONF_URL,
+    KEY_CORE,
     TYPE_GIT,
     TYPE_LOCAL,
 )
@@ -159,6 +161,8 @@ def _validate_source_shorthand(value):
         raise cv.Invalid("Model source must be a string or dict")
     if Path(value).exists():
         return MODEL_SOURCE_SCHEMA({CONF_TYPE: TYPE_LOCAL, CONF_PATH: value})
+    if value.startswith(("http://", "https://")):
+        return MODEL_SOURCE_SCHEMA({CONF_TYPE: TYPE_HTTP, CONF_URL: value})
     if value.endswith(".tflite"):
         return MODEL_SOURCE_SCHEMA({CONF_TYPE: TYPE_LOCAL, CONF_PATH: value})
     if value.startswith("github://"):
@@ -176,8 +180,6 @@ def _validate_source_shorthand(value):
             return MODEL_SOURCE_SCHEMA(conf)
         except cv.Invalid as e:
             raise cv.Invalid(f"Could not resolve github:// model: {value}") from e
-    if value.startswith(("http://", "https://")):
-        return MODEL_SOURCE_SCHEMA({CONF_TYPE: TYPE_HTTP, CONF_URL: value})
     raise cv.Invalid(
         f"Cannot resolve model source: '{value}'. "
         f"Use a local .tflite path, github:// URL, or http(s):// URL."
@@ -216,19 +218,42 @@ GIT_SCHEMA = cv.All(
 )
 
 
-def _process_http_source(config):
-    url = config[CONF_URL]
-    path = _compute_local_file_path(url)
+def _download_http_model(url):
+    """Download a model from an http(s) URL and return its local path.
+
+    Supports both JSON manifests (which reference the model file) and direct
+    ``.tflite`` URLs. For direct model URLs the companion ``.txt`` metadata
+    file (same basename, ``.txt`` extension) is also fetched best-effort so
+    image/audio model auto-config stays available.
+    """
     from esphome import external_files
 
-    json_path = path / "manifest.json"
-    json_contents = external_files.download_content(url, json_path)
+    path = _compute_local_file_path(url)
+    if url.lower().endswith(".tflite"):
+        model_path = path / Path(url).name
+        external_files.download_content(url, model_path)
+        # Optional companion .txt metadata file; missing is fine, config
+        # auto-detection falls back to filename heuristics.
+        txt_url = f"{url[:-7]}.txt"
+        txt_path = path / Path(txt_url).name
+        with suppress(cv.Invalid, OSError):
+            external_files.download_content(txt_url, txt_path)
+        return model_path
+
+    manifest_path = path / "manifest.json"
+    json_contents = external_files.download_content(url, manifest_path)
     manifest_data = json.loads(json_contents)
-    model_file = manifest_data.get("model", "")
-    if model_file:
-        model_url = urljoin(url, model_file)
-        model_path = path / Path(model_file).name
-        external_files.download_content(str(model_url), model_path)
+    model_file = manifest_data.get("model")
+    if not model_file:
+        raise cv.Invalid(f"Manifest at {url} does not specify a model file")
+    model_url = urljoin(url, model_file)
+    model_path = path / Path(model_file).name
+    external_files.download_content(str(model_url), model_path)
+    return model_path
+
+
+def _process_http_source(config):
+    _download_http_model(config[CONF_URL])
     return config
 
 
@@ -294,9 +319,13 @@ PER_MODEL_SCHEMA = cv.Schema(
 )
 
 MULTI_CONF = True
-CONFIG_SCHEMA = PER_MODEL_SCHEMA
+CONFIG_SCHEMA = cv.All(PER_MODEL_SCHEMA, cv.only_on_esp32)
 
-DEPENDENCIES = ["esp32"] if CORE.target_platform == "esp32" else []
+DEPENDENCIES = (
+    ["esp32"]
+    if CORE.data.get(KEY_CORE) is not None and CORE.target_platform == "esp32"
+    else []
+)
 
 
 def resolve_model_source(entry_config):
@@ -340,19 +369,7 @@ def _load_git_file(config):
 
 
 def _load_http_file(config):
-    from esphome import external_files
-
-    url = config[CONF_URL]
-    path = _compute_local_file_path(url)
-    manifest_path = path / "manifest.json"
-    json_contents = external_files.download_content(url, manifest_path)
-    manifest_data = json.loads(json_contents)
-    model_file = manifest_data.get("model")
-    if not model_file:
-        raise cv.Invalid(f"Manifest at {url} does not specify a model file")
-    model_url = urljoin(url, model_file)
-    model_path = path / Path(model_file).name
-    external_files.download_content(str(model_url), model_path)
+    model_path = _download_http_model(config[CONF_URL])
     with Path(model_path).open("rb") as f:
         model_data = f.read()
     return model_path, model_data
@@ -375,6 +392,11 @@ async def to_code(config):
         cg.add_build_flag("-DTF_LITE_DISABLE_X86_NEON")
         cg.add_build_flag("-DESP_NN")
         cg.add_build_flag("-DOPTIMIZED_KERNEL=esp_nn")
+        # E7: MAX_OPERATORS is a process-global compile-time macro. With MULTI_CONF,
+        # emitting one flag per instance would let the last one win. Compute the max
+        # across ALL configured models so every instance is safe. Idempotent: every
+        # to_code() call for this DOMAIN emits the same value.
+        cg.add_build_flag(f"-DMAX_OPERATORS={_compute_max_operators()}")
         if config.get(CONF_DEBUG, False):
             cg.add_define("DEBUG_TFLITE_MICRO_HELPER")
             cg.add(var.set_debug(True))
@@ -382,22 +404,42 @@ async def to_code(config):
             await _configure_image_model(config, var, model_path, model_data)
         elif model_type == "audio":
             await _configure_audio_model(config, var, model_path, model_data)
-        txt_path = str(Path(model_path).with_suffix(".txt"))
-        if Path(txt_path).exists():
-            with Path(txt_path).open(encoding="utf-8") as f:
-                txt_content = f.read()
-            ops_match = re.search(r"Total operations:\s+(\d+)", txt_content)
-            if ops_match:
-                model_ops = int(ops_match.group(1)) + 5
-                cg.add_build_flag(f"-DMAX_OPERATORS={model_ops}")
-        else:
-            cg.add_build_flag("-DMAX_OPERATORS=30")
         esp32.add_idf_component(name="espressif/esp-tflite-micro", ref="1.3.7")
         esp32.add_idf_component(name="espressif/esp-nn", ref="1.2.3")
         if model_type == "audio":
             esp32.add_idf_component(
                 name="esphome/esp-micro-speech-features", ref="1.2.3"
             )
+
+
+def _compute_max_operators():
+    """Compute the single MAX_OPERATORS value for the ENTIRE build.
+
+    Build flags are process-global (cg.add_build_flag). With MULTI_CONF each
+    to_code() invocation would otherwise emit its own -DMAX_OPERATORS and the
+    last one wins -- silently breaking earlier models with a too-small resolver.
+    All invocations therefore compute the SAME max across every configured model.
+
+    Returns max(ops + 5) across all .txt reports, or 30 (the default) when no
+    .txt report provides a count.
+    """
+    if CORE.config is None:
+        return 30
+    max_ops = 0
+    for entry in CORE.config.get(DOMAIN, []):
+        try:
+            model_path, _ = resolve_model_source(entry)
+        except cv.Invalid:
+            continue
+        txt_path = str(Path(model_path).with_suffix(".txt"))
+        if not Path(txt_path).exists():
+            continue
+        with Path(txt_path).open(encoding="utf-8") as f:
+            txt_content = f.read()
+        ops_match = re.search(r"Total operations:\s+(\d+)", txt_content)
+        if ops_match:
+            max_ops = max(max_ops, int(ops_match.group(1)) + 5)
+    return max_ops if max_ops > 0 else 30
 
 
 async def _configure_image_model(entry, var, model_path, model_data):
