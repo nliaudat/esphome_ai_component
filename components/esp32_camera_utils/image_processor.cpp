@@ -56,6 +56,22 @@ static jpeg_rotate_t normalize_rotation(float rotation, bool &needs_software) {
   return JPEG_ROTATE_0D;
 }
 
+// E2: pin a single decoder byte-order contract (canonical RGB).
+// The ESP32 JPEG decoder emits pixels as BGR (Little Endian RGB). Every consumer
+// (grayscale conversion, arrange_channels RGB path, web preview) expects RGB, so we
+// normalize immediately after decode instead of swapping inside each zone path.
+// In-place: swap R (index 0) and B (index 2) for every pixel.
+static void ensure_rgb_order(uint8_t *pixels, size_t pixel_count) {
+  if (pixels == nullptr)
+    return;
+  for (size_t i = 0; i < pixel_count; ++i) {
+    size_t idx = i * 3;
+    uint8_t tmp = pixels[idx];      // B (from BGR)
+    pixels[idx] = pixels[idx + 2];  // R -> index 0
+    pixels[idx + 2] = tmp;          // B -> index 2
+  }
+}
+
 // Debug macros for image processing analysis (restored from legacy code)
 #if defined(DEBUG_ESP32_CAMERA_UTILS) || defined(DEBUG_METER_READER_TFLITE) || \
     defined(DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL)
@@ -734,18 +750,13 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(s
   const uint8_t *processing_source_ptr = nullptr;
 
   if (use_master_buffer && master_decoded_buffer) {
-    // Fix BGR -> RGB for 3-channel (needed for RGB models where channel order matters)
+    // E2 (B1): fix BGR -> RGB for 3-channel (needed for RGB models where channel order
+    // matters) via the same shared helper used by process_jpeg_zone_to_buffer.
     // Skip for grayscale models (model_channels == 1) since arrange_channels()
     // computes luminance from R,G,B which is order-independent.
     if (master_channels == 3 && this->config_.model_channels >= 3) {
-      uint8_t *raw_buf = master_decoded_buffer.get();
-      size_t pixel_count = master_width * master_height;
-      for (size_t i = 0; i < pixel_count; i++) {
-        size_t idx = i * 3;
-        uint8_t temp = raw_buf[idx];
-        raw_buf[idx] = raw_buf[idx + 2];
-        raw_buf[idx + 2] = temp;
-      }
+      ensure_rgb_order(master_decoded_buffer.get(),
+                       static_cast<size_t>(master_width) * static_cast<size_t>(master_height));
     }
 
     // Convert master buffer to grayscale when model expects 1 channel
@@ -1044,6 +1055,15 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(std::shared_ptr<camera::CameraI
   if (!full_image_buf) {
     this->stats_.jpeg_decoding_errors++;
     return false;
+  }
+
+  // E2 (B1): pin the canonical byte order. The decoder emits BGR; the RGB crop/scaling
+  // paths read RGB and the grayscale conversion reads BGR. For RGB models we must
+  // normalize to RGB immediately after decode so both paths agree. Grayscale models
+  // are order-independent (luminance is symmetric in R/G/B), so we skip the swap to
+  // match the master-path (split_image_in_zone) behavior exactly.
+  if (this->config_.model_channels >= 3 && decode_format == JPEG_PIXEL_FORMAT_RGB888) {
+    ensure_rgb_order(full_image_buf.get(), static_cast<size_t>(jpeg_width) * static_cast<size_t>(jpeg_height));
   }
 
   // Update with authoritative dimensions
