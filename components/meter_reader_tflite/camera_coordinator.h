@@ -65,7 +65,6 @@ class CameraCoordinator {
   }
 
   // Helpers
-  bool test_camera_after_reset(std::atomic<bool> &frame_available, std::atomic<bool> &frame_requested);
   void basic_recovery();
   std::string get_pixel_format() const { return current_format_; }
   void set_enable_preview(bool enable) { this->enable_preview_ = enable; }

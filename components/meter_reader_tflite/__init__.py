@@ -26,8 +26,7 @@ try:
 except ImportError:
     value_validator = None
 
-from esphome.components import esp32_camera, globals
-from esphome.components.tflite_micro_helper import TFLiteMicroHelper
+from esphome.components import esp32_camera, globals, tflite_micro_helper
 from esphome.cpp_generator import RawExpression
 
 try:
@@ -96,171 +95,11 @@ MeterReaderTFLite = meter_reader_tflite_ns.class_(
 )
 
 
-def datasize_to_bytes(value):
-    """Parse a data size string with units like KB, MB to bytes."""
-    try:
-        value = str(value).upper().strip()
-        if value.endswith("KB"):
-            return int(float(value[:-2]) * 1024)
-        if value.endswith("MB"):
-            return int(float(value[:-2]) * 1024 * 1024)
-        if value.endswith("B"):
-            return int(value[:-1])
-        return int(value)
-    except ValueError as e:
-        raise cv.Invalid(f"Invalid data size: {e}") from e
-
-
-def parse_model_txt_file(model_path):
-    """Parse a model .txt file to extract configuration parameters.
-
-    Returns a dict with auto-detected config values, or None if file not found.
-    """
-    txt_path = os.path.splitext(model_path)[0] + ".txt"
-    if not os.path.exists(txt_path):
-        return None
-
-    with open(txt_path) as f:
-        content = f.read()
-
-    config = {}
-
-    # Parse input type and shape from INPUT/OUTPUT SUMMARY section
-    # Example: "Input 0:  [ 1 32 20  3]   <class 'numpy.float32'>"
-    # TFLite NHWC layout: [batch, height, width, channels]
-    input_match = re.search(
-        r"Input\s+0:\s+\[\s*\d+\s+(\d+)\s+(\d+)\s+(\d+)\].*?numpy\.(\w+)", content
-    )
-    if input_match:
-        config["input_height"] = int(input_match.group(1))
-        config["input_width"] = int(input_match.group(2))
-        config["input_channels"] = int(input_match.group(3))
-        dtype = input_match.group(4)
-        config["input_type"] = "float32" if dtype == "float32" else "uint8"
-
-    # Parse output shape to determine class count
-    # Example: "Output 0: [ 1 10]         <class 'numpy.float32'>"
-    output_match = re.search(r"Output\s+0:\s+\[\s*\d+\s+(\d+)\]", content)
-    if output_match:
-        num_classes = int(output_match.group(1))
-        # 10 classes -> scale_factor=1.0, 100 classes -> scale_factor=10.0
-        if num_classes == 10:
-            config["scale_factor"] = 1.0
-        elif num_classes == 100:
-            config["scale_factor"] = 10.0
-        else:
-            config["scale_factor"] = 1.0
-
-    # Parse recommended tensor_arena_size from peak analysis (if available)
-    # Example: "Recommended tensor_arena_size: 42KB"
-    arena_match = re.search(r"Recommended tensor_arena_size:\s+(\d+)KB", content)
-    if arena_match:
-        arena_kb = int(arena_match.group(1))
-        config["tensor_arena_size"] = arena_kb * 1024
-
-    # Parse total operations count for MAX_OPERATORS
-    # Example: "Total operations: 37"
-    ops_match = re.search(r"Total operations:\s+(\d+)", content)
-    if ops_match:
-        total_ops = int(ops_match.group(1))
-        # Add safety margin of 5 for the resolver
-        config["max_operators"] = total_ops + 5
-        print(
-            f"  Auto-detected MAX_OPERATORS: {config['max_operators']} (from {total_ops} operations + 5 margin)"
-        )
-
-    # Detect DELEGATE ops (incompatible with TFLite Micro) - informational only
-    # Use specific pattern to match only the actual warning (e.g. "Found 3 DELEGATE operation(s)!")
-    # not the OK message ("No DELEGATE operations found") which also contains the word DELEGATE
-    if re.search(r"Found \d+ DELEGATE operation", content):
-        print(f"  Note: Model '{os.path.basename(txt_path)}' contains DELEGATE ops.")
-        print("    DELEGATE ops are NOT compatible with TFLite Micro.")
-        print("    Re-export the model with delegates disabled:")
-        print(
-            "      converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS]"
-        )
-
-    # Detect output processing mode from SOFTMAX operator presence
-    # If the model has a built-in SOFTMAX -> use 'direct_class' (output is already probabilities)
-    # If no SOFTMAX -> apply C++ softmax on raw logits
-    # Pattern matches "SOFTMAX: N" in the Unique operator types section
-    has_softmax = bool(re.search(r"^\s+SOFTMAX:\s+\d+", content, re.MULTILINE))
-    if has_softmax:
-        config["output_processing"] = "direct_class"
-        print(
-            "  Auto-detected output_processing: direct_class (model has built-in SOFTMAX)"
-        )
-    else:
-        config["output_processing"] = "softmax"
-        print(
-            "  Auto-detected output_processing: softmax (model has raw logits, will apply softmax in C++)"
-        )
-
-    # Detect quantization family: QAT vs TQT vs hybrid
-    # - QAT: first conv after QUANTIZE has kernel shape [1 1 1 3] (learned grayscale weights)
-    # - TQT: uses explicit formula (STRIDED_SLICE+MUL+ADD) or depthwise conv for grayscale
-    # Pattern: shape=[1 1 1 3] in a CONV_2D input tensor = QAT 1x1 learned grayscale
-    if re.search(r"shape=\[1 1 1 3\]", content):
-        config["quantization_family"] = "qat"
-        print("  Auto-detected quantization: QAT (learned 1x1 RGB->gray conv)")
-    else:
-        config["quantization_family"] = "tqt"
-        print("  Auto-detected quantization: TQT (standard post-training quantization)")
-
-    # Detect hybrid quantization (float32 I/O + int8 weights) -- incompatible with TFLite Micro
-    # Pattern: float32 input but int8 weight/bias tensors present (pseudo_qconst / int8 weight tensors)
-    input_dtype = config.get("input_type", "")
-    has_float32_io = input_dtype == "float32"
-    has_int8_weights = bool(re.search(r"<class 'numpy\.(int8|uint8)'>", content))
-
-    if has_float32_io and has_int8_weights:
-        # Hybrid quantization detected: float32 I/O with int8 quantized weights
-        # TFLite Micro does NOT support this mixed-precision pattern on ESP32
-        model_name = os.path.basename(txt_path).replace(".txt", ".tflite")
-        raise cv.Invalid(
-            f"Model '{model_name}' uses hybrid quantization (float32 I/O + int8 weights).\n"
-            f"  TFLite Micro on ESP32 does NOT support hybrid execution.\n"
-            f"  This model will fail at runtime with 'Failed to allocate tensors'.\n"
-            f"  Use a full integer quantized model instead (int8 I/O int8 weights).\n"
-            f"  Re-export with:\n"
-            f"    converter.optimizations = [tf.lite.Optimize.DEFAULT]\n"
-            f"    converter.representative_dataset = representative_dataset\n"
-            f"    converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]\n"
-            f"    converter.inference_input_type = tf.int8\n"
-            f"    converter.inference_output_type = tf.int8"
-        )
-
-    return config
-
-
-def infer_model_config_from_filename(model_filename):
-    """Infer model config from filename heuristics when no .txt file exists."""
-    config = {}
-    name = os.path.splitext(model_filename)[0]
-
-    # Detect channels from filename
-    if "_GRAY" in name or "_GRAYSCALE" in name:
-        config["input_channels"] = 1
-        config["input_order"] = "GRAY"
-    elif "_RGB" in name:
-        config["input_channels"] = 3
-        config["input_order"] = "RGB"
-    elif "_BGR" in name:
-        config["input_channels"] = 3
-        config["input_order"] = "BGR"
-    else:
-        config["input_channels"] = 3
-        config["input_order"] = "RGB"
-
-    # Detect class count from filename
-    if "_10cls_" in name or name.endswith("_10cls"):
-        config["scale_factor"] = 1.0
-    elif "_100cls_" in name or name.endswith("_100cls"):
-        config["scale_factor"] = 10.0
-    else:
-        config["scale_factor"] = 1.0
-
-    return config
+# E4: reuse the shared model-config helpers from tflite_micro_helper instead of
+# keeping a second, drift-prone copy of the .txt parsing + filename heuristics.
+datasize_to_bytes = tflite_micro_helper.datasize_to_bytes
+parse_model_txt_file = tflite_micro_helper.parse_model_txt_file
+infer_model_config_from_filename = tflite_micro_helper.infer_model_config_from_filename
 
 
 # Use the standard ESPHome sensor configuration pattern
@@ -268,7 +107,7 @@ CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(MeterReaderTFLite),
         cv.Required(CONF_MODEL): cv.Any(
-            cv.use_id(TFLiteMicroHelper),  # New: ID reference to tflite_micro_helper
+            cv.use_id(tflite_micro_helper.TFLiteMicroHelper),  # ID reference
             cv.file_,  # Legacy: direct file path
         ),
         cv.Optional(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator)

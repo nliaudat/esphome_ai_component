@@ -97,6 +97,14 @@ void CropZoneHandler::parse_zones(const std::string &zones_json) {
     }
 
     if (coords.size() == 4) {
+      // E8: cap the number of zones -- the readers use StaticVector<float,16>,
+      // so more zones would be silently truncated during inference.
+      if (zones_.size() >= MAX_CROP_ZONES) {
+        ESP_LOGE(TAG, "Too many crop zones: maximum is %d (zone [%d,%d,%d,%d] ignored)",
+                 static_cast<int>(MAX_CROP_ZONES), coords[0], coords[1], coords[2], coords[3]);
+        pos = end + 1;
+        continue;
+      }
       ESP_LOGD(TAG, "Added zone [%d,%d,%d,%d]", coords[0], coords[1], coords[2], coords[3]);
       zones_.push_back({coords[0], coords[1], coords[2], coords[3]});
     } else {
