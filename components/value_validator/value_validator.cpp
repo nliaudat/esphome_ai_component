@@ -194,7 +194,10 @@ void ValueValidator::setup() {
     // P1-1: migrate from the old (pre-E1) unsalted key on first boot after upgrade.
     // An existing device saved its baseline under fnv1_hash("value_validator"); without
     // this fallback the baseline would be discarded and validation restarts in
-    // first-reading state.
+    // first-reading state. NOTE: we deliberately do NOT erase the legacy slot -- with
+    // multiple persisted validators (cold/hot) upgrading together, the first instance
+    // must not claim the single shared legacy value. Each instance independently seeds
+    // its own salted slot from the shared source, then states diverge naturally.
     if (!loaded) {
       uint32_t legacy_key = fnv1_hash("value_validator");
       auto legacy_pref = global_preferences->make_preference<int>(legacy_key);
@@ -202,10 +205,8 @@ void ValueValidator::setup() {
       if (legacy_pref.load(&legacy_val) && legacy_val > 0) {
         restored = legacy_val;
         loaded = true;
-        // Persist to the new salted key and erase the legacy slot so the
-        // migration runs exactly once.
+        // Persist to the new salted key (do NOT erase the legacy shared slot).
         this->pref_.save(&legacy_val);
-        legacy_pref.save(nullptr);
         ESP_LOGI(TAG, "Migrated persistent state from legacy key: last_valid_reading = %d", legacy_val);
       }
     }
@@ -826,20 +827,25 @@ void ValueValidator::set_last_valid_reading(int value, size_t num_digits) {
   // P1-2: when no explicit width is supplied, keep the last known digit count
   // (from a prior real reading) so a numeric override like 50 on a 5-digit
   // meter (00050) does not degrade to 2 digits and break per-digit stability.
+  // If neither width source is available (fresh boot / after reset / after
+  // persistence restore), skip per-digit storage entirely: the first real
+  // reading establishes the true digit count via validate_reading(span).
   size_t len = num_digits > 0 ? num_digits : this->last_valid_digits_count_;
-  std::string val_str = std::to_string(value);
-  if (len == 0 || val_str.length() >= len) {
-    len = val_str.length();
-  } else {
-    val_str = std::string(len - val_str.length(), '0') + val_str;
-  }
-  this->ensure_last_valid_digits_size(len);
-  if (this->last_valid_digits_data_) {
-    for (size_t i = 0; i < len; i++) {
-      this->last_valid_digits_data_[i] = val_str[i] - '0';
+  if (len > 0) {
+    std::string val_str = std::to_string(value);
+    if (val_str.length() >= len) {
+      len = val_str.length();
+    } else {
+      val_str = std::string(len - val_str.length(), '0') + val_str;
     }
-  } else {
-    ESP_LOGE(TAG, "Cannot store last valid digits: allocation failed");
+    this->ensure_last_valid_digits_size(len);
+    if (this->last_valid_digits_data_) {
+      for (size_t i = 0; i < len; i++) {
+        this->last_valid_digits_data_[i] = val_str[i] - '0';
+      }
+    } else {
+      ESP_LOGE(TAG, "Cannot store last valid digits: allocation failed");
+    }
   }
 
   this->last_good_values_count_ = 0;
@@ -850,8 +856,12 @@ void ValueValidator::set_last_valid_reading(int value, size_t num_digits) {
   this->history_.clear();
   this->consecutive_rejections_ = 0;
   this->rejection_confidence_sum_ = 0.0f;
-  ESP_LOGW(TAG, "Manually set last valid reading to: %d (Digits: %d, Str: %s)", value, static_cast<int>(len),
-           val_str.c_str());
+  if (len == 0) {
+    ESP_LOGW(TAG, "Manually set last valid reading to: %d (digit count not yet established)", value);
+  } else {
+    ESP_LOGW(TAG, "Manually set last valid reading to: %d (Digits: %d, Str: %s)", value, static_cast<int>(len),
+             val_str.c_str());
+  }
 }
 
 void ValueValidator::set_last_valid_reading(const std::string &value) {
