@@ -189,7 +189,28 @@ void ValueValidator::setup() {
     uint32_t key = fnv1_hash("value_validator") ^ this->pref_key_salt_;
     this->pref_ = global_preferences->make_preference<int>(key);
     int restored = 0;
-    if (this->pref_.load(&restored) && restored > 0) {
+    bool loaded = this->pref_.load(&restored) && restored > 0;
+
+    // P1-1: migrate from the old (pre-E1) unsalted key on first boot after upgrade.
+    // An existing device saved its baseline under fnv1_hash("value_validator"); without
+    // this fallback the baseline would be discarded and validation restarts in
+    // first-reading state.
+    if (!loaded) {
+      uint32_t legacy_key = fnv1_hash("value_validator");
+      auto legacy_pref = global_preferences->make_preference<int>(legacy_key);
+      int legacy_val = 0;
+      if (legacy_pref.load(&legacy_val) && legacy_val > 0) {
+        restored = legacy_val;
+        loaded = true;
+        // Persist to the new salted key and erase the legacy slot so the
+        // migration runs exactly once.
+        this->pref_.save(&legacy_val);
+        legacy_pref.save(nullptr);
+        ESP_LOGI(TAG, "Migrated persistent state from legacy key: last_valid_reading = %d", legacy_val);
+      }
+    }
+
+    if (loaded) {
       this->last_valid_reading_ = restored;
       this->first_reading_ = false;
       // Seed good values with restored reading
@@ -802,7 +823,10 @@ void ValueValidator::set_last_valid_reading(int value, size_t num_digits) {
   this->first_reading_ = false;
 
   // E3: preserve leading-zero digit count for fixed-width meters.
-  size_t len = num_digits > 0 ? num_digits : 0;
+  // P1-2: when no explicit width is supplied, keep the last known digit count
+  // (from a prior real reading) so a numeric override like 50 on a 5-digit
+  // meter (00050) does not degrade to 2 digits and break per-digit stability.
+  size_t len = num_digits > 0 ? num_digits : this->last_valid_digits_count_;
   std::string val_str = std::to_string(value);
   if (len == 0 || val_str.length() >= len) {
     len = val_str.length();
