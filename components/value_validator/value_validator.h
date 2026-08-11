@@ -12,6 +12,7 @@
 #include "esphome/components/text_sensor/text_sensor.h"
 #include <vector>
 #include <span>
+#include <esp_heap_caps.h>
 
 #include "esphome/core/defines.h"
 
@@ -21,8 +22,10 @@ namespace esphome {
 namespace value_validator {
 
 // FreeDeleter for RAII-managed PSRAM/internal RAM buffers (shared by ReadingHistory and ValueValidator)
+// E6: use heap_caps_free so SPIRAM allocations from heap_caps_malloc are freed with the
+// matching API (free() also works on the IDF default heap, but this is the strictly correct pairing).
 struct FreeDeleter {
-  void operator()(void *p) const { free(p); }
+  void operator()(void *p) const { heap_caps_free(p); }
 };
 
 /**
@@ -117,6 +120,7 @@ class ValueValidator : public Component {
   void set_max_consecutive_rejections(int v) { this->config_.max_consecutive_rejections = v; }
   void set_small_negative_tolerance(int v) { this->config_.small_negative_tolerance = v; }
   void set_persist_state(bool v) { this->config_.persist_state = v; }
+  void set_pref_key_salt(uint32_t salt) { this->pref_key_salt_ = salt; }  // E1: per-instance NVS key
   void set_enable_dial_correction(bool v) { this->config_.enable_dial_correction = v; }
   void set_dial_correction_high_threshold(float v) { this->config_.dial_correction_high_threshold = v; }
   void set_dial_correction_low_threshold(float v) { this->config_.dial_correction_low_threshold = v; }
@@ -134,6 +138,8 @@ class ValueValidator : public Component {
   void reset();
   void set_debug(bool debug) { this->debug_ = debug; }
   void set_last_valid_reading(int value);
+  // E3: preserve leading-zero digit count for fixed-width meters (e.g. 5-digit "00050").
+  void set_last_valid_reading(int value, size_t num_digits);
   void set_last_valid_reading(const std::string &value);
   bool is_hallucination_pattern(std::span<const float> digits) const;
 
@@ -176,6 +182,7 @@ class ValueValidator : public Component {
 
   // Persistent state
   ESPPreferenceObject pref_;
+  uint32_t pref_key_salt_{0};
 
   // Recent good values ring buffer (PSRAM) -- RAII
   std::unique_ptr<int[], FreeDeleter> last_good_values_data_;
