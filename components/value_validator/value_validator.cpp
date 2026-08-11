@@ -830,9 +830,12 @@ void ValueValidator::set_last_valid_reading(int value, size_t num_digits) {
   // If neither width source is available (fresh boot / after reset / after
   // persistence restore), skip per-digit storage entirely: the first real
   // reading establishes the true digit count via validate_reading(span).
+  // P1-2 compile fix: val_str is referenced by the log below, so it must be
+  // declared at function scope (not inside the if-block).
   size_t len = num_digits > 0 ? num_digits : this->last_valid_digits_count_;
+  std::string val_str;
   if (len > 0) {
-    std::string val_str = std::to_string(value);
+    val_str = std::to_string(value);
     if (val_str.length() >= len) {
       len = val_str.length();
     } else {
