@@ -28,7 +28,8 @@ class FlashLightController : public Component {
   uint32_t get_flash_pre_time() const { return this->flash_pre_time_; }
   uint32_t get_flash_post_time() const { return this->flash_post_time_; }
 
-  /// Runtime changes to pre/post time only apply to the *next* capture sequence.
+  /// Pre-time changes apply to the next sequence; post-time changes made before capture affect
+  /// the active sequence (post_time_ is read when the capture callback returns).
   void set_debug(bool debug) { this->debug_ = debug; }
 
   using CaptureCallback = std::function<void()>;

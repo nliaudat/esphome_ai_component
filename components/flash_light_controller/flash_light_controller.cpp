@@ -7,8 +7,8 @@ namespace flash_light_controller {
 static const char *const TAG = "flash_light_controller";
 
 // Static-lifetime timeout names so cancel_active_sequence() can cancel them.
-static const char *const TIMEOUT_CAPTURE = "flash_capture";
-static const char *const TIMEOUT_OFF = "flash_off";
+static constexpr const char *TIMEOUT_CAPTURE = "flash_capture";
+static constexpr const char *TIMEOUT_OFF = "flash_off";
 
 void FlashLightController::setup() {
   this->is_active_ = false;
