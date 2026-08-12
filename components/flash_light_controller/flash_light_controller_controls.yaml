@@ -8,10 +8,10 @@ number:
     id: ${id_prefix}_flash_pre_time_setting
     icon: "mdi:lightning-bolt"
     unit_of_measurement: "ms"
-    min_value: 0
+    min_value: 1
     max_value: 10000
     step: 100
-    initial_value: 7000
+    initial_value: 5000
     entity_category: config
     optimistic: true
     restore_value: true
@@ -27,7 +27,7 @@ number:
     id: ${id_prefix}_flash_post_time_setting
     icon: "mdi:lightning-bolt-outline"
     unit_of_measurement: "ms"
-    min_value: 0
+    min_value: 1
     max_value: 5000
     step: 100
     initial_value: 2000

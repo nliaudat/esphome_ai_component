@@ -58,8 +58,6 @@ class FlashlightCoordinator {
   bool debug_{false};
 
   std::function<void()> request_frame_callback_;
-
-  template<typename F> void schedule_timeout(uint32_t ms, F &&f);
 #else
   // Dummy implementation
   void setup(Component *parent, light::LightState *legacy_light, void *controller) {}
