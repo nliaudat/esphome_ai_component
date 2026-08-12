@@ -1058,8 +1058,12 @@ void MeterReaderTFLite::set_generate_preview(bool generate) {
   }
 }
 
-void MeterReaderTFLite::set_flash_pre_time(uint32_t ms) { this->flashlight_coord_.set_timing(ms, 2000); }  // simplified
-void MeterReaderTFLite::set_flash_post_time(uint32_t ms) { this->flashlight_coord_.set_timing(5000, ms); }
+void MeterReaderTFLite::set_flash_pre_time(uint32_t ms) {
+  this->flashlight_coord_.set_timing(ms, this->flashlight_coord_.get_post_time());
+}
+void MeterReaderTFLite::set_flash_post_time(uint32_t ms) {
+  this->flashlight_coord_.set_timing(this->flashlight_coord_.get_pre_time(), ms);
+}
 
 // Preview
 void MeterReaderTFLite::take_preview_image() { this->capture_preview(); }

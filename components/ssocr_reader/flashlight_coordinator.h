@@ -55,8 +55,6 @@ class FlashlightCoordinator {
   std::atomic<bool> auto_controlled_{false};  // If we turned it on autonomously
 
   std::function<void()> request_frame_callback_;
-
-  template<typename F> void schedule_timeout(uint32_t ms, F &&f);
 #else
   // Dummy implementation
   void setup(Component *parent, light::LightState *legacy_light, void *controller) {}

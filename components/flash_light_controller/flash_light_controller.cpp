@@ -6,6 +6,10 @@ namespace flash_light_controller {
 
 static const char *const TAG = "flash_light_controller";
 
+// Static-lifetime timeout names so cancel_active_sequence() can cancel them.
+static constexpr const char *TIMEOUT_CAPTURE = "flash_capture";
+static constexpr const char *TIMEOUT_OFF = "flash_off";
+
 void FlashLightController::setup() {
   this->is_active_ = false;
   ESP_LOGCONFIG(TAG, "Setting up Flash Light Controller...");
@@ -20,7 +24,11 @@ void FlashLightController::setup() {
 
 void FlashLightController::initiate_capture_sequence(CaptureCallback callback) {
   if (!this->flash_light_) {
+    // Config problem: always warn, regardless of debug mode.
     ESP_LOGW(TAG, "No flash light configured, executing callback immediately");
+    if (this->debug_) {
+      ESP_LOGD(TAG, "  (flash skipped: null flash_light_ pointer)");
+    }
     if (callback)
       callback();
     return;
@@ -32,23 +40,45 @@ void FlashLightController::initiate_capture_sequence(CaptureCallback callback) {
   }
 
   this->is_active_ = true;
-  ESP_LOGD(TAG, "Starting flash sequence (Pre: %u ms, Post: %u ms)", this->flash_pre_time_, this->flash_post_time_);
+  if (this->debug_) {
+    ESP_LOGD(TAG, "Starting flash sequence (Pre: %u ms, Post: %u ms)", this->flash_pre_time_, this->flash_post_time_);
+  }
 
   this->enable_flash();
 
-  // Schedule callback after pre-time
-  this->set_timeout(this->flash_pre_time_, [this, callback]() {
-    ESP_LOGD(TAG, "Flash warmup complete (%u ms elapsed), executing capture callback", this->flash_pre_time_);
+  // Schedule callback after pre-time (named so the sequence can be cancelled)
+  this->set_timeout(TIMEOUT_CAPTURE, this->flash_pre_time_, [this, callback]() {
+    if (this->debug_) {
+      ESP_LOGD(TAG, "Flash warmup complete (%u ms elapsed), executing capture callback", this->flash_pre_time_);
+    }
     if (callback)
       callback();
 
     // Schedule flash off after post-time (relative to now)
-    this->set_timeout(this->flash_post_time_, [this]() {
+    this->set_timeout(TIMEOUT_OFF, this->flash_post_time_, [this]() {
       this->disable_flash();
       this->is_active_ = false;
-      ESP_LOGD(TAG, "Flash sequence complete (Post-time %u ms finished)", this->flash_post_time_);
+      if (this->debug_) {
+        ESP_LOGD(TAG, "Flash sequence complete (Post-time %u ms finished)", this->flash_post_time_);
+      }
     });
   });
+}
+
+void FlashLightController::cancel_active_sequence() {
+  if (!this->is_active_) {
+    if (this->debug_) {
+      ESP_LOGD(TAG, "cancel_active_sequence() called while idle, no-op");
+    }
+    return;
+  }
+  if (this->debug_) {
+    ESP_LOGD(TAG, "Cancelling active flash sequence");
+  }
+  this->cancel_timeout(TIMEOUT_CAPTURE);
+  this->cancel_timeout(TIMEOUT_OFF);
+  this->disable_flash();
+  this->is_active_ = false;
 }
 
 void FlashLightController::enable_flash() {

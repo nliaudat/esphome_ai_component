@@ -27,6 +27,7 @@ class FlashlightCoordinator {
   void set_timing(uint32_t pre_time, uint32_t post_time);
   void set_update_interval(uint32_t interval_ms);
   uint32_t get_pre_time() const { return this->pre_time_; }
+  uint32_t get_post_time() const { return this->post_time_; }
 
   // Logic
   bool update_scheduling();
@@ -59,14 +60,13 @@ class FlashlightCoordinator {
   bool debug_{false};
 
   std::function<void()> request_frame_callback_;
-
-  template<typename F> void schedule_timeout(uint32_t ms, F &&f);
 #else
   // Dummy implementation
   void setup(Component *parent, light::LightState *legacy_light, void *controller) {}
   void set_timing(uint32_t pre_time, uint32_t post_time) {}
   void set_update_interval(uint32_t interval_ms) {}
   uint32_t get_pre_time() const { return 0; }
+  uint32_t get_post_time() const { return 0; }
   bool update_scheduling() { return false; }
   void enable_flash() {}
   void disable_flash() {}

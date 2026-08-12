@@ -16,11 +16,20 @@ class FlashLightController : public Component {
  public:
   void setup() override;
   void set_flash_light(light::LightState *flash_light) { this->flash_light_ = flash_light; }
-  void set_flash_pre_time(uint32_t pre_time) { this->flash_pre_time_ = pre_time; }
-  void set_flash_post_time(uint32_t post_time) { this->flash_post_time_ = post_time; }
+
+  /// Configure pre-time in ms. Values are clamped to >= 1 so the sequence cannot collapse.
+  void set_flash_pre_time(uint32_t pre_time) {
+    this->flash_pre_time_ = (pre_time == 0) ? 1 : pre_time;
+  }
+  /// Configure post-time in ms. Values are clamped to >= 1 so the sequence cannot collapse.
+  void set_flash_post_time(uint32_t post_time) {
+    this->flash_post_time_ = (post_time == 0) ? 1 : post_time;
+  }
   uint32_t get_flash_pre_time() const { return this->flash_pre_time_; }
   uint32_t get_flash_post_time() const { return this->flash_post_time_; }
 
+  /// Pre-time changes apply to the next sequence; post-time changes made before capture affect
+  /// the active sequence (post_time_ is read when the capture callback returns).
   void set_debug(bool debug) { this->debug_ = debug; }
 
   using CaptureCallback = std::function<void()>;
@@ -35,11 +44,23 @@ class FlashLightController : public Component {
    * 4. Wait for flash_post_time_ (ensure light during capture)
    * 5. Turn off flash
    *
+   * The callback is expected to block until capture completes. If the capture is
+   * asynchronous, the consumer must hold the flash active itself for the duration
+   * of the capture (see capture_preview_sequence for an example).
+   *
    * @param callback Function to execute when flash is ready (usually image capture)
    */
   void initiate_capture_sequence(CaptureCallback callback);
 
   bool is_active() const { return this->is_active_; }
+
+  /**
+   * @brief Force-abort an in-progress or stuck capture sequence.
+   *
+   * Cancels the pending timeouts, turns the flash off, and releases the active
+   * flag so a new sequence can start immediately. Safe to call when idle.
+   */
+  void cancel_active_sequence();
 
   void enable_flash();
   void disable_flash();
