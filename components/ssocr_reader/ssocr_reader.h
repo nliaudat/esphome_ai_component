@@ -82,8 +82,17 @@ class SSOCRReader : public PollingComponent, public esphome::camera::CameraListe
   std::vector<int> col_sums_;
   std::vector<std::pair<int, int>> digit_bounds_;
 
+  // Per-digit recognition confidences (last processed image)
+  std::vector<float> digit_confidences_;
+
   void process_image(std::shared_ptr<esphome::camera::CameraImage> image);
-  int recognize_digit(const uint8_t *img, int width, int height, int stride);
+
+  /// @brief Recognize a single seven-segment digit.
+  /// @param confidence_out If non-null, receives the recognition confidence in [0,1]
+  ///   derived from the per-segment decision margins (1.0 = all segments decisively
+  ///   on/off, 0.0 = all segments at the decision boundary).
+  /// @return Digit index 0-9, or -1 if the segment mask is unknown.
+  int recognize_digit(const uint8_t *img, int width, int height, int stride, float *confidence_out = nullptr);
 };
 
 }  // namespace ssocr_reader

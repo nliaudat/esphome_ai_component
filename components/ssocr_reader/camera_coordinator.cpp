@@ -94,9 +94,29 @@ bool CameraCoordinator::reset_window() {
 }
 
 void CameraCoordinator::basic_recovery() {
-  ESP_LOGI(TAG, "Executing basic camera recovery (state reset)");
-  // Implement any specific camera re-init calls if exposed by esp32_camera,
-  // but mostly this just logs and maybe allows the system to try again next loop.
+  if (!this->camera_) {
+    ESP_LOGW(TAG, "Basic recovery: no camera set");
+    return;
+  }
+
+  ESP_LOGW(TAG, "Executing basic camera recovery (state reset)");
+
+  // Attempt a hard reset first, mirroring the recovery used in reset_window().
+  bool ok = this->window_control_.hard_reset_camera(this->camera_);
+  if (!ok) {
+    ESP_LOGW(TAG, "Hard reset failed, trying soft reset");
+    ok = this->window_control_.soft_reset_camera(this->camera_);
+  }
+
+  if (ok) {
+    // Restore the original full-frame dimensions and format.
+    this->window_control_.reset_to_full_frame_with_dimensions(this->camera_, this->orig_width_, this->orig_height_,
+                                                              this->current_width_, this->current_height_);
+    this->current_format_ = this->orig_format_;
+    ESP_LOGI(TAG, "Camera recovery completed");
+  } else {
+    ESP_LOGE(TAG, "Camera recovery failed -- will retry on next timeout");
+  }
 }
 
 bool CameraCoordinator::test_camera_after_reset(std::atomic<bool> &frame_available,
