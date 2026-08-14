@@ -49,6 +49,13 @@ BufferPool::Buffer BufferPool::acquire(size_t size) {
     return {nullptr, 0, false};
   }
 
+  // Track which allocator path actually succeeded (debug aid)
+  if (size > 1024) {
+    this->psram_allocations_.fetch_add(1);
+  } else {
+    this->sram_allocations_.fetch_add(1);
+  }
+
   // Try to add to pool if space available
   if (this->pool_.size() < MAX_POOL_ENTRIES) {
     this->pool_.push_back({data, size, true});
@@ -62,18 +69,35 @@ BufferPool::Buffer BufferPool::acquire(size_t size) {
   return {data, size, false};
 }
 
+BufferPool::~BufferPool() {
+  std::lock_guard<std::mutex> lock(this->mutex_);
+  for (auto &slot : this->pool_) {
+    if (slot.data) {
+      heap_caps_free(slot.data);
+      slot.data = nullptr;
+      slot.size = 0;
+      slot.in_use = false;
+    }
+  }
+  this->pool_.clear();
+}
+
 void BufferPool::release(Buffer &buffer) {
   if (!buffer.data)
     return;
 
   std::lock_guard<std::mutex> lock(this->mutex_);
 
+  const size_t buffer_size = buffer.size;
+
   // Find in pool and mark available
   for (auto &slot : this->pool_) {
     if (slot.data == buffer.data) {
       slot.in_use = false;
       buffer.data = nullptr;
-      ESP_LOGV(TAG, "Buffer returned to pool (%zu bytes)", buffer.size);
+      buffer.size = 0;
+      buffer.from_pool = false;
+      ESP_LOGV(TAG, "Buffer returned to pool (%zu bytes)", buffer_size);
       return;
     }
   }
@@ -81,7 +105,9 @@ void BufferPool::release(Buffer &buffer) {
   // Not in pool, free it
   heap_caps_free(buffer.data);
   buffer.data = nullptr;
-  ESP_LOGV(TAG, "Non-pooled buffer freed (%zu bytes)", buffer.size);
+  buffer.size = 0;
+  buffer.from_pool = false;
+  ESP_LOGV(TAG, "Non-pooled buffer freed (%zu bytes)", buffer_size);
 }
 
 size_t BufferPool::get_hit_rate() const {
@@ -98,6 +124,20 @@ size_t BufferPool::get_pool_size() const {
 }
 
 size_t BufferPool::get_saturation_misses() const { return this->saturation_misses_.load(); }
+
+size_t BufferPool::get_psram_allocations() const { return this->psram_allocations_.load(); }
+
+size_t BufferPool::get_sram_allocations() const { return this->sram_allocations_.load(); }
+
+void BufferPool::report_statistics() const {
+  size_t h = this->hits_.load();
+  size_t m = this->misses_.load();
+  size_t total = h + m;
+  float hit_rate = total > 0 ? (100.0f * h / total) : 0.0f;
+  ESP_LOGI(TAG, "BufferPool stats - Hits: %zu, Misses: %zu, Hit rate: %.1f%%", h, m, hit_rate);
+  ESP_LOGI(TAG, "Pool size: %zu, Saturation misses: %zu, PSRAM allocs: %zu, SRAM allocs: %zu", this->get_pool_size(),
+           this->saturation_misses_.load(), this->psram_allocations_.load(), this->sram_allocations_.load());
+}
 
 }  // namespace esp32_camera_utils
 }  // namespace esphome
