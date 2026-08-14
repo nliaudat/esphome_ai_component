@@ -129,6 +129,7 @@ size_t BufferPool::get_psram_allocations() const { return this->psram_allocation
 
 size_t BufferPool::get_sram_allocations() const { return this->sram_allocations_.load(); }
 
+#ifdef DEBUG_ESP32_CAMERA_UTILS
 void BufferPool::report_statistics() const {
   size_t h = this->hits_.load();
   size_t m = this->misses_.load();
@@ -138,6 +139,7 @@ void BufferPool::report_statistics() const {
   ESP_LOGI(TAG, "Pool size: %zu, Saturation misses: %zu, PSRAM allocs: %zu, SRAM allocs: %zu", this->get_pool_size(),
            this->saturation_misses_.load(), this->psram_allocations_.load(), this->sram_allocations_.load());
 }
+#endif  // DEBUG_ESP32_CAMERA_UTILS
 
 }  // namespace esp32_camera_utils
 }  // namespace esphome

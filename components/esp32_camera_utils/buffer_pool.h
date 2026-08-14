@@ -75,10 +75,13 @@ class BufferPool {
    */
   size_t get_sram_allocations() const;
 
+#ifdef DEBUG_ESP32_CAMERA_UTILS
   /**
    * @brief Log buffer pool statistics (hit rate, pool size, allocation sources).
+   * Debug-gated: compiled out of release builds to save flash.
    */
   void report_statistics() const;
+#endif
 
  private:
   struct PoolSlot {

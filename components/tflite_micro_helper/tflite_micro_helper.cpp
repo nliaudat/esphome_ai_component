@@ -210,8 +210,10 @@ bool TFLiteMicroHelper::load_model() {
 
   this->state_.store(LoadState::READY);
   ESP_LOGI(TAG, "Model loaded successfully");
+#ifdef DEBUG_TFLITE_MICRO_HELPER
   ESP_LOGI(TAG, "Load stats: parse=%u ms, arena_alloc=%u ms, total=%u ms", stats.parse_time_ms,
            stats.arena_alloc_time_ms, stats.total_load_time_ms);
+#endif
   return true;
 }
 
@@ -309,9 +311,13 @@ void TFLiteMicroHelper::report_memory_status() {
                                       this->model_handler_.get_arena_used_bytes(), this->model_length_);
 
   // 5.1: monitor heap fragmentation -- warn when the largest contiguous free
-  // block can no longer satisfy the arena requirement.
-  size_t total_free = heap_caps_get_total_free(MALLOC_CAP_INTERNAL);
-  size_t max_block = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+  // block can no longer satisfy the arena requirement. Query the heap the
+  // arena was actually allocated from (PSRAM vs internal) to avoid false
+  // warnings when internal RAM is fragmented but PSRAM has sufficient free
+  // contiguous space.
+  uint32_t heap_caps = this->tensor_arena_allocation_.from_psram ? MALLOC_CAP_SPIRAM : MALLOC_CAP_INTERNAL;
+  size_t total_free = heap_caps_get_total_free(heap_caps);
+  size_t max_block = heap_caps_get_largest_free_block(heap_caps);
 
   ESP_LOGD(TAG, "Heap status - Total free: %zu bytes, Largest block: %zu bytes", total_free, max_block);
 
