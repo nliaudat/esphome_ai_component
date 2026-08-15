@@ -6,9 +6,19 @@ external_components:
   - source:
       type: local
       path: ../../../components
-    components: [ssocr_reader, esp32_camera_utils]
+    components: [ssocr_reader, esp32_camera_utils, flash_light_controller]
+
+# globals is a built-in ESPHome component required by esp32_camera_utils'
+# crop_zone_handler.h include. Declare a minimal instance so the component
+# graph loads it and its headers are copied into the build tree.
+globals:
+  - id: test_global
+    type: int
+    initial_value: "0"
+    restore_value: false
 
 esp32_camera:
+  id: test_camera
   name: Test Camera
   external_clock:
     pin: GPIO0
@@ -33,3 +43,7 @@ ssocr_reader:
   update_interval: 5s
   digit_count: 8
   threshold_level: 128
+  value:
+    name: Test SSOCR Value
+  confidence:
+    name: Test SSOCR Confidence
