@@ -39,8 +39,9 @@ void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, in
     return;
   }
 
-  // Check switch state if configured
-  if (this->web_submit_switch_ && !this->web_submit_switch_->state) {
+  // Check switch state if configured (snapshot for cross-task consistency)
+  const bool submit_enabled = this->web_submit_switch_ == nullptr || this->web_submit_switch_->state;
+  if (!submit_enabled) {
     ESP_LOGD(TAG, "Data collection skipped (switch off)");
     return;
   }
@@ -133,19 +134,17 @@ bool DataCollector::upload_image(const uint8_t *data, size_t len, const std::str
   job.confidence = confidence;
 
   // Handle Metadata
-  if (metadata && strlen(metadata) > 0) {
-    job.metadata_len = strlen(metadata) + 1;
+  const size_t metadata_len = metadata ? strlen(metadata) : 0;
+  if (metadata_len > 0) {
+    job.metadata_len = metadata_len + 1;
     job.metadata = static_cast<char *>(heap_caps_malloc(job.metadata_len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
     if (job.metadata) {
       strncpy(job.metadata, metadata, job.metadata_len);
     } else {
-      ESP_LOGW(TAG, "Failed to allocate memory for metadata (%u bytes)", job.metadata_len);
+      ESP_LOGW(TAG, "Failed to allocate memory for metadata (%zu bytes)", job.metadata_len);
       job.metadata = nullptr;
       job.metadata_len = 0;
     }
-  } else {
-    job.metadata = nullptr;
-    job.metadata_len = 0;
   }
 
   // Send to queue (non-blocking or small timeout)
