@@ -16,6 +16,9 @@
 #ifdef USE_ANALOG_READER
 
 namespace esphome {
+namespace esp32_camera_utils {
+class ImageProcessor;
+}
 namespace analog_reader {
 
 // Exported constants for algorithm implementations
@@ -88,6 +91,7 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   void dump_config() override;
 
   void set_value_sensor(sensor::Sensor *s) { this->value_sensor_ = s; }
+  void set_confidence_sensor(sensor::Sensor *s) { this->confidence_sensor_ = s; }
 #ifdef USE_VALUE_VALIDATOR
   void set_validator(value_validator::ValueValidator *v) { this->validation_coord_.set_validator(v); }
 #endif
@@ -136,9 +140,9 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   uint32_t last_request_time_{0};
 
   struct DetectionResult {
-    float angle;
-    float confidence;
-    std::string algorithm;
+    float angle{0.0f};
+    float confidence{0.0f};
+    std::string algorithm{""};
   };
 
   bool paused_{false};
@@ -152,7 +156,11 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   std::string pixel_format_str_{"JPEG"};
 
   sensor::Sensor *value_sensor_{nullptr};
+  sensor::Sensor *confidence_sensor_{nullptr};
   std::vector<DialConfig> dials_;
+
+  // Pre-allocated per-dial ImageProcessors (B3: no heap allocation in loop())
+  std::vector<std::unique_ptr<esphome::esp32_camera_utils::ImageProcessor>> processors_;
 
   bool debug_{false};
 
