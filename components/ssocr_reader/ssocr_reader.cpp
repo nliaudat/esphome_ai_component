@@ -26,6 +26,19 @@ void SSOCRReader::setup() {
     this->camera_->add_listener(this);
   }
 
+  // B2: runtime crop-bounds guard (defensive; schema-level validation in
+  // __init__.py already rejects out-of-range values against the substitutions-
+  // resolved camera resolution). Guards against invalid state from codegen or
+  // future non-schema callers -- mirrors the analog_reader guard pattern.
+  if (this->img_width_ > 0 && this->crop_x_ > this->img_width_)
+    this->crop_x_ = this->img_width_;
+  if (this->img_height_ > 0 && this->crop_y_ > this->img_height_)
+    this->crop_y_ = this->img_height_;
+  if (this->crop_w_ > 0 && this->img_width_ > 0 && this->crop_x_ + this->crop_w_ > this->img_width_)
+    this->crop_w_ = this->img_width_ - this->crop_x_;
+  if (this->crop_h_ > 0 && this->img_height_ > 0 && this->crop_y_ + this->crop_h_ > this->img_height_)
+    this->crop_h_ = this->img_height_ - this->crop_y_;
+
   int effective_crop_w = (this->crop_w_ > 0) ? this->crop_w_ : this->img_width_ - this->crop_x_;
   int effective_crop_h = (this->crop_h_ > 0) ? this->crop_h_ : this->img_height_ - this->crop_y_;
 
@@ -124,8 +137,17 @@ void SSOCRReader::process_image(std::shared_ptr<esphome::camera::CameraImage> im
   int roi_w = cw;
   int roi_h = ch;
 
+  // Guarded multiplication per .ai/instructions.md 8.1 (CVE-2026-23833 pattern):
+  // roi_w/roi_h derive from user config / camera dimensions, so the product must
+  // not overflow before the binarise + vertical-projection loops index the buffer.
+  if (roi_w <= 0 || roi_h <= 0 || static_cast<size_t>(roi_h) > SIZE_MAX / static_cast<size_t>(roi_w)) {
+    ESP_LOGE(TAG, "Invalid or overflowing ROI size %dx%d; skipping frame", roi_w, roi_h);
+    return;
+  }
+  const size_t roi_pixels = static_cast<size_t>(roi_w) * static_cast<size_t>(roi_h);
+
   // Binarize
-  for (size_t i = 0; i < static_cast<size_t>(roi_w) * static_cast<size_t>(roi_h); i++) {
+  for (size_t i = 0; i < roi_pixels; i++) {
     raw_roi[i] = (raw_roi[i] > this->threshold_level_) ? 255 : 0;
   }
 

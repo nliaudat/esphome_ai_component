@@ -13,7 +13,10 @@ from esphome.core import CORE
 CONF_CAMERA_ID = "camera_id"
 
 DEPENDENCIES = ["esp32_camera"]
-AUTO_LOAD = ["esp32_camera_utils"]
+# sensor: publishes value/confidence sensors via sensor.sensor_schema().
+# light: flashlight_coordinator.h unconditionally includes light_state.h.
+# globals: transitively required by esp32_camera_utils' crop_zone_handler.h include.
+AUTO_LOAD = ["esp32_camera_utils", "sensor", "light", "globals"]
 
 ssocr_reader_ns = cg.esphome_ns.namespace("ssocr_reader")
 SSOCRReader = ssocr_reader_ns.class_("SSOCRReader", cg.PollingComponent)
@@ -25,9 +28,9 @@ CONF_CROP_Y = "crop_y"
 CONF_CROP_W = "crop_w"
 CONF_CROP_H = "crop_h"
 CONF_DIGIT_COUNT = "digit_count"
-CONF_DECIMAL_POINT = "decimal_point"
 
 CONF_VALUE = "value"
+CONF_CONFIDENCE = "confidence"
 CONF_VALIDATOR = "validator"
 
 CONFIG_SCHEMA = cv.Schema(
@@ -38,9 +41,14 @@ CONFIG_SCHEMA = cv.Schema(
         else cv.string,
         cv.Optional(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera),
         cv.Optional(CONF_VALUE): sensor.sensor_schema(),
+        cv.Optional(CONF_CONFIDENCE): sensor.sensor_schema(
+            unit_of_measurement="%",
+            accuracy_decimals=1,
+            icon="mdi:percent",
+        ),
         cv.Optional("debug", default=False): cv.boolean,
         cv.Optional(CONF_THRESHOLD_TYPE, default="fixed"): cv.enum(
-            {"fixed": 0, "otsu": 1}, lower=True
+            {"fixed": 0}, lower=True
         ),
         cv.Optional(CONF_THRESHOLD_LEVEL, default=128): cv.int_range(min=0, max=255),
         cv.Optional(CONF_CROP_X, default=0): cv.int_range(min=0),
@@ -74,6 +82,10 @@ async def to_code(config):
         sens = await sensor.new_sensor(config[CONF_VALUE])
         cg.add(var.set_value_sensor(sens))
 
+    if CONF_CONFIDENCE in config:
+        sens = await sensor.new_sensor(config[CONF_CONFIDENCE])
+        cg.add(var.set_confidence_sensor(sens))
+
     cg.add(var.set_threshold_config(config[CONF_THRESHOLD_LEVEL]))
     cg.add(
         var.set_crop_config(
@@ -101,6 +113,26 @@ async def to_code(config):
 
     if "camera_pixel_format" in substitutions:
         pixel_format = substitutions["camera_pixel_format"]
+
+    # Bounds-check the crop against the camera resolution (per .ai/instructions.md
+    # 12.8 "Config Bounds-Checking"). Values are substitutions-resolved here, so
+    # the check must live in to_code() rather than in the static schema.
+    crop_x = config[CONF_CROP_X]
+    crop_y = config[CONF_CROP_Y]
+    crop_w = config[CONF_CROP_W]
+    crop_h = config[CONF_CROP_H]
+    if crop_x > width:
+        raise cv.Invalid(f"crop_x ({crop_x}) exceeds camera width ({width})")
+    if crop_y > height:
+        raise cv.Invalid(f"crop_y ({crop_y}) exceeds camera height ({height})")
+    if crop_w > 0 and crop_x + crop_w > width:
+        raise cv.Invalid(
+            f"crop_x + crop_w ({crop_x} + {crop_w}) exceeds camera width ({width})"
+        )
+    if crop_h > 0 and crop_y + crop_h > height:
+        raise cv.Invalid(
+            f"crop_y + crop_h ({crop_y} + {crop_h}) exceeds camera height ({height})"
+        )
 
     cg.add(var.set_resolution(width, height))
     cg.add(var.set_pixel_format_str(pixel_format))

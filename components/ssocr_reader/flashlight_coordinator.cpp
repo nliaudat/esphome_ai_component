@@ -2,6 +2,8 @@
 #include "esphome/core/log.h"
 #include "esphome/core/application.h"
 
+#ifdef USE_FLASH_LIGHT_CONTROLLER
+
 namespace esphome {
 namespace ssocr_reader {
 
@@ -131,3 +133,5 @@ void FlashlightCoordinator::capture_preview_sequence(std::function<void()> frame
 
 }  // namespace ssocr_reader
 }  // namespace esphome
+
+#endif  // USE_FLASH_LIGHT_CONTROLLER

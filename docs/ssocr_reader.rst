@@ -26,7 +26,11 @@ Configuration Variables
 - **id** (*Required*): The ID of this component.
 - **camera_id** (*Required*): The ID of the ``esp32_camera`` component.
 - **validator** (*Optional*): The ID of a ``value_validator`` component.
+- **value** (*Optional*): A ``sensor`` sub-configuration for the OCR reading.
+- **confidence** (*Optional*): A ``sensor`` sub-configuration for recognition confidence (0-100%, averaged per-digit margin in percent).
 - **threshold_level** (*Optional*): Binarization threshold (0-255). Default: 128.
+- **threshold_type** (*Optional*): Binarization method. Only ``fixed`` is currently implemented. Default: ``fixed``.
+- **crop_x** / **crop_y** / **crop_w** / **crop_h** (*Optional*): Crop region. Bounds-checked against the camera resolution at config time. Default: 0 (full frame).
 - **digit_count** (*Optional*): Number of digits to read (1-16). Default: 6.
 - **update_interval** (*Optional*): Polling interval. Default: 5s.
 
