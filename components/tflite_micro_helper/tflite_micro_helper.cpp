@@ -316,7 +316,7 @@ void TFLiteMicroHelper::report_memory_status() {
   // warnings when internal RAM is fragmented but PSRAM has sufficient free
   // contiguous space.
   uint32_t heap_caps = this->tensor_arena_allocation_.from_psram ? MALLOC_CAP_SPIRAM : MALLOC_CAP_INTERNAL;
-  size_t total_free = heap_caps_get_total_free(heap_caps);
+  size_t total_free = heap_caps_get_free_size(heap_caps);
   size_t max_block = heap_caps_get_largest_free_block(heap_caps);
 
   ESP_LOGD(TAG, "Heap status - Total free: %zu bytes, Largest block: %zu bytes", total_free, max_block);
