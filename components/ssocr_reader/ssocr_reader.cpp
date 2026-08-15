@@ -170,6 +170,7 @@ void SSOCRReader::process_image(std::shared_ptr<esphome::camera::CameraImage> im
   // Recognize digits
   std::string result_str;
   result_str.reserve(this->digit_bounds_.size() + 1);
+  this->digit_confidences_.clear();
 
   for (size_t k = 0; k < this->digit_bounds_.size(); k++) {
     if (k >= static_cast<size_t>(this->digit_count_))
@@ -180,9 +181,11 @@ void SSOCRReader::process_image(std::shared_ptr<esphome::camera::CameraImage> im
     if (d_w < 3)
       continue;
 
-    int val = this->recognize_digit(raw_roi + d_x, d_w, roi_h, roi_w);
+    float digit_conf = 0.0f;
+    int val = this->recognize_digit(raw_roi + d_x, d_w, roi_h, roi_w, &digit_conf);
     if (val >= 0) {
       result_str += std::to_string(val);
+      this->digit_confidences_.push_back(digit_conf);
     } else {
       result_str += "?";
     }
@@ -195,13 +198,24 @@ void SSOCRReader::process_image(std::shared_ptr<esphome::camera::CameraImage> im
       long v_long = strtol(result_str.c_str(), nullptr, 10);
       int v = static_cast<int>(v_long);
 
+      // Real per-digit confidence (P1): average the per-digit margins so the
+      // confidence sensor reflects recognition quality instead of a constant 100.
+      float avg_confidence = 0.0f;
+      if (!digit_confidences_.empty()) {
+        float sum = 0.0f;
+        for (float c : digit_confidences_) {
+          sum += c;
+        }
+        avg_confidence = sum / static_cast<float>(digit_confidences_.size());
+      }
+
       int validated_v = v;
-      bool valid = this->validation_coord_.validate_reading(v, 1.0f, validated_v);
+      bool valid = this->validation_coord_.validate_reading(v, avg_confidence, validated_v);
 
       if (valid) {
         this->value_sensor_->publish_state(static_cast<float>(validated_v));
         if (this->confidence_sensor_)
-          this->confidence_sensor_->publish_state(100.0f);
+          this->confidence_sensor_->publish_state(avg_confidence * 100.0f);
       } else {
         ESP_LOGW(TAG, "Result invalid check logs");
       }
@@ -212,7 +226,10 @@ void SSOCRReader::process_image(std::shared_ptr<esphome::camera::CameraImage> im
   }
 }
 
-int SSOCRReader::recognize_digit(const uint8_t *img, int w, int h, int stride) {
+int SSOCRReader::recognize_digit(const uint8_t *img, int w, int h, int stride, float *confidence_out) {
+  if (confidence_out != nullptr) {
+    *confidence_out = 0.0f;
+  }
   struct Pt {
     float x;
     float y;
@@ -230,6 +247,7 @@ int SSOCRReader::recognize_digit(const uint8_t *img, int w, int h, int stride) {
   const uint8_t digit_map[10] = {63, 6, 91, 79, 102, 109, 125, 7, 127, 111};
 
   uint8_t mask = 0;
+  float conf_sum = 0.0f;
 
   for (int i = 0; i < 7; i++) {
     int sx = static_cast<int>(segments[i].x * w);
@@ -249,9 +267,18 @@ int SSOCRReader::recognize_digit(const uint8_t *img, int w, int h, int stride) {
       }
     }
 
-    if (static_cast<float>(on_pixels) / static_cast<float>(count) > 0.5f) {
+    float ratio = (count > 0) ? (static_cast<float>(on_pixels) / static_cast<float>(count)) : 0.0f;
+    // Normalized decision margin: 1.0 when a segment is decisively on/off,
+    // 0.0 when the probe window sits exactly at the 0.5 decision boundary.
+    conf_sum += std::abs(ratio - 0.5f) / 0.5f;
+
+    if (ratio > 0.5f) {
       mask |= (1 << i);
     }
+  }
+
+  if (confidence_out != nullptr) {
+    *confidence_out = conf_sum / 7.0f;
   }
 
   for (int i = 0; i < 10; i++) {

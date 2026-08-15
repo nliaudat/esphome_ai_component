@@ -43,6 +43,18 @@ struct ArenaStats {
 };
 
 /**
+ * @struct LoadStats
+ * @brief Model loading stage timings and final result.
+ */
+struct LoadStats {
+  uint32_t load_start_ms{0};
+  uint32_t parse_time_ms{0};  // CRC verify + arena probe
+  uint32_t arena_alloc_time_ms{0};
+  uint32_t total_load_time_ms{0};
+  bool success{false};
+};
+
+/**
  * @class TFLiteMicroHelper
  * @brief Reusable TFLite Micro component for ESPHome.
  *
@@ -135,6 +147,9 @@ class TFLiteMicroHelper {
   void update_arena_stats_cache();
   void report_memory_status();
 
+  // -- Load statistics -------------------------------------------------
+  const LoadStats &get_last_load_stats() const { return this->last_load_stats_; }
+
 #ifdef DEBUG_TFLITE_MICRO_HELPER
   void debug_test_parameters(const std::vector<std::vector<uint8_t>> &zone_data) {
     this->model_handler_.debug_test_parameters(zone_data);
@@ -173,6 +188,9 @@ class TFLiteMicroHelper {
   // Arena stats cache (thread-safe for dual-core)
   mutable std::mutex arena_stats_mutex_;
   ArenaStats cached_arena_stats_{};
+
+  // Load statistics (last load_model() attempt)
+  LoadStats last_load_stats_{};
 
   // State -- single atomic load state machine (E2 / TOCTOU fix)
   enum class LoadState : uint8_t { UNLOADED, LOADING, READY };

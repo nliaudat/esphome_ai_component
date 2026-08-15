@@ -112,6 +112,15 @@ void AnalogReader::setup() {
                 [](const std::pair<float, float> &a, const std::pair<float, float> &b) { return a.first < b.first; });
       ESP_LOGD(TAG, "Sorted calibration mapping for dial %s (%d points)", dial.id.c_str(),
                static_cast<int>(dial.calibration_mapping.size()));
+      // B2: calibration mapping takes precedence over the wrap-around angle
+      // branch in angle_to_value(). Log once here so users with both configured
+      // (min_angle > max_angle AND calibration_mapping) know which path wins.
+      if (dial.min_angle > dial.max_angle) {
+        ESP_LOGW(TAG,
+                 "Dial %s has BOTH calibration_mapping and a wrap-around angle range (min_angle > max_angle). "
+                 "calibration_mapping takes precedence; the wrap-around branch is skipped for this dial.",
+                 dial.id.c_str());
+      }
     }
   }
 
@@ -203,6 +212,26 @@ void AnalogReader::setup() {
     this->scratch_buffer_.reserve(max_crop_area);
     this->scratch_buffer_2_.reserve(max_crop_area);
     ESP_LOGD(TAG, "Reserved scratch buffers for max area: %d pixels", max_crop_area);
+  }
+
+  // B3: Pre-allocate per-dial ImageProcessors so no heap allocation happens
+  // during loop(). Each dial needs its own processor because ImageProcessorConfig
+  // encodes the dial's model/crop dimensions and channel count. The ImageProcessor
+  // constructor itself is allocation-free; its internal buffers use the shared
+  // BufferPool / RAII paths at process time.
+  this->processors_.clear();
+  this->processors_.reserve(this->dials_.size());
+  for (const auto &dial : this->dials_) {
+    bool need_rgb = dial.use_color || (dial.process_channel != PROCESS_CHANNEL_GRAYSCALE);
+    esphome::esp32_camera_utils::ImageProcessorConfig config;
+    config.camera_width = (this->img_width_ > 0) ? this->img_width_ : 640;
+    config.camera_height = (this->img_height_ > 0) ? this->img_height_ : 480;
+    config.pixel_format = need_rgb ? "RGB888" : "GRAYSCALE";
+    config.model_width = dial.crop_w;
+    config.model_height = dial.crop_h;
+    config.model_channels = need_rgb ? 3 : 1;
+    config.input_type = esphome::esp32_camera_utils::kInputTypeUInt8;
+    this->processors_.emplace_back(std::make_unique<esphome::esp32_camera_utils::ImageProcessor>(config));
   }
 
   // Pre-allocate per-frame readings vector to avoid heap alloc in loop()
