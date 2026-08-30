@@ -57,6 +57,14 @@ The repository allows you to use specific components based on your needs:
 
 ## 🏁 Quick Start
 
+> [!IMPORTANT]
+> **The project MUST be compiled after cloning locally.** The components ship as C++ source code, not pre-built binaries. After cloning the repository, install ESPHome and compile your configuration:
+
+```bash
+pip install esphome
+esphome compile config.yaml
+```
+
 ### 1. Installation
 
 ***A detailed procedure for setting up is available in [wiki/setup page](https://github.com/nliaudat/esphome_ai_component/wiki/Setup)***
