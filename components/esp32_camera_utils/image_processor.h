@@ -284,6 +284,16 @@ class ImageProcessor {
                                                  int crop_height, uint8_t *output_buffer, int model_width,
                                                  int model_height, int model_channels, int src_stride_width);
 
+  // YUV422 (YUYV packed: Y0 U Y1 V per 2 pixels) crop + scale with on-the-fly BT.601 conversion.
+  // Both functions mirror the RGB888/RGB565/grayscale variants and handle odd source X via pair masking.
+  bool process_yuv422_crop_and_scale_to_float32(const uint8_t *input_data, const CropZone &zone, int crop_width,
+                                                int crop_height, uint8_t *output_buffer, int model_width,
+                                                int model_height, int model_channels, bool normalize,
+                                                int src_stride_width);
+  bool process_yuv422_crop_and_scale_to_uint8(const uint8_t *input_data, const CropZone &zone, int crop_width,
+                                              int crop_height, uint8_t *output_buffer, int model_width,
+                                              int model_height, int model_channels, int src_stride_width);
+
   bool scale_rgb888_to_float32(const uint8_t *src, int src_w, int src_h, uint8_t *dst, int dst_w, int dst_h,
                                int channels, bool normalize);
   bool scale_rgb888_to_uint8(const uint8_t *src, int src_w, int src_h, uint8_t *dst, int dst_w, int dst_h,

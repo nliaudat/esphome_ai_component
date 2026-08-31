@@ -349,7 +349,7 @@ async def to_code(config):
     res = config.get(CONF_CAMERA_RESOLUTION, "640x480")
     width, height = map(int, res.split("x"))
     # Validate pixel_format from YAML substitutions
-    VALID_PIXEL_FORMATS = ("RGB888", "RGB565", "GRAYSCALE", "JPEG")
+    VALID_PIXEL_FORMATS = ("RGB888", "RGB565", "GRAYSCALE", "YUV422", "JPEG")
     pixel_format = CORE.config.get("substitutions", {}).get(
         "camera_pixel_format", "RGB888"
     )
