@@ -18,6 +18,10 @@ from esphome.core import CORE
 
 DEPENDENCIES = ["esp32"]
 
+# sensor: esp32_camera_utils.h unconditionally includes sensor/sensor.h (debug memory sensors).
+# globals: crop_zone_handler.h (via image_processor.h) includes globals/globals_component.h.
+AUTO_LOAD = ["sensor", "globals"]
+
 esp32_camera_utils_ns = cg.esphome_ns.namespace("esp32_camera_utils")
 Esp32CameraUtils = esp32_camera_utils_ns.class_("Esp32CameraUtils", cg.Component)
 
