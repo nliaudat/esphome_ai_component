@@ -41,7 +41,7 @@ def tool_available(name):
 
 
 def run_check(name, args, cwd=None, fix=False):
-    """Run a check and return (pass, output)."""
+    """Run a check and return (pass, output, stderr, returncode)."""
     if cwd is None:
         cwd = ROOT
     try:
@@ -49,11 +49,11 @@ def run_check(name, args, cwd=None, fix=False):
             args, capture_output=True, text=True, cwd=cwd, timeout=120, check=False
         )
         passed = r.returncode == 0
-        return passed, r.stdout, r.stderr
+        return passed, r.stdout, r.stderr, r.returncode
     except subprocess.TimeoutExpired:
-        return False, "", "TIMEOUT (120s)"
+        return False, "", "TIMEOUT (120s)", 1
     except FileNotFoundError:
-        return False, "", "Tool not found"
+        return False, "", "Tool not found", 1
 
 
 def fix_crlf_trailing_ws():
@@ -132,6 +132,14 @@ def main():
             "name": "ci-custom (CRLF, tabs, trailing WS, EOF, ASCII, #define, etc.)",
             "cmd": [sys.executable, "script/ci-custom.py"],
             "extra_args": [mode, changed_flag],
+        }
+    )
+
+    # --- TFLM operator table vs library ---
+    checks.append(
+        {
+            "name": "verify_tflm_operators (table vs esp-tflite-micro 1.3.7)",
+            "cmd": [sys.executable, "script/verify_tflm_operators.py"],
         }
     )
 
@@ -269,8 +277,14 @@ def main():
             cmd = check["cmd"]
 
         start = time.time()
-        ok, stdout, stderr = run_check(name, cmd)
+        ok, stdout, stderr, returncode = run_check(name, cmd)
         elapsed = time.time() - start
+
+        if returncode == 2:
+            # e.g. verify_tflm_operators when the library header is not downloaded yet
+            print(f"[{name}] {color('SKIP', 'SKIPPED')} (dependency not present)")
+            skipped += 1
+            continue
 
         if ok:
             print(f"[{name}] {color('PASS', 'PASSED')} ({elapsed:.1f}s)")
