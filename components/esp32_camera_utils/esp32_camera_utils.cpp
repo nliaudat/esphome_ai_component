@@ -226,6 +226,14 @@ void Esp32CameraUtils::update_memory_sensors() {
   if (this->camera_buffer_size_sensor_ && this->image_processor_) {
     this->camera_buffer_size_sensor_->publish_state(this->image_processor_->get_required_buffer_size());
   }
+  // "Minimum free since boot" watermarks -- detect fragmentation/long-run heap growth.
+  if (this->camera_min_free_psram_sensor_) {
+    this->camera_min_free_psram_sensor_->publish_state(heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
+  }
+  if (this->camera_min_free_internal_sensor_) {
+    this->camera_min_free_internal_sensor_->publish_state(
+        heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+  }
 #endif
 }
 

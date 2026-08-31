@@ -74,6 +74,8 @@ class Esp32CameraUtils : public Component {
 #ifdef DEBUG_ESP32_CAMERA_UTILS_MEMORY
   void set_camera_buffer_size_sensor(sensor::Sensor *s) { this->camera_buffer_size_sensor_ = s; }
   void set_camera_free_psram_sensor(sensor::Sensor *s) { this->camera_free_psram_sensor_ = s; }
+  void set_camera_min_free_psram_sensor(sensor::Sensor *s) { this->camera_min_free_psram_sensor_ = s; }
+  void set_camera_min_free_internal_sensor(sensor::Sensor *s) { this->camera_min_free_internal_sensor_ = s; }
 #endif
 
  protected:
@@ -115,6 +117,8 @@ class Esp32CameraUtils : public Component {
 #ifdef DEBUG_ESP32_CAMERA_UTILS_MEMORY
   sensor::Sensor *camera_buffer_size_sensor_{nullptr};
   sensor::Sensor *camera_free_psram_sensor_{nullptr};
+  sensor::Sensor *camera_min_free_psram_sensor_{nullptr};
+  sensor::Sensor *camera_min_free_internal_sensor_{nullptr};
 #endif
 };
 

@@ -170,3 +170,11 @@ async def to_code(config):
         # Free PSRAM
         s = await create_sensor("camera_free_psram", "B", 0)
         cg.add(var.set_camera_free_psram_sensor(s))
+
+        # Min free PSRAM since boot (fragmentation / long-run growth watermark)
+        s = await create_sensor("camera_min_free_psram", "B", 0)
+        cg.add(var.set_camera_min_free_psram_sensor(s))
+
+        # Min free internal RAM since boot (fragmentation / long-run growth watermark)
+        s = await create_sensor("camera_min_free_internal", "B", 0)
+        cg.add(var.set_camera_min_free_internal_sensor(s))

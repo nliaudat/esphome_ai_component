@@ -1444,6 +1444,17 @@ bool ImageProcessor::process_raw_zone_pointer(const uint8_t *input_data, size_t 
           input_data, zone, crop_width, crop_height, target_buffer, scale_width, scale_height,
           this->config_.model_channels, this->config_.camera_width);
     }
+  } else if (this->config_.pixel_format == "YUV422") {
+    // YUYV packed, converted to RGB on-the-fly during crop + scale.
+    if (this->config_.input_type == kInputTypeFloat32) {
+      success = this->process_yuv422_crop_and_scale_to_float32(
+          input_data, zone, crop_width, crop_height, target_buffer, scale_width, scale_height,
+          this->config_.model_channels, this->config_.normalize, width);  // Use original width for stride
+    } else if (this->config_.input_type == kInputTypeUInt8) {
+      success = this->process_yuv422_crop_and_scale_to_uint8(input_data, zone, crop_width, crop_height, target_buffer,
+                                                             scale_width, scale_height, this->config_.model_channels,
+                                                             width);  // Use original width for stride
+    }
   } else {
     ESP_LOGE(TAG, "ProcessRawZone: Unsupported pixel format '%s'", this->config_.pixel_format.c_str());
     return false;
@@ -1747,6 +1758,105 @@ bool ImageProcessor::process_grayscale_crop_and_scale_to_uint8(const uint8_t *in
       } else if (model_channels == 1) {
         output_buffer[dst_pos] = gray;
       }
+    }
+  }
+  return true;
+}
+
+bool ImageProcessor::process_yuv422_crop_and_scale_to_float32(const uint8_t *input_data, const CropZone &zone,
+                                                              int crop_width, int crop_height, uint8_t *output_buffer,
+                                                              int model_width, int model_height, int model_channels,
+                                                              bool normalize, int src_stride_width) {
+  float *float_output = reinterpret_cast<float *>(output_buffer);
+  float x_scale = static_cast<float>(crop_width) / model_width;
+  float y_scale = static_cast<float>(crop_height) / model_height;
+
+  for (int y = 0; y < model_height; y++) {
+    int src_y = static_cast<int>(y * y_scale);
+    if (src_y >= crop_height)
+      src_y = crop_height - 1;
+
+    for (int x = 0; x < model_width; x++) {
+      int src_x = static_cast<int>(x * x_scale);
+      if (src_x >= crop_width)
+        src_x = crop_width - 1;
+
+      // YUV422 (YUYV packed): 4 bytes hold 2 pixels (Y0 U Y1 V).
+      const int row_start = (zone.y1 + src_y) * src_stride_width * 2;
+      const int row_bytes = src_stride_width * 2;
+      const int abs_x = zone.x1 + src_x;
+      const int pair_byte = (abs_x & ~1) * 2;  // byte offset of the even-aligned YUYV pair (2 BPP)
+      // Defensive: if the pair's V would cross the row end (only possible for odd widths),
+      // fall back to the previous pair's V. Camera rows are even, so this is rarely hit.
+      const int v_idx = (pair_byte + 3 < row_bytes) ? pair_byte + 3 : pair_byte - 1;
+
+      const uint8_t y_byte = input_data[row_start + pair_byte + (abs_x & 1) * 2];
+      const uint8_t u = input_data[row_start + pair_byte + 1];
+      const uint8_t v = input_data[row_start + v_idx];
+
+      // BT.601 fixed-point conversion (same constants as esp32-camera conversions/yuv.c).
+      const int c = y_byte - 16;
+      const int d = u - 128;
+      const int e = v - 128;
+      int r = (298 * c + 409 * e + 128) >> 8;
+      int g = (298 * c - 100 * d - 208 * e + 128) >> 8;
+      int b = (298 * c + 516 * d + 128) >> 8;
+      r = std::clamp(r, 0, 255);
+      g = std::clamp(g, 0, 255);
+      b = std::clamp(b, 0, 255);
+
+      int dst_pos = (y * model_width + x) * model_channels;
+      arrange_channels(&float_output[dst_pos], static_cast<uint8_t>(r), static_cast<uint8_t>(g),
+                       static_cast<uint8_t>(b), model_channels, normalize);
+    }
+  }
+  return true;
+}
+
+bool ImageProcessor::process_yuv422_crop_and_scale_to_uint8(const uint8_t *input_data, const CropZone &zone,
+                                                            int crop_width, int crop_height, uint8_t *output_buffer,
+                                                            int model_width, int model_height, int model_channels,
+                                                            int src_stride_width) {
+  float x_scale = static_cast<float>(crop_width) / model_width;
+  float y_scale = static_cast<float>(crop_height) / model_height;
+
+  for (int y = 0; y < model_height; y++) {
+    int src_y = static_cast<int>(y * y_scale);
+    if (src_y >= crop_height)
+      src_y = crop_height - 1;
+
+    for (int x = 0; x < model_width; x++) {
+      int src_x = static_cast<int>(x * x_scale);
+      if (src_x >= crop_width)
+        src_x = crop_width - 1;
+
+      // YUV422 (YUYV packed): 4 bytes hold 2 pixels (Y0 U Y1 V).
+      const int row_start = (zone.y1 + src_y) * src_stride_width * 2;
+      const int row_bytes = src_stride_width * 2;
+      const int abs_x = zone.x1 + src_x;
+      const int pair_byte = (abs_x & ~1) * 2;  // byte offset of the even-aligned YUYV pair (2 BPP)
+      // Defensive: if the pair's V would cross the row end (only possible for odd widths),
+      // fall back to the previous pair's V. Camera rows are even, so this is rarely hit.
+      const int v_idx = (pair_byte + 3 < row_bytes) ? pair_byte + 3 : pair_byte - 1;
+
+      const uint8_t y_byte = input_data[row_start + pair_byte + (abs_x & 1) * 2];
+      const uint8_t u = input_data[row_start + pair_byte + 1];
+      const uint8_t v = input_data[row_start + v_idx];
+
+      // BT.601 fixed-point conversion (same constants as esp32-camera conversions/yuv.c).
+      const int c = y_byte - 16;
+      const int d = u - 128;
+      const int e = v - 128;
+      int r = (298 * c + 409 * e + 128) >> 8;
+      int g = (298 * c - 100 * d - 208 * e + 128) >> 8;
+      int b = (298 * c + 516 * d + 128) >> 8;
+      r = std::clamp(r, 0, 255);
+      g = std::clamp(g, 0, 255);
+      b = std::clamp(b, 0, 255);
+
+      int dst_pos = (y * model_width + x) * model_channels;
+      arrange_channels(&output_buffer[dst_pos], static_cast<uint8_t>(r), static_cast<uint8_t>(g),
+                       static_cast<uint8_t>(b), model_channels);
     }
   }
   return true;
