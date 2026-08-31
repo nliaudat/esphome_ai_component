@@ -180,6 +180,9 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   struct FreeDeleter {
     void operator()(uint8_t *ptr) const { free(ptr); }
   };
+  // Thread-safety invariant: persistent_buffer_ is only accessed from the ESPHome main
+  // loop task (setup()/update()/process_image* run on the main task). No locks required;
+  // do NOT touch it from other tasks or ISRs.
   std::unique_ptr<uint8_t[], FreeDeleter> persistent_buffer_{nullptr};
   size_t persistent_buffer_size_{0};
   bool requires_color_{false};
