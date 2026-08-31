@@ -27,3 +27,5 @@ esp32_camera:
 data_collector:
   id: test_collector
   upload_url: "http://localhost:5123/api/upload/test"
+  upload_interval: "60s"
+  upload_queue_size: 5

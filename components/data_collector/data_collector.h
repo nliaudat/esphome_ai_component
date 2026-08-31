@@ -30,6 +30,8 @@ class DataCollector : public Component {
   }
   void set_api_key(const std::string &key) { this->api_key_ = key; }
   void set_debug(bool debug) { this->debug_ = debug; }
+  void set_upload_interval(uint32_t ms) { this->upload_interval_ms_ = ms; }
+  void set_upload_queue_size(size_t n) { this->upload_queue_size_ = n; }
 
   // Main entry point
   // raw_value and confidence are passed for metadata/logging
@@ -47,9 +49,12 @@ class DataCollector : public Component {
   // Helper to upload
   bool upload_image(const uint8_t *data, size_t len, const std::string &raw_value, float confidence,
                     const char *metadata = nullptr);
+  // Result of a synchronous upload attempt (centralized error handling, review enhancement #4)
+  enum class UploadResult : uint8_t { OK, CONFIG_ERROR, CLIENT_INIT_FAILED, HTTP_ERROR, NON_2XX };
+
   // Internal synchronous upload
-  bool process_upload_sync(const uint8_t *data, size_t len, const std::string &raw_value, float confidence,
-                           const char *metadata = nullptr);
+  UploadResult process_upload_sync(const uint8_t *data, size_t len, const std::string &raw_value, float confidence,
+                                   const char *metadata = nullptr);
 
   // RAII-enabled upload job -- frees resources on destruction if not processed
   struct UploadJob {
@@ -85,9 +90,14 @@ class DataCollector : public Component {
     UploadJob() = default;
   };
 
-  // Rate limiting: max 1 upload per 60 seconds (3.4)
-  static constexpr uint32_t MIN_UPLOAD_INTERVAL_MS = 60000;
-  uint32_t last_upload_time_{0u - MIN_UPLOAD_INTERVAL_MS};  // Ensures first upload is always permitted
+  // Rate limiting: max 1 upload per configured interval (default 60s, review enhancement #2)
+  static constexpr uint32_t DEFAULT_UPLOAD_INTERVAL_MS = 60000;
+  uint32_t upload_interval_ms_{DEFAULT_UPLOAD_INTERVAL_MS};
+  uint32_t last_upload_time_{0};  // Set in setup() so the first upload is always permitted
+
+  // Bounded upload queue depth (review enhancement #2)
+  static constexpr size_t DEFAULT_UPLOAD_QUEUE_SIZE = 5;
+  size_t upload_queue_size_{DEFAULT_UPLOAD_QUEUE_SIZE};
 
   QueueHandle_t upload_queue_{nullptr};
   TaskHandle_t upload_task_handle_{nullptr};

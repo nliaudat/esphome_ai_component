@@ -41,6 +41,10 @@ data_collector:
 
 > **Note**: This component is fully optional. If you do not include the `data_collector` block in your YAML, the feature is disabled and no code is compiled.
 
+> **Rate limiting**: Uploads are limited to **1 per minute** by default (`upload_interval: "60s"`).
+> The minimum allowed value is `60s` — sub-minute intervals are rejected at config time to protect
+> device memory and collection-server load.
+
 ## 🔗 Integration with Meter Reader
 
 Enable the collection logic in your `meter_reader_tflite` config:

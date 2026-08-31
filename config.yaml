@@ -138,6 +138,8 @@ flash_light_controller:
 # data_collector:
 #   id: ${id_prefix}_data_collector
 #   upload_url: "http://192.168.1.53:5000/api/upload" # CHANGE ME
+#   # upload_interval: "60s"   # Min interval between uploads (default 60s, 1s-1h)
+#   # upload_queue_size: 5     # Queued images before dropping (default 5)
 #   # api_key: "Bearer my-secret-token" # Optional: Adds Authorization header
 #   # username: "usr" # Optional: Basic Auth
 #   # api_key: "Bearer my-secret-token" # Optional: Adds Authorization header
