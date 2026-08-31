@@ -1785,13 +1785,13 @@ bool ImageProcessor::process_yuv422_crop_and_scale_to_float32(const uint8_t *inp
       const int row_start = (zone.y1 + src_y) * src_stride_width * 2;
       const int row_bytes = src_stride_width * 2;
       const int abs_x = zone.x1 + src_x;
-      const int pair_base = abs_x & ~1;  // even-aligned start of the YUYV pair
+      const int pair_byte = (abs_x & ~1) * 2;  // byte offset of the even-aligned YUYV pair (2 BPP)
       // Defensive: if the pair's V would cross the row end (only possible for odd widths),
       // fall back to the previous pair's V. Camera rows are even, so this is rarely hit.
-      const int v_idx = (pair_base + 3 < row_bytes) ? pair_base + 3 : pair_base - 1;
+      const int v_idx = (pair_byte + 3 < row_bytes) ? pair_byte + 3 : pair_byte - 1;
 
-      const uint8_t y_byte = input_data[row_start + pair_base + (abs_x & 1) * 2];
-      const uint8_t u = input_data[row_start + pair_base + 1];
+      const uint8_t y_byte = input_data[row_start + pair_byte + (abs_x & 1) * 2];
+      const uint8_t u = input_data[row_start + pair_byte + 1];
       const uint8_t v = input_data[row_start + v_idx];
 
       // BT.601 fixed-point conversion (same constants as esp32-camera conversions/yuv.c).
@@ -1834,13 +1834,13 @@ bool ImageProcessor::process_yuv422_crop_and_scale_to_uint8(const uint8_t *input
       const int row_start = (zone.y1 + src_y) * src_stride_width * 2;
       const int row_bytes = src_stride_width * 2;
       const int abs_x = zone.x1 + src_x;
-      const int pair_base = abs_x & ~1;  // even-aligned start of the YUYV pair
+      const int pair_byte = (abs_x & ~1) * 2;  // byte offset of the even-aligned YUYV pair (2 BPP)
       // Defensive: if the pair's V would cross the row end (only possible for odd widths),
       // fall back to the previous pair's V. Camera rows are even, so this is rarely hit.
-      const int v_idx = (pair_base + 3 < row_bytes) ? pair_base + 3 : pair_base - 1;
+      const int v_idx = (pair_byte + 3 < row_bytes) ? pair_byte + 3 : pair_byte - 1;
 
-      const uint8_t y_byte = input_data[row_start + pair_base + (abs_x & 1) * 2];
-      const uint8_t u = input_data[row_start + pair_base + 1];
+      const uint8_t y_byte = input_data[row_start + pair_byte + (abs_x & 1) * 2];
+      const uint8_t u = input_data[row_start + pair_byte + 1];
       const uint8_t v = input_data[row_start + v_idx];
 
       // BT.601 fixed-point conversion (same constants as esp32-camera conversions/yuv.c).
