@@ -20,12 +20,16 @@ static const char *const TAG = "data_collector";
 
 void DataCollector::setup() {
   ESP_LOGCONFIG(TAG, "Setting up Data Collector...");
+  // Ensure the first upload is always permitted, regardless of the configured interval.
+  this->last_upload_time_ = millis() - this->upload_interval_ms_;
   this->start_upload_task();
 }
 
 void DataCollector::dump_config() {
   ESP_LOGCONFIG(TAG, "Data Collector:");
   ESP_LOGCONFIG(TAG, "  Upload URL: %s", this->upload_url_.c_str());
+  ESP_LOGCONFIG(TAG, "  Upload Interval: %u ms", this->upload_interval_ms_);
+  ESP_LOGCONFIG(TAG, "  Upload Queue Size: %u", static_cast<unsigned>(this->upload_queue_size_));
   if (this->web_submit_switch_) {
     ESP_LOGCONFIG(TAG, "  Web Submit Switch: %s", this->web_submit_switch_->get_name().c_str());
   }
@@ -53,7 +57,7 @@ void DataCollector::collect_image(std::shared_ptr<camera::CameraImage> frame, in
 
   // Check rate limit early to avoid expensive JPEG conversion
   uint32_t now = millis();
-  if (now - this->last_upload_time_ < MIN_UPLOAD_INTERVAL_MS) {
+  if (now - this->last_upload_time_ < this->upload_interval_ms_) {
     ESP_LOGD(TAG, "Rate limited: skipping image collection");
     return;
   }
@@ -162,8 +166,8 @@ bool DataCollector::upload_image(const uint8_t *data, size_t len, const std::str
 }
 
 void DataCollector::start_upload_task() {
-  // Create queue for 5 items (approx 250KB if 50KB each)
-  this->upload_queue_ = xQueueCreate(5, sizeof(UploadJob));
+  // Create a bounded queue (default 5 items, approx 250KB if 50KB each)
+  this->upload_queue_ = xQueueCreate(this->upload_queue_size_, sizeof(UploadJob));
   if (!this->upload_queue_) {
     ESP_LOGE(TAG, "Failed to create upload queue");
     return;
@@ -230,10 +234,11 @@ DataCollector::~DataCollector() {
   }
 }
 
-bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, const std::string &raw_value, float confidence,
-                                        const char *metadata) {
+DataCollector::UploadResult DataCollector::process_upload_sync(const uint8_t *data, size_t len,
+                                                               const std::string &raw_value, float confidence,
+                                                               const char *metadata) {
   if (this->upload_url_.empty())
-    return false;
+    return UploadResult::CONFIG_ERROR;
 
   ESP_LOGI(TAG, "Uploading image to %s...", this->upload_url_.c_str());
 
@@ -251,7 +256,7 @@ bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, const s
   esp_http_client_handle_t client = esp_http_client_init(&config);
   if (!client) {
     ESP_LOGE(TAG, "Failed to allocate HTTP client");
-    return false;
+    return UploadResult::CLIENT_INIT_FAILED;
   }
 
   // Set Headers
@@ -282,7 +287,7 @@ bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, const s
   esp_http_client_set_post_field(client, reinterpret_cast<const char *>(data), len);
 
   esp_err_t err = esp_http_client_perform(client);
-  bool success = false;
+  UploadResult result = UploadResult::OK;
 
   if (err == ESP_OK) {
     int status_code = esp_http_client_get_status_code(client);
@@ -292,13 +297,14 @@ bool DataCollector::process_upload_sync(const uint8_t *data, size_t len, const s
       ESP_LOGD(TAG, "Full upload metrics: Value=%s, Conf=%.4f, Size=%zu", raw_value.c_str(), confidence, len);
       ESP_LOGD(TAG, "Headers sent: X-Meter-Value, X-Meter-Confidence, Content-Type, Authorization");
     }
-    success = (status_code >= 200 && status_code < 300);
+    result = (status_code >= 200 && status_code < 300) ? UploadResult::OK : UploadResult::NON_2XX;
   } else {
     ESP_LOGE(TAG, "HTTP POST request failed: %s", esp_err_to_name(err));
+    result = UploadResult::HTTP_ERROR;
   }
 
   esp_http_client_cleanup(client);
-  return success;
+  return result;
 }
 
 }  // namespace data_collector

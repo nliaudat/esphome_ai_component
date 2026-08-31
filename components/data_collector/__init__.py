@@ -14,6 +14,8 @@ CONF_WEB_SUBMIT = "web_submit"
 CONF_USERNAME = "username"
 CONF_PASSWORD = "password"
 CONF_API_KEY = "api_key"
+CONF_UPLOAD_INTERVAL = "upload_interval"
+CONF_UPLOAD_QUEUE_SIZE = "upload_queue_size"
 
 CONFIG_SCHEMA = cv.Schema(
     {
@@ -23,6 +25,8 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_USERNAME): cv.string,
         cv.Optional(CONF_PASSWORD): cv.string,
         cv.Optional(CONF_API_KEY): cv.string,
+        cv.Optional(CONF_UPLOAD_INTERVAL, default="60s"): cv.positive_time_period_milliseconds,
+        cv.Optional(CONF_UPLOAD_QUEUE_SIZE, default=5): cv.int_range(min=1, max=20),
         cv.Optional(CONF_WEB_SUBMIT): switch.switch_schema(
             switch.Switch,
             icon="mdi:cloud-upload",
@@ -54,6 +58,12 @@ async def to_code(config):
 
     if CONF_API_KEY in config:
         cg.add(var.set_api_key(config[CONF_API_KEY]))
+
+    if CONF_UPLOAD_INTERVAL in config:
+        cg.add(var.set_upload_interval(config[CONF_UPLOAD_INTERVAL]))
+
+    if CONF_UPLOAD_QUEUE_SIZE in config:
+        cg.add(var.set_upload_queue_size(config[CONF_UPLOAD_QUEUE_SIZE]))
 
     if CONF_WEB_SUBMIT in config:
         sens = await switch.new_switch(config[CONF_WEB_SUBMIT])
