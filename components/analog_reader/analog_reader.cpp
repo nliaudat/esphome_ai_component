@@ -18,6 +18,10 @@ static const char *const TAG = "analog_reader";
 // Use existing JpegDecoderDeleter from image_processor.h (avoids redundant local struct)
 using JpegDecoderDeleter = esphome::esp32_camera_utils::ImageProcessor::JpegDecoderDeleter;
 
+// PSRAM headroom kept free above the raw RGB buffer before PSRAM is considered sufficient
+// (~1.5MB for camera framebuffers and other components). Named constant per review item #5.
+static constexpr size_t PSRAM_RGB_HEADROOM_BYTES = 1536 * 1024;
+
 // Thin wrapper: decode JPEG directly into a pre-allocated buffer
 // Avoids the double allocation of ImageProcessor::decode_jpeg() + memcpy to persistent buffer.
 static bool decode_jpeg_to_buffer(const uint8_t *data, size_t len, jpeg_pixel_format_t output_format,
@@ -157,7 +161,7 @@ void AnalogReader::setup() {
       rgb_size = pixels * 3u;
       gray_size = pixels;  // x1 can never overflow
     }
-    bool sufficient_psram_for_rgb = free_psram > (rgb_size + 1536 * 1024);
+    bool sufficient_psram_for_rgb = free_psram > (rgb_size + PSRAM_RGB_HEADROOM_BYTES);
 
     if (this->requires_color_ || sufficient_psram_for_rgb) {
       this->buffer_format_ = PIXFORMAT_RGB888;
@@ -381,6 +385,7 @@ void AnalogReader::process_image(std::shared_ptr<esphome::camera::CameraImage> i
   }
 }
 
+// Main-task only (see persistent_buffer_ invariant in analog_reader.h).
 void AnalogReader::process_image_from_buffer(const uint8_t *data, size_t len) {
   if (this->camera_ == nullptr || this->dials_.empty())
     return;
