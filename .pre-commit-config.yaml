@@ -54,3 +54,8 @@ repos:
         name: ci-custom
         entry: python script/ci-custom.py
         language: system
+      - id: verify-tflm-operators
+        name: verify-tflm-operators
+        entry: python script/verify_tflm_operators.py
+        language: system
+        pass_filenames: false

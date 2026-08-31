@@ -33,6 +33,8 @@ from esphome.const import (
 )
 from esphome.core import CORE, HexInt
 
+from .op_manifest import extract_model_ops, parse_op_table
+
 CODEOWNERS = ["@nliaudat"]
 
 DOMAIN = "tflite_micro_helper"
@@ -380,6 +382,23 @@ async def to_code(config):
         cg.add_define("USE_TFLITE_MICRO_HELPER")
         model_type = config[CONF_MODEL_TYPE]
         model_path, model_data = resolve_model_source(config)
+        # Compile-time operator support check: fail config generation (before
+        # compiling/flashing) when the model requires an operator the TFLM
+        # operator table cannot register. The device-side check remains the
+        # final safety net when no .txt report is available.
+        model_ops = extract_model_ops(model_path)
+        if model_ops:
+            available_ops, _ = parse_op_table()
+            unsupported_ops = sorted(model_ops - available_ops)
+            if unsupported_ops:
+                raise cv.Invalid(
+                    f"Model '{Path(model_path).name}' requires operator(s) "
+                    f"{', '.join(unsupported_ops)} which esp-tflite-micro 1.3.7 "
+                    f"does not support.\n"
+                    f"  Available operators: {', '.join(sorted(available_ops))}\n"
+                    f"  Re-export the model without the unsupported operator(s) "
+                    f"or choose a compatible model."
+                )
         var = cg.new_Pvariable(config[CONF_ID])
         rhs = [HexInt(x) for x in model_data]
         prog_arr = cg.progmem_array(config[CONF_RAW_DATA_ID], rhs)
