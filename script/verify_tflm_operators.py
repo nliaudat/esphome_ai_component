@@ -15,9 +15,10 @@ Usage:
     python script/verify_tflm_operators.py --legacy        # also check legacy table
 
 Exit codes:
-    0 - table matches the library
-    1 - mismatches found
-    2 - library header not found (nothing to verify - run after a build)
+    0 - table matches the library, or the library header is unavailable and the
+        run was skipped (not failed)
+    1 - mismatches found (or an invalid --header path)
+    2 - library header not found, with --strict (nothing was verified)
 """
 
 from __future__ import annotations
@@ -87,9 +88,13 @@ def parse_kernel_registrations(header: Path) -> set[str]:
 
 
 def verify_table(
-    table: Path, library_ops: dict[str, str], kernels: set[str]
+    table: Path, library_ops: dict[str, str], kernels: set[str] | None
 ) -> list[str]:
-    """Return a list of table/library mismatches (empty when consistent)."""
+    """Return a list of table/library mismatches (empty when consistent).
+
+    ``kernels`` may be None when the kernels directory is not available next to
+    the library header; in that case the link-safety check is skipped.
+    """
     available, unavailable = op_manifest.parse_op_table(table)
     text = "\n".join(
         line
@@ -110,7 +115,7 @@ def verify_table(
                 f"{table.name}: {op} method mismatch - table uses {method}(), "
                 f"library has {library_ops[op]}()"
             )
-        elif op not in kernels:
+        elif kernels is not None and op not in kernels:
             issues.append(
                 f"{table.name}: {op} marked AVAILABLE but no Register_{op}() "
                 f"kernel definition found (link error at build time)"
@@ -139,10 +144,20 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="also verify the legacy_meter_reader_tflite table",
     )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="exit with code 2 when the library header is not available "
+        "(default: exit 0 so pre-commit stays non-blocking on a clean checkout)",
+    )
     args = parser.parse_args(argv)
 
     if args.header:
-        headers = [Path(args.header)]
+        header_path = Path(args.header)
+        if not header_path.exists():
+            print(f"[ERROR] --header file not found: {header_path}")
+            return 1
+        headers = [header_path]
     else:
         headers = find_library_headers()
         if not headers:
@@ -151,17 +166,24 @@ def main(argv: list[str] | None = None) -> int:
                 "managed cache (.esphome/.espressif)."
             )
             print("       Run once after a successful build, or pass --header PATH.")
-            return 2
+            return 2 if args.strict else 0
     header = headers[0]
     if len(headers) > 1:
         print(f"[INFO] Multiple cached versions found; using {header}")
 
     library_ops = parse_library_ops(header)
-    kernels = parse_kernel_registrations(header)
+    kernels_dir = header.parent / "kernels"
+    kernels = parse_kernel_registrations(header) if kernels_dir.is_dir() else None
+    if kernels is None:
+        print(
+            "[INFO] kernels/ dir not found next to the header - skipping the "
+            "kernel link-safety check"
+        )
     print(f"[INFO] Library: {header}")
     print(
         f"[INFO] Builtin ops with Add method: {len(library_ops)}; "
-        f"kernels with Register_* definition: {len(kernels)}"
+        f"kernels with Register_* definition: "
+        f"{len(kernels) if kernels is not None else 'n/a'}"
     )
 
     issues = verify_table(COMPONENT_DIR / "tflm_operators.h", library_ops, kernels)

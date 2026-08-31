@@ -139,7 +139,7 @@ def main():
     checks.append(
         {
             "name": "verify_tflm_operators (table vs esp-tflite-micro 1.3.7)",
-            "cmd": [sys.executable, "script/verify_tflm_operators.py"],
+            "cmd": [sys.executable, "script/verify_tflm_operators.py", "--strict"],
         }
     )
 
