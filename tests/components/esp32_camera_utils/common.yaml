@@ -7,6 +7,12 @@ esp32:
   framework:
     type: esp-idf
 
+# crop_zone_handler.h (included by image_processor.h) requires the globals component.
+# Declare a minimal instance so the component graph loads it and its headers are copied.
+globals:
+  - id: test_global
+    type: int
+
 logger:
   level: DEBUG
 
