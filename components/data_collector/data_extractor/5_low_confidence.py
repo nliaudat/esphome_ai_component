@@ -393,11 +393,15 @@ class MeterReader:
                 f"Predicted class: {predicted_class}, raw_confidence: {raw_confidence:.4f}, normalized: {confidence:.4f}"
             )
 
-            # Apply scaling based on model type
-            if self.model_config.output_processing in {"direct_class", "softmax"}:
-                meter_reading = float(predicted_class)
-            else:  # "softmax_scale10"
-                meter_reading = float(predicted_class) / self.model_config.scale_factor
+            # Convert class index to reading. 100-class models encode
+            # tenths-of-a-step (index 0-99 -> 0.0-9.9), so the index must
+            # always be divided by scale_factor (10.0 for 100-class models,
+            # 1.0 for 10-class models).  `output_processing` only describes
+            # whether the model's output already has softmax applied; it must
+            # not gate the scaling (that is what corrupted 100cls filenames
+            # into two-digit values such as 89.0 instead of 7.0/9.9).
+            scale = self.model_config.scale_factor or 1.0
+            meter_reading = float(predicted_class) / scale
 
             return meter_reading, confidence
 

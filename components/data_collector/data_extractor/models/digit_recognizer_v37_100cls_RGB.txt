@@ -1,0 +1,986 @@
+
+================================================================================
+TFLITE MODEL COMPREHENSIVE INSPECTION REPORT
+================================================================================
+Model: D:\digit_images\real_integra_data_collector\models\digit_recognizer_v37_teacher_float32.tflite
+Timestamp: 2026-09-27 17:20:06
+TensorFlow Version: 2.20.0
+File Size: 24026.02 KB
+
+================================================================================
+MODEL SUMMARY: TFLite Model
+================================================================================
+Layer (type)              Output Shape         Param #         Size (KB)
+--------------------------------------------------------------------------------
+CONV_2D_0                 [ 1 32 20 64]        0               162.27
+CONV_2D_1                 [  1  32  20 256]    0               5.26
+DEPTHWISE_CONV_2D_2       [  1  16  10 256]    0               3.01
+MEAN_3                    [  1   1   1 256]    0               0.02
+CONV_2D_4                 [ 1  1  1 64]        0               3.58
+CONV_2D_5                 [  1   1   1 256]    0               3.02
+LOGISTIC_6                [  1   1   1 256]    0               0.02
+MUL_7                     [  1  16  10 256]    0               4.51
+CONV_2D_8                 [ 1 16 10 64]        0               11.26
+CONV_2D_9                 [  1  16  10 256]    0               17.25
+DEPTHWISE_CONV_2D_10      [  1  16  10 256]    0               69.00
+MEAN_11                   [  1   1   1 256]    0               0.02
+CONV_2D_12                [ 1  1  1 64]        0               15.01
+CONV_2D_13                [  1   1   1 256]    0               4.51
+LOGISTIC_14               [  1   1   1 256]    0               0.00
+MUL_15                    [  1  16  10 256]    0               0.00
+CONV_2D_16                [ 1 16 10 64]        0               4.52
+ADD_17                    [ 1 16 10 64]        0               0.00
+CONV_2D_18                [  1  16  10 384]    0               2.26
+DEPTHWISE_CONV_2D_19      [  1   8   5 384]    0               56.25
+MEAN_20                   [  1   1   1 384]    0               0.00
+CONV_2D_21                [ 1  1  1 96]        0               2.27
+CONV_2D_22                [  1   1   1 384]    0               9.02
+LOGISTIC_23               [  1   1   1 384]    0               0.00
+MUL_24                    [  1   8   5 384]    0               0.00
+CONV_2D_25                [ 1  8  5 96]        0               57.00
+CONV_2D_26                [  1   8   5 576]    0               39.00
+DEPTHWISE_CONV_2D_27      [  1   8   5 576]    0               40.50
+MEAN_28                   [  1   1   1 576]    0               0.00
+CONV_2D_29                [  1   1   1 144]    0               3.01
+CONV_2D_30                [  1   1   1 576]    0               4.51
+LOGISTIC_31               [  1   1   1 576]    0               0.00
+MUL_32                    [  1   8   5 576]    0               0.00
+CONV_2D_33                [ 1  8  5 96]        0               54.02
+ADD_34                    [ 1  8  5 96]        0               0.00
+CONV_2D_35                [  1   8   5 576]    0               6.01
+DEPTHWISE_CONV_2D_36      [  1   8   5 576]    0               15.00
+MEAN_37                   [  1   1   1 576]    0               0.00
+CONV_2D_38                [  1   1   1 144]    0               6.02
+CONV_2D_39                [  1   1   1 576]    0               2.02
+LOGISTIC_40               [  1   1   1 576]    0               0.00
+MUL_41                    [  1   8   5 576]    0               0.00
+CONV_2D_42                [ 1  8  5 96]        0               6.00
+ADD_43                    [ 1  8  5 96]        0               0.00
+CONV_2D_44                [  1   8   5 576]    0               3.00
+DEPTHWISE_CONV_2D_45      [  1   4   3 576]    0               3.39
+MEAN_46                   [  1   1   1 576]    0               0.00
+CONV_2D_47                [  1   1   1 144]    0               3.00
+CONV_2D_48                [  1   1   1 576]    0               67.50
+LOGISTIC_49               [  1   1   1 576]    0               0.00
+MUL_50                    [  1   4   3 576]    0               0.00
+CONV_2D_51                [  1   4   3 128]    0               0.01
+CONV_2D_52                [  1   4   3 768]    0               36.00
+DEPTHWISE_CONV_2D_53      [  1   4   3 768]    0               37.00
+MEAN_54                   [  1   1   1 768]    0               0.00
+CONV_2D_55                [  1   1   1 192]    0               36.00
+CONV_2D_56                [  1   1   1 768]    0               0.01
+LOGISTIC_57               [  1   1   1 768]    0               0.00
+MUL_58                    [  1   4   3 768]    0               0.00
+CONV_2D_59                [  1   4   3 128]    0               0.02
+ADD_60                    [  1   4   3 128]    0               0.00
+CONV_2D_61                [  1   4   3 768]    0               36.00
+DEPTHWISE_CONV_2D_62      [  1   4   3 768]    0               37.50
+MEAN_63                   [  1   1   1 768]    0               0.00
+CONV_2D_64                [  1   1   1 192]    0               9.00
+CONV_2D_65                [  1   1   1 768]    0               0.01
+LOGISTIC_66               [  1   1   1 768]    0               0.00
+MUL_67                    [  1   4   3 768]    0               0.00
+CONV_2D_68                [  1   4   3 128]    0               0.02
+ADD_69                    [  1   4   3 128]    0               0.00
+CONV_2D_70                [  1   4   3 768]    0               4.50
+DEPTHWISE_CONV_2D_71      [  1   4   3 768]    0               6.75
+MEAN_72                   [  1   1   1 768]    0               0.00
+CONV_2D_73                [  1   1   1 192]    0               4.50
+CONV_2D_74                [  1   1   1 768]    0               0.01
+LOGISTIC_75               [  1   1   1 768]    0               0.00
+MUL_76                    [  1   4   3 768]    0               0.00
+CONV_2D_77                [  1   4   3 192]    0               0.02
+CONV_2D_78                [   1    4    3 1152] 0               54.00
+DEPTHWISE_CONV_2D_79      [   1    4    3 1152] 0               54.01
+MEAN_80                   [   1    1    1 1152] 0               0.00
+CONV_2D_81                [  1   1   1 288]    0               54.00
+CONV_2D_82                [   1    1    1 1152] 0               0.02
+LOGISTIC_83               [   1    1    1 1152] 0               0.00
+MUL_84                    [   1    4    3 1152] 0               0.00
+CONV_2D_85                [  1   4   3 192]    0               3.00
+ADD_86                    [  1   4   3 192]    0               0.00
+CONV_2D_87                [   1    4    3 1152] 0               54.00
+DEPTHWISE_CONV_2D_88      [   1    4    3 1152] 0               54.01
+MEAN_89                   [   1    1    1 1152] 0               0.00
+CONV_2D_90                [  1   1   1 288]    0               9.00
+CONV_2D_91                [   1    1    1 1152] 0               0.02
+LOGISTIC_92               [   1    1    1 1152] 0               0.00
+MUL_93                    [   1    4    3 1152] 0               0.00
+CONV_2D_94                [  1   4   3 192]    0               4.50
+ADD_95                    [  1   4   3 192]    0               0.00
+CONV_2D_96                [  1   4   3 512]    0               4.00
+MEAN_97                   [  1   1   1 512]    0               0.00
+RESHAPE_98                [  1 512]            0               4.50
+FULLY_CONNECTED_99        [   1 1024]          0               0.39
+FULLY_CONNECTED_100       [  1 512]            0               0.39
+FULLY_CONNECTED_101       [  1 100]            0               0.01
+SOFTMAX_102               [  1 100]            0               0.00
+--------------------------------------------------------------------------------
+Total params: 0
+Total memory: 1186.15 KB
+Total operations: 103
+
+================================================================================
+INPUT/OUTPUT SUMMARY
+================================================================================
+Input 0:  [ 1 32 20  3]   <class 'numpy.float32'>
+Output 0: [  1 100]       <class 'numpy.float32'>
+
+================================================================================
+MEMORY USAGE ANALYSIS
+================================================================================
+Tensor Name                    Shape                Dtype      Elements     Memory (KB)
+--------------------------------------------------------------------------------
+arith.constant117              [ 512 1024]          <class 'numpy.float32'> 524,288      2048.00
+arith.constant118              [1024  512]          <class 'numpy.float32'> 524,288      2048.00
+arith.constant73               [1152    1    1  2... <class 'numpy.float32'> 331,776      1296.00
+arith.constant74               [ 288    1    1 11... <class 'numpy.float32'> 331,776      1296.00
+arith.constant77               [1152    1    1  2... <class 'numpy.float32'> 331,776      1296.00
+arith.constant78               [ 288    1    1 11... <class 'numpy.float32'> 331,776      1296.00
+arith.constant72               [ 192    1    1 11... <class 'numpy.float32'> 221,184      864.00
+arith.constant75               [1152    1    1  1... <class 'numpy.float32'> 221,184      864.00
+arith.constant76               [ 192    1    1 11... <class 'numpy.float32'> 221,184      864.00
+arith.constant79               [1152    1    1  1... <class 'numpy.float32'> 221,184      864.00
+model_13/tf.nn.relu6_25/Relu   [  1  32  20 256]    <class 'numpy.float32'> 163,840      640.00
+arith.constant80               [192   1   1 768]    <class 'numpy.float32'> 147,456      576.00
+arith.constant81               [768   1   1 192]    <class 'numpy.float32'> 147,456      576.00
+arith.constant82               [192   1   1 768]    <class 'numpy.float32'> 147,456      576.00
+arith.constant85               [768   1   1 192]    <class 'numpy.float32'> 147,456      576.00
+arith.constant86               [192   1   1 768]    <class 'numpy.float32'> 147,456      576.00
+arith.constant89               [768   1   1 192]    <class 'numpy.float32'> 147,456      576.00
+arith.constant90               [192   1   1 768]    <class 'numpy.float32'> 147,456      576.00
+arith.constant71               [512   1   1 192]    <class 'numpy.float32'> 98,304       384.00
+arith.constant83               [768   1   1 128]    <class 'numpy.float32'> 98,304       384.00
+--------------------------------------------------------------------------------
+Total Memory Usage: 27784.97 KB
+Number of Tensors: 263
+
+================================================================================
+PEAK MEMORY ANALYSIS (TFLite Micro Arena Estimate)
+================================================================================
+
+Total tensor memory (sum of all tensors): 27784.97 KB
+Peak concurrent tensor memory (lifetime analysis): 800.00 KB at op 1 (CONV_2D)
+Planner overhead: 2.2x safety factor + 3264B head
+Estimated arena size: 1764.00 KB (1806336 bytes)
+
+Recommended tensor_arena_size: 1764KB
+
+Top tensors by memory:
+  [118]  2048.00 KB  [ 512 1024]               <class 'numpy.float32'> arith.constant117
+  [119]  2048.00 KB  [1024  512]               <class 'numpy.float32'> arith.constant118
+  [ 74]  1296.00 KB  [1152    1    1  288]     <class 'numpy.float32'> arith.constant73
+  [ 75]  1296.00 KB  [ 288    1    1 1152]     <class 'numpy.float32'> arith.constant74
+  [ 78]  1296.00 KB  [1152    1    1  288]     <class 'numpy.float32'> arith.constant77
+  [ 79]  1296.00 KB  [ 288    1    1 1152]     <class 'numpy.float32'> arith.constant78
+  [ 73]   864.00 KB  [ 192    1    1 1152]     <class 'numpy.float32'> arith.constant72
+  [ 76]   864.00 KB  [1152    1    1  192]     <class 'numpy.float32'> arith.constant75
+  [ 77]   864.00 KB  [ 192    1    1 1152]     <class 'numpy.float32'> arith.constant76
+  [ 80]   864.00 KB  [1152    1    1  192]     <class 'numpy.float32'> arith.constant79
+
+================================================================================
+TFLITE MICRO COMPATIBILITY CHECK
+================================================================================
+
+[OK] No DELEGATE operations found - compatible with TFLite Micro
+
+[INFO] Model has 103 operations
+   Recommended MAX_OPERATORS: 108 (total ops + 5 margin)
+   Set via build flag: -DMAX_OPERATORS=108
+
+Unique operator types: 9
+  ADD: 7
+  CONV_2D: 46
+  DEPTHWISE_CONV_2D: 11
+  FULLY_CONNECTED: 3
+  LOGISTIC: 11
+  MEAN: 12
+  MUL: 11
+  RESHAPE: 1
+  SOFTMAX: 1
+
+================================================================================
+DETAILED OPERATIONS BREAKDOWN
+================================================================================
+
+OPERATION COUNTS:
+  ADD: 7
+  CONV_2D: 46
+  DEPTHWISE_CONV_2D: 11
+  FULLY_CONNECTED: 3
+  LOGISTIC: 11
+  MEAN: 12
+  MUL: 11
+  RESHAPE: 1
+  SOFTMAX: 1
+
+DETAILED OPERATION INFO:
+
+CONV_2D (index: 0):
+  Input tensors: [  0 121 122]
+  Output tensors: [123]
+    Input 0: shape=[ 1 32 20  3], dtype=<class 'numpy.float32'>
+    Input 121: shape=[64  3  3  3], dtype=<class 'numpy.float32'>
+    Input 122: shape=[64], dtype=<class 'numpy.float32'>
+    Output 123: shape=[ 1 32 20 64], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 1):
+  Input tensors: [123 116  36]
+  Output tensors: [124]
+    Input 123: shape=[ 1 32 20 64], dtype=<class 'numpy.float32'>
+    Input 116: shape=[256   1   1  64], dtype=<class 'numpy.float32'>
+    Input 36: shape=[256], dtype=<class 'numpy.float32'>
+    Output 124: shape=[  1  32  20 256], dtype=<class 'numpy.float32'>
+
+DEPTHWISE_CONV_2D (index: 2):
+  Input tensors: [124  71  35]
+  Output tensors: [125]
+    Input 124: shape=[  1  32  20 256], dtype=<class 'numpy.float32'>
+    Input 71: shape=[  1   3   3 256], dtype=<class 'numpy.float32'>
+    Input 35: shape=[256], dtype=<class 'numpy.float32'>
+    Output 125: shape=[  1  16  10 256], dtype=<class 'numpy.float32'>
+
+MEAN (index: 3):
+  Input tensors: [125 120]
+  Output tensors: [126]
+    Input 125: shape=[  1  16  10 256], dtype=<class 'numpy.float32'>
+    Input 120: shape=[2], dtype=<class 'numpy.int32'>
+    Output 126: shape=[  1   1   1 256], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 4):
+  Input tensors: [126 115  34]
+  Output tensors: [127]
+    Input 126: shape=[  1   1   1 256], dtype=<class 'numpy.float32'>
+    Input 115: shape=[ 64   1   1 256], dtype=<class 'numpy.float32'>
+    Input 34: shape=[64], dtype=<class 'numpy.float32'>
+    Output 127: shape=[ 1  1  1 64], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 5):
+  Input tensors: [127 114  70]
+  Output tensors: [128]
+    Input 127: shape=[ 1  1  1 64], dtype=<class 'numpy.float32'>
+    Input 114: shape=[256   1   1  64], dtype=<class 'numpy.float32'>
+    Input 70: shape=[256], dtype=<class 'numpy.float32'>
+    Output 128: shape=[  1   1   1 256], dtype=<class 'numpy.float32'>
+
+LOGISTIC (index: 6):
+  Input tensors: [128]
+  Output tensors: [129]
+    Input 128: shape=[  1   1   1 256], dtype=<class 'numpy.float32'>
+    Output 129: shape=[  1   1   1 256], dtype=<class 'numpy.float32'>
+
+MUL (index: 7):
+  Input tensors: [125 129]
+  Output tensors: [130]
+    Input 125: shape=[  1  16  10 256], dtype=<class 'numpy.float32'>
+    Input 129: shape=[  1   1   1 256], dtype=<class 'numpy.float32'>
+    Output 130: shape=[  1  16  10 256], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 8):
+  Input tensors: [130 113  69]
+  Output tensors: [131]
+    Input 130: shape=[  1  16  10 256], dtype=<class 'numpy.float32'>
+    Input 113: shape=[ 64   1   1 256], dtype=<class 'numpy.float32'>
+    Input 69: shape=[64], dtype=<class 'numpy.float32'>
+    Output 131: shape=[ 1 16 10 64], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 9):
+  Input tensors: [131 112  33]
+  Output tensors: [132]
+    Input 131: shape=[ 1 16 10 64], dtype=<class 'numpy.float32'>
+    Input 112: shape=[256   1   1  64], dtype=<class 'numpy.float32'>
+    Input 33: shape=[256], dtype=<class 'numpy.float32'>
+    Output 132: shape=[  1  16  10 256], dtype=<class 'numpy.float32'>
+
+DEPTHWISE_CONV_2D (index: 10):
+  Input tensors: [132  68  32]
+  Output tensors: [133]
+    Input 132: shape=[  1  16  10 256], dtype=<class 'numpy.float32'>
+    Input 68: shape=[  1   3   3 256], dtype=<class 'numpy.float32'>
+    Input 32: shape=[256], dtype=<class 'numpy.float32'>
+    Output 133: shape=[  1  16  10 256], dtype=<class 'numpy.float32'>
+
+MEAN (index: 11):
+  Input tensors: [133 120]
+  Output tensors: [134]
+    Input 133: shape=[  1  16  10 256], dtype=<class 'numpy.float32'>
+    Input 120: shape=[2], dtype=<class 'numpy.int32'>
+    Output 134: shape=[  1   1   1 256], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 12):
+  Input tensors: [134 111  31]
+  Output tensors: [135]
+    Input 134: shape=[  1   1   1 256], dtype=<class 'numpy.float32'>
+    Input 111: shape=[ 64   1   1 256], dtype=<class 'numpy.float32'>
+    Input 31: shape=[64], dtype=<class 'numpy.float32'>
+    Output 135: shape=[ 1  1  1 64], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 13):
+  Input tensors: [135 110  67]
+  Output tensors: [136]
+    Input 135: shape=[ 1  1  1 64], dtype=<class 'numpy.float32'>
+    Input 110: shape=[256   1   1  64], dtype=<class 'numpy.float32'>
+    Input 67: shape=[256], dtype=<class 'numpy.float32'>
+    Output 136: shape=[  1   1   1 256], dtype=<class 'numpy.float32'>
+
+LOGISTIC (index: 14):
+  Input tensors: [136]
+  Output tensors: [137]
+    Input 136: shape=[  1   1   1 256], dtype=<class 'numpy.float32'>
+    Output 137: shape=[  1   1   1 256], dtype=<class 'numpy.float32'>
+
+MUL (index: 15):
+  Input tensors: [133 137]
+  Output tensors: [138]
+    Input 133: shape=[  1  16  10 256], dtype=<class 'numpy.float32'>
+    Input 137: shape=[  1   1   1 256], dtype=<class 'numpy.float32'>
+    Output 138: shape=[  1  16  10 256], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 16):
+  Input tensors: [138 109  66]
+  Output tensors: [139]
+    Input 138: shape=[  1  16  10 256], dtype=<class 'numpy.float32'>
+    Input 109: shape=[ 64   1   1 256], dtype=<class 'numpy.float32'>
+    Input 66: shape=[64], dtype=<class 'numpy.float32'>
+    Output 139: shape=[ 1 16 10 64], dtype=<class 'numpy.float32'>
+
+ADD (index: 17):
+  Input tensors: [131 139]
+  Output tensors: [140]
+    Input 131: shape=[ 1 16 10 64], dtype=<class 'numpy.float32'>
+    Input 139: shape=[ 1 16 10 64], dtype=<class 'numpy.float32'>
+    Output 140: shape=[ 1 16 10 64], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 18):
+  Input tensors: [140 108  30]
+  Output tensors: [141]
+    Input 140: shape=[ 1 16 10 64], dtype=<class 'numpy.float32'>
+    Input 108: shape=[384   1   1  64], dtype=<class 'numpy.float32'>
+    Input 30: shape=[384], dtype=<class 'numpy.float32'>
+    Output 141: shape=[  1  16  10 384], dtype=<class 'numpy.float32'>
+
+DEPTHWISE_CONV_2D (index: 19):
+  Input tensors: [141  65  29]
+  Output tensors: [142]
+    Input 141: shape=[  1  16  10 384], dtype=<class 'numpy.float32'>
+    Input 65: shape=[  1   3   3 384], dtype=<class 'numpy.float32'>
+    Input 29: shape=[384], dtype=<class 'numpy.float32'>
+    Output 142: shape=[  1   8   5 384], dtype=<class 'numpy.float32'>
+
+MEAN (index: 20):
+  Input tensors: [142 120]
+  Output tensors: [143]
+    Input 142: shape=[  1   8   5 384], dtype=<class 'numpy.float32'>
+    Input 120: shape=[2], dtype=<class 'numpy.int32'>
+    Output 143: shape=[  1   1   1 384], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 21):
+  Input tensors: [143 107  28]
+  Output tensors: [144]
+    Input 143: shape=[  1   1   1 384], dtype=<class 'numpy.float32'>
+    Input 107: shape=[ 96   1   1 384], dtype=<class 'numpy.float32'>
+    Input 28: shape=[96], dtype=<class 'numpy.float32'>
+    Output 144: shape=[ 1  1  1 96], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 22):
+  Input tensors: [144 106  64]
+  Output tensors: [145]
+    Input 144: shape=[ 1  1  1 96], dtype=<class 'numpy.float32'>
+    Input 106: shape=[384   1   1  96], dtype=<class 'numpy.float32'>
+    Input 64: shape=[384], dtype=<class 'numpy.float32'>
+    Output 145: shape=[  1   1   1 384], dtype=<class 'numpy.float32'>
+
+LOGISTIC (index: 23):
+  Input tensors: [145]
+  Output tensors: [146]
+    Input 145: shape=[  1   1   1 384], dtype=<class 'numpy.float32'>
+    Output 146: shape=[  1   1   1 384], dtype=<class 'numpy.float32'>
+
+MUL (index: 24):
+  Input tensors: [142 146]
+  Output tensors: [147]
+    Input 142: shape=[  1   8   5 384], dtype=<class 'numpy.float32'>
+    Input 146: shape=[  1   1   1 384], dtype=<class 'numpy.float32'>
+    Output 147: shape=[  1   8   5 384], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 25):
+  Input tensors: [147 105  63]
+  Output tensors: [148]
+    Input 147: shape=[  1   8   5 384], dtype=<class 'numpy.float32'>
+    Input 105: shape=[ 96   1   1 384], dtype=<class 'numpy.float32'>
+    Input 63: shape=[96], dtype=<class 'numpy.float32'>
+    Output 148: shape=[ 1  8  5 96], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 26):
+  Input tensors: [148 104  27]
+  Output tensors: [149]
+    Input 148: shape=[ 1  8  5 96], dtype=<class 'numpy.float32'>
+    Input 104: shape=[576   1   1  96], dtype=<class 'numpy.float32'>
+    Input 27: shape=[576], dtype=<class 'numpy.float32'>
+    Output 149: shape=[  1   8   5 576], dtype=<class 'numpy.float32'>
+
+DEPTHWISE_CONV_2D (index: 27):
+  Input tensors: [149  62  26]
+  Output tensors: [150]
+    Input 149: shape=[  1   8   5 576], dtype=<class 'numpy.float32'>
+    Input 62: shape=[  1   3   3 576], dtype=<class 'numpy.float32'>
+    Input 26: shape=[576], dtype=<class 'numpy.float32'>
+    Output 150: shape=[  1   8   5 576], dtype=<class 'numpy.float32'>
+
+MEAN (index: 28):
+  Input tensors: [150 120]
+  Output tensors: [151]
+    Input 150: shape=[  1   8   5 576], dtype=<class 'numpy.float32'>
+    Input 120: shape=[2], dtype=<class 'numpy.int32'>
+    Output 151: shape=[  1   1   1 576], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 29):
+  Input tensors: [151 103  25]
+  Output tensors: [152]
+    Input 151: shape=[  1   1   1 576], dtype=<class 'numpy.float32'>
+    Input 103: shape=[144   1   1 576], dtype=<class 'numpy.float32'>
+    Input 25: shape=[144], dtype=<class 'numpy.float32'>
+    Output 152: shape=[  1   1   1 144], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 30):
+  Input tensors: [152 102  61]
+  Output tensors: [153]
+    Input 152: shape=[  1   1   1 144], dtype=<class 'numpy.float32'>
+    Input 102: shape=[576   1   1 144], dtype=<class 'numpy.float32'>
+    Input 61: shape=[576], dtype=<class 'numpy.float32'>
+    Output 153: shape=[  1   1   1 576], dtype=<class 'numpy.float32'>
+
+LOGISTIC (index: 31):
+  Input tensors: [153]
+  Output tensors: [154]
+    Input 153: shape=[  1   1   1 576], dtype=<class 'numpy.float32'>
+    Output 154: shape=[  1   1   1 576], dtype=<class 'numpy.float32'>
+
+MUL (index: 32):
+  Input tensors: [150 154]
+  Output tensors: [155]
+    Input 150: shape=[  1   8   5 576], dtype=<class 'numpy.float32'>
+    Input 154: shape=[  1   1   1 576], dtype=<class 'numpy.float32'>
+    Output 155: shape=[  1   8   5 576], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 33):
+  Input tensors: [155 101  60]
+  Output tensors: [156]
+    Input 155: shape=[  1   8   5 576], dtype=<class 'numpy.float32'>
+    Input 101: shape=[ 96   1   1 576], dtype=<class 'numpy.float32'>
+    Input 60: shape=[96], dtype=<class 'numpy.float32'>
+    Output 156: shape=[ 1  8  5 96], dtype=<class 'numpy.float32'>
+
+ADD (index: 34):
+  Input tensors: [148 156]
+  Output tensors: [157]
+    Input 148: shape=[ 1  8  5 96], dtype=<class 'numpy.float32'>
+    Input 156: shape=[ 1  8  5 96], dtype=<class 'numpy.float32'>
+    Output 157: shape=[ 1  8  5 96], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 35):
+  Input tensors: [157 100  24]
+  Output tensors: [158]
+    Input 157: shape=[ 1  8  5 96], dtype=<class 'numpy.float32'>
+    Input 100: shape=[576   1   1  96], dtype=<class 'numpy.float32'>
+    Input 24: shape=[576], dtype=<class 'numpy.float32'>
+    Output 158: shape=[  1   8   5 576], dtype=<class 'numpy.float32'>
+
+DEPTHWISE_CONV_2D (index: 36):
+  Input tensors: [158  59  23]
+  Output tensors: [159]
+    Input 158: shape=[  1   8   5 576], dtype=<class 'numpy.float32'>
+    Input 59: shape=[  1   3   3 576], dtype=<class 'numpy.float32'>
+    Input 23: shape=[576], dtype=<class 'numpy.float32'>
+    Output 159: shape=[  1   8   5 576], dtype=<class 'numpy.float32'>
+
+MEAN (index: 37):
+  Input tensors: [159 120]
+  Output tensors: [160]
+    Input 159: shape=[  1   8   5 576], dtype=<class 'numpy.float32'>
+    Input 120: shape=[2], dtype=<class 'numpy.int32'>
+    Output 160: shape=[  1   1   1 576], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 38):
+  Input tensors: [160  99  22]
+  Output tensors: [161]
+    Input 160: shape=[  1   1   1 576], dtype=<class 'numpy.float32'>
+    Input 99: shape=[144   1   1 576], dtype=<class 'numpy.float32'>
+    Input 22: shape=[144], dtype=<class 'numpy.float32'>
+    Output 161: shape=[  1   1   1 144], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 39):
+  Input tensors: [161  98  58]
+  Output tensors: [162]
+    Input 161: shape=[  1   1   1 144], dtype=<class 'numpy.float32'>
+    Input 98: shape=[576   1   1 144], dtype=<class 'numpy.float32'>
+    Input 58: shape=[576], dtype=<class 'numpy.float32'>
+    Output 162: shape=[  1   1   1 576], dtype=<class 'numpy.float32'>
+
+LOGISTIC (index: 40):
+  Input tensors: [162]
+  Output tensors: [163]
+    Input 162: shape=[  1   1   1 576], dtype=<class 'numpy.float32'>
+    Output 163: shape=[  1   1   1 576], dtype=<class 'numpy.float32'>
+
+MUL (index: 41):
+  Input tensors: [159 163]
+  Output tensors: [164]
+    Input 159: shape=[  1   8   5 576], dtype=<class 'numpy.float32'>
+    Input 163: shape=[  1   1   1 576], dtype=<class 'numpy.float32'>
+    Output 164: shape=[  1   8   5 576], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 42):
+  Input tensors: [164  97  57]
+  Output tensors: [165]
+    Input 164: shape=[  1   8   5 576], dtype=<class 'numpy.float32'>
+    Input 97: shape=[ 96   1   1 576], dtype=<class 'numpy.float32'>
+    Input 57: shape=[96], dtype=<class 'numpy.float32'>
+    Output 165: shape=[ 1  8  5 96], dtype=<class 'numpy.float32'>
+
+ADD (index: 43):
+  Input tensors: [157 165]
+  Output tensors: [166]
+    Input 157: shape=[ 1  8  5 96], dtype=<class 'numpy.float32'>
+    Input 165: shape=[ 1  8  5 96], dtype=<class 'numpy.float32'>
+    Output 166: shape=[ 1  8  5 96], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 44):
+  Input tensors: [166  96  21]
+  Output tensors: [167]
+    Input 166: shape=[ 1  8  5 96], dtype=<class 'numpy.float32'>
+    Input 96: shape=[576   1   1  96], dtype=<class 'numpy.float32'>
+    Input 21: shape=[576], dtype=<class 'numpy.float32'>
+    Output 167: shape=[  1   8   5 576], dtype=<class 'numpy.float32'>
+
+DEPTHWISE_CONV_2D (index: 45):
+  Input tensors: [167  56  20]
+  Output tensors: [168]
+    Input 167: shape=[  1   8   5 576], dtype=<class 'numpy.float32'>
+    Input 56: shape=[  1   3   3 576], dtype=<class 'numpy.float32'>
+    Input 20: shape=[576], dtype=<class 'numpy.float32'>
+    Output 168: shape=[  1   4   3 576], dtype=<class 'numpy.float32'>
+
+MEAN (index: 46):
+  Input tensors: [168 120]
+  Output tensors: [169]
+    Input 168: shape=[  1   4   3 576], dtype=<class 'numpy.float32'>
+    Input 120: shape=[2], dtype=<class 'numpy.int32'>
+    Output 169: shape=[  1   1   1 576], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 47):
+  Input tensors: [169  95  19]
+  Output tensors: [170]
+    Input 169: shape=[  1   1   1 576], dtype=<class 'numpy.float32'>
+    Input 95: shape=[144   1   1 576], dtype=<class 'numpy.float32'>
+    Input 19: shape=[144], dtype=<class 'numpy.float32'>
+    Output 170: shape=[  1   1   1 144], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 48):
+  Input tensors: [170  94  55]
+  Output tensors: [171]
+    Input 170: shape=[  1   1   1 144], dtype=<class 'numpy.float32'>
+    Input 94: shape=[576   1   1 144], dtype=<class 'numpy.float32'>
+    Input 55: shape=[576], dtype=<class 'numpy.float32'>
+    Output 171: shape=[  1   1   1 576], dtype=<class 'numpy.float32'>
+
+LOGISTIC (index: 49):
+  Input tensors: [171]
+  Output tensors: [172]
+    Input 171: shape=[  1   1   1 576], dtype=<class 'numpy.float32'>
+    Output 172: shape=[  1   1   1 576], dtype=<class 'numpy.float32'>
+
+MUL (index: 50):
+  Input tensors: [168 172]
+  Output tensors: [173]
+    Input 168: shape=[  1   4   3 576], dtype=<class 'numpy.float32'>
+    Input 172: shape=[  1   1   1 576], dtype=<class 'numpy.float32'>
+    Output 173: shape=[  1   4   3 576], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 51):
+  Input tensors: [173  93  54]
+  Output tensors: [174]
+    Input 173: shape=[  1   4   3 576], dtype=<class 'numpy.float32'>
+    Input 93: shape=[128   1   1 576], dtype=<class 'numpy.float32'>
+    Input 54: shape=[128], dtype=<class 'numpy.float32'>
+    Output 174: shape=[  1   4   3 128], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 52):
+  Input tensors: [174  92  18]
+  Output tensors: [175]
+    Input 174: shape=[  1   4   3 128], dtype=<class 'numpy.float32'>
+    Input 92: shape=[768   1   1 128], dtype=<class 'numpy.float32'>
+    Input 18: shape=[768], dtype=<class 'numpy.float32'>
+    Output 175: shape=[  1   4   3 768], dtype=<class 'numpy.float32'>
+
+DEPTHWISE_CONV_2D (index: 53):
+  Input tensors: [175  53  17]
+  Output tensors: [176]
+    Input 175: shape=[  1   4   3 768], dtype=<class 'numpy.float32'>
+    Input 53: shape=[  1   3   3 768], dtype=<class 'numpy.float32'>
+    Input 17: shape=[768], dtype=<class 'numpy.float32'>
+    Output 176: shape=[  1   4   3 768], dtype=<class 'numpy.float32'>
+
+MEAN (index: 54):
+  Input tensors: [176 120]
+  Output tensors: [177]
+    Input 176: shape=[  1   4   3 768], dtype=<class 'numpy.float32'>
+    Input 120: shape=[2], dtype=<class 'numpy.int32'>
+    Output 177: shape=[  1   1   1 768], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 55):
+  Input tensors: [177  91  16]
+  Output tensors: [178]
+    Input 177: shape=[  1   1   1 768], dtype=<class 'numpy.float32'>
+    Input 91: shape=[192   1   1 768], dtype=<class 'numpy.float32'>
+    Input 16: shape=[192], dtype=<class 'numpy.float32'>
+    Output 178: shape=[  1   1   1 192], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 56):
+  Input tensors: [178  90  52]
+  Output tensors: [179]
+    Input 178: shape=[  1   1   1 192], dtype=<class 'numpy.float32'>
+    Input 90: shape=[768   1   1 192], dtype=<class 'numpy.float32'>
+    Input 52: shape=[768], dtype=<class 'numpy.float32'>
+    Output 179: shape=[  1   1   1 768], dtype=<class 'numpy.float32'>
+
+LOGISTIC (index: 57):
+  Input tensors: [179]
+  Output tensors: [180]
+    Input 179: shape=[  1   1   1 768], dtype=<class 'numpy.float32'>
+    Output 180: shape=[  1   1   1 768], dtype=<class 'numpy.float32'>
+
+MUL (index: 58):
+  Input tensors: [176 180]
+  Output tensors: [181]
+    Input 176: shape=[  1   4   3 768], dtype=<class 'numpy.float32'>
+    Input 180: shape=[  1   1   1 768], dtype=<class 'numpy.float32'>
+    Output 181: shape=[  1   4   3 768], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 59):
+  Input tensors: [181  89  51]
+  Output tensors: [182]
+    Input 181: shape=[  1   4   3 768], dtype=<class 'numpy.float32'>
+    Input 89: shape=[128   1   1 768], dtype=<class 'numpy.float32'>
+    Input 51: shape=[128], dtype=<class 'numpy.float32'>
+    Output 182: shape=[  1   4   3 128], dtype=<class 'numpy.float32'>
+
+ADD (index: 60):
+  Input tensors: [174 182]
+  Output tensors: [183]
+    Input 174: shape=[  1   4   3 128], dtype=<class 'numpy.float32'>
+    Input 182: shape=[  1   4   3 128], dtype=<class 'numpy.float32'>
+    Output 183: shape=[  1   4   3 128], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 61):
+  Input tensors: [183  88  15]
+  Output tensors: [184]
+    Input 183: shape=[  1   4   3 128], dtype=<class 'numpy.float32'>
+    Input 88: shape=[768   1   1 128], dtype=<class 'numpy.float32'>
+    Input 15: shape=[768], dtype=<class 'numpy.float32'>
+    Output 184: shape=[  1   4   3 768], dtype=<class 'numpy.float32'>
+
+DEPTHWISE_CONV_2D (index: 62):
+  Input tensors: [184  50  14]
+  Output tensors: [185]
+    Input 184: shape=[  1   4   3 768], dtype=<class 'numpy.float32'>
+    Input 50: shape=[  1   3   3 768], dtype=<class 'numpy.float32'>
+    Input 14: shape=[768], dtype=<class 'numpy.float32'>
+    Output 185: shape=[  1   4   3 768], dtype=<class 'numpy.float32'>
+
+MEAN (index: 63):
+  Input tensors: [185 120]
+  Output tensors: [186]
+    Input 185: shape=[  1   4   3 768], dtype=<class 'numpy.float32'>
+    Input 120: shape=[2], dtype=<class 'numpy.int32'>
+    Output 186: shape=[  1   1   1 768], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 64):
+  Input tensors: [186  87  13]
+  Output tensors: [187]
+    Input 186: shape=[  1   1   1 768], dtype=<class 'numpy.float32'>
+    Input 87: shape=[192   1   1 768], dtype=<class 'numpy.float32'>
+    Input 13: shape=[192], dtype=<class 'numpy.float32'>
+    Output 187: shape=[  1   1   1 192], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 65):
+  Input tensors: [187  86  49]
+  Output tensors: [188]
+    Input 187: shape=[  1   1   1 192], dtype=<class 'numpy.float32'>
+    Input 86: shape=[768   1   1 192], dtype=<class 'numpy.float32'>
+    Input 49: shape=[768], dtype=<class 'numpy.float32'>
+    Output 188: shape=[  1   1   1 768], dtype=<class 'numpy.float32'>
+
+LOGISTIC (index: 66):
+  Input tensors: [188]
+  Output tensors: [189]
+    Input 188: shape=[  1   1   1 768], dtype=<class 'numpy.float32'>
+    Output 189: shape=[  1   1   1 768], dtype=<class 'numpy.float32'>
+
+MUL (index: 67):
+  Input tensors: [185 189]
+  Output tensors: [190]
+    Input 185: shape=[  1   4   3 768], dtype=<class 'numpy.float32'>
+    Input 189: shape=[  1   1   1 768], dtype=<class 'numpy.float32'>
+    Output 190: shape=[  1   4   3 768], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 68):
+  Input tensors: [190  85  48]
+  Output tensors: [191]
+    Input 190: shape=[  1   4   3 768], dtype=<class 'numpy.float32'>
+    Input 85: shape=[128   1   1 768], dtype=<class 'numpy.float32'>
+    Input 48: shape=[128], dtype=<class 'numpy.float32'>
+    Output 191: shape=[  1   4   3 128], dtype=<class 'numpy.float32'>
+
+ADD (index: 69):
+  Input tensors: [183 191]
+  Output tensors: [192]
+    Input 183: shape=[  1   4   3 128], dtype=<class 'numpy.float32'>
+    Input 191: shape=[  1   4   3 128], dtype=<class 'numpy.float32'>
+    Output 192: shape=[  1   4   3 128], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 70):
+  Input tensors: [192  84  12]
+  Output tensors: [193]
+    Input 192: shape=[  1   4   3 128], dtype=<class 'numpy.float32'>
+    Input 84: shape=[768   1   1 128], dtype=<class 'numpy.float32'>
+    Input 12: shape=[768], dtype=<class 'numpy.float32'>
+    Output 193: shape=[  1   4   3 768], dtype=<class 'numpy.float32'>
+
+DEPTHWISE_CONV_2D (index: 71):
+  Input tensors: [193  47  11]
+  Output tensors: [194]
+    Input 193: shape=[  1   4   3 768], dtype=<class 'numpy.float32'>
+    Input 47: shape=[  1   3   3 768], dtype=<class 'numpy.float32'>
+    Input 11: shape=[768], dtype=<class 'numpy.float32'>
+    Output 194: shape=[  1   4   3 768], dtype=<class 'numpy.float32'>
+
+MEAN (index: 72):
+  Input tensors: [194 120]
+  Output tensors: [195]
+    Input 194: shape=[  1   4   3 768], dtype=<class 'numpy.float32'>
+    Input 120: shape=[2], dtype=<class 'numpy.int32'>
+    Output 195: shape=[  1   1   1 768], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 73):
+  Input tensors: [195  83  10]
+  Output tensors: [196]
+    Input 195: shape=[  1   1   1 768], dtype=<class 'numpy.float32'>
+    Input 83: shape=[192   1   1 768], dtype=<class 'numpy.float32'>
+    Input 10: shape=[192], dtype=<class 'numpy.float32'>
+    Output 196: shape=[  1   1   1 192], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 74):
+  Input tensors: [196  82  46]
+  Output tensors: [197]
+    Input 196: shape=[  1   1   1 192], dtype=<class 'numpy.float32'>
+    Input 82: shape=[768   1   1 192], dtype=<class 'numpy.float32'>
+    Input 46: shape=[768], dtype=<class 'numpy.float32'>
+    Output 197: shape=[  1   1   1 768], dtype=<class 'numpy.float32'>
+
+LOGISTIC (index: 75):
+  Input tensors: [197]
+  Output tensors: [198]
+    Input 197: shape=[  1   1   1 768], dtype=<class 'numpy.float32'>
+    Output 198: shape=[  1   1   1 768], dtype=<class 'numpy.float32'>
+
+MUL (index: 76):
+  Input tensors: [194 198]
+  Output tensors: [199]
+    Input 194: shape=[  1   4   3 768], dtype=<class 'numpy.float32'>
+    Input 198: shape=[  1   1   1 768], dtype=<class 'numpy.float32'>
+    Output 199: shape=[  1   4   3 768], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 77):
+  Input tensors: [199  81  45]
+  Output tensors: [200]
+    Input 199: shape=[  1   4   3 768], dtype=<class 'numpy.float32'>
+    Input 81: shape=[192   1   1 768], dtype=<class 'numpy.float32'>
+    Input 45: shape=[192], dtype=<class 'numpy.float32'>
+    Output 200: shape=[  1   4   3 192], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 78):
+  Input tensors: [200  80   9]
+  Output tensors: [201]
+    Input 200: shape=[  1   4   3 192], dtype=<class 'numpy.float32'>
+    Input 80: shape=[1152    1    1  192], dtype=<class 'numpy.float32'>
+    Input 9: shape=[1152], dtype=<class 'numpy.float32'>
+    Output 201: shape=[   1    4    3 1152], dtype=<class 'numpy.float32'>
+
+DEPTHWISE_CONV_2D (index: 79):
+  Input tensors: [201  44   8]
+  Output tensors: [202]
+    Input 201: shape=[   1    4    3 1152], dtype=<class 'numpy.float32'>
+    Input 44: shape=[   1    3    3 1152], dtype=<class 'numpy.float32'>
+    Input 8: shape=[1152], dtype=<class 'numpy.float32'>
+    Output 202: shape=[   1    4    3 1152], dtype=<class 'numpy.float32'>
+
+MEAN (index: 80):
+  Input tensors: [202 120]
+  Output tensors: [203]
+    Input 202: shape=[   1    4    3 1152], dtype=<class 'numpy.float32'>
+    Input 120: shape=[2], dtype=<class 'numpy.int32'>
+    Output 203: shape=[   1    1    1 1152], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 81):
+  Input tensors: [203  79   7]
+  Output tensors: [204]
+    Input 203: shape=[   1    1    1 1152], dtype=<class 'numpy.float32'>
+    Input 79: shape=[ 288    1    1 1152], dtype=<class 'numpy.float32'>
+    Input 7: shape=[288], dtype=<class 'numpy.float32'>
+    Output 204: shape=[  1   1   1 288], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 82):
+  Input tensors: [204  78  43]
+  Output tensors: [205]
+    Input 204: shape=[  1   1   1 288], dtype=<class 'numpy.float32'>
+    Input 78: shape=[1152    1    1  288], dtype=<class 'numpy.float32'>
+    Input 43: shape=[1152], dtype=<class 'numpy.float32'>
+    Output 205: shape=[   1    1    1 1152], dtype=<class 'numpy.float32'>
+
+LOGISTIC (index: 83):
+  Input tensors: [205]
+  Output tensors: [206]
+    Input 205: shape=[   1    1    1 1152], dtype=<class 'numpy.float32'>
+    Output 206: shape=[   1    1    1 1152], dtype=<class 'numpy.float32'>
+
+MUL (index: 84):
+  Input tensors: [202 206]
+  Output tensors: [207]
+    Input 202: shape=[   1    4    3 1152], dtype=<class 'numpy.float32'>
+    Input 206: shape=[   1    1    1 1152], dtype=<class 'numpy.float32'>
+    Output 207: shape=[   1    4    3 1152], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 85):
+  Input tensors: [207  77  42]
+  Output tensors: [208]
+    Input 207: shape=[   1    4    3 1152], dtype=<class 'numpy.float32'>
+    Input 77: shape=[ 192    1    1 1152], dtype=<class 'numpy.float32'>
+    Input 42: shape=[192], dtype=<class 'numpy.float32'>
+    Output 208: shape=[  1   4   3 192], dtype=<class 'numpy.float32'>
+
+ADD (index: 86):
+  Input tensors: [200 208]
+  Output tensors: [209]
+    Input 200: shape=[  1   4   3 192], dtype=<class 'numpy.float32'>
+    Input 208: shape=[  1   4   3 192], dtype=<class 'numpy.float32'>
+    Output 209: shape=[  1   4   3 192], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 87):
+  Input tensors: [209  76   6]
+  Output tensors: [210]
+    Input 209: shape=[  1   4   3 192], dtype=<class 'numpy.float32'>
+    Input 76: shape=[1152    1    1  192], dtype=<class 'numpy.float32'>
+    Input 6: shape=[1152], dtype=<class 'numpy.float32'>
+    Output 210: shape=[   1    4    3 1152], dtype=<class 'numpy.float32'>
+
+DEPTHWISE_CONV_2D (index: 88):
+  Input tensors: [210  41   5]
+  Output tensors: [211]
+    Input 210: shape=[   1    4    3 1152], dtype=<class 'numpy.float32'>
+    Input 41: shape=[   1    3    3 1152], dtype=<class 'numpy.float32'>
+    Input 5: shape=[1152], dtype=<class 'numpy.float32'>
+    Output 211: shape=[   1    4    3 1152], dtype=<class 'numpy.float32'>
+
+MEAN (index: 89):
+  Input tensors: [211 120]
+  Output tensors: [212]
+    Input 211: shape=[   1    4    3 1152], dtype=<class 'numpy.float32'>
+    Input 120: shape=[2], dtype=<class 'numpy.int32'>
+    Output 212: shape=[   1    1    1 1152], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 90):
+  Input tensors: [212  75   4]
+  Output tensors: [213]
+    Input 212: shape=[   1    1    1 1152], dtype=<class 'numpy.float32'>
+    Input 75: shape=[ 288    1    1 1152], dtype=<class 'numpy.float32'>
+    Input 4: shape=[288], dtype=<class 'numpy.float32'>
+    Output 213: shape=[  1   1   1 288], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 91):
+  Input tensors: [213  74  40]
+  Output tensors: [214]
+    Input 213: shape=[  1   1   1 288], dtype=<class 'numpy.float32'>
+    Input 74: shape=[1152    1    1  288], dtype=<class 'numpy.float32'>
+    Input 40: shape=[1152], dtype=<class 'numpy.float32'>
+    Output 214: shape=[   1    1    1 1152], dtype=<class 'numpy.float32'>
+
+LOGISTIC (index: 92):
+  Input tensors: [214]
+  Output tensors: [215]
+    Input 214: shape=[   1    1    1 1152], dtype=<class 'numpy.float32'>
+    Output 215: shape=[   1    1    1 1152], dtype=<class 'numpy.float32'>
+
+MUL (index: 93):
+  Input tensors: [211 215]
+  Output tensors: [216]
+    Input 211: shape=[   1    4    3 1152], dtype=<class 'numpy.float32'>
+    Input 215: shape=[   1    1    1 1152], dtype=<class 'numpy.float32'>
+    Output 216: shape=[   1    4    3 1152], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 94):
+  Input tensors: [216  73  39]
+  Output tensors: [217]
+    Input 216: shape=[   1    4    3 1152], dtype=<class 'numpy.float32'>
+    Input 73: shape=[ 192    1    1 1152], dtype=<class 'numpy.float32'>
+    Input 39: shape=[192], dtype=<class 'numpy.float32'>
+    Output 217: shape=[  1   4   3 192], dtype=<class 'numpy.float32'>
+
+ADD (index: 95):
+  Input tensors: [209 217]
+  Output tensors: [218]
+    Input 209: shape=[  1   4   3 192], dtype=<class 'numpy.float32'>
+    Input 217: shape=[  1   4   3 192], dtype=<class 'numpy.float32'>
+    Output 218: shape=[  1   4   3 192], dtype=<class 'numpy.float32'>
+
+CONV_2D (index: 96):
+  Input tensors: [218  72   3]
+  Output tensors: [219]
+    Input 218: shape=[  1   4   3 192], dtype=<class 'numpy.float32'>
+    Input 72: shape=[512   1   1 192], dtype=<class 'numpy.float32'>
+    Input 3: shape=[512], dtype=<class 'numpy.float32'>
+    Output 219: shape=[  1   4   3 512], dtype=<class 'numpy.float32'>
+
+MEAN (index: 97):
+  Input tensors: [219 120]
+  Output tensors: [220]
+    Input 219: shape=[  1   4   3 512], dtype=<class 'numpy.float32'>
+    Input 120: shape=[2], dtype=<class 'numpy.int32'>
+    Output 220: shape=[  1   1   1 512], dtype=<class 'numpy.float32'>
+
+RESHAPE (index: 98):
+  Input tensors: [220  38]
+  Output tensors: [221]
+    Input 220: shape=[  1   1   1 512], dtype=<class 'numpy.float32'>
+    Input 38: shape=[2], dtype=<class 'numpy.int32'>
+    Output 221: shape=[  1 512], dtype=<class 'numpy.float32'>
+
+FULLY_CONNECTED (index: 99):
+  Input tensors: [221 119   2]
+  Output tensors: [222]
+    Input 221: shape=[  1 512], dtype=<class 'numpy.float32'>
+    Input 119: shape=[1024  512], dtype=<class 'numpy.float32'>
+    Input 2: shape=[1024], dtype=<class 'numpy.float32'>
+    Output 222: shape=[   1 1024], dtype=<class 'numpy.float32'>
+
+FULLY_CONNECTED (index: 100):
+  Input tensors: [222 118   1]
+  Output tensors: [223]
+    Input 222: shape=[   1 1024], dtype=<class 'numpy.float32'>
+    Input 118: shape=[ 512 1024], dtype=<class 'numpy.float32'>
+    Input 1: shape=[512], dtype=<class 'numpy.float32'>
+    Output 223: shape=[  1 512], dtype=<class 'numpy.float32'>
+
+FULLY_CONNECTED (index: 101):
+  Input tensors: [223 117  37]
+  Output tensors: [224]
+    Input 223: shape=[  1 512], dtype=<class 'numpy.float32'>
+    Input 117: shape=[100 512], dtype=<class 'numpy.float32'>
+    Input 37: shape=[100], dtype=<class 'numpy.float32'>
+    Output 224: shape=[  1 100], dtype=<class 'numpy.float32'>
+
+SOFTMAX (index: 102):
+  Input tensors: [224]
+  Output tensors: [225]
+    Input 224: shape=[  1 100], dtype=<class 'numpy.float32'>
+    Output 225: shape=[  1 100], dtype=<class 'numpy.float32'>

@@ -1,8 +1,9 @@
+
 ================================================================================
 TFLITE MODEL COMPREHENSIVE INSPECTION REPORT
 ================================================================================
-Model: C:\Users\nl\Dropbox\home_automation\esphome_ai_component\components\data_collector\data_extractor\models\digit_recognizer_v16_100cls_RGB.tflite
-Timestamp: 2026-06-26 17:31:40
+Model: D:\digit_images\real_integra_data_collector\models\digit_recognizer_v16_100cls_RGB.tflite
+Timestamp: 2026-09-27 17:19:54
 TensorFlow Version: 2.20.0
 File Size: 139.74 KB
 
