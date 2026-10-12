@@ -2,7 +2,7 @@
 
 This tool addresses a specific challenge with ESP32 cameras: configuring a hardware `camera_window` (ROI) when the camera is mounted at a rotation (90°, 180°, 270°).
 
-**Live tool:** [`roi.html`](roi.html) — Open in browser to use.
+**Live tool:** [`roi.html`]([roi.html](https://nliaudat.github.io/esphome_ai_component/roi.html)— Open in browser to use.
 
 ## The Challenge
 
