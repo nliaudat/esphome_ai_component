@@ -69,7 +69,7 @@ Generic C++ advice is OVERRIDDEN by the rules below.
 ```
 esphome_ai_component/
 ├── meter_reader_tflite/          # AI PRIMARY - Digit recognition with TFLite
-│   ├── DEPENDS ON: tflite_micro_helper, esp32_camera_utils
+│   ├── DEPENDS ON: tflite_micro_runtime, esp32_camera_utils
 │   └── OPTIONAL: value_validator, flash_light_controller, data_collector
 │
 ├── ssocr_reader/                 # NO AI - Seven-segment OCR (alpha)
@@ -88,9 +88,10 @@ esphome_ai_component/
 │   ├── USED BY: All reader components
 │   └── DEPENDS ON: esp32_camera component
 │
-├── tflite_micro_helper/         # SHARED - TFLite runtime wrapper
+├── tflite_micro_runtime/         # SHARED - TFLite runtime wrapper (split series)
 │   ├── USED BY: meter_reader_tflite ONLY
-│   └── DEPENDS ON: tensorflow/lite/micro (ESPHome component)
+│   ├── DEPENDS ON: tflite_model_loader, tflite_model_debug (auto-loaded sub-components)
+│   └── SOURCE: external component, fetched from esphome PR series #21282-#21288
 │
 ├── flash_light_controller/      # SHARED - Illumination timing
 │   ├── USED BY: meter_reader_tflite
@@ -117,7 +118,7 @@ esphome_ai_component/
 - `meter_reader_tflite`: **Active** (v2.0+)
 - `value_validator`: **Active**
 - `esp32_camera_utils`: **Active**
-- `tflite_micro_helper`: **Active**
+- `tflite_micro_runtime`: **Active** (external component series; replaces the monolithic `tflite_micro_helper`)
 - `flash_light_controller`: **Active**
 - `data_collector`: **Active**
 - `ssocr_reader`: **Alpha**
@@ -160,7 +161,9 @@ Component rules are categorized by **role** --- the functionality a component pr
 
 ### 3.2 TFLite Consumer Rules
 
-**Applies to any component that** includes `tensorflow/lite/*` headers, depends on `tflite_micro_helper`, or uses `TfLiteTensor`/`MicroInterpreter`.
+**Applies to any component that** includes `tensorflow/lite/*` headers, depends on `tflite_micro_runtime`, or uses `TfLiteTensor`/`MicroInterpreter`.
+
+**Model configuration (split-component rule):** a model is declared ONCE in a `tflite_micro_runtime:` YAML entry (`model:`, `tensor_arena_size:`, `debug:`), and consumers reference that entry by ID (`model: <runtime_id>`). Consumers MUST NOT emit model codegen (`set_model()`, `set_tensor_arena_size()`, `RawExpression` paths) — the runtime owns loading; consumers only hold a `tflite_micro_runtime::TFLiteMicroHelper*` and call `load_model()` / `run_inference()`.
 
 **✅ REQUIRED:**
 - **Tensor arena** MUST be user-configurable (YAML or codegen), with reasonable defaults per target: 512KB (ESP32), 768KB (ESP32-S3)
@@ -169,12 +172,12 @@ Component rules are categorized by **role** --- the functionality a component pr
 - **Model CRC32 verification** --- MUST call `verify_model_crc()` on every model load to detect corruption.
 - **Operator registration** MUST use the X-Macro pattern in `tflm_operators.h` via `OpResolverManager::RegisterOps()` (not hand-written resolver code)
 - **`MAX_OPERATORS`** MUST be build-time configurable (default 30, override via `-DMAX_OPERATORS=N`)
-- **`USE_TFLITE_MICRO_HELPER` guard** --- ALL TFLite headers and source files MUST be wrapped in `#ifdef USE_TFLITE_MICRO_HELPER`
+- **`USE_TFLITE_MICRO_HELPER` guard** --- ALL TFLite headers and source files MUST be wrapped in `#ifdef USE_TFLITE_MICRO_HELPER` (the runtime emits this define for every build)
 - **Model dimension derivation** --- dimensions MUST come from `TfLiteTensor::dims` at runtime. NEVER hardcode model input dimensions.
 - **Output processing** --- `process_output()` must handle BOTH `const float*` and `TfLiteTensor*` overloads, supporting quantized (uint8/int8 dequantization) and float model types
 - **Support BOTH RGB and GRAYSCALE input models** --- grayscale pipeline optimization (bypass JPEG decode + RGB->Gray) MUST only activate when the model has 1-channel input (`TfLiteTensor::dims->data[3] == 1`). RGB models MUST be unaffected.
 - **ESP-IDF dependency pinning** --- `__init__.py` SHALL pin `esp-tflite-micro` and `esp-nn` versions, and set required build flags (`-DTF_LITE_STATIC_MEMORY`, `-DTF_LITE_DISABLE_X86_NEON`, `-DESP_NN`, `-DOPTIMIZED_KERNEL=esp_nn`)
-- **Debug gating** --- ALL debug logging and diagnostic methods MUST be guarded by `#ifdef DEBUG_TFLITE_MICRO_HELPER` (set by YAML `debug: true` -> `cg.add_define()`)
+- **Debug gating** --- debug logging of the runtime is gated by `#ifdef DEBUG_TFLITE_MICRO_HELPER` (emitted by the runtime for every build); API-level debug members (tensor inspection, quantization analysis) are gated by `#ifdef USE_TFLITE_MODEL_DEBUG` (emitted by `tflite_model_debug`). A model's YAML `debug: true` only calls `set_debug()` at runtime --- it does NOT create either define.
 - **MUST expose confidence scores** to Home Assistant when performing AI inference
 
 **⚠️ WARNING:**

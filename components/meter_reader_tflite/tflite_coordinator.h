@@ -7,7 +7,7 @@
 #include "esphome/core/component.h"
 #include "esphome/components/esp32_camera/esp32_camera.h"
 #include "esphome/components/esp32_camera_utils/image_processor.h"
-#include "esphome/components/tflite_micro_helper/tflite_micro_helper.h"
+#include "esphome/components/tflite_micro_runtime/tflite_micro_runtime.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -20,9 +20,10 @@ namespace meter_reader_tflite {
 /**
  * @brief Domain-specific TFLite coordinator for image zone inference.
  *
- * Holds a reference to a TFLiteMicroHelper instance (owned and configured
- * by the tflite_micro_helper component's __init__.py). This layer handles
- * only the zone-based image inference pattern specific to meter reading.
+ * Holds a reference to a TFLiteMicroHelper instance (owned and configured by
+ * the tflite_micro_runtime component's __init__.py, one instance per model).
+ * This layer handles only the zone-based image inference pattern specific to
+ * meter reading: it never loads, configures or unloads a model on its own.
  */
 class TFLiteCoordinator {
  public:
@@ -32,81 +33,70 @@ class TFLiteCoordinator {
     bool success;
   };
 
-  /// @brief Set a reference to an externally-owned, already-loaded TFLiteMicroHelper.
-  void set_tflite(tflite_micro_helper::TFLiteMicroHelper *tflite) { this->tflite_ = tflite; }
+  /// @brief Set a reference to an externally-owned, already-configured TFLiteMicroHelper.
+  void set_tflite(tflite_micro_runtime::TFLiteMicroHelper *tflite) { this->tflite_ = tflite; }
 
-  /// @brief Legacy: load model from raw data (for backward compat with old __init__.py)
-  void set_model(const uint8_t *model, size_t length);
+  /// @brief Make sure the referenced model is loaded (setup() already does it for image models).
   [[nodiscard]] bool load_model();
-
-  /// @brief Unload the active model (and its arena).
-  /// @param reset_config If true, also reset the underlying TFLiteMicroHelper's
-  ///   model configuration to defaults (P1). Use when switching to a *different*
-  ///   model -- re-issue set_model() and all relevant setters before load_model().
+  /// @brief Unload the referenced model (and its arena).
+  /// @param reset_config If true, also reset the runtime's model configuration to
+  ///   defaults. Use when switching to a *different* model.
   void unload_model(bool reset_config = false);
   [[nodiscard]] bool is_model_loaded() const;
 
-  // Legacy: config setters (delegate to legacy instance, used by old __init__.py)
-  void set_model_type(const std::string &t);
-  void set_tensor_arena_size(size_t size);
-  void set_debug(bool debug);
-  void set_input_type(const std::string &t);
-  void set_input_channels(int c);
-  void set_input_width(int w);
-  void set_input_height(int h);
-  void set_output_processing(const std::string &p);
-  void set_scale_factor(float f);
-  void set_input_order(const std::string &o);
-  void set_normalize(bool n);
-  void set_invert(bool i);
+  // -- Enum mapping for esp32_camera_utils ---------------------------
+  /// @brief Map the runtime's input type onto esp32_camera_utils::ImageProcessorInputType.
+  static int to_processor_input_type(tflite_micro_runtime::InputType input_type);
+  /// @brief Map the runtime's channel order onto ImageProcessorConfig::input_order.
+  static std::string to_input_order_name(tflite_micro_runtime::InputOrder input_order);
 
-  // -- Accessors (delegate to active TFLiteMicroHelper) --------------
+  // -- Accessors (delegate to the referenced TFLiteMicroHelper) ------
   int get_input_width() const {
-    const auto *t = this->active_tflite();
+    const auto *t = this->tflite_;
     return t ? t->get_input_width() : 0;
   }
   int get_input_height() const {
-    const auto *t = this->active_tflite();
+    const auto *t = this->tflite_;
     return t ? t->get_input_height() : 0;
   }
   int get_input_channels() const {
-    const auto *t = this->active_tflite();
+    const auto *t = this->tflite_;
     return t ? t->get_input_channels() : 0;
   }
   size_t get_tensor_arena_size() const {
-    const auto *t = this->active_tflite();
+    const auto *t = this->tflite_;
     return t ? t->get_tensor_arena_size() : 0;
   }
   size_t get_tensor_arena_size_actual() const {
-    const auto *t = this->active_tflite();
+    const auto *t = this->tflite_;
     return t ? t->get_tensor_arena_size_actual() : 0;
   }
   size_t get_model_size_bytes() const {
-    const auto *t = this->active_tflite();
+    const auto *t = this->tflite_;
     return t ? t->get_model_size_bytes() : 0;
   }
   size_t get_arena_used_bytes() const {
-    const auto *t = this->active_tflite();
+    const auto *t = this->tflite_;
     return t ? t->get_arena_used_bytes() : 0;
   }
   size_t get_arena_peak_bytes() const {
-    const auto *t = this->active_tflite();
+    const auto *t = this->tflite_;
     return t ? t->get_arena_stats().used_bytes : 0;
   }
-  tflite_micro_helper::ModelSpec get_model_spec() const {
-    const auto *t = this->active_tflite();
-    return t ? t->get_model_spec() : tflite_micro_helper::ModelSpec{};
+  tflite_micro_runtime::ModelSpec get_model_spec() const {
+    const auto *t = this->tflite_;
+    return t ? t->get_model_spec() : tflite_micro_runtime::ModelSpec{};
   }
-  tflite_micro_helper::ArenaStats get_arena_stats() const {
-    const auto *t = this->active_tflite();
-    return t ? t->get_arena_stats() : tflite_micro_helper::ArenaStats{};
+  tflite_micro_runtime::ArenaStats get_arena_stats() const {
+    const auto *t = this->tflite_;
+    return t ? t->get_arena_stats() : tflite_micro_runtime::ArenaStats{};
   }
   void report_memory_status() {
-    auto *t = this->active_tflite();
+    auto *t = this->tflite_;
     if (t)
       t->report_memory_status();
   }
-#if defined(DEBUG_TFLITE_MICRO_HELPER) && defined(USE_TFLITE_MICRO_HELPER)
+#ifdef USE_TFLITE_MODEL_DEBUG
   void debug_test_parameters(const std::vector<std::vector<uint8_t>> &zone_data);
 #endif
 
@@ -115,20 +105,11 @@ class TFLiteCoordinator {
   std::vector<InferenceResult> run_inference(std::span<const ProcessResult> processed_zones);
 
  private:
-  /** @brief Return the active helper: tflite_ (external) or legacy_tflite_ (owned). */
-  tflite_micro_helper::TFLiteMicroHelper *active_tflite() const {
-    return this->tflite_ ? this->tflite_ : this->legacy_tflite_.get();
-  }
+  bool process_model_result(const ProcessResult &result, float *value, float *confidence);
 
-  // Pointer to externally-owned TFLiteMicroHelper (or nullptr for legacy mode)
-  tflite_micro_helper::TFLiteMicroHelper *tflite_{nullptr};
-
-  // Legacy: owned instance for backward compat (when old __init__.py passes raw data)
-  std::unique_ptr<tflite_micro_helper::TFLiteMicroHelper> legacy_tflite_;
+  // Pointer to the externally-owned TFLiteMicroHelper (owned by tflite_micro_runtime)
+  tflite_micro_runtime::TFLiteMicroHelper *tflite_{nullptr};
   mutable std::mutex model_mutex_;
-
-  bool process_model_result(const esp32_camera_utils::ImageProcessor::ProcessResult &result, float *value,
-                            float *confidence);
 };
 
 }  // namespace meter_reader_tflite

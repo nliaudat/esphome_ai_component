@@ -6,113 +6,57 @@ namespace meter_reader_tflite {
 
 static const char *const TAG = "tflite_coordinator";
 
-void TFLiteCoordinator::set_model(const uint8_t *model, size_t length) {
-  if (!this->legacy_tflite_) {
-    this->legacy_tflite_ = std::make_unique<tflite_micro_helper::TFLiteMicroHelper>();
+int TFLiteCoordinator::to_processor_input_type(tflite_micro_runtime::InputType input_type) {
+  switch (input_type) {
+    case tflite_micro_runtime::InputType::INPUT_TYPE_FLOAT32:
+      return static_cast<int>(esp32_camera_utils::ImageProcessorInputType::kInputTypeFloat32);
+    case tflite_micro_runtime::InputType::INPUT_TYPE_UINT8:
+    case tflite_micro_runtime::InputType::INPUT_TYPE_INT8:
+      return static_cast<int>(esp32_camera_utils::ImageProcessorInputType::kInputTypeUInt8);
+    case tflite_micro_runtime::InputType::INPUT_TYPE_UNKNOWN:
+    default:
+      return static_cast<int>(esp32_camera_utils::ImageProcessorInputType::kInputTypeUnknown);
   }
-  this->legacy_tflite_->set_model(model, length);
 }
 
-// Legacy setters - delegate to legacy instance (or create one)
-void TFLiteCoordinator::set_model_type(const std::string &t) {
-  if (!this->legacy_tflite_)
-    this->legacy_tflite_ = std::make_unique<tflite_micro_helper::TFLiteMicroHelper>();
-  this->legacy_tflite_->set_model_type(t);
-}
-void TFLiteCoordinator::set_tensor_arena_size(size_t size) {
-  if (!this->legacy_tflite_)
-    this->legacy_tflite_ = std::make_unique<tflite_micro_helper::TFLiteMicroHelper>();
-  this->legacy_tflite_->set_tensor_arena_size(size);
-}
-void TFLiteCoordinator::set_debug(bool debug) {
-  if (!this->legacy_tflite_)
-    this->legacy_tflite_ = std::make_unique<tflite_micro_helper::TFLiteMicroHelper>();
-  this->legacy_tflite_->set_debug(debug);
-}
-void TFLiteCoordinator::set_input_type(const std::string &t) {
-  if (!this->legacy_tflite_)
-    this->legacy_tflite_ = std::make_unique<tflite_micro_helper::TFLiteMicroHelper>();
-  this->legacy_tflite_->set_input_type(t);
-}
-void TFLiteCoordinator::set_input_channels(int c) {
-  if (!this->legacy_tflite_)
-    this->legacy_tflite_ = std::make_unique<tflite_micro_helper::TFLiteMicroHelper>();
-  this->legacy_tflite_->set_input_channels(c);
-}
-void TFLiteCoordinator::set_input_width(int w) {
-  if (!this->legacy_tflite_)
-    this->legacy_tflite_ = std::make_unique<tflite_micro_helper::TFLiteMicroHelper>();
-  this->legacy_tflite_->set_input_width(w);
-}
-void TFLiteCoordinator::set_input_height(int h) {
-  if (!this->legacy_tflite_)
-    this->legacy_tflite_ = std::make_unique<tflite_micro_helper::TFLiteMicroHelper>();
-  this->legacy_tflite_->set_input_height(h);
-}
-void TFLiteCoordinator::set_output_processing(const std::string &p) {
-  if (!this->legacy_tflite_)
-    this->legacy_tflite_ = std::make_unique<tflite_micro_helper::TFLiteMicroHelper>();
-  this->legacy_tflite_->set_output_processing(p);
-}
-void TFLiteCoordinator::set_scale_factor(float f) {
-  if (!this->legacy_tflite_)
-    this->legacy_tflite_ = std::make_unique<tflite_micro_helper::TFLiteMicroHelper>();
-  this->legacy_tflite_->set_scale_factor(f);
-}
-void TFLiteCoordinator::set_input_order(const std::string &o) {
-  if (!this->legacy_tflite_)
-    this->legacy_tflite_ = std::make_unique<tflite_micro_helper::TFLiteMicroHelper>();
-  this->legacy_tflite_->set_input_order(o);
-}
-void TFLiteCoordinator::set_normalize(bool n) {
-  if (!this->legacy_tflite_)
-    this->legacy_tflite_ = std::make_unique<tflite_micro_helper::TFLiteMicroHelper>();
-  this->legacy_tflite_->set_normalize(n);
-}
-void TFLiteCoordinator::set_invert(bool i) {
-  if (!this->legacy_tflite_)
-    this->legacy_tflite_ = std::make_unique<tflite_micro_helper::TFLiteMicroHelper>();
-  this->legacy_tflite_->set_invert(i);
+std::string TFLiteCoordinator::to_input_order_name(tflite_micro_runtime::InputOrder input_order) {
+  switch (input_order) {
+    case tflite_micro_runtime::InputOrder::INPUT_ORDER_BGR:
+      return "BGR";
+    case tflite_micro_runtime::InputOrder::INPUT_ORDER_GRAY:
+      return "GRAY";
+    case tflite_micro_runtime::InputOrder::INPUT_ORDER_RGB:
+    default:
+      return "RGB";
+  }
 }
 
 bool TFLiteCoordinator::load_model() {
-  if (this->tflite_ != nullptr) {
-    if (!this->tflite_->is_model_loaded()) {
-      return this->tflite_->load_model();
-    }
+  if (this->tflite_ == nullptr) {
+    ESP_LOGE(TAG, "No TFLiteMicroHelper set. Call set_tflite() first.");
+    return false;
+  }
+  if (this->tflite_->is_model_loaded()) {
     return true;
   }
-  if (this->legacy_tflite_) {
-    return this->legacy_tflite_->load_model();
-  }
-  ESP_LOGE(TAG, "No TFLiteMicroHelper set. Call set_tflite() or set_model() first.");
-  return false;
+  // setup() loads an image model, so reaching here means the first load failed or
+  // the model was unloaded on purpose; retrying is what the reload button expects.
+  return this->tflite_->load_model();
 }
 
 void TFLiteCoordinator::unload_model(bool reset_config) {
   std::lock_guard<std::mutex> lock(this->model_mutex_);
-  if (this->tflite_) {
+  if (this->tflite_ != nullptr) {
     this->tflite_->unload_model(reset_config);
-  }
-  if (this->legacy_tflite_) {
-    this->legacy_tflite_->unload_model(reset_config);
   }
 }
 
 bool TFLiteCoordinator::is_model_loaded() const {
-  if (this->tflite_ != nullptr) {
-    return this->tflite_->is_model_loaded();
-  }
-  if (this->legacy_tflite_) {
-    return this->legacy_tflite_->is_model_loaded();
-  }
-  return false;
+  return this->tflite_ != nullptr && this->tflite_->is_model_loaded();
 }
 
-bool TFLiteCoordinator::process_model_result(const esp32_camera_utils::ImageProcessor::ProcessResult &result,
-                                             float *value, float *confidence) {
-  tflite_micro_helper::TFLiteMicroHelper *tflite = this->tflite_ ? this->tflite_ : this->legacy_tflite_.get();
-  if (!tflite || !tflite->is_model_loaded()) {
+bool TFLiteCoordinator::process_model_result(const ProcessResult &result, float *value, float *confidence) {
+  if (this->tflite_ == nullptr || !this->tflite_->is_model_loaded()) {
     ESP_LOGE(TAG, "Cannot run inference - Model not loaded");
     return false;
   }
@@ -121,9 +65,15 @@ bool TFLiteCoordinator::process_model_result(const esp32_camera_utils::ImageProc
     ESP_LOGE(TAG, "Null result data buffer");
     return false;
   }
-  auto output = tflite->run_inference(src_data, result.size);
-  *value = output.value;
-  *confidence = output.confidence;
+  // nullopt means the run failed (buffer size mismatch, invoke error, ...); the
+  // reason is logged by the runtime. A failed run is never reported as a reading.
+  auto output = this->tflite_->run_inference(src_data, result.size);
+  if (!output.has_value()) {
+    ESP_LOGW(TAG, "Inference failed for zone (%zu bytes)", result.size);
+    return false;
+  }
+  *value = output->value;
+  *confidence = output->confidence;
   if (*confidence < 0.0001f) {
     ESP_LOGW(TAG, "Zero confidence detected");
   }
@@ -134,6 +84,7 @@ std::vector<TFLiteCoordinator::InferenceResult> TFLiteCoordinator::run_inference
     std::span<const ProcessResult> processed_zones) {
   std::lock_guard<std::mutex> lock(this->model_mutex_);
   std::vector<InferenceResult> results;
+  results.reserve(processed_zones.size());
   for (const auto &zone_result : processed_zones) {
     float val, conf;
     if (this->process_model_result(zone_result, &val, &conf)) {
@@ -145,11 +96,10 @@ std::vector<TFLiteCoordinator::InferenceResult> TFLiteCoordinator::run_inference
   return results;
 }
 
-#if defined(DEBUG_TFLITE_MICRO_HELPER) && defined(USE_TFLITE_MICRO_HELPER)
+#ifdef USE_TFLITE_MODEL_DEBUG
 void TFLiteCoordinator::debug_test_parameters(const std::vector<std::vector<uint8_t>> &zone_data) {
-  tflite_micro_helper::TFLiteMicroHelper *tflite = this->tflite_ ? this->tflite_ : this->legacy_tflite_.get();
-  if (tflite) {
-    tflite->debug_test_parameters(zone_data);
+  if (this->tflite_ != nullptr) {
+    this->tflite_->debug_test_parameters(zone_data);
   }
 }
 #endif

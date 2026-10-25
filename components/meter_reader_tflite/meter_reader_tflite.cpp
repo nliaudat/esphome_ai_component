@@ -239,8 +239,8 @@ void MeterReaderTFLite::setup() {
     this->camera_coord_.set_enable_preview(this->generate_preview_);
 
     // Use consolidated helper (replaces 4 copies of ImageProcessorConfig construction)
-    // Map: spec.input_type 1=FLOAT -> 0=FLOAT, 0=UINT8 -> 1=UINT8 (ImageProcessorInputType)
-    int processor_input_type = (spec.input_type == 1) ? 0 : 1;
+    // The runtime's InputType enum is mapped onto ImageProcessorInputType here.
+    int processor_input_type = TFLiteCoordinator::to_processor_input_type(spec.input_type);
     this->refresh_image_processor_config(processor_input_type);
 
 // Setup Web Server Preview
@@ -322,7 +322,8 @@ void MeterReaderTFLite::set_camera(camera::Camera *camera) {  // -> CameraCoord 
 
 void MeterReaderTFLite::set_debug(bool debug) {
   this->debug_ = debug;
-  this->tflite_coord_.set_debug(debug);
+  // The referenced model's verbose logging is set by `debug:` on its
+  // tflite_micro_runtime entry, not by this component's option.
   this->camera_coord_.set_debug(debug);
   this->flashlight_coord_.set_debug(debug);
 
@@ -967,17 +968,15 @@ void MeterReaderTFLite::set_crop_zones(const std::string &zones_json) {
 }
 
 // Config Delegators
-void MeterReaderTFLite::set_tensor_arena_size(size_t size) { this->tflite_coord_.set_tensor_arena_size(size); }
-void MeterReaderTFLite::set_model_config(const std::string &type) { this->tflite_coord_.set_model_type(type); }
-void MeterReaderTFLite::set_model(const uint8_t *model, size_t length) { this->tflite_coord_.set_model(model, length); }
-
 void MeterReaderTFLite::set_camera_image_format(int w, int h, const std::string &fmt) {
   this->camera_coord_.set_config(w, h, fmt);
   // Update ImageProcessor config if model is loaded
   if (this->tflite_coord_.is_model_loaded()) {
     auto spec = this->tflite_coord_.get_model_spec();
-    this->camera_coord_.update_image_processor_config(spec.input_width, spec.input_height, spec.input_channels,
-                                                      spec.input_type, spec.normalize, spec.input_order);
+    this->camera_coord_.update_image_processor_config(
+        spec.input_width, spec.input_height, spec.input_channels,
+        TFLiteCoordinator::to_processor_input_type(spec.input_type), spec.normalize,
+        TFLiteCoordinator::to_input_order_name(spec.input_order));
   }
 }
 
@@ -1044,7 +1043,7 @@ void MeterReaderTFLite::set_generate_preview(bool generate) {
   // Refresh ImageProcessor config if model is loaded (uses consolidated helper)
   if (this->tflite_coord_.is_model_loaded()) {
     auto spec = this->tflite_coord_.get_model_spec();
-    int processor_input_type = (spec.input_type == 1) ? 0 : 1;
+    int processor_input_type = TFLiteCoordinator::to_processor_input_type(spec.input_type);
     this->refresh_image_processor_config(processor_input_type);
   }
 
@@ -1268,8 +1267,9 @@ void MeterReaderTFLite::refresh_image_processor_config(int processor_input_type)
   auto spec = this->tflite_coord_.get_model_spec();
 
   // Update Camera Coordinator first
-  this->camera_coord_.update_image_processor_config(spec.input_width, spec.input_height, spec.input_channels,
-                                                    processor_input_type, spec.normalize, spec.input_order);
+  this->camera_coord_.update_image_processor_config(
+      spec.input_width, spec.input_height, spec.input_channels, processor_input_type, spec.normalize,
+      TFLiteCoordinator::to_input_order_name(spec.input_order));
 
   // Sync Utils if present
   if (this->esp32_camera_utils_) {
@@ -1290,7 +1290,7 @@ void MeterReaderTFLite::refresh_image_processor_config(int processor_input_type)
     config.rotation = this->rotation_;
     config.input_type = static_cast<esp32_camera_utils::ImageProcessorInputType>(processor_input_type);
     config.normalize = spec.normalize;
-    config.input_order = spec.input_order;
+    config.input_order = TFLiteCoordinator::to_input_order_name(spec.input_order);
 
     this->esp32_camera_utils_->reinitialize_image_processor(config);
   }
@@ -1650,7 +1650,7 @@ void MeterReaderTFLite::reload_resources() {
 
     // Use consolidated helper (replaces duplicated ImageProcessorConfig construction)
     auto spec = this->tflite_coord_.get_model_spec();
-    int processor_input_type = (spec.input_type == 1) ? 0 : 1;
+    int processor_input_type = TFLiteCoordinator::to_processor_input_type(spec.input_type);
     this->refresh_image_processor_config(processor_input_type);
 
     // Resume processing

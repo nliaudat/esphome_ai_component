@@ -49,10 +49,10 @@ void DebugCoordinator::test_with_pattern(TFLiteCoordinator &tflite_coord) {
     pattern[i] = i % 255;
 
   std::vector<std::vector<uint8_t>> batch = {pattern};
-#ifdef DEBUG_TFLITE_MICRO_HELPER
+#ifdef USE_TFLITE_MODEL_DEBUG
   tflite_coord.debug_test_parameters(batch);
 #else
-  ESP_LOGW(TAG, "debug_test_parameters not available: tflite_micro_helper debug is disabled");
+  ESP_LOGW(TAG, "debug_test_parameters not available: tflite_model_debug is not compiled in");
 #endif
 }
 

@@ -2,7 +2,6 @@
 
 import os
 import re
-import zlib
 
 import esphome.codegen as cg
 from esphome.components import button, esp32, sensor, text_sensor
@@ -16,17 +15,16 @@ from esphome.const import (
     CONF_INTERNAL,
     CONF_MODEL,
     CONF_NAME,
-    CONF_ROTATION,
     CONF_UNIT_OF_MEASUREMENT,
 )
-from esphome.core import CORE, HexInt
+from esphome.core import CORE
 
 try:
     from esphome.components import value_validator
 except ImportError:
     value_validator = None
 
-from esphome.components import esp32_camera, globals, tflite_micro_helper
+from esphome.components import esp32_camera, globals, tflite_micro_runtime
 from esphome.cpp_generator import RawExpression
 
 try:
@@ -41,18 +39,17 @@ except ImportError:
 
 CODEOWNERS = ["@nl"]
 if CORE.target_platform == "esp32":
-    DEPENDENCIES = ["esp32", "tflite_micro_helper"]
+    DEPENDENCIES = ["esp32", "tflite_micro_runtime"]
     AUTO_LOAD = ["esp32_camera_utils", "sensor"]
     # flash_light_controller and data_collector are optional; not added to DEPENDENCIES here
 else:
-    # On host, we mock utils and remove esp32 check
-    DEPENDENCIES = ["tflite_micro_helper"]
+    # On host, we mock utils and remove esp32 check. The TFLite runtime only
+    # validates on ESP32 (cv.only_on_esp32), so it cannot be a dependency here.
+    DEPENDENCIES = []
     AUTO_LOAD = ["sensor"]
 
 CONF_CAMERA_ID = "camera_id"
-CONF_TENSOR_ARENA_SIZE = "tensor_arena_size"
 CONF_CONFIDENCE_THRESHOLD = "confidence_threshold"
-CONF_RAW_DATA_ID = "raw_data_id"
 CONF_DEBUG = "debug"
 CONF_DEBUG_IMAGE = "debug_image"
 CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL = "debug_image_out_serial"
@@ -78,38 +75,17 @@ CONF_FRAME_REQUEST_TIMEOUT = "frame_request_timeout"
 CONF_UNLOAD_BUTTON = "unload_button"
 CONF_RELOAD_BUTTON = "reload_button"
 
-# Dynamic model config overrides (optional - auto-detected from .txt file)
-CONF_INPUT_TYPE = "input_type"
-CONF_INPUT_CHANNELS = "input_channels"
-CONF_INPUT_WIDTH = "input_width"
-CONF_INPUT_HEIGHT = "input_height"
-CONF_OUTPUT_PROCESSING = "output_processing"
-CONF_SCALE_FACTOR = "scale_factor"
-CONF_INPUT_ORDER = "input_order"
-CONF_NORMALIZE = "normalize"
-CONF_INVERT = "invert"
-
 meter_reader_tflite_ns = cg.esphome_ns.namespace("meter_reader_tflite")
 MeterReaderTFLite = meter_reader_tflite_ns.class_(
     "MeterReaderTFLite", cg.PollingComponent
 )
 
 
-# E4: reuse the shared model-config helpers from tflite_micro_helper instead of
-# keeping a second, drift-prone copy of the .txt parsing + filename heuristics.
-datasize_to_bytes = tflite_micro_helper.datasize_to_bytes
-parse_model_txt_file = tflite_micro_helper.parse_model_txt_file
-infer_model_config_from_filename = tflite_micro_helper.infer_model_config_from_filename
-
-
 # Use the standard ESPHome sensor configuration pattern
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(MeterReaderTFLite),
-        cv.Required(CONF_MODEL): cv.Any(
-            cv.use_id(tflite_micro_helper.TFLiteMicroHelper),  # ID reference
-            cv.file_,  # Legacy: direct file path
-        ),
+        cv.Required(CONF_MODEL): cv.use_id(tflite_micro_runtime.TFLiteMicroHelper),
         cv.Optional(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator)
         if value_validator
         else cv.invalid(
@@ -121,13 +97,6 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_CONFIDENCE_THRESHOLD, default=0.85): cv.float_range(
             min=0.0, max=1.0
         ),
-        # Make tensor_arena_size optional since it's auto-detected from .txt file
-        # datasize_to_bytes handles both int and string inputs (e.g. "110KB")
-        cv.Optional(CONF_TENSOR_ARENA_SIZE): cv.All(
-            datasize_to_bytes,
-            cv.Range(min=50 * 1024, max=1000 * 1024),
-        ),
-        cv.GenerateID(CONF_RAW_DATA_ID): cv.declare_id(cg.uint8),
         cv.Optional(CONF_DEBUG, default=False): cv.boolean,
         cv.Optional(CONF_DEBUG_IMAGE, default=False): cv.boolean,
         cv.Optional(
@@ -179,33 +148,9 @@ CONFIG_SCHEMA = cv.Schema(
                 )
             ),
         ),
-        # Dynamic model config overrides (optional - auto-detected from .txt file)
-        cv.Optional(CONF_INPUT_TYPE): cv.enum(
-            {"uint8": "uint8", "float32": "float32"}, lower=True
-        ),
-        cv.Optional(CONF_INPUT_CHANNELS): cv.int_range(min=1, max=4),
-        cv.Optional(CONF_INPUT_WIDTH): cv.int_range(min=8, max=512),
-        cv.Optional(CONF_INPUT_HEIGHT): cv.int_range(min=8, max=512),
-        cv.Optional(CONF_OUTPUT_PROCESSING): cv.enum(
-            {
-                "direct_class": "direct_class",
-                "softmax": "softmax",
-                "argmax": "argmax",
-                "logits": "logits",
-                "qat_quantized": "qat_quantized",
-                "experimental_scale": "experimental_scale",
-                "logits_jomjol": "logits_jomjol",
-                "softmax_jomjol": "softmax_jomjol",
-                "auto_detect": "auto_detect",
-            },
-            lower=True,
-        ),
-        cv.Optional(CONF_SCALE_FACTOR): cv.float_range(min=0.1, max=100.0),
-        cv.Optional(CONF_INPUT_ORDER): cv.enum(
-            {"RGB": "RGB", "BGR": "BGR", "GRAY": "GRAY"}, upper=True
-        ),
-        cv.Optional(CONF_NORMALIZE): cv.boolean,
-        cv.Optional(CONF_INVERT): cv.boolean,
+        # The model's own parameters (input type/shape, output processing, arena
+        # size, ...) live in the tflite_micro_runtime entry that this component
+        # references, so they are deliberately not duplicated here.
         cv.Optional("value_sensor"): cv.use_id(sensor.Sensor),
         cv.Optional("confidence_sensor"): cv.use_id(sensor.Sensor),
         cv.Optional("inference_logs"): cv.use_id(text_sensor.TextSensor),
@@ -253,94 +198,10 @@ async def to_code(config):
 
     cg.add(var.set_confidence_threshold(config[CONF_CONFIDENCE_THRESHOLD]))
 
-    # Check if model config is a tflite_micro_helper ID reference
-    model_value = config[CONF_MODEL]
-    if isinstance(model_value, str) and model_value.endswith(".tflite"):
-        # Legacy mode: read model file directly (deprecated)
-        print("WARNING: Deprecated model configuration in meter_reader_tflite.")
-        print("  The 'model: \"<file>.tflite\"' syntax is deprecated.")
-        print(
-            "  Please move model configuration to the tflite_micro_helper section instead."
-        )
-
-        model_path = CORE.relative_config_path(model_value)
-        model_filename = os.path.basename(str(model_path).replace("\\", "/"))
-        model_type = os.path.splitext(model_filename)[0]
-
-        cg.add(var.set_model_config(model_type))
-
-        with open(model_path, "rb") as f:
-            model_data = f.read()
-
-        crc32_val = zlib.crc32(model_data) & 0xFFFFFFFF
-        cg.add_define("MODEL_CRC32", HexInt(crc32_val))
-
-        rhs = [HexInt(x) for x in model_data]
-        prog_arr = cg.progmem_array(config[CONF_RAW_DATA_ID], rhs)
-
-        cg.add(var.set_model(prog_arr, len(model_data)))
-
-        auto_config = parse_model_txt_file(model_path)
-        if auto_config:
-            print(f"  Auto-detected model config from '{model_filename}.txt':")
-            for k, v in auto_config.items():
-                print(f"    {k}: {v}")
-        else:
-            auto_config = infer_model_config_from_filename(model_filename)
-            print(
-                f"  No .txt file found for '{model_filename}', using filename heuristics:"
-            )
-            for k, v in auto_config.items():
-                print(f"    {k}: {v}")
-
-        yaml_overrides = {}
-        for yaml_key, auto_key in [
-            ("input_type", "input_type"),
-            ("input_channels", "input_channels"),
-            ("input_width", "input_width"),
-            ("input_height", "input_height"),
-            ("output_processing", "output_processing"),
-            ("scale_factor", "scale_factor"),
-            ("input_order", "input_order"),
-            ("normalize", "normalize"),
-            ("invert", "invert"),
-        ]:
-            if yaml_key in config:
-                yaml_overrides[auto_key] = config[yaml_key]
-        if yaml_overrides:
-            auto_config.update(yaml_overrides)
-
-        cg.add(var.set_input_type(auto_config.get("input_type", "uint8")))
-        cg.add(var.set_input_channels(auto_config.get("input_channels", 3)))
-        cg.add(var.set_input_width(auto_config.get("input_width", 32)))
-        cg.add(var.set_input_height(auto_config.get("input_height", 20)))
-        cg.add(
-            var.set_output_processing(
-                auto_config.get("output_processing", "direct_class")
-            )
-        )
-        cg.add(var.set_scale_factor(auto_config.get("scale_factor", 1.0)))
-        cg.add(var.set_input_order(auto_config.get("input_order", "RGB")))
-        cg.add(var.set_normalize(auto_config.get("normalize", False)))
-        cg.add(var.set_invert(auto_config.get("invert", False)))
-
-        if CONF_TENSOR_ARENA_SIZE in config:
-            arena_size = config[CONF_TENSOR_ARENA_SIZE]
-            if isinstance(arena_size, str):
-                arena_size = datasize_to_bytes(arena_size)
-            cg.add(var.set_tensor_arena_size(arena_size))
-        elif "tensor_arena_size" in auto_config:
-            cg.add(var.set_tensor_arena_size(auto_config["tensor_arena_size"]))
-        else:
-            cg.add(var.set_tensor_arena_size(100 * 1024))
-
-        max_ops = auto_config.get("max_operators", 30)
-        cg.add_build_flag(f"-DMAX_OPERATORS={max_ops}")
-    else:
-        # New mode: model is a tflite_micro_helper ID reference
-        tflite_var = await cg.get_variable(config[CONF_MODEL])
-        cg.add(var.set_tflite(tflite_var))
-        print("  Using tflite_micro_helper model reference")
+    # The model itself is loaded, validated and post-processed by the referenced
+    # tflite_micro_runtime instance (MULTI_CONF, one entry per model).
+    tflite_var = await cg.get_variable(config[CONF_MODEL])
+    cg.add(var.set_tflite(tflite_var))
 
     if "show_crop_areas" in config:
         cg.add(var.set_show_crop_areas(config["show_crop_areas"]))
@@ -404,11 +265,10 @@ async def to_code(config):
 
     if config.get(CONF_DEBUG, False):
         cg.add_define("DEBUG_METER_READER_TFLITE")
-        cg.add_define(
-            "DEBUG_TFLITE_MICRO_HELPER"
-        )  # Enable helper debug so debug_test_parameters() compiles in
+        # The runtime's own diagnostics are build-wide defines emitted by
+        # tflite_micro_runtime / tflite_model_debug; a model's verbose logging is
+        # switched per instance with `debug: true` on its runtime entry.
         cg.add(var.set_debug_mode(True))
-        cg.add(var.set_debug(True))
 
     if config.get(CONF_DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL, False):
         cg.add_define("DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL")

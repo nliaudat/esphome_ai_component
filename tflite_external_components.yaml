@@ -1,0 +1,48 @@
+# Shared `external_components` entries for every config that runs a TFLite model.
+#
+# Usage (top of the config):
+#   external_components: !include tflite_external_components.yaml
+#
+# Two groups:
+#   1. Project-only components, compiled from ./components in this repo.
+#   2. The split TFLite components, fetched from their PR heads on GitHub. One
+#      entry per PR because a single `source` carries a single ref; the seven
+#      components live in PRs #21282-#21288.
+#
+# Delete .esphome/external_components to force a re-fetch before `refresh`
+# expires.
+
+# 1. Project-only components (local sources).
+- source:
+    type: local
+    path: components
+  components:
+    - meter_reader_tflite
+    - esp32_camera_utils
+    - flash_light_controller
+    - value_validator
+    - analog_reader
+    - data_collector
+
+# 2. Split TFLite components from their PR heads.
+- source: github://pr#21282
+  components: [tflite_model_source]
+  refresh: always
+- source: github://pr#21283
+  components: [tflite_op_processor]
+  refresh: always
+- source: github://pr#21284
+  components: [tflite_memory_handler]
+  refresh: always
+- source: github://pr#21285
+  components: [tflite_output_processor]
+  refresh: always
+- source: github://pr#21286
+  components: [tflite_model_loader]
+  refresh: always
+- source: github://pr#21287
+  components: [tflite_model_debug]
+  refresh: always
+- source: github://pr#21288
+  components: [tflite_micro_runtime]
+  refresh: always

@@ -2,30 +2,30 @@
 
 `meter_reader_tflite` is the core component that orchestrates the AI meter reading process. It integrates the camera, TFLite model, and image processing to deliver sensor readings.
 
-Model configuration is now handled by the **`tflite_micro_helper`** component. You define the model in a `tflite_micro_helper` entry and reference it by ID from `meter_reader_tflite`.
+Model configuration is handled by the **`tflite_micro_runtime`** component. You declare the model once in a `tflite_micro_runtime` entry and reference it by ID from `meter_reader_tflite`.
 
-> **Note:** The legacy `model: "file.tflite"` syntax still works but is deprecated and prints a warning. See [Backward Compatibility](#-backward-compatibility) below.
+> **Note:** `model:` is a required **ID reference**. The old `model: "file.tflite"` string syntax has been removed — see [Migration from `tflite_micro_helper`](#-migration-from-tflite_micro_helper) below.
 
 ## ⚙️ Configuration
 
-### Recommended Setup (tflite_micro_helper)
+### Recommended Setup (tflite_micro_runtime)
 
 ```yaml
-# 1. Define the model in tflite_micro_helper
-tflite_micro_helper:
-  - id: my_digit_model
-    model_type: image
-    model: "digit_recognizer_v40_quantized_integer_quant_uint8.tflite"
-    # All config auto-detected from .txt file
-    # Optional overrides:
-    # tensor_arena_size: "110KB"
-    # input_width: 32
-    # input_height: 20
+# 1. Declare the model in tflite_micro_runtime
+tflite_micro_runtime:
+  id: my_digit_model
+  model_type: image
+  model: "models/digit_recognizer_v40_quantized_integer_quant_uint8.tflite"
+  # Input shape / arena size auto-detected from the .txt report
+  # Optional overrides:
+  # tensor_arena_size: "110KB"
+  # input_width: 32
+  # input_height: 20
 
 # 2. Reference the model by ID in meter_reader_tflite
 meter_reader_tflite:
   id: my_meter_reader
-  model: my_digit_model            # ← ID reference to tflite_micro_helper entry
+  model: my_digit_model            # ← required ID reference to a tflite_micro_runtime entry
   camera_id: my_camera             # ID of esp32_camera component
 
   # Validator (optional but recommended)
@@ -38,7 +38,6 @@ meter_reader_tflite:
   # Debugging
   debug: false                     # Enable verbose logging
   debug_image: false               # Use embedded static image for testing
-  rotation: "0"                    # Image rotation ("0", "90", "180", "270")
 
   # Sensors
   value_sensor: my_value_sensor
@@ -50,40 +49,46 @@ meter_reader_tflite:
   data_collector: my_collector
 ```
 
-### Legacy Setup (Deprecated)
+> Model parameters (input type/shape/channels, `tensor_arena_size`, `scale_factor`, `output_processing`, `normalize`, `invert`, and the audio keys) belong to the `tflite_micro_runtime` entry, not to `meter_reader_tflite`. Image rotation is configured on `esp32_camera_utils` (see below).
+
+### Migration from `tflite_micro_helper`
+
+The monolithic `tflite_micro_helper` entry has been replaced by the split TFLite components:
+
+| Before | After |
+|--------|-------|
+| `tflite_micro_helper:` (list entry) | `tflite_micro_runtime:` (entry, `id:` required) |
+| `meter_reader_tflite: model: "file.tflite"` | `meter_reader_tflite: model: <runtime entry id>` |
+| `debug: true` on the model entry | `debug: true` on the `tflite_micro_runtime` entry (auto-loads `tflite_model_debug`) |
+| `tensor_arena_size` on the model entry | unchanged: still on the `tflite_micro_runtime` entry |
 
 ```yaml
-value_validator:
-  id: my_validator
-  allow_negative_rates: false
-  max_absolute_diff: 300
+# Before (tflite_micro_helper)
+tflite_micro_helper:
+  - id: my_digit_model
+    model_type: image
+    model: "digit_recognizer.tflite"
 
-meter_reader_tflite:
-  id: my_meter_reader
-  model: "digit_recognizer.tflite"  # Direct file path (deprecated)
-  camera_id: my_camera
-  validator: my_validator
-  update_interval: 60s
-  debug: false
-  rotation: "0"
+# After (tflite_micro_runtime) — `meter_reader_tflite: model: my_digit_model` is unchanged
+tflite_micro_runtime:
+  id: my_digit_model
+  model_type: image
+  model: "digit_recognizer.tflite"
 ```
 
-> [!WARNING]
-> The `model: "file.tflite"` syntax is **deprecated**. It will print a warning at compile time. Please migrate to the `tflite_micro_helper` approach.
+> `tflite_micro_helper` still exists for `micro_wake_word` (audio); `meter_reader_tflite` no longer depends on it.
 
 ### Image Rotation
 
 **Image Rotation**:
-The `rotation` parameter allows you to rotate the camera image by 90, 180, or 270 degrees. This is useful if your camera is mounted sideways or upside down.
-
-To rotate the camera image, configure the `esp32_camera_utils` component:
+Rotation is configured on the **`esp32_camera_utils`** component (it is no longer a `meter_reader_tflite` option). Enabling it lets the AI read an image rotated by 90, 180, or 270 degrees, which is useful if your camera is mounted sideways or upside down.
 
 ```yaml
 esp32_camera_utils:
+  id: my_camera_utils
+  camera_id: my_camera
+  enable_rotation: true
   rotation: "90" # Options: "0", "90", "180", "270"
-  # Optional: Image Rotation
-  # Options: "0", "90", "180", "270"
-  rotation: "90"
 ```
 
 > [!IMPORTANT]

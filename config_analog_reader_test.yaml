@@ -8,12 +8,7 @@
       # ref: main
     # components: [legacy_meter_reader_tflite]
 
-external_components:
-  - source:
-      type: local
-      path: components
-    #components: [meter_reader_tflite, tflite_micro_helper, esp32_camera_utils, flash_light_controller] #, ssocr_reader]
-    components: [meter_reader_tflite, analog_reader, tflite_micro_helper, esp32_camera_utils, flash_light_controller, value_validator]
+external_components: !include tflite_external_components.yaml
 
 ############## General configuration
 
@@ -85,7 +80,7 @@ api:
   #             id(${id_prefix}_meter_reader).set_camera_window(offset_x, offset_y, width, height);
   #           }
 
-tflite_micro_helper:
+tflite_micro_runtime:
   - id: ${id_prefix}_digit_model
     model_type: image
     model: "models/digit_recognizer_v24_quantized_integer_quant_uint8.tflite"

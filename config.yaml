@@ -1,66 +1,46 @@
+
 # for flashing : press boot button for 2-3 seconds before the serial connection initialize
 # After OTA update, the EN (reset) button must be pressed to run firmware
 
-# external_components:
-#   - source:
-#       type: git
-#       url: https://github.com/nliaudat/esphome_ai_component
-#       ref: main
-#     components: [legacy_meter_reader_tflite]
 
-external_components:
-  - source:
-      type: local
-      path: components
-    components: [meter_reader_tflite, tflite_micro_helper, esp32_camera_utils, flash_light_controller, value_validator]  # data_collector] #, ssocr_reader #, analog_reader]
-    # components: [meter_reader_tflite, esp32_camera_utils, flash_light_controller, value_validator]  # data_collector] #, ssocr_reader #, analog_reader]
-  # - source:
-  #     type: git
-  #     url: https://github.com/nliaudat/esphome
-  #     ref: tflite_micro_helper
-  #   components: [tflite_micro_helper]
-  # - source: github://pr#17478
-    # components: [tflite_micro_helper]
-    # refresh: 0s
+external_components: !include tflite_external_components.yaml
 
 ############## General configuration
 
 substitutions:
+  camera_resolution: 640x480
+  camera_pixel_format: "JPEG"
 
-  name: s3cam-tflite  # no special caracters
-  friendly_name: "S3 camera tflite"
-  id_prefix: "s3_cam_tflite"  # if you have more than one board, it could be usefull to remane all the "id:prefix_xxxx" with a decicaded prefix
+  name: esp-cam-freenove #no special caracters
+  friendly_name: "esp_cam_freenove"
+  id_prefix: "esp_cam_freenove" #if you have more than one board, it could be usefull to remane all the "id:prefix_xxxx" with a decicaded prefix
   # name: esp-cam-2mb #no special caracters
   # friendly_name: "esp-cam-2mb"
   # id_prefix: "esp_cam_2mb" #if you have more than one board, it could be usefull to remane all the "id:prefix_xxxx" with a decicaded prefix
 
   revision: "1.3"
-  esphome_min_version: "2025.12.0"
+  esphome_min_version: "2026.11.0"
 
   # Board Selection (s3_cam, aithinker)
   # board_variant: s3_cam
 
   # Meter settings
-  meter_unit: L  # Unit of measurement for the meter (e.g. m^3, kWh, L) (https://developers.home-assistant.io/docs/core/entity/sensor/https://developers.home-assistant.io/docs/core/entity/sensor/)
-  meter_device_class: water  # device class for the meter (e.g. water, energy, gas)
-  meter_state_class: total_increasing  # state class for the meter (e.g. total_increasing, total, measurement)
+  meter_unit: L # Unit of measurement for the meter (e.g. m³, kWh, L)
+  meter_device_class: water # device class for the meter (e.g. water, energy, gas)
+  meter_state_class: total_increasing # state class for the meter (e.g. total_increasing, total, measurement)
 
   # camera
-  # NOTE: OV2640 + ESP32 camera driver cannot reliably do grayscale AND windowing at the same time.
-  # Using JPEG pixel format with the camera; grayscale conversion is done in software by the ImageProcessor
-  # when a grayscale model (model_channels == 1) is loaded.
-  camera_pixel_format: JPEG  # (cropping implementation is faster with RGB888 format) | Displays: RGB565, RGB888 | Cameras: YUV422, YUV420, RAW | Efficiency: Grayscale, YUV420, JPEG
-  ### windowing not available nativelyin grayscale mode (OV2640) due to driver limitations. The image is forced JPEG and then converted to grayscale in software by the ImageProcessor
+  # camera_pixel_format: JPEG # (cropping implementation is faster with RGB888 format) | Displays: RGB565, RGB888 | Cameras: YUV422, YUV420, RAW | Efficiency: Grayscale, YUV420, JPEG
   # camera_pixel_format: GRAYSCALE
-  camera_resolution: 640x480  # 800x600 #640x480 #https://esphome.io/components/esp32_camera.html
+  # camera_resolution: 640x480 #800x600 #640x480 #https://esphome.io/components/esp32_camera.html
   # camera_jpeg_quality: 10 # From 10 (best) to 63 (worst). | Must be 0 if non JPEG
   camera_jpeg_quality: 10
   # camera_max_framerate: 1fps
-  camera_max_framerate: 1fps
+  camera_max_framerate: 5fps # Increased for performance testing
   camera_idle_framerate: 0.2fps
 
-  # time
-  TZ: Europe/Zurich  # timezone
+  #time
+  TZ: Europe/Zurich #timezone
   reboot_days_of_week: MON
   reboot_hours: 5
   reboot_minutes: 0
@@ -71,6 +51,14 @@ preferences:
 
 ota:
   - platform: esphome
+    # on_begin:
+      # then:
+        # - lambda: |-
+            # ESP_LOGI("ota", "Preparing for OTA: Pausing AI & Analog Reader...");
+            # // id(${id_prefix}_meter_reader).set_pause_processing(true);
+            # id(${id_prefix}_analog_reader).set_pause_processing(true);
+            # // Ensure flash is off
+            # id(${id_prefix}_flash_controller).disable_flash();
 
 safe_mode:
 
@@ -84,127 +72,84 @@ globals:
   - id: ${id_prefix}_crop_zones
     type: std::string
     max_restore_data_length: 254
-    initial_value: "\"[]\""
+    # initial_value: "\"[]\""
 
-    # #debug config
-    # initial_value: '"[[9, 10, 49, 74], [64, 10, 104, 74], [118, 9, 158, 81], [173, 9, 213, 81], [230, 9, 270, 81], [286, 10, 326, 82], [339, 11, 379, 83], [394, 10, 434, 82]]"'
-    #    # Note: The outer quotes are escaped with single quotes + double quotes ("...")
+    # debug config
+    initial_value: '"[[446,20,490,114]]"' #'"[[92,4,139,90],[179,3,222,87],[272,2,318,90],[357,7,407,90],[446,3,491,92]]"'
+    #Note: The outer quotes are escaped with single quotes + double quotes ("...")
 
-tflite_micro_helper:
-  - id: ${id_prefix}_digit_model
-    model_type: image
-    model: "models/digit_recognizer_v40_quantized_integer_quant_uint8.tflite"
-    debug: false
+tflite_micro_runtime:
+  id: ${id_prefix}_tflite
+  model_type: image
+  model: "models/digit_recognizer_v23_10cls_RGB.tflite"
+  debug: true
 
 esp32_camera_utils:
   id: ${id_prefix}_camera_utils
   camera_id: ${id_prefix}_espcam
-  debug: false
-  ### zoom availale for OV2640, OV3660, OV5640, SC101IOT, SC030IOT from crop zones (explicit)
-  ### windowing not available nativelyin grayscale mode (OV2640) due to driver limitations. The image is forced JPEG and then converted to grayscale in software by the ImageProcessor
-  # camera_window:  # can be set in http://[hassio]/developer-tools/action > esphome.[s3cam_tflite]_set_camera_window
-  #   offset_x: 928 # multiple of 4
-  #   offset_y: 480 # multiple of 4
-  #   width: 448 # multiple of 4 or 16 if rotation enabled and 4:3 proportions with height for best quality
-  #   height: 88 #  multiple of 4 or 16 if rotation enabled and 4:3 proportions with width for best quality
+  # debug: true
 
-  # enable_rotation: true
-  # rotation: 270 # 0, 90, 180, 270 (special case built-in "accelerated" for 90, 180, 270 )
-
-  # enable_scaler: true
-  # scaler:
-  #   width: 640
-  #   height: 480
-
-  # enable_cropper: true
-  # cropper:
-  #   width: 320
-  #   height: 240
-  #   offset_x: 0
-  #   offset_y: 0
-
-  # enable_drawing: true # enable drawing subsystem, needed if meter_reader_tflite: generate_preview: true + show_crop_areas: true
-
-  debug_memory: false
+  # debug_memory: true
 
 # optional : flash light at taking image
-flash_light_controller:
-  id: ${id_prefix}_flash_controller
-  flash_light: ${id_prefix}_flash
-  flash_pre_time: 7000ms # 7 seconds before update (time to stabilize) (works with 5sec on my board)
-  flash_post_time: 200ms # 2 seconds after update (works with 100ms on my board)
-  debug: false
+# flash_light_controller:
+  # id: ${id_prefix}_flash_controller
+  # flash_light: ${id_prefix}_flash
+  # flash_pre_time: 7000ms # 7 seconds before update (time to stabilize) (works with 5sec on my board)
+  # flash_post_time: 200ms # 2 seconds after update (works with 100ms on my board)
+  # debug: true
 
-# data_collector:
-#   id: ${id_prefix}_data_collector
-#   upload_url: "http://192.168.1.53:5000/api/upload" # CHANGE ME
-#   # upload_interval: "60s"   # Min interval between uploads (default 60s, 1s-1h)
-#   # upload_queue_size: 5     # Queued images before dropping (default 5)
-#   # api_key: "Bearer my-secret-token" # Optional: Adds Authorization header
-#   # username: "usr" # Optional: Basic Auth
-#   # api_key: "Bearer my-secret-token" # Optional: Adds Authorization header
-  # username: "usr" # Optional: Basic Auth
-  # password: "pwd"
-  # web_submit:
-  #   name: "${friendly_name} Allow Data Collection"
-  #   id: ${id_prefix}_allow_collection
-  #   icon: "mdi:cloud-upload"
+data_collector:
+  id: ${id_prefix}_data_collector
+  upload_url: "http://192.168.1.121:5123/api/upload/${id_prefix}"
+  api_key: !secret datacollector_api_key
 
-value_validator:
-  id: ${id_prefix}_validator
-  # Basic Validation
-  allow_negative_rates: false          # Allow values < previous value (default: false)
-  max_absolute_diff: 300               # Max allowed absolute change (default: 100)
-  # max_rate_change: 0.15                # Max rate change as percentage (default: 15%)
+# value_validator:
+  # - id: ${id_prefix}_validator
+    # allow_negative_rates: false          # Allow values < previous value (default: false)
+    # max_absolute_diff: 300               # Max allowed absolute change (default: 100)
 
-  # Smart Validation
-  enable_smart_validation: true        # Enable adaptive validation (default: true)
-  smart_validation_window: 5           # Window size for pattern analysis (default: 5)
+    # enable_smart_validation: true        # Enable adaptive validation (default: true)
+    # smart_validation_window: 5           # Window size for pattern analysis (default: 5)
 
-  # Confidence Thresholds
-  high_confidence_threshold: 0.90     # Threshold for high confidence (default: 90%)
-  per_digit_confidence_threshold: 0.85 # Min confidence per digit (default: 85%)
-  strict_confidence_check: true       # Require all digits meet threshold (default: false)
-  #first_reading_digit_threshold: 0.70
+    # high_confidence_threshold: 0.95      # Threshold for high confidence (default: 90%)
+    # per_digit_confidence_threshold: 0.95 # Min confidence per digit (default: 85%)
+    # strict_confidence_check: true       # Require all digits meet threshold (default: false)
 
-  # Memory Management
-  max_history_size: 50kB               # Max history memory usage (default: 50kB)
+    # max_history_size: 50kB               # Max history memory usage (default: 50kB)
 
 meter_reader_tflite:
   id: ${id_prefix}_meter_reader
-  validator: ${id_prefix}_validator
-  # confidence_threshold: 0.85 # Only if validator is disabled
+  # validator: ${id_prefix}_validator
+  confidence_threshold: 0.99 # Only if validator is disabled
   camera_id: ${id_prefix}_espcam
-  model: ${id_prefix}_digit_model # 99.06 acc | inference in 1300ms | 105.91 KB memory footprint
+  # model: "models/dig-class100-0180-s2-q.tflite"
+  model: ${id_prefix}_tflite
+  # Legacy direct-file model (deprecated - use tflite_micro_runtime ID reference)
+  # model: "models/digit_recognizer_v23_10cls_RGB.tflite"
+  # model: "models/digit_recognizer_v4_10cls_GRAY.tflite"
 
-  update_interval: 60s
+  update_interval: 30s
 
-  # collect_low_confidence: true # [Optional] Default: true. Required for data collector. Defines what is considered "low confidence" (uses confidence_threshold).
-  # collect_min_global_confidence: 0.90 # [Optional] Default: 0.90. Low confidence override for data collection (Average < Value). Prerequisite: data_collector.
-  # collect_min_digit_confidence: 0.90 # [Optional] Default: 0.90. Low confidence override for data collection (Any Digit < Value). Prerequisite: data_collector.
+  collect_low_confidence: true # [Optional] Default: true. Required for data collector. Defines what is considered "low confidence" (uses confidence_threshold).
+  collect_min_global_confidence: 1 # [Optional] Default: 0.90. Low confidence override for data collection (Average < Value). Prerequisite: data_collector.
+  collect_min_digit_confidence: 1 # [Optional] Default: 0.90. Low confidence override for data collection (Any Digit < Value). Prerequisite: data_collector.
 
-  debug: false
+  # debug: true
   debug_image: false # static embedded image (debug.jpg)
   debug_image_out_serial: false
-  debug_memory: false
-  debug_timing: false
+  # debug_memory: true
+  # debug_timing: true
 
   # Preview of what the AI sees (Rotated Live Cam)
   # Set to true to enable continuous updates, or false for on-demand only (via button)
-  generate_preview: false # need web_server: port: 80 (wait for update_interval to be reached) + esp32_camera_utils: enable drawing subsystem
+  generate_preview: false # need web_server: port: 80 (wait for update_interval to be reached)
   # show_crop_areas: true # DEV (not ready for production) Draw boxes on preview
-  ## other needs :
-    # esp32_camera_utils: enable_drawing: true
-    # generate_preview: true
-    # show_crop_areas: true
-    # web_server:
-        # port: 80  # commented  uncomment
-    # - !include camera_webserver.yaml
 
   crop_zones_global: ${id_prefix}_crop_zones  # Reference the global variables set in globals_AI_component.yaml | To update, use http://[hassio]/developer-tools/action >esphome.[s3cam_tflite]_set_crop_zones | to get, use the tools>draw_regions.py
-  flash_light_controller: ${id_prefix}_flash_controller
+  # flash_light_controller: ${id_prefix}_flash_controller
 
-  # data_collector: ${id_prefix}_data_collector
+  data_collector: ${id_prefix}_data_collector
   # collect_low_confidence: true
 
   value_sensor: ${id_prefix}_meter_value
@@ -220,6 +165,7 @@ meter_reader_tflite:
 
   ### Advanced parameters
   # frame_request_timeout: 15000  # ms (1000-60000)
+
   # tensor_arena_size: "110KB"
   # Pool efficiency monitoring (optional, requires DEBUG_METER_READER_MEMORY)
   # pool_job_efficiency_sensor: ${id_prefix}_pool_job_efficiency
@@ -231,7 +177,7 @@ meter_reader_tflite:
   reload_button: ${id_prefix}_reload_btn
 
 # ssocr_reader: #seven segment reader (dev) / do not if using meter_reader_tflite
-#   id: ${id_prefix}_ssocr_reader
+#   id: ${id_prefix}_ssocr_main
 #   update_interval: 60s
 #   threshold_level: 128
 #   digit_count: 8
@@ -243,66 +189,33 @@ meter_reader_tflite:
 #   value:
 #     name: "SSOCR Value"
 
-# analog_reader: # DEV !
-#   id: ${id_prefix}_analog_reader
-#   camera_id: ${id_prefix}_espcam
-#   validator: ${id_prefix}_validator
-#   update_interval: 60s
-#   debug: false # Set true to see ASCII in logs
-#   value_sensor:
-#     name: "Analog Total"
-#   dials:
-#     - id: dial_1
-#       scale: 1.0
-#       crop_x: 0
-#       crop_y: 0
-#       crop_w: 100
-#       crop_h: 100
-#
-#       # Image Enhancements
-#       auto_contrast: true
-#       contrast: 1.0
-#
-#       # Color Detection (Optional)
-#       # target_color: 0xFF0000 # Red needle
-#
-#       # Geometry
-#       min_angle: 0
-#       max_angle: 360
-#       angle_offset: 0 # 0=North, 90=East
-#       min_value: 0
-#       max_value: 10
-#
-#       # Algorithm Selection (optional, default: radial_profile)
-      # detection_algorithm: radial_profile # Options: radial_profile, hough_transform, template_match, legacy, auto
-
 # web_server: # needed if generate_preview: true
   # port: 80
 
 packages:
   # Board Configuration (Mutually Exclusive)
-  # - !include boards/board_freenove_esp32-s3-n8r8.yaml
+  - !include boards/board_freenove_esp32-s3-n8r8.yaml
   # - !include boards/board_Seeed_Studio_XIAO_ESP32-S3_sense.yaml
   # - !include boards/board_generic_esp32-s3-n16r8.yaml
   # - !include boards/board_wrover_kit.yaml
   # - !include boards/board_m5stack_psram.yaml
   # - !include boards/board_esp32cam_aithinker.yaml #esp32_camera.yaml > power_down_pin must be enabled
-  - !include boards/board_AI-On-The-Edge-Cam_Esp32-S3.yaml
+  # - !include boards/board_AI-On-The-Edge-Cam_Esp32-S3.yaml
 
-  # - !include debug_board.yaml
+  - !include debug_board.yaml
 
   # Component-specific controls (comment to disable individual controls)
   - !include components/meter_reader_tflite/meter_reader_tflite_controls.yaml
-  - !include components/value_validator/value_validator_controls.yaml
-  - !include components/flash_light_controller/flash_light_controller_controls.yaml
+  # - !include components/value_validator/value_validator_controls.yaml
+  # - !include components/flash_light_controller/flash_light_controller_controls.yaml
   - !include components/esp32_camera_utils/esp32_camera_utils_controls.yaml
+  # - !include data_collector_controls.yaml
   # - !include components/analog_reader/analog_reader_controls.yaml
-  # - !include components/value_validator/value_validator_dial_controls.yaml
 
   # camera configs
   - !include camera_options.yaml
   - !include esp32_camera.yaml
-  # - !include camera_webserver.yaml # generate_preview must be set to true is used
+  # - !include camera_webserver.yaml
 
   # network choice
   - !include wifi.yaml

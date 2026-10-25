@@ -12,7 +12,7 @@ external_components:
   - source:
       type: local
       path: components
-    #components: [meter_reader_tflite, tflite_micro_helper, esp32_camera_utils, flash_light_controller] #, ssocr_reader]
+    #components: [meter_reader_tflite, esp32_camera_utils, flash_light_controller] #, ssocr_reader]
     components: [ssocr_reader, esp32_camera_utils, flash_light_controller, value_validator]
 
 ############## General configuration
@@ -78,9 +78,6 @@ api:
   #           if (offset_x >= 0 && offset_y >= 0 && width > 0 && height > 0) {
   #             id(${id_prefix}_meter_reader).set_camera_window(offset_x, offset_y, width, height);
   #           }
-
-# tflite_micro_helper:
-#   debug: true
 
 # globals:
 #   - id: ${id_prefix}_crop_zones

@@ -23,7 +23,7 @@ Unlike other solutions that are standalone firmwares, this is a **native ESPHome
 ### 🚀 Reusable AI Core & Technical Excellence
 Beyond just a meter reader, this project provides a robust foundation for **any** ESP32 AI project:
 
-*   **`tflite_micro_helper`**: A standalone, reusable TFLite Micro model loader supporting **image** (single-shot) and **audio** (streaming) model types, with local/remote model fetching, CRC32 verification, and auto-detection from `.txt` reports. Used by `meter_reader_tflite` and `micro_wake_word`.
+*   **`tflite_micro_runtime`**: A standalone, reusable TFLite Micro runtime supporting **image** (single-shot) and **audio** (streaming) model types, with local/remote model fetching, CRC32 verification, and auto-detection from `.txt` reports. `meter_reader_tflite` references a runtime entry by ID; the loader/debug/op/memory/output building blocks are auto-loaded.
 *   **Memory Safe & Optimized**: Written in modern **Safe C++**. We use `std::span`, zero-copy buffers, and `esp-nn` hardware acceleration to squeeze every drop of performance while preventing crashes and memory leaks.
 *   **Production Ready**: Designed for 24/7 operation with robust error handling and watchdog protections.
 
@@ -45,7 +45,10 @@ The repository allows you to use specific components based on your needs:
 |-----------|-------------|
 | **[value_validator](./components/value_validator)** | Robust validation engine for meter readings. Eliminates outliers, tracks history, prevents impossible value jumps, and supports dial-aware digit correction when combined with `analog_reader`. Outputs float values when analog_reader is active. Publishes a separate `validated_value_sensor` (only on accept) while the raw value_sensor always shows raw digits. |
 | **[esp32_camera_utils](./components/esp32_camera_utils)** | Powerful image processing utilities. Handles cropping, scaling, rotation (JPEG/Raw), and format conversion using `esp_new_jpeg` library. |
-| **[tflite_micro_helper](./components/tflite_micro_helper)** | Self-contained TFLite Micro model loader and runtime wrapper. Supports **image** and **audio** model types, model source resolution (local, `github://`, `http(s)://`), CRC32 verification, auto-detection from `.txt` reports, and ESP-NN hardware acceleration. Required by `meter_reader_tflite` and `micro_wake_word`. |
+| **`tflite_micro_runtime`** | TFLite Micro runtime for **image** and **audio** models: tensor arena, op resolver, interpreter, input preprocessing and output post-processing. Declare one entry per model and reference it by ID. Fetched as an external component (see [Installation](#1-installation)). |
+| **`tflite_model_loader`** / **`tflite_model_debug`** | Auto-loaded by `tflite_micro_runtime`. The loader resolves the model source (local, `github://`, `http(s)://`), verifies it (CRC32) and parses `.txt` reports; the debug helper adds the optional model debug sensors/text. |
+| **`tflite_model_source`** / **`tflite_op_processor`** / **`tflite_memory_handler`** / **`tflite_output_processor`** | Auto-loaded building blocks of the runtime (source resolution, operator registration/ESP-NN kernels, arena sizing, output decoding). |
+| **[tflite_micro_helper](./components/tflite_micro_helper)** | Legacy monolithic loader/runtime, still used by `micro_wake_word` (audio). `meter_reader_tflite` no longer depends on it. |
 | **[flash_light_controller](./components/flash_light_controller)** | Manages flash light timing for optimal image capture conditions. |
 | **[data_collector](./components/data_collector)** | **Active Learning** tool. Automatically collects "hard" images (low confidence) and uploads them to a server for training set improvement. |
 
@@ -85,20 +88,37 @@ external_components:
 
       # Supporting components:
       - value_validator       # Validation engine (recommended)
-      - tflite_micro_helper   # Required for meter_reader_tflite
       - esp32_camera_utils    # Image processing utilities
       - flash_light_controller
       - data_collector        # Optional: For collecting training data
+
+  # TFLite stack: the model runtime plus the components it auto-loads.
+  # One `source` carries a single ref, so they are listed one per source.
+  - source: github://pr#21282
+    components: [tflite_model_source]
+  - source: github://pr#21283
+    components: [tflite_op_processor]
+  - source: github://pr#21284
+    components: [tflite_memory_handler]
+  - source: github://pr#21285
+    components: [tflite_output_processor]
+  - source: github://pr#21286
+    components: [tflite_model_loader]
+  - source: github://pr#21287
+    components: [tflite_model_debug]
+  - source: github://pr#21288
+    components: [tflite_micro_runtime]   # Required for meter_reader_tflite
 ```
 
 ### 2. Basic Configuration
 
 #### Option A: AI-Powered Meter Reader (TFLite)
 
-Model configuration is now handled by the dedicated **`tflite_micro_helper`** component — define the model there and reference it by ID:
+Model configuration is handled by the dedicated **`tflite_micro_runtime`** component — declare the model once there and reference it by ID:
 
 ```yaml
 esp32_camera:
+  id: my_camera
   name: "My Camera"
   resolution: 640x480
   pixel_format: JPEG
@@ -108,16 +128,16 @@ value_validator:
   allow_negative_rates: false
   max_absolute_diff: 300
 
-# 1. Define the model (auto-detected from .txt report)
-tflite_micro_helper:
-  - id: my_digit_model
-    model_type: image
-    model: "digit_recognizer.tflite"
+# 1. Declare the model (input shape, arena size, ... auto-detected from .txt report)
+tflite_micro_runtime:
+  id: my_digit_model
+  model_type: image
+  model: "models/digit_recognizer.tflite"   # local path, github://... or http(s)://...
 
-# 2. Reference the model by ID from consumer component
+# 2. Reference the model by ID from the consumer component
 meter_reader_tflite:
   id: my_meter_reader
-  model: my_digit_model          # ← ID reference
+  model: my_digit_model          # ← ID reference to the tflite_micro_runtime entry
   camera_id: my_camera
   validator: my_validator
   update_interval: 60s
@@ -125,12 +145,9 @@ meter_reader_tflite:
   # Optional: Link to other components
   flash_light_controller: my_flash_controller
   crop_zones_global: my_crop_zones
-
-  # Image Rotation (Dev)
-  rotation: "90" # Options: "0", "90", "180", "270"
 ```
 
-> **Note:** The legacy `model: "file.tflite"` syntax inside `meter_reader_tflite` still works for backward compatibility, but prints a deprecation warning. See the [meter_reader_tflite README](./components/meter_reader_tflite) for details.
+> **Note:** `model:` must be an ID reference to a `tflite_micro_runtime` entry; the old `model: "file.tflite"` string syntax inside `meter_reader_tflite` has been removed. Model parameters (input type/shape, `tensor_arena_size`, `output_processing`, ...) live on the runtime entry, and image rotation is configured on `esp32_camera_utils`. See the [meter_reader_tflite README](./components/meter_reader_tflite) for details.
 
 #### Option B: Seven-Segment OCR Reader (No AI)
 
@@ -236,13 +253,13 @@ These entities normally appear under the device in Home Assistant.
 
 **❌ Model loading fails**
 - **Cause**: Tensor arena size is too small.
-- **Solution**: Increase `tensor_arena_size` in the `tflite_micro_helper` config (auto-detected from `.txt` report by default).
+- **Solution**: Increase `tensor_arena_size` on the `tflite_micro_runtime` entry (auto-detected from `.txt` report by default).
 ```yaml
-tflite_micro_helper:
-  - id: my_digit_model
-    model_type: image
-    model: "digit_recognizer.tflite"
-    tensor_arena_size: "768KB"
+tflite_micro_runtime:
+  id: my_digit_model
+  model_type: image
+  model: "models/digit_recognizer.tflite"
+  tensor_arena_size: "768KB"
 ```
 
 **❌ Poor inference results**

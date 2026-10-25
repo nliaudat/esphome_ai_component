@@ -3,10 +3,12 @@
 #ifdef USE_CAMERA_CROPPER
 
 #include <cstring>
-#include "../tflite_micro_helper/debug_utils.h"
+#include "debug_utils.h"
 
 namespace esphome {
 namespace esp32_camera_utils {
+
+static const char *const TAG = "cropper";
 
 ImageView Cropper::get_crop_view(const uint8_t *src, int src_w, int src_h, int channels, const CropZone &zone) {
   ImageView view = {nullptr, 0, 0, 0, 0};
@@ -38,7 +40,7 @@ ImageView Cropper::get_crop_view(const uint8_t *src, int src_w, int src_h, int c
 }
 
 bool Cropper::extract_to_buffer(const ImageView &view, uint8_t *dst) {
-  DURATION_START();
+  ScopedDuration _dur(TAG);
   if (!view.is_valid() || !dst)
     return false;
 
@@ -58,7 +60,7 @@ bool Cropper::extract_to_buffer(const ImageView &view, uint8_t *dst) {
       dst_row += row_size;
     }
   }
-  DURATION_END("extract_to_buffer");
+  _dur.log_duration("extract_to_buffer");
   return true;
 }
 

@@ -82,23 +82,8 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   // Config Setters (Delegated)
   void set_confidence_threshold(float threshold) { this->confidence_threshold_ = threshold; }
 
-  // New mode: set a reference to an externally-managed TFLiteMicroHelper
-  void set_tflite(tflite_micro_helper::TFLiteMicroHelper *tflite) { this->tflite_coord_.set_tflite(tflite); }
-
-  // Legacy mode: set model data directly
-  void set_tensor_arena_size(size_t size_bytes);        // -> TFLite
-  void set_model(const uint8_t *model, size_t length);  // -> TFLite
-
-  // Dynamic model config setters (delegated to TFLiteCoordinator)
-  void set_input_type(const std::string &t) { this->tflite_coord_.set_input_type(t); }
-  void set_input_channels(int c) { this->tflite_coord_.set_input_channels(c); }
-  void set_input_width(int w) { this->tflite_coord_.set_input_width(w); }
-  void set_input_height(int h) { this->tflite_coord_.set_input_height(h); }
-  void set_output_processing(const std::string &p) { this->tflite_coord_.set_output_processing(p); }
-  void set_scale_factor(float f) { this->tflite_coord_.set_scale_factor(f); }
-  void set_input_order(const std::string &o) { this->tflite_coord_.set_input_order(o); }
-  void set_normalize(bool n) { this->tflite_coord_.set_normalize(n); }
-  void set_invert(bool i) { this->tflite_coord_.set_invert(i); }
+  // The model is owned and configured by the tflite_micro_runtime component.
+  void set_tflite(tflite_micro_runtime::TFLiteMicroHelper *tflite) { this->tflite_coord_.set_tflite(tflite); }
 
   void set_value_sensor(sensor::Sensor *sensor) { this->value_sensor_ = sensor; }
   void set_confidence_sensor(sensor::Sensor *sensor) { this->confidence_sensor_ = sensor; }
@@ -119,7 +104,6 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   sensor::Sensor *get_value_sensor() const { return value_sensor_; }
   sensor::Sensor *get_confidence_sensor() const { return confidence_sensor_; }
 
-  void set_model_config(const std::string &model_type);              // -> TFLite
   void set_rotation(float rotation) { this->rotation_ = rotation; }  // Storage, passed to TFLite late
 
   void set_generate_preview(bool generate);

@@ -1,25 +1,61 @@
 # ESPHome build test: meter_reader_tflite (common)
-# Image model via ID reference to tflite_micro_helper entry (new pattern).
-# Model is fetched over HTTP at compile time, matching the D:\esphome
-# tflite_micro_helper test approach (no local model file required).
+# Split-component pattern: the model is declared ONCE in a `tflite_micro_runtime:`
+# entry and referenced by ID from `meter_reader_tflite:`.
+# Model is fetched over HTTP at compile time (no local model file required),
+# matching the previous tflite_micro_helper test approach.
 
 external_components:
+  # Project components, compiled from the repo sources.
   - source:
       type: local
       path: ../../../components
     components:
       - meter_reader_tflite
       - value_validator
-      - tflite_micro_helper
       - esp32_camera_utils
+  # Split TFLite components, fetched from their PR heads (one source = one ref).
+  - source: github://pr#21282
+    components: [tflite_model_source]
+    refresh: always
+  - source: github://pr#21283
+    components: [tflite_op_processor]
+    refresh: always
+  - source: github://pr#21284
+    components: [tflite_memory_handler]
+    refresh: always
+  - source: github://pr#21285
+    components: [tflite_output_processor]
+    refresh: always
+  - source: github://pr#21286
+    components: [tflite_model_loader]
+    refresh: always
+  - source: github://pr#21287
+    components: [tflite_model_debug]
+    refresh: always
+  - source: github://pr#21288
+    components: [tflite_micro_runtime]
+    refresh: always
 
 value_validator:
   id: test_validator
 
-tflite_micro_helper:
-  - id: test_digit_model
-    model_type: image
-    model: "https://raw.githubusercontent.com/nliaudat/esphome_ai_component/refs/heads/main/models/digit_recognizer_v3_quantized_integer_quant_uint8.tflite"
+# `esp32_camera_utils` AUTO_LOADs the core `globals` component (its
+# crop_zone_handler.h includes globals_component.h). On the current dev branch
+# an auto-loaded MULTI_CONF component still has to contain at least one entry,
+# so declare a harmless global here.
+globals:
+  - id: test_crop_zones
+    type: std::string
+    restore_value: false
+    initial_value: '""'
+
+tflite_micro_runtime:
+  id: test_digit_model
+  model_type: image
+  model: "https://raw.githubusercontent.com/nliaudat/esphome_ai_component/refs/heads/main/models/digit_recognizer_v3_quantized_integer_quant_uint8.tflite"
+  # `debug: true` exercises the auto-loaded `tflite_model_debug` component
+  # (runtime-gated, no `USE_TFLITE_MODEL_DEBUG` define involved).
+  debug: true
 
 esp32_camera_utils:
   id: test_camera_utils
@@ -30,3 +66,4 @@ meter_reader_tflite:
   camera_id: test_camera
   validator: test_validator
   update_interval: 60s
+

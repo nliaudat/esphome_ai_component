@@ -28,7 +28,7 @@ components:
     status: active
     version: "2.0+"
     description: "AI PRIMARY --- Digit recognition with TFLite"
-    depends: [tflite_micro_helper, esp32_camera_utils]
+    depends: [tflite_micro_runtime, esp32_camera_utils]
     optional: [value_validator, flash_light_controller, data_collector]
   ssocr_reader:
     status: alpha
@@ -48,10 +48,12 @@ components:
     status: active
     description: "SHARED --- Image processing core"
     used_by: [All reader components]
-  tflite_micro_helper:
+  tflite_micro_runtime:
     status: active
-    description: "SHARED --- TFLite runtime wrapper"
+    description: "SHARED --- TFLite runtime wrapper (split series: runtime + model_loader + model_debug)"
+    source: "external component, esphome PR series #21282-#21288"
     used_by: [meter_reader_tflite]
+    note: "Model declared once in the runtime YAML entry; consumers reference it by ID"
   flash_light_controller:
     status: active
     description: "SHARED --- Illumination timing"
@@ -96,7 +98,8 @@ universal:
 # S3.2 TFLITE CONSUMER RULES
 # =============================================================================
 tflite_consumer:
-  detection: ["includes tensorflow/lite/* headers", "depends on tflite_micro_helper", "uses TfLiteTensor or MicroInterpreter"]
+  detection: ["includes tensorflow/lite/* headers", "depends on tflite_micro_runtime", "uses TfLiteTensor or MicroInterpreter"]
+  model_config: "Declared ONCE in a `tflite_micro_runtime:` entry (model:, tensor_arena_size:, debug:); consumers reference it by ID and MUST NOT emit model codegen (set_model/set_tensor_arena_size/RawExpression model paths)"
   required:
     - "Tensor arena user-configurable: 512KB (ESP32), 768KB (ESP32-S3)"
     - "PSRAM-aware arena via MemoryManager::allocate_tensor_arena() using heap_caps_aligned_alloc()"
@@ -104,12 +107,12 @@ tflite_consumer:
     - "Model CRC32 verification on every model load"
     - "Operator registration via X-Macro pattern in tflm_operators.h"
     - "MAX_OPERATORS configurable (default 30, override -DMAX_OPERATORS=N)"
-    - "ALL TFLite headers guarded by #ifdef USE_TFLITE_MICRO_HELPER"
+    - "ALL TFLite headers guarded by #ifdef USE_TFLITE_MICRO_HELPER (runtime emits it always)"
     - "Model dimensions from TfLiteTensor::dims at runtime --- NEVER hardcode"
     - "process_output() handles BOTH const float* and TfLiteTensor* overloads"
     - "Grayscale optimization only when dims->data[3] == 1"
     - "__init__.py pins esp-tflite-micro + esp-nn versions + build flags"
-    - "Debug logging guarded by #ifdef DEBUG_TFLITE_MICRO_HELPER"
+    - "Debug logging guarded by #ifdef DEBUG_TFLITE_MICRO_HELPER; debug API guarded by #ifdef USE_TFLITE_MODEL_DEBUG (both emitted by the components, NOT by a model's debug: flag)"
     - "Confidence scores exposed to Home Assistant"
   warnings:
     - "PSRAM path does NOT fall back to SRAM"

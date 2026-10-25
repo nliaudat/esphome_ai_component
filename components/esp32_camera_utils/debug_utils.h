@@ -36,6 +36,8 @@ namespace esphome {
 namespace esp32_camera_utils {
 struct ScopedDuration {
   explicit ScopedDuration(const char *) {}
+  // Same call shape as the active variant, so a caller logs unconditionally.
+  void log_duration(const char *) {}
 };
 }  // namespace esp32_camera_utils
 }  // namespace esphome

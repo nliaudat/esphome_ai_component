@@ -4,15 +4,17 @@
 
 #include <cmath>
 #include <algorithm>
-#include "../tflite_micro_helper/debug_utils.h"
+#include "debug_utils.h"
 
 namespace esphome {
 namespace esp32_camera_utils {
 
+static const char *const TAG = "scaler";
+
 // Optimized implementation using fixed-point math (Q16.16)
 bool Scaler::scale_rgb888_to_uint8(const uint8_t *src, int src_w, int src_h, uint8_t *dst, int dst_w, int dst_h,
                                    int channels) {
-  DURATION_START();
+  ScopedDuration _dur(TAG);
   if (!src || !dst)
     return false;
 
@@ -45,13 +47,13 @@ bool Scaler::scale_rgb888_to_uint8(const uint8_t *src, int src_w, int src_h, uin
       }
     }
   }
-  DURATION_END("scale_rgb888_to_uint8");
+  _dur.log_duration("scale_rgb888_to_uint8");
   return true;
 }
 
 bool Scaler::scale_rgb888_to_float32(const uint8_t *src, int src_w, int src_h, uint8_t *dst, int dst_w, int dst_h,
                                      int channels, bool normalize) {
-  DURATION_START();
+  ScopedDuration _dur(TAG);
   if (!src || !dst)
     return false;
 
@@ -88,13 +90,13 @@ bool Scaler::scale_rgb888_to_float32(const uint8_t *src, int src_w, int src_h, u
       }
     }
   }
-  DURATION_END("scale_rgb888_to_float32");
+  _dur.log_duration("scale_rgb888_to_float32");
   return true;
 }
 
 bool Scaler::scale_nearest(const uint8_t *src, int src_w, int src_h, int src_channels, uint8_t *dst, int dst_w,
                            int dst_h) {
-  DURATION_START();
+  ScopedDuration _dur(TAG);
   if (!src || !dst)
     return false;
 
@@ -117,7 +119,7 @@ bool Scaler::scale_nearest(const uint8_t *src, int src_w, int src_h, int src_cha
       dst_row += src_channels;
     }
   }
-  DURATION_END("scale_nearest");
+  _dur.log_duration("scale_nearest");
   return true;
 }
 
@@ -125,9 +127,9 @@ bool Scaler::scale_bilinear(const uint8_t *src, int src_w, int src_h, int src_ch
                             int dst_h) {
   // TODO: Implement Bilinear if higher quality needed.
   // For now, defaulting to nearest as it's much faster on S3 without SIMD.
-  DURATION_START();
+  ScopedDuration _dur(TAG);
   bool res = scale_nearest(src, src_w, src_h, src_channels, dst, dst_w, dst_h);
-  DURATION_END("scale_bilinear");
+  _dur.log_duration("scale_bilinear");
   return res;
 }
 
