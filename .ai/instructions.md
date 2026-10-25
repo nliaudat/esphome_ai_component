@@ -836,6 +836,19 @@ enables the grouped test runner to merge common configs.
 - Test both minimal and full-feature configurations
 - Test with and without optional dependencies
 
+**Split TFLite components in fixtures (as of the split-series migration):**
+- `common.yaml` declares the model ONCE in a `tflite_micro_runtime:` entry and
+  `meter_reader_tflite: model: <runtime_id>` references it by ID.
+- The seven split components are fetched from their PR heads (`github://pr#21282`
+  … `github://pr#21288`, one `source` per ref) and the project components from
+  `../../../components` (`type: local`).
+- A `globals:` entry is required in the fixture: `esp32_camera_utils` AUTO_LOADs
+  the core `globals` component, and an auto-loaded MULTI_CONF component still has
+  to contain at least one entry, otherwise validation fails with
+  `'type' is a required option for [globals]`.
+- `esphome config` on a fixture re-fetches the PR heads and takes ~1 min; run it
+  as a foreground command and poll the redirected log file.
+
 **Run tests:**
 ```bash
 ./script/test_build_components.py -c meter_reader_tflite -t esp32
