@@ -492,9 +492,17 @@ bool ValueValidator::validate_reading(std::span<const float> digits, std::span<c
     this->has_dial_fraction_ = false;
     if (this->config_.enable_dial_correction && !this->first_reading_) {
       if (current_fraction > this->config_.dial_correction_high_threshold) {
-        corrected_val = dial_correct_decrement(filtered_val);
-        ESP_LOGD(TAG, "Dial correction: raw=%d, fraction=%.4f > %.2f -> corrected=%d", filtered_val, current_fraction,
-                 this->config_.dial_correction_high_threshold, corrected_val);
+        // Never decrement past the last accepted value: the dial correction exists to
+        // compensate a roll-over that already happened, not to invent a lower reading.
+        if (filtered_val > this->last_valid_reading_) {
+          corrected_val = dial_correct_decrement(filtered_val);
+          ESP_LOGD(TAG, "Dial correction: raw=%d, fraction=%.4f > %.2f -> corrected=%d", filtered_val, current_fraction,
+                   this->config_.dial_correction_high_threshold, corrected_val);
+        } else {
+          ESP_LOGD(TAG, "Dial correction skipped: raw=%d <= last valid=%d (fraction=%.4f > %.2f), keeping raw",
+                   filtered_val, this->last_valid_reading_, current_fraction,
+                   this->config_.dial_correction_high_threshold);
+        }
       } else if (current_fraction < this->config_.dial_correction_low_threshold) {
         ESP_LOGD(TAG, "Dial correction: fraction=%.4f < %.2f -> keeping raw=%d (solid digit)", current_fraction,
                  this->config_.dial_correction_low_threshold, filtered_val);
