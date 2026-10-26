@@ -135,10 +135,10 @@ esp32:
       CONFIG_FREERTOS_HZ: "1000"
       CONFIG_ESP32S3_SPIRAM_SUPPORT: y
       CONFIG_SPIRAM_SPEED_80M: y
-      # ESP-NN: the S3 optimized kernels return a constant class for some quantized
-      # uint8 digit models (issue #196). ANSI C kernels are slower but correct.
-      CONFIG_NN_ANSI_C: "y"
-      CONFIG_NN_OPTIMIZED: "n"
+      # ESP-NN: the optimized S3 kernels are the IDF default and are correct as of
+      # esp-nn 1.4.1 (issue #196 fixed). For a slow but bit-exact debug build, add:
+      #   CONFIG_NN_ANSI_C: "y"
+      #   CONFIG_NN_OPTIMIZED: "n"
 
 psram:
   mode: octal
