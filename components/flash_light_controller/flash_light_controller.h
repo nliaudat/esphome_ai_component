@@ -18,13 +18,9 @@ class FlashLightController : public Component {
   void set_flash_light(light::LightState *flash_light) { this->flash_light_ = flash_light; }
 
   /// Configure pre-time in ms. Values are clamped to >= 1 so the sequence cannot collapse.
-  void set_flash_pre_time(uint32_t pre_time) {
-    this->flash_pre_time_ = (pre_time == 0) ? 1 : pre_time;
-  }
+  void set_flash_pre_time(uint32_t pre_time) { this->flash_pre_time_ = (pre_time == 0) ? 1 : pre_time; }
   /// Configure post-time in ms. Values are clamped to >= 1 so the sequence cannot collapse.
-  void set_flash_post_time(uint32_t post_time) {
-    this->flash_post_time_ = (post_time == 0) ? 1 : post_time;
-  }
+  void set_flash_post_time(uint32_t post_time) { this->flash_post_time_ = (post_time == 0) ? 1 : post_time; }
   uint32_t get_flash_pre_time() const { return this->flash_pre_time_; }
   uint32_t get_flash_post_time() const { return this->flash_post_time_; }
 

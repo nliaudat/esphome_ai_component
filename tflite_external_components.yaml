@@ -1,0 +1,31 @@
+# Shared `external_components` entries for every config that runs a TFLite model
+# on the current (`dev`) branch.
+#
+# Usage (top of the config):
+#   external_components: !include tflite_external_components.yaml
+#
+# All components are compiled from ./components in this repo:
+#   - meter_reader_tflite   : camera -> crop -> inference -> reading pipeline
+#   - tflite_micro_helper   : model + runtime holder (declared as a LIST because
+#                             it sets MULTI_CONF = True)
+#   - esp32_camera_utils, flash_light_controller, value_validator,
+#     data_collector, analog_reader, ssocr_reader
+#
+# NOTE: the `esphome-components` branch uses a different, split layout
+# (tflite_micro_runtime + tflite_model_source + ... fetched from the upstream
+# PR heads #21282-#21288) and needs its own include file. Configs written for
+# that layout declare `tflite_micro_runtime:` and must be migrated to
+# `tflite_micro_helper:` before they can build here.
+
+- source:
+    type: local
+    path: components
+  components:
+    - meter_reader_tflite
+    - tflite_micro_helper
+    - esp32_camera_utils
+    - flash_light_controller
+    - value_validator
+    - data_collector
+    - analog_reader
+    - ssocr_reader
