@@ -1,0 +1,52 @@
+# REAL `external_components` entries: ESPHome fetches the components from GitHub
+# into .esphome/external_components/ instead of compiling a local ./components
+# directory. The local (internal) layout of the same components lives in
+# tflite_internal_components.yaml.
+#
+# Usage (top of the config):
+#   external_components: !include tflite_external_components.yaml
+#
+# Use this include when the sources must come from the remote repository:
+#   - a config that lives outside this repo (copy the block below verbatim,
+#     because `!include` only resolves next to the referring config file),
+#   - a build that validates the published `dev`/`main` branch instead of the
+#     working tree.
+# A checkout that already has ./components should use
+# tflite_internal_components.yaml instead, to avoid a redundant clone.
+#
+# Components fetched (all shipped in ./components of the referenced branch):
+#   - meter_reader_tflite   : camera -> crop -> inference -> reading pipeline
+#   - tflite_micro_helper   : model + runtime holder (declared as a LIST because
+#                             it sets MULTI_CONF = True)
+#   - esp32_camera_utils, flash_light_controller, value_validator,
+#     data_collector, analog_reader, ssocr_reader
+#
+# `ref` selects the branch/tag: `dev` tracks this development branch (where the
+# esp-tflite-micro 1.4.1 / esp-nn 1.4.1 bump ships), `main` is the released
+# code. The clone is cached in .esphome/external_components and re-fetched once
+# `refresh` expires (ESPHome default: 24h); use `refresh: always` to follow
+# every new `dev` commit, or `refresh: 0s` to build offline from the cache.
+#
+# NOTE: the `esphome-components` branch uses a different, split layout
+# (tflite_micro_runtime + tflite_model_source + ... fetched from the upstream
+# PR heads #21282-#21288) and needs its own include file. Configs written for
+# that layout declare `tflite_micro_runtime:` and must be migrated to
+# `tflite_micro_helper:` before they can build here.
+
+- source:
+    type: git
+    url: https://github.com/nliaudat/esphome_ai_component
+    ref: dev
+  components:
+    - meter_reader_tflite
+    - tflite_micro_helper
+    - esp32_camera_utils
+    - flash_light_controller
+    - value_validator
+    - data_collector
+    - analog_reader
+    - ssocr_reader
+
+# Equivalent source using the `github://` shorthand, kept for reference:
+#   - source: github://nliaudat/esphome_ai_component@dev
+#     components: [meter_reader_tflite, tflite_micro_helper]
