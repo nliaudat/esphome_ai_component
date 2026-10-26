@@ -25,6 +25,11 @@ class CameraCoordinator {
 
   void unload();
 
+  // Ask the camera to capture a frame now. Without a request the camera component
+  // only publishes frames when it is polled, so a flash-triggered capture could be
+  // served by a frame taken before the flash was on.
+  void request_image();
+
   // Image Processor
   void update_image_processor_config(int model_width, int model_height, int model_channels, int input_type,
                                      bool normalize, const std::string &input_order);

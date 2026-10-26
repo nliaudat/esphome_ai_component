@@ -257,6 +257,14 @@ meter_reader_tflite:
 - **Cause**: Low memory or bandwidth issues.
 - **Solution**: Lower resolution or framerate in `esp32_camera`.
 
+**❌ `invalid frame` errors, or black / truncated images with `camera_window`**
+- **Cause**: The JPEG frame buffer is sized from `esp32_camera.resolution`, so a `camera_window` larger than the configured resolution cannot fit in a single frame.
+- **Solution**: Set `resolution` at least as large as the window (e.g. for a `832x624` window):
+```yaml
+esp32_camera:
+  resolution: 1024x768
+```
+
 ### Performance Tips
 1. **Use quantized models** (int8) for better performance
 2. **Enable ESP-NN optimizations** (enabled by default)
