@@ -1,10 +1,19 @@
-# Shared `external_components` entries for every config that runs a TFLite model
-# on the current (`dev`) branch.
+# INTERNAL `external_components` entries for every config that runs a TFLite
+# model on the current (`dev`) branch: the components are INTERNAL to this repo
+# and compiled straight from ./components (no network, no clone, edits in the
+# working tree apply on the next `esphome compile`).
 #
-# Usage (top of the config):
-#   external_components: !include tflite_external_components.yaml
+# Usage (top of the config, e.g. config_prokyber_s3.yaml):
+#   external_components: !include tflite_internal_components.yaml
 #
-# All components are compiled from ./components in this repo:
+# The `external_components:` key is just ESPHome's name for the mechanism, which
+# is why this pair of files exists:
+#   - tflite_internal_components.yaml : type: local  -> ./components (this file)
+#   - tflite_external_components.yaml : type: git    -> GitHub checkout
+# Use the external file for configs built outside this clone, or to exercise the
+# published `dev`/`main` sources.
+#
+# All components below are compiled from ./components in this repo:
 #   - meter_reader_tflite   : camera -> crop -> inference -> reading pipeline
 #   - tflite_micro_helper   : model + runtime holder (declared as a LIST because
 #                             it sets MULTI_CONF = True)
