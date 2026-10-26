@@ -217,7 +217,9 @@ expected CRC, image config, and audio config.
 The component automatically enables hardware acceleration:
 
 - **Build flags**: `TF_LITE_STATIC_MEMORY`, `ESP_NN`, `OPTIMIZED_KERNEL=esp_nn`
-- **IDF components**: `espressif/esp-tflite-micro` v1.3.7, `espressif/esp-nn` v1.2.3
+- **IDF components**: `espressif/esp-tflite-micro` v1.4.1, `espressif/esp-nn` v1.4.1
+  (pinned as a pair: 1.4.x TFLM requires esp-nn >= 1.3.0, and the esp-nn 1.4.x
+  kernels fix the ESP32-S3 wrong-inference bug, [issue #196](https://github.com/nliaudat/esphome_ai_component/issues/196))
 - **Audio only**: `esphome/esp-micro-speech-features` v1.2.3
 - **ESP32-S3**: Automatic 1.5x tensor arena bump for cache alignment
 
