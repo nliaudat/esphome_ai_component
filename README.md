@@ -253,13 +253,24 @@ meter_reader_tflite:
   debug: true
 ```
 
+**❌ Every image produces the same reading (e.g. `88888` or `00000`)**
+- **Cause**: The ESP-NN optimized kernels on ESP32-S3 can return a constant class for some quantized uint8 digit models ([issue #196](https://github.com/nliaudat/esphome_ai_component/issues/196)).
+- **Solution**: All S3 board files in `boards/` already force the ANSI C kernels. If you use your own board definition, add these options:
+```yaml
+esp32:
+  framework:
+    sdkconfig_options:
+      CONFIG_NN_ANSI_C: "y"
+      CONFIG_NN_OPTIMIZED: "n"
+```
+
 **❌ Camera frame issues**
 - **Cause**: Low memory or bandwidth issues.
 - **Solution**: Lower resolution or framerate in `esp32_camera`.
 
 ### Performance Tips
 1. **Use quantized models** (int8) for better performance
-2. **Enable ESP-NN optimizations** (enabled by default)
+2. **ESP-NN kernels**: the S3 board files select the ANSI C kernels for correct uint8 results (see Troubleshooting) — only re-enable the optimized kernels if your model works with them
 3. **Use appropriate tensor_arena_size** (already calculated per model)
 
 ## 🔄 Backward Compatibility
