@@ -114,8 +114,12 @@ void FlashlightCoordinator::force_inference(std::function<void()> frame_request_
     App.scheduler.set_timeout(this->parent_, "force_flash_warmup", 3000, [this, frame_request_callback]() {
       frame_request_callback();
 
-      // Off after 500ms safety
-      App.scheduler.set_timeout(this->parent_, "force_flash_off", 500, [this]() { this->disable_flash(); });
+      // Keep the flash on long enough for the requested frame to be exposed,
+      // honouring the configured post time (min 500ms safety).
+      uint32_t post = this->controller_ ? this->controller_->get_flash_post_time() : this->post_time_;
+      if (post < 500)
+        post = 500;
+      App.scheduler.set_timeout(this->parent_, "force_flash_off", post, [this]() { this->disable_flash(); });
     });
   }
 }
