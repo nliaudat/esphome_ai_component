@@ -5,6 +5,7 @@
 #include <esp_cache.h>
 
 #include <numeric>
+#include <cmath>
 
 #ifdef USE_WEB_SERVER
 #include "esphome/components/esp32_camera_utils/preview_web_handler.h"
@@ -890,12 +891,11 @@ void MeterReaderTFLite::publish_inference_result(const std::string &digit_str, f
 
 #ifdef USE_VALUE_VALIDATOR
   if (this->validation_coord_.has_validator()) {
-    if (this->value_sensor_ && !digit_str.empty()) {
-      char *end;
-      float raw_val = strtof(digit_str.c_str(), &end);
-      if (end == digit_str.c_str() + digit_str.size()) {
-        this->value_sensor_->publish_state(raw_val);
-      }
+    if (this->value_sensor_ && valid && std::isfinite(validated_val)) {
+      // Publish only readings the validator accepted, and the value it validated.
+      // The raw digit string stays visible in the inference log (see above) and in
+      // the validator's own raw reading sensor.
+      this->value_sensor_->publish_state(validated_val);
     }
     if (this->confidence_sensor_)
       this->confidence_sensor_->publish_state(avg_conf * 100.0f);
