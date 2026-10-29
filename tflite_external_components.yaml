@@ -22,7 +22,7 @@
 #     data_collector, analog_reader, ssocr_reader
 #
 # `ref` selects the branch/tag: `dev` tracks this development branch (where the
-# esp-tflite-micro 1.4.1 / esp-nn 1.4.1 bump ships), `main` is the released
+# esp-tflite-micro 1.4.1 / esp-nn 1.4.2 bump ships), `main` is the released
 # code. The clone is cached in .esphome/external_components and re-fetched once
 # `refresh` expires (ESPHome default: 24h); use `refresh: always` to follow
 # every new `dev` commit, or `refresh: 0s` to build offline from the cache.

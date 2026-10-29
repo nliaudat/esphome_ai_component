@@ -591,9 +591,10 @@ async def to_code(config):
         psram.request_external_task_stack()
 
     # Keep this pair in lockstep with tflite_micro_helper: esp-tflite-micro 1.4.x
-    # requires esp-nn >= 1.3.0 and esp-nn 1.4.x fixes the S3 kernels (issue #196).
+    # requires esp-nn >= 1.3.0 and esp-nn 1.4.x fixes the S3 kernels (issue #196);
+    # 1.4.2 adds further S3/P4 kernel correctness fixes (drop-in patch).
     esp32.add_idf_component(name="espressif/esp-tflite-micro", ref="1.4.1")
-    esp32.add_idf_component(name="espressif/esp-nn", ref="1.4.1")
+    esp32.add_idf_component(name="espressif/esp-nn", ref="1.4.2")
 
     esp32.add_idf_component(name="esphome/esp-micro-speech-features", ref="1.2.3")
 

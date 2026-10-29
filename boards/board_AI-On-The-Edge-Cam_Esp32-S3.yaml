@@ -136,7 +136,7 @@ esp32:
       CONFIG_ESP32S3_SPIRAM_SUPPORT: y
       CONFIG_SPIRAM_SPEED_80M: y
       # ESP-NN: the optimized S3 kernels are the IDF default and are correct as of
-      # esp-nn 1.4.1 (issue #196 fixed). For a slow but bit-exact debug build, add:
+      # esp-nn 1.4.2 (issue #196 fixed). For a slow but bit-exact debug build, add:
       #   CONFIG_NN_ANSI_C: "y"
       #   CONFIG_NN_OPTIMIZED: "n"
 
