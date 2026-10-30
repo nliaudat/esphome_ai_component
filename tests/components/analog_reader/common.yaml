@@ -1,4 +1,6 @@
 # ESPHome build test: analog_reader common config (Alpha)
+# Baseline build without optional dependencies (no flash_light_controller).
+# See common_flash.yaml for the flash-enabled variant.
 logger:
   level: DEBUG
 
@@ -6,7 +8,7 @@ external_components:
   - source:
       type: local
       path: ../../../components
-    components: [analog_reader, esp32_camera_utils, flash_light_controller]
+    components: [analog_reader, esp32_camera_utils]
 
 esp32_camera:
   id: test_camera
@@ -28,24 +30,9 @@ esp32_camera:
 esp32_camera_utils:
   id: test_camera_utils
 
-output:
-  - platform: gpio
-    id: test_light_output
-    pin: GPIO2
-
-light:
-  - platform: binary
-    id: test_light
-    output: test_light_output
-
-flash_light_controller:
-  id: test_flash
-  flash_light: test_light
-
 analog_reader:
   id: test_analog
   camera_id: test_camera
-  flash_light_controller: test_flash
   update_interval: 60s
   dials:
     - id: dial1
