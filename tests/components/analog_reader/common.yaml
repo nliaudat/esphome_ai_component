@@ -6,9 +6,10 @@ external_components:
   - source:
       type: local
       path: ../../../components
-    components: [analog_reader, esp32_camera_utils]
+    components: [analog_reader, esp32_camera_utils, flash_light_controller]
 
 esp32_camera:
+  id: test_camera
   name: Test Camera
   external_clock:
     pin: GPIO0
@@ -27,9 +28,24 @@ esp32_camera:
 esp32_camera_utils:
   id: test_camera_utils
 
+output:
+  - platform: gpio
+    id: test_light_output
+    pin: GPIO2
+
+light:
+  - platform: binary
+    id: test_light
+    output: test_light_output
+
+flash_light_controller:
+  id: test_flash
+  flash_light: test_light
+
 analog_reader:
   id: test_analog
   camera_id: test_camera
+  flash_light_controller: test_flash
   update_interval: 60s
   dials:
     - id: dial1

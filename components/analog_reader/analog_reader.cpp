@@ -438,14 +438,6 @@ void AnalogReader::process_image_from_buffer(const uint8_t *data, size_t len) {
       }
 
       if (ok) {
-        // A camera_window makes frames smaller than the configured resolution. That is fine: the buffer is sized
-        // for the configured resolution and decode_jpeg_to_buffer() already rejects frames that do not fit.
-        if (out_w > this->img_width_ || out_h > this->img_height_) {
-          ESP_LOGW(TAG,
-                   "Decoded dimensions larger than config: %dx%d vs %dx%d. Skipping analog processing to avoid conflict.",
-                   out_w, out_h, this->img_width_, this->img_height_);
-          return;
-        }
         processing_image = std::make_shared<PersistentDecodedImage>(this->persistent_buffer_.get(), out_w, out_h,
                                                                     this->buffer_format_);
         is_decoded = true;
@@ -478,6 +470,16 @@ void AnalogReader::process_image_from_buffer(const uint8_t *data, size_t len) {
 
   if (!processing_image) {
     ESP_LOGE(TAG, "No valid image available for processing.");
+    return;
+  }
+
+  // A camera_window makes frames smaller than the configured resolution, which is fine: crop
+  // coordinates are interpreted against the decoded frame. Larger frames are still rejected so
+  // the buffer and image processor stay consistent with the configured dimensions.
+  if (processing_w > this->img_width_ || processing_h > this->img_height_) {
+    ESP_LOGW(TAG,
+             "Decoded dimensions larger than config: %dx%d vs %dx%d. Skipping analog processing to avoid conflict.",
+             processing_w, processing_h, this->img_width_, this->img_height_);
     return;
   }
 
