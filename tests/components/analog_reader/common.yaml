@@ -1,4 +1,6 @@
 # ESPHome build test: analog_reader common config (Alpha)
+# Baseline build without optional dependencies (no flash_light_controller).
+# See common_flash.yaml for the flash-enabled variant.
 logger:
   level: DEBUG
 
@@ -9,6 +11,7 @@ external_components:
     components: [analog_reader, esp32_camera_utils]
 
 esp32_camera:
+  id: test_camera
   name: Test Camera
   external_clock:
     pin: GPIO0

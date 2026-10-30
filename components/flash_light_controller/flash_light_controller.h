@@ -4,6 +4,8 @@
 #include "esphome/components/light/light_state.h"
 #include <functional>
 #include <atomic>
+#include <utility>
+#include <vector>
 
 #include "esphome/core/defines.h"
 
@@ -18,14 +20,14 @@ class FlashLightController : public Component {
   void set_flash_light(light::LightState *flash_light) { this->flash_light_ = flash_light; }
 
   /// Configure pre-time in ms. Values are clamped to >= 1 so the sequence cannot collapse.
+  /// Pre-time changes apply to the next sequence.
   void set_flash_pre_time(uint32_t pre_time) { this->flash_pre_time_ = (pre_time == 0) ? 1 : pre_time; }
   /// Configure post-time in ms. Values are clamped to >= 1 so the sequence cannot collapse.
+  /// Post-time changes take effect when the capture point or a late join (re)starts the window.
   void set_flash_post_time(uint32_t post_time) { this->flash_post_time_ = (post_time == 0) ? 1 : post_time; }
   uint32_t get_flash_pre_time() const { return this->flash_pre_time_; }
   uint32_t get_flash_post_time() const { return this->flash_post_time_; }
 
-  /// Pre-time changes apply to the next sequence; post-time changes made before capture affect
-  /// the active sequence (post_time_ is read when the capture callback returns).
   void set_debug(bool debug) { this->debug_ = debug; }
 
   using CaptureCallback = std::function<void()>;
@@ -43,6 +45,11 @@ class FlashLightController : public Component {
    * The callback is expected to block until capture completes. If the capture is
    * asynchronous, the consumer must hold the flash active itself for the duration
    * of the capture (see capture_preview_sequence for an example).
+   *
+   * If a sequence is already running, the callback joins it instead of being
+   * dropped: callbacks registered during warmup run together at the capture point,
+   * and a callback registered during post-time runs immediately (the post-time
+   * window is restarted so it still gets a lit capture window).
    *
    * @param callback Function to execute when flash is ready (usually image capture)
    */
@@ -62,10 +69,18 @@ class FlashLightController : public Component {
   void disable_flash();
 
  protected:
+  /// (Re)start the post-time window. Uses the same timeout name so a late join can extend it.
+  void schedule_flash_off_();
+
   light::LightState *flash_light_{nullptr};
   uint32_t flash_pre_time_{5000};
   uint32_t flash_post_time_{2000};
   std::atomic<bool> is_active_{false};
+  // Readers that joined the running sequence (e.g. meter_reader_tflite and analog_reader share one flash cycle).
+  // Both vectors keep their capacity between cycles: this runs on memory-constrained ESP32 targets.
+  std::vector<CaptureCallback> pending_callbacks_;
+  std::vector<CaptureCallback> executing_callbacks_;
+  bool captured_{false};
   bool debug_{false};
 };
 
