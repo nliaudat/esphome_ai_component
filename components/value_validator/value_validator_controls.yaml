@@ -67,7 +67,8 @@ number:
     icon: "mdi:delta"
     min_value: 0
     max_value: 2000
-    step: 10
+    step: 1
+    mode: box
     initial_value: 300
     entity_category: config
     optimistic: true
@@ -144,7 +145,7 @@ number:
     min_value: 50
     max_value: 100
     step: 1
-    initial_value: 90
+    initial_value: 85  # same as the component default for per_digit_confidence_threshold
     entity_category: config
     optimistic: true
     restore_value: true
