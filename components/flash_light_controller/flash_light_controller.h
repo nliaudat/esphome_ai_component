@@ -4,6 +4,7 @@
 #include "esphome/components/light/light_state.h"
 #include <functional>
 #include <atomic>
+#include <vector>
 
 #include "esphome/core/defines.h"
 
@@ -66,6 +67,9 @@ class FlashLightController : public Component {
   uint32_t flash_pre_time_{5000};
   uint32_t flash_post_time_{2000};
   std::atomic<bool> is_active_{false};
+  // Readers that joined the running sequence (e.g. meter_reader_tflite and analog_reader share one flash cycle)
+  std::vector<CaptureCallback> pending_callbacks_;
+  bool captured_{false};
   bool debug_{false};
 };
 

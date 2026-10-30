@@ -35,11 +35,26 @@ void FlashLightController::initiate_capture_sequence(CaptureCallback callback) {
   }
 
   if (this->is_active_) {
-    ESP_LOGW(TAG, "Flash sequence already active, ignoring request");
+    if (this->captured_) {
+      // Capture point already passed, the flash stays on for the post time: capture right away
+      if (this->debug_) {
+        ESP_LOGD(TAG, "Flash sequence active (post time), executing joined capture callback now");
+      }
+      if (callback)
+        callback();
+    } else {
+      if (this->debug_) {
+        ESP_LOGD(TAG, "Flash sequence already active, joining it");
+      }
+      this->pending_callbacks_.push_back(callback);
+    }
     return;
   }
 
   this->is_active_ = true;
+  this->captured_ = false;
+  this->pending_callbacks_.clear();
+  this->pending_callbacks_.push_back(callback);
   if (this->debug_) {
     ESP_LOGD(TAG, "Starting flash sequence (Pre: %u ms, Post: %u ms)", this->flash_pre_time_, this->flash_post_time_);
   }
@@ -47,12 +62,19 @@ void FlashLightController::initiate_capture_sequence(CaptureCallback callback) {
   this->enable_flash();
 
   // Schedule callback after pre-time (named so the sequence can be cancelled)
-  this->set_timeout(TIMEOUT_CAPTURE, this->flash_pre_time_, [this, callback]() {
+  this->set_timeout(TIMEOUT_CAPTURE, this->flash_pre_time_, [this]() {
     if (this->debug_) {
-      ESP_LOGD(TAG, "Flash warmup complete (%u ms elapsed), executing capture callback", this->flash_pre_time_);
+      ESP_LOGD(TAG, "Flash warmup complete (%u ms elapsed), executing %u capture callback(s)", this->flash_pre_time_,
+               static_cast<unsigned>(this->pending_callbacks_.size()));
     }
-    if (callback)
-      callback();
+    this->captured_ = true;
+    // Moved out first: a callback may start or join a sequence and change the list
+    auto callbacks = std::move(this->pending_callbacks_);
+    this->pending_callbacks_.clear();
+    for (auto &cb : callbacks) {
+      if (cb)
+        cb();
+    }
 
     // Schedule flash off after post-time (relative to now)
     this->set_timeout(TIMEOUT_OFF, this->flash_post_time_, [this]() {
@@ -77,6 +99,8 @@ void FlashLightController::cancel_active_sequence() {
   }
   this->cancel_timeout(TIMEOUT_CAPTURE);
   this->cancel_timeout(TIMEOUT_OFF);
+  this->pending_callbacks_.clear();
+  this->captured_ = false;
   this->disable_flash();
   this->is_active_ = false;
 }

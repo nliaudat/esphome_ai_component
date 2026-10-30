@@ -204,7 +204,23 @@ void AnalogReader::setup() {
     ESP_LOGD(TAG, "Trigonometric LUTs initialized");
   }
 
+#ifdef USE_FLASH_LIGHT_CONTROLLER
+  this->flashlight_coord_.setup(this, nullptr, this->flash_controller_);
+#else
   this->flashlight_coord_.setup(this, nullptr, nullptr);
+#endif
+  // Called by the flash controller once the light has warmed up: request the lit frame right away
+  this->flashlight_coord_.set_request_frame_callback([this]() {
+    if (this->paused_)
+      return;
+    FrameState expected = FrameState::IDLE;
+    if (this->frame_state_.compare_exchange_strong(expected, FrameState::REQUESTED)) {
+      this->last_request_time_ = millis();
+      if (this->camera_)
+        this->camera_->request_image(esphome::camera::IDLE);
+      ESP_LOGD(TAG, "Requesting frame (flash on)");
+    }
+  });
 
   size_t max_crop_area = 0;
   for (const auto &dial : this->dials_) {
@@ -422,9 +438,11 @@ void AnalogReader::process_image_from_buffer(const uint8_t *data, size_t len) {
       }
 
       if (ok) {
-        if (out_w != this->img_width_ || out_h != this->img_height_) {
+        // A camera_window makes frames smaller than the configured resolution. That is fine: the buffer is sized
+        // for the configured resolution and decode_jpeg_to_buffer() already rejects frames that do not fit.
+        if (out_w > this->img_width_ || out_h > this->img_height_) {
           ESP_LOGW(TAG,
-                   "Decoded dimensions mismatch config: %dx%d vs %dx%d. Skipping analog processing to avoid conflict.",
+                   "Decoded dimensions larger than config: %dx%d vs %dx%d. Skipping analog processing to avoid conflict.",
                    out_w, out_h, this->img_width_, this->img_height_);
           return;
         }
