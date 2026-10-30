@@ -204,7 +204,8 @@ void ValueValidator::setup() {
       uint32_t legacy_key = fnv1_hash("value_validator");
       auto legacy_pref = global_preferences->make_preference<int>(legacy_key);
       int legacy_val = 0;
-      if (legacy_pref.load(&legacy_val) && legacy_val > 0) {
+      // 0 is a valid reading here too: an upgraded device that saved 0 must keep it as its baseline.
+      if (legacy_pref.load(&legacy_val) && legacy_val >= 0) {
         restored = legacy_val;
         loaded = true;
         // Persist to the new salted key (do NOT erase the legacy shared slot).
@@ -1116,13 +1117,18 @@ void ValueValidator::publish_diagnostics_(const char *state) {
 }
 
 void ValueValidator::save_state_() {
-  if (this->config_.persist_state && this->last_valid_reading_ >= 0 &&
-      this->last_valid_reading_ != this->last_saved_reading_) {
-    this->pref_.save(&this->last_valid_reading_);
+  if (!this->config_.persist_state || this->last_valid_reading_ < 0 ||
+      this->last_valid_reading_ == this->last_saved_reading_) {
+    return;
+  }
+  // Only remember the value once it is actually accepted, so a failed write is retried next time.
+  if (this->pref_.save(&this->last_valid_reading_)) {
     // Do not wait for flash_write_interval: a reboot inside it would restore an older value.
     // The value only changes about once per meter unit, so the extra flash writes are negligible.
     global_preferences->sync();
     this->last_saved_reading_ = this->last_valid_reading_;
+  } else {
+    ESP_LOGW(TAG, "Failed to save persistent state (last_valid_reading = %d)", this->last_valid_reading_);
   }
 }
 
