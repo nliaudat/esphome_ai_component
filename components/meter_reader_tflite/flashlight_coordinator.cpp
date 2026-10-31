@@ -57,8 +57,12 @@ bool FlashlightCoordinator::update_scheduling() {
       });
       return true;
     } else {
-      // Already running
-      ESP_LOGD(TAG, "Controller already active, skipping trigger");
+      // Already running (e.g. started by another reader): join it so this reader also gets the lit frame
+      ESP_LOGD(TAG, "Controller already active, joining running sequence");
+      this->controller_->initiate_capture_sequence([this]() {
+        if (this->request_frame_callback_)
+          this->request_frame_callback_();
+      });
       return true;
     }
   }

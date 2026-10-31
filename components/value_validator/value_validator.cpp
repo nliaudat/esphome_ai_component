@@ -6,6 +6,7 @@
 #include "value_validator.h"
 #include "esphome/core/log.h"
 #include "esphome/core/application.h"
+#include "esphome/core/preferences.h"
 #include <esp_heap_caps.h>
 #include <algorithm>
 #include <cerrno>
@@ -189,7 +190,8 @@ void ValueValidator::setup() {
     uint32_t key = fnv1_hash("value_validator") ^ this->pref_key_salt_;
     this->pref_ = global_preferences->make_preference<int>(key);
     int restored = 0;
-    bool loaded = this->pref_.load(&restored) && restored > 0;
+    // 0 is a valid reading (new meter): without restoring it, 00000 would be rejected as a hallucination
+    bool loaded = this->pref_.load(&restored) && restored >= 0;
 
     // P1-1: migrate from the old (pre-E1) unsalted key on first boot after upgrade.
     // An existing device saved its baseline under fnv1_hash("value_validator"); without
@@ -202,7 +204,8 @@ void ValueValidator::setup() {
       uint32_t legacy_key = fnv1_hash("value_validator");
       auto legacy_pref = global_preferences->make_preference<int>(legacy_key);
       int legacy_val = 0;
-      if (legacy_pref.load(&legacy_val) && legacy_val > 0) {
+      // 0 is a valid reading here too: an upgraded device that saved 0 must keep it as its baseline.
+      if (legacy_pref.load(&legacy_val) && legacy_val >= 0) {
         restored = legacy_val;
         loaded = true;
         // Persist to the new salted key (do NOT erase the legacy shared slot).
@@ -213,6 +216,7 @@ void ValueValidator::setup() {
 
     if (loaded) {
       this->last_valid_reading_ = restored;
+      this->last_saved_reading_ = restored;
       this->first_reading_ = false;
       // Seed good values with restored reading
       for (int i = 0; i < this->config_.smart_validation_window; i++) {
@@ -873,6 +877,7 @@ void ValueValidator::set_last_valid_reading(int value, size_t num_digits) {
     ESP_LOGW(TAG, "Manually set last valid reading to: %d (Digits: %d, Str: %s)", value, static_cast<int>(len),
              val_str.c_str());
   }
+  this->save_state_();
 }
 
 void ValueValidator::set_last_valid_reading(const std::string &value) {
@@ -924,6 +929,7 @@ void ValueValidator::set_last_valid_reading(const std::string &value) {
   this->rejection_confidence_sum_ = 0.0f;
   ESP_LOGW(TAG, "Manually set last valid reading to: %d (Digits: %d, Str: %s)", int_val,
            static_cast<int>(value.length()), value.c_str());
+  this->save_state_();
 }
 
 void ValueValidator::set_smart_validation_window(int v) {
@@ -1111,8 +1117,18 @@ void ValueValidator::publish_diagnostics_(const char *state) {
 }
 
 void ValueValidator::save_state_() {
-  if (this->config_.persist_state && this->last_valid_reading_ >= 0) {
-    this->pref_.save(&this->last_valid_reading_);
+  if (!this->config_.persist_state || this->last_valid_reading_ < 0 ||
+      this->last_valid_reading_ == this->last_saved_reading_) {
+    return;
+  }
+  // Only remember the value once it is actually accepted, so a failed write is retried next time.
+  if (this->pref_.save(&this->last_valid_reading_)) {
+    // Do not wait for flash_write_interval: a reboot inside it would restore an older value.
+    // The value only changes about once per meter unit, so the extra flash writes are negligible.
+    global_preferences->sync();
+    this->last_saved_reading_ = this->last_valid_reading_;
+  } else {
+    ESP_LOGW(TAG, "Failed to save persistent state (last_valid_reading = %d)", this->last_valid_reading_);
   }
 }
 

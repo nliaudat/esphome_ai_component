@@ -20,3 +20,4 @@ value_validator:
   id: test_validator
   allow_negative_rates: false
   max_absolute_diff: 100
+  persist_state: true
