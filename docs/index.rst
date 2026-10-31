@@ -17,6 +17,7 @@ This project provides a modular framework for running TensorFlow Lite Micro mode
     data_collector
     ssocr_reader
     analog_reader
+    esp_nn_s3_kernels
 
 Installation
 ------------
