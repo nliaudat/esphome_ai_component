@@ -393,7 +393,7 @@ async def to_code(config):
             if unsupported_ops:
                 raise cv.Invalid(
                     f"Model '{Path(model_path).name}' requires operator(s) "
-                    f"{', '.join(unsupported_ops)} which esp-tflite-micro 1.3.7 "
+                    f"{', '.join(unsupported_ops)} which esp-tflite-micro 1.4.1 "
                     f"does not support.\n"
                     f"  Available operators: {', '.join(sorted(available_ops))}\n"
                     f"  Re-export the model without the unsupported operator(s) "
@@ -423,8 +423,13 @@ async def to_code(config):
             await _configure_image_model(config, var, model_path, model_data)
         elif model_type == "audio":
             await _configure_audio_model(config, var, model_path, model_data)
-        esp32.add_idf_component(name="espressif/esp-tflite-micro", ref="1.3.7")
-        esp32.add_idf_component(name="espressif/esp-nn", ref="1.2.3")
+        # Pinned pair: esp-tflite-micro 1.4.x requires esp-nn >= 1.3.0, and the
+        # esp-nn 1.4.x kernels fix the ESP32-S3 wrong-inference bug (issue #196).
+        # 1.4.2 is a drop-in patch with more S3/P4 kernel correctness fixes
+        # (pooling row stride, conv im2col padding, depthwise conv scratch).
+        # Both must be bumped together - 1.4.x changed the conv/mean scratch APIs.
+        esp32.add_idf_component(name="espressif/esp-tflite-micro", ref="1.4.1")
+        esp32.add_idf_component(name="espressif/esp-nn", ref="1.4.2")
         if model_type == "audio":
             esp32.add_idf_component(
                 name="esphome/esp-micro-speech-features", ref="1.2.3"

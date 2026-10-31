@@ -253,13 +253,33 @@ meter_reader_tflite:
   debug: true
 ```
 
+**❌ Every image produces the same reading (e.g. `88888` or `00000`)**
+- **Cause**: The ESP-NN optimized kernels shipped with `esp-nn` < 1.4.0 had correctness bugs on ESP32-S3 (3x3 conv im2col, depthwise conv, fully-connected, MEAN, softmax), which made some quantized uint8 digit models return a constant class ([issue #196](https://github.com/nliaudat/esphome_ai_component/issues/196)).
+- **Fixed**: the component now pins `espressif/esp-tflite-micro` v1.4.1 + `espressif/esp-nn` v1.4.2, and the S3 board files no longer force the ANSI C kernels. Update the component and rebuild (the sdkconfig is regenerated automatically).
+- **Fallback**: if you pin an older esp-nn yourself (or want a bit-exact reference run), force the ANSI C kernels — slower, but unaffected by the S3 asm bugs:
+```yaml
+esp32:
+  framework:
+    sdkconfig_options:
+      CONFIG_NN_ANSI_C: "y"
+      CONFIG_NN_OPTIMIZED: "n"
+```
+
 **❌ Camera frame issues**
 - **Cause**: Low memory or bandwidth issues.
 - **Solution**: Lower resolution or framerate in `esp32_camera`.
 
+**❌ `invalid frame` errors, or black / truncated images with `camera_window`**
+- **Cause**: The JPEG frame buffer is sized from `esp32_camera.resolution`, so a `camera_window` larger than the configured resolution cannot fit in a single frame.
+- **Solution**: Set `resolution` at least as large as the window (e.g. for a `832x624` window):
+```yaml
+esp32_camera:
+  resolution: 1024x768
+```
+
 ### Performance Tips
 1. **Use quantized models** (int8) for better performance
-2. **Enable ESP-NN optimizations** (enabled by default)
+2. **ESP-NN kernels**: the optimized kernels are enabled by default and are correct with the pinned `esp-nn` v1.4.2; the ANSI C kernels are only a debugging fallback (see Troubleshooting)
 3. **Use appropriate tensor_arena_size** (already calculated per model)
 
 ## 🔄 Backward Compatibility

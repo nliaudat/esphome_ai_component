@@ -104,6 +104,9 @@ number:
       - lambda: |-
           if (id(${id_prefix}_meter_reader) != nullptr) {
             id(${id_prefix}_meter_reader)->set_update_interval((uint32_t)(x * 1000));
+            // set_update_interval only stores the value; restart the poller so it takes effect
+            id(${id_prefix}_meter_reader)->stop_poller();
+            id(${id_prefix}_meter_reader)->start_poller();
           }
 
   # Confidence Threshold (only used when no external validator is configured)

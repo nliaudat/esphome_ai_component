@@ -138,7 +138,7 @@ def main():
     # --- TFLM operator table vs library ---
     checks.append(
         {
-            "name": "verify_tflm_operators (table vs esp-tflite-micro 1.3.7)",
+            "name": "verify_tflm_operators (table vs esp-tflite-micro 1.4.1)",
             "cmd": [sys.executable, "script/verify_tflm_operators.py", "--strict"],
         }
     )

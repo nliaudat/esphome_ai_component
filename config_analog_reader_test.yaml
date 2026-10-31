@@ -286,6 +286,7 @@ value_validator:
 analog_reader: # DEV !
   id: ${id_prefix}_analog_reader
   camera_id: ${id_prefix}_espcam
+  flash_light_controller: ${id_prefix}_flash_controller
   validator: ${id_prefix}_validator
   value_sensor:
     name: "Analog Total"
