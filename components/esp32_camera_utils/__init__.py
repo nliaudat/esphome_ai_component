@@ -1,5 +1,8 @@
+import logging
+
 import esphome.codegen as cg
 from esphome.components import esp32, esp32_camera, sensor
+from esphome.components.const import CONF_WINDOW
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_DISABLED_BY_DEFAULT,
@@ -15,6 +18,9 @@ from esphome.const import (
     CONF_WIDTH,
 )
 from esphome.core import CORE
+import esphome.final_validate as fv
+
+_LOGGER = logging.getLogger(__name__)
 
 DEPENDENCIES = ["esp32"]
 
@@ -28,6 +34,17 @@ Esp32CameraUtils = esp32_camera_utils_ns.class_("Esp32CameraUtils", cg.Component
 CONF_CAMERA_WINDOW = "camera_window"
 CONF_CAMERA_ID = "camera_id"
 CONF_ROTATION = "rotation"
+
+# Window coordinates are in the pixels of the esp32_camera `resolution`, not the
+# full sensor, so they can be handed to the native esp32_camera window API.
+WINDOW_SCHEMA = cv.Schema(
+    {
+        cv.Required(CONF_OFFSET_X): cv.int_range(min=0),
+        cv.Required(CONF_OFFSET_Y): cv.int_range(min=0),
+        cv.Required(CONF_WIDTH): cv.int_range(min=1),
+        cv.Required(CONF_HEIGHT): cv.int_range(min=1),
+    }
+)
 
 CONF_SCALER = "scaler"
 CONF_CROPPER = "cropper"
@@ -43,48 +60,82 @@ ROTATION_OPTIONS = {
 CONF_DEBUG_MEMORY = "debug_memory"
 
 
-CONFIG_SCHEMA = cv.Schema(
-    {
-        cv.GenerateID(): cv.declare_id(Esp32CameraUtils),
-        cv.Optional(CONF_CAMERA_WINDOW): cv.Schema(
-            {
-                cv.Required(CONF_OFFSET_X): cv.int_,
-                cv.Required(CONF_OFFSET_Y): cv.int_,
-                cv.Required(CONF_WIDTH): cv.int_,
-                cv.Required(CONF_HEIGHT): cv.int_,
-            }
-        ),
-        cv.Optional(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera),
-        cv.Optional("debug", default=False): cv.boolean,
-        # Allow arbitrary rotation (float), but also string for backward compat "90"
-        cv.Optional(CONF_ROTATION, default=0.0): cv.float_,
-        cv.Optional("enable_rotation", default=False): cv.boolean,
-        cv.Optional(CONF_SCALER): cv.Schema(
-            {
-                cv.Optional(CONF_WIDTH): cv.int_,
-                cv.Optional(CONF_HEIGHT): cv.int_,
-            }
-        ),
-        cv.Optional(CONF_CROPPER): cv.Schema(
-            {
-                cv.Optional(CONF_WIDTH): cv.int_,
-                cv.Optional(CONF_HEIGHT): cv.int_,
-                cv.Optional(CONF_OFFSET_X, default=0): cv.int_,
-                cv.Optional(CONF_OFFSET_Y, default=0): cv.int_,
-            }
-        ),
-        cv.Optional("enable_scaler", default=True): cv.boolean,
-        cv.Optional("enable_cropper", default=True): cv.boolean,
-        cv.Optional("enable_drawing", default=True): cv.boolean,
-        cv.Optional(CONF_DEBUG_MEMORY, default=False): cv.boolean,
-        cv.Optional("camera_buffer_size_sensor"): cv.use_id(sensor.Sensor),
-        cv.Optional("camera_free_psram_sensor"): cv.use_id(sensor.Sensor),
-    }
-).extend(cv.COMPONENT_SCHEMA)
+CONFIG_SCHEMA = cv.All(
+    cv.Schema(
+        {
+            cv.GenerateID(): cv.declare_id(Esp32CameraUtils),
+            # Prefer esp32_camera.window. camera_window is kept as a compatibility
+            # alias and is applied through the same native window API.
+            cv.Optional(CONF_CAMERA_WINDOW): WINDOW_SCHEMA,
+            cv.Optional(CONF_WINDOW): WINDOW_SCHEMA,
+            cv.Optional(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera),
+            cv.Optional("debug", default=False): cv.boolean,
+            # Allow arbitrary rotation (float), but also string for backward compat "90"
+            cv.Optional(CONF_ROTATION, default=0.0): cv.float_,
+            cv.Optional("enable_rotation", default=False): cv.boolean,
+            cv.Optional(CONF_SCALER): cv.Schema(
+                {
+                    cv.Optional(CONF_WIDTH): cv.int_,
+                    cv.Optional(CONF_HEIGHT): cv.int_,
+                }
+            ),
+            cv.Optional(CONF_CROPPER): cv.Schema(
+                {
+                    cv.Optional(CONF_WIDTH): cv.int_,
+                    cv.Optional(CONF_HEIGHT): cv.int_,
+                    cv.Optional(CONF_OFFSET_X, default=0): cv.int_,
+                    cv.Optional(CONF_OFFSET_Y, default=0): cv.int_,
+                }
+            ),
+            cv.Optional("enable_scaler", default=True): cv.boolean,
+            cv.Optional("enable_cropper", default=True): cv.boolean,
+            cv.Optional("enable_drawing", default=True): cv.boolean,
+            cv.Optional(CONF_DEBUG_MEMORY, default=False): cv.boolean,
+            cv.Optional("camera_buffer_size_sensor"): cv.use_id(sensor.Sensor),
+            cv.Optional("camera_free_psram_sensor"): cv.use_id(sensor.Sensor),
+        }
+    ).extend(cv.COMPONENT_SCHEMA),
+    cv.require_esphome_version(2026, 11, 0),
+    cv.has_at_most_one_key(CONF_WINDOW, CONF_CAMERA_WINDOW),
+)
+
+
+def _get_camera_config(source, camera_id=None):
+    """Return the validated esp32_camera config matching camera_id, if any."""
+    camera_conf = source.get("esp32_camera")
+    if camera_conf is None:
+        return None
+    configs = camera_conf if isinstance(camera_conf, list) else [camera_conf]
+    if not configs:
+        return None
+    if camera_id is None:
+        return configs[0]
+    for conf in configs:
+        if str(conf.get(CONF_ID)) == str(camera_id):
+            return conf
+    return None
+
+
+def _final_validate(config):
+    camera_conf = _get_camera_config(fv.full_config.get(), config.get(CONF_CAMERA_ID))
+    if (
+        camera_conf is not None
+        and CONF_WINDOW in camera_conf
+        and (CONF_WINDOW in config or CONF_CAMERA_WINDOW in config)
+    ):
+        raise cv.Invalid(
+            "Set the camera window in esp32_camera.window, not in "
+            "esp32_camera_utils; both would be applied at startup."
+        )
+
+
+FINAL_VALIDATE_SCHEMA = _final_validate
 
 
 async def to_code(config):
     cg.add_define("USE_ESP32_CAMERA_UTILS")
+    # This component delegates window control to the native esp32_camera API.
+    cg.add_define("USE_ESP32_CAMERA_WINDOW")
 
     esp32.add_idf_component(name="espressif/esp_new_jpeg", ref="1.0.2")
 
@@ -93,20 +144,50 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
 
-    if CONF_CAMERA_WINDOW in config:
-        conf = config[CONF_CAMERA_WINDOW]
+    camera_id = config.get(CONF_CAMERA_ID)
+    camera_conf = _get_camera_config(CORE.config, camera_id)
+    if camera_id is None and camera_conf is not None:
+        camera_id = camera_conf.get(CONF_ID)
+
+    cam = None
+    if camera_id is not None:
+        cam = await cg.get_variable(camera_id)
+        cg.add(var.set_camera(cam))
+
+    # The native key lives on esp32_camera and is already applied by its codegen;
+    # read it here so process_zone() knows the window offsets. camera_window is
+    # kept as a compatibility alias and applied through the same native API.
+    window = config.get(CONF_WINDOW)
+    if window is None:
+        window = config.get(CONF_CAMERA_WINDOW)
+    if window is None and camera_conf is not None:
+        window = camera_conf.get(CONF_WINDOW)
+
+    if window is not None:
         cg.add(
             var.set_camera_window_config(
-                conf[CONF_OFFSET_X],
-                conf[CONF_OFFSET_Y],
-                conf[CONF_WIDTH],
-                conf[CONF_HEIGHT],
+                window[CONF_OFFSET_X],
+                window[CONF_OFFSET_Y],
+                window[CONF_WIDTH],
+                window[CONF_HEIGHT],
             )
         )
 
-    if CONF_CAMERA_ID in config:
-        cam = await cg.get_variable(config[CONF_CAMERA_ID])
-        cg.add(var.set_camera(cam))
+        if CONF_CAMERA_WINDOW in config or CONF_WINDOW in config:
+            if cam is not None:
+                cg.add(
+                    cam.set_initial_window(
+                        window[CONF_OFFSET_X],
+                        window[CONF_OFFSET_Y],
+                        window[CONF_WIDTH],
+                        window[CONF_HEIGHT],
+                    )
+                )
+            else:
+                _LOGGER.warning(
+                    "A window is set in esp32_camera_utils but no esp32_camera was "
+                    "found; the window will not be applied."
+                )
 
     # Set image rotation
     cg.add(var.set_rotation(config[CONF_ROTATION]))

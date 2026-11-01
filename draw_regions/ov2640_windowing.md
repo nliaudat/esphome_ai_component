@@ -27,21 +27,26 @@ This means if you define a window of 800x600, the raw sensor output might be con
 
 ## How the ROI Tool Works
 
-The **ROI Tool** ([`roi.html`](roi.html)) calculates the `offset_x`, `offset_y`, `width`, and `height` based on your selection on the full sensor canvas.
+The **ROI Tool** ([`roi.html`](roi.html)) calculates the `offset_x`, `offset_y`, `width`, and `height` from your selection on the camera canvas.
 
 When you draw a rectangle:
-1.  **`offset_x` / `offset_y`**: Corresponds to `HREFST` and `VSTRT` (plus an offset depending on sensor centering).
-2.  **`width` / `height`**: Used to calculate `HREFEND` and `VEND`.
+1.  **`offset_x` / `offset_y`**: The top-left corner of the crop, in unrotated frame pixels.
+2.  **`width` / `height`**: The size of the crop, in unrotated frame pixels.
 
-The ESPHome `camera_window` configuration takes these high-level values:
+Since ESPHome 2026.11.0 the native `esp32_camera.window` configuration takes
+these high-level values in `resolution` pixels (not full-sensor pixels):
 ```yaml
-camera_window:
-  offset_x: <calculated>
-  offset_y: <calculated>
-  width: <calculated>
-  height: <calculated>
+esp32_camera:
+  resolution: 640x480
+  window:
+    offset_x: <calculated>
+    offset_y: <calculated>
+    width: <calculated>
+    height: <calculated>
 ```
-The underlying `esp32_camera` driver then converts these integer values into the hexadecimal register values (`0x32`, etc.) required by the OV2640.
+The underlying `esp32_camera` driver then converts these integer values into the hexadecimal register values (`0x32`, etc.) required by the OV2640. The
+`esp32_camera_utils.camera_window` key remains available as a compatibility
+alias with the same resolution-pixel semantics.
 
 The tool enforces **Multiples of 8** (or 4) because the OV2640's internal DSP and the ESP32's DMA engine often require data to be aligned to specific byte boundaries for efficient processing. Misalignment can result in garbled images or "green/purple" lines.
 

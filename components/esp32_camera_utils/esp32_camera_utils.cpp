@@ -9,24 +9,15 @@ namespace esp32_camera_utils {
 static const char *const TAG = "esp32_camera_utils";
 
 void Esp32CameraUtils::setup() {
-  if (this->has_config_) {
-    ESP_LOGI(TAG, "Setting up camera window: offset=%d,%d size=%dx%d", this->offset_x_, this->offset_y_, this->width_,
-             this->height_);
-    if (this->camera_) {
-      // Attempt to set the window. If camera is not ready, this might fail or be skipped.
-      // Component setup priority should normally ensure camera is initialized first.
-      bool success = this->window_control_.set_window_with_reset(
-          this->camera_,
-          CameraWindowControl::WindowConfig{this->offset_x_, this->offset_y_, this->width_, this->height_, true});
+  if (!this->has_config_)
+    return;
 
-      if (success) {
-        ESP_LOGI(TAG, "Camera window configured successfully");
-      } else {
-        ESP_LOGE(TAG, "Failed to configure camera window");
-      }
-    } else {
-      ESP_LOGW(TAG, "Camera instance not available, skipping window configuration");
-    }
+  // The window is applied by esp32_camera itself (set_initial_window during its
+  // setup), so this component only keeps the offsets for process_zone().
+  ESP_LOGI(TAG, "Camera window: offset=%d,%d size=%dx%d", this->offset_x_, this->offset_y_, this->width_,
+           this->height_);
+  if (this->camera_ == nullptr) {
+    ESP_LOGW(TAG, "Camera instance not available, window will not be applied");
   }
 }
 
@@ -44,16 +35,21 @@ bool Esp32CameraUtils::set_camera_window(int offset_x, int offset_y, int width, 
   bool success = this->window_control_.set_window(this->camera_, offset_x, offset_y, width, height);
 
   if (success) {
-    this->camera_width_ = width;
-    this->camera_height_ = height;
+    // The published frame size depends on the sensor: the OV2640 publishes the
+    // window size, the other supported sensors keep the configured resolution.
+    auto new_dims = this->window_control_.update_dimensions_after_window(
+        this->camera_, CameraWindowControl::WindowConfig{offset_x, offset_y, width, height, true}, this->camera_width_,
+        this->camera_height_);
+    this->camera_width_ = new_dims.first;
+    this->camera_height_ = new_dims.second;
 
     if (this->has_processor_config_) {
       this->reinitialize_image_processor(this->last_config_template_);
     }
     if (this->debug_) {
-      ESP_LOGD(TAG, "Camera window set to %dx%d. ImageProcessor updated.", width, height);
+      ESP_LOGD(TAG, "Camera window set to %dx%d. ImageProcessor updated.", this->camera_width_, this->camera_height_);
     } else {
-      ESP_LOGI(TAG, "Camera window set to %dx%d. ImageProcessor updated.", width, height);
+      ESP_LOGI(TAG, "Camera window set to %dx%d. ImageProcessor updated.", this->camera_width_, this->camera_height_);
     }
   }
   return success;
@@ -179,8 +175,9 @@ bool Esp32CameraUtils::process_zone(std::shared_ptr<camera::CameraImage> frame, 
   // Translate global crop zone to local window coordinates
   CropZone local_zone = zone;
 
-  // If we have a window offset, adjust the coordinates
-  if (this->has_config_) {
+  // Only the OV2640 publishes the window itself. The other supported sensors
+  // publish the configured resolution, so their crop zones stay in frame space.
+  if (this->has_config_ && this->window_control_.window_defines_frame(this->camera_)) {
     local_zone.x1 -= this->offset_x_;
     local_zone.y1 -= this->offset_y_;
     local_zone.x2 -= this->offset_x_;

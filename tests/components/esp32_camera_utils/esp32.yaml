@@ -44,3 +44,9 @@ esp32_camera:
 
 esp32_camera_utils:
   id: test_camera_utils
+  # Compatibility alias, in `resolution` pixels.
+  camera_window:
+    offset_x: 0
+    offset_y: 0
+    width: 320
+    height: 240

@@ -8,13 +8,14 @@ The root cause of this is almost always how large your **Camera Window (ROI)** a
 
 ## The Impact of Camera Window Size
 
-The ESPHome component configures the ESP32 camera to capture a specific Region of Interest (ROI) directly from the sensor using the `camera_window` settings. The hardware then transfers this array into the ESP32's RAM for decoding, image manipulation, and AI inference.
+The ESPHome component configures the ESP32 camera to capture a specific Region of Interest (ROI) directly from the sensor using the native `esp32_camera.window` settings (the `esp32_camera_utils.camera_window` key is a compatibility alias). The hardware then transfers this array into the ESP32's RAM for decoding, image manipulation, and AI inference.
 
-The bigger the `camera_window`, the more pixels have to be processed.
+The bigger the window, the more pixels have to be processed. Window coordinates are in `esp32_camera.resolution` pixels, not full-sensor pixels.
 
 **Less Optimized Example (e.g., 524ms Loop Time):**
 ```yaml
-  camera_window:
+esp32_camera:
+  window:
     width: 240
     height: 736
 ```
@@ -22,7 +23,8 @@ The bigger the `camera_window`, the more pixels have to be processed.
 
 **Highly Optimized Example (e.g., 203ms Loop Time):**
 ```yaml
-  camera_window:
+esp32_camera:
+  window:
     width: 96
     height: 496
 ```
@@ -50,4 +52,4 @@ To keep your ESP32 running smoothly, predictably, and with the lowest possible `
 2. **Keep Digit Boxes exact:** Your green digit boxes should tightly frame the numbers themselves. Making them excessively large wastes processing cycles during the image scaling phase before inference.
 3. **Physical Alignment is key:** Ensure your camera is physically mounted as close and aligned as possible to reduce the need for large digital crop boxes wrapping empty space.
 
-By aggressively optimizing your `camera_window` and `crop_zones` regions, you can often halve your AI inference loop times, decrease the chances of memory fragmentation, and greatly improve the device's responsiveness within Home Assistant.
+By aggressively optimizing your window and `crop_zones` regions, you can often halve your AI inference loop times, decrease the chances of memory fragmentation, and greatly improve the device's responsiveness within Home Assistant.

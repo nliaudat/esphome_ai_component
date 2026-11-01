@@ -14,9 +14,23 @@ A dedicated component for advanced image processing operations on ESP32, specifi
 
 ## ⚙️ Configuration
 
-This component is responsible for image rotation and preprocessing.
+Requires ESPHome **2026.11.0** or later. Windowing uses the native
+[`esp32_camera` window API](https://esphome.io/components/esp32_camera.html), so
+`esp32_camera_utils` no longer touches the sensor registers itself.
 
 ```yaml
+esp32_camera:
+  id: my_camera
+  # ...
+  resolution: 640x480
+  pixel_format: JPEG
+  # Preferred: hardware window (digital zoom), in `resolution` pixels.
+  window:
+    offset_x: 160
+    offset_y: 80
+    width: 320
+    height: 240
+
 esp32_camera_utils:
   id: camera_utils
   camera_id: my_camera # ID of the esp32_camera component
@@ -26,16 +40,36 @@ esp32_camera_utils:
   rotation: 90.0
   enable_rotation: true
 
-  # Camera Windowing (Hardware Cropping)
-  # Useful for OV2640/OV3660 to zoom in before capture
-  camera_window:
-    offset_x: 928
-    offset_y: 480
-    width: 448
-    height: 88
+  # Compatibility alias for esp32_camera.window. Do not set both.
+  # camera_window:
+  #   offset_x: 160
+  #   offset_y: 80
+  #   width: 320
+  #   height: 240
 
   debug: false
 ```
+
+### Window coordinates
+
+Window coordinates are in the pixels of the `esp32_camera` `resolution`, **not**
+the full sensor. This differs from older releases, which used full-sensor
+coordinates. For example, with `resolution: 640x480`, a window of
+`offset_x: 160, offset_y: 80, width: 320, height: 240` is valid, while a
+full-sensor window such as `width: 1600` would be clamped.
+
+Supported sensors: **OV2640** (JPEG output only), **OV3660**, **OV5640**,
+**SC101IOT** and **SC030IOT**. The published frame size depends on the sensor:
+
+| Sensor | Published frame |
+|---|---|
+| OV2640 | Window size, rounded to 16×8 JPEG blocks |
+| OV3660 / OV5640 | Configured resolution (window is scaled down into it) |
+| SC101IOT / SC030IOT | Configured resolution (window must equal it) |
+
+`esp32_camera_utils.camera_window` is kept as a compatibility alias but is
+deprecated; prefer `esp32_camera.window`. Setting both is a configuration
+error.
 
 ## 🛠️ Internal Usage
 

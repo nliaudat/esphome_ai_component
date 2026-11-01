@@ -9,9 +9,20 @@
 #include "esphome/core/log.h"
 #include "crop_zone_handler.h"
 
+#include <string>
+#include <utility>
+#include <vector>
+
 namespace esphome {
 namespace esp32_camera_utils {
 
+/**
+ * @brief Thin adapter over the native esp32_camera window API.
+ *
+ * Window coordinates are in the pixels of the esp32_camera `resolution`, not
+ * the full sensor. The native API clamps them to the frame and applies the
+ * per-sensor readout rules.
+ */
 class CameraWindowControl {
  public:
   struct WindowConfig {
@@ -115,6 +126,14 @@ class CameraWindowControl {
   bool set_window_with_reset(esp32_camera::ESP32Camera *camera, const WindowConfig &config);
   bool reset_to_full_frame_with_reset(esp32_camera::ESP32Camera *camera);
 
+  /**
+   * @brief True when the published frame is the window itself.
+   *
+   * The OV2640 publishes the (JPEG-aligned) window size; the other supported
+   * sensors publish the configured resolution and only crop/scale into it.
+   */
+  bool window_defines_frame(esp32_camera::ESP32Camera *camera) const;
+
   // Sensor detection and specific implementations
   std::string get_sensor_name(sensor_t *sensor) const;
   bool is_sensor_supported(sensor_t *sensor) const;
@@ -122,21 +141,8 @@ class CameraWindowControl {
  private:
   static const char *const TAG;
 
-  // Sensor detection and specific implementations
-
-  // Main window setting function
-  bool set_sensor_window(sensor_t *sensor, const WindowConfig &config);
-
-  // Sensor-specific implementations
-  bool set_ov2640_window(sensor_t *sensor, const WindowConfig &config);
-  bool set_ov3660_window(sensor_t *sensor, const WindowConfig &config);
-  bool set_ov5640_window(sensor_t *sensor, const WindowConfig &config);
-
-  // Helper function to get framesize from dimensions
-  framesize_t get_framesize_from_dimensions(int width, int height);
-
-  static std::string framesize_to_string(framesize_t framesize);
-  framesize_t get_max_framesize(sensor_t *sensor) const;
+  /// Dimensions of the configured frame, falling back to the given values.
+  static std::pair<int, int> frame_dimensions(int fallback_width, int fallback_height);
 };
 
 }  // namespace esp32_camera_utils

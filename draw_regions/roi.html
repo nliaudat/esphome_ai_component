@@ -229,6 +229,15 @@
                     </div>
                 </div>
 
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 5px;">
+                    <div><label>Camera W:</label> <input type="number" id="camera_w" placeholder="640"
+                            onchange="generateOutput()" style="width: 70px;"></div>
+                    <div><label>Camera H:</label> <input type="number" id="camera_h" placeholder="480"
+                            onchange="generateOutput()" style="width: 70px;"></div>
+                </div>
+                <p class="help-text" style="margin-bottom: 10px;">Must match <code>esp32_camera.resolution</code>.
+                    Window coordinates are in these pixels, not the full sensor.</p>
+
                 <div style="display: flex; gap: 5px; align-items: center; margin-bottom: 10px;">
                     <input type="checkbox" id="force43" onchange="state.force43 = this.checked; generateOutput()">
                     <label for="force43" style="cursor: pointer; user-select: none;">Force 4:3 (Div by 8)</label>
@@ -447,6 +456,12 @@
                     const dims = getTransformedDimensions();
                     document.getElementById('target_w').value = dims.w;
                     document.getElementById('target_h').value = dims.h;
+
+                    // The screenshot is normally taken at the camera resolution.
+                    const cameraW = document.getElementById('camera_w');
+                    const cameraH = document.getElementById('camera_h');
+                    if (cameraW && !cameraW.value) cameraW.value = img.width;
+                    if (cameraH && !cameraH.value) cameraH.value = img.height;
 
                     state.roi = null;
                     updateImageInfo();
@@ -708,18 +723,21 @@
             const img_w = state.image.width;
             const img_h = state.image.height;
 
-            let sensor_w = state.sensorRes.w;
-            let sensor_h = state.sensorRes.h;
+            let camera_w = parseInt(document.getElementById('camera_w').value);
+            let camera_h = parseInt(document.getElementById('camera_h').value);
+            if (isNaN(camera_w) || camera_w <= 0) camera_w = img_w;
+            if (isNaN(camera_h) || camera_h <= 0) camera_h = img_h;
 
-            let scale_x = sensor_w / img_w;
-            let scale_y = sensor_h / img_h;
+            // Window coordinates are in esp32_camera.resolution pixels.
+            let scale_x = camera_w / img_w;
+            let scale_y = camera_h / img_h;
 
             let anisotropic = Math.abs(scale_x - scale_y) > 0.1;
 
             let off_x = 0;
             let off_y = 0;
-            let w = sensor_w;
-            let h = sensor_h;
+            let w = camera_w;
+            let h = camera_h;
 
             if (state.roi) {
                 const visROI = mapToOriginal(state.roi.x, state.roi.y, state.roi.w, state.roi.h);
@@ -766,29 +784,44 @@
                 final_scale_y = target_h / unscaled_out_h;
             }
 
+            let comment_w = "# multiple of 8";
+            let comment_h = "# multiple of 8";
+            if (state.rotation === 90 || state.rotation === 270) {
+                comment_w += " (Visual Height)";
+                comment_h += " (Visual Width)";
+            }
+
+            lines.push(`# Preferred: add this to your esp32_camera block (uncomment it).`);
+            lines.push(`# Do not set both esp32_camera.window and camera_window.`);
+            lines.push(`# Coordinates are in the camera resolution (${camera_w}x${camera_h}), not the full sensor.`);
+            if (state.roi) {
+                if (off_x + w > camera_w) lines.push(`# WARNING: ROI width exceeds camera resolution!`);
+                if (off_y + h > camera_h) lines.push(`# WARNING: ROI height exceeds camera resolution!`);
+
+                lines.push(`# window:`);
+                lines.push(`#   offset_x: ${off_x} # multiple of 4`);
+                lines.push(`#   offset_y: ${off_y} # multiple of 4`);
+                lines.push(`#   width: ${w} ${comment_w}`);
+                lines.push(`#   height: ${h} ${comment_h}`);
+            } else {
+                lines.push(`# # No window defined (full frame)`);
+            }
+
+            lines.push(``);
             lines.push(`esp32_camera_utils:`);
             lines.push(`  id: \${id_prefix}_camera_utils`);
             lines.push(`  camera_id: \${id_prefix}_espcam`);
             lines.push(`  # debug: true`);
 
             if (state.roi) {
-                let comment_w = "# multiple of 8";
-                let comment_h = "# multiple of 8";
-                if (state.rotation === 90 || state.rotation === 270) {
-                    comment_w += " (Visual Height)";
-                    comment_h += " (Visual Width)";
-                }
-
-                if (off_x + w > sensor_w) lines.push(`  # WARNING: ROI width exceeds sensor bounds!`);
-                if (off_y + h > sensor_h) lines.push(`  # WARNING: ROI height exceeds sensor bounds!`);
-
+                lines.push(`  # Compatibility alias for esp32_camera.window:`);
                 lines.push(`  camera_window:`);
                 lines.push(`    offset_x: ${off_x} # multiple of 4`);
                 lines.push(`    offset_y: ${off_y} # multiple of 4`);
                 lines.push(`    width: ${w} ${comment_w}`);
                 lines.push(`    height: ${h} ${comment_h}`);
             } else {
-                lines.push(`  # No camera_window defined (Full Sensor or default)`);
+                lines.push(`  # No camera_window defined (full frame)`);
             }
 
             lines.push(``);
@@ -802,7 +835,8 @@
 
             lines.push(``);
             lines.push(`# --- Debug Info ---`);
-            lines.push(`# Sensor: ${state.sensorRes.name}`);
+            lines.push(`# Sensor model: ${state.sensorRes.name}`);
+            lines.push(`# Camera resolution: ${camera_w}x${camera_h}`);
             lines.push(`# Original Image: ${img_w}x${img_h}`);
             if (use_scaling) {
                 let unscaled_out_w = (state.rotation % 180 === 0) ? w : h;

@@ -13,7 +13,7 @@ Download full repo or git clone
  - [ ] [optional] change the name in the substitutions section
  - [ ] [optional] change the timezone
  - [ ] meter_reader_tflite :
- Start with a minimal config with no camera_window (zoom)
+ Start with a minimal config with no camera window (zoom)
  Copy the model you choose from ./model to the config.yaml directory
  set it's name in model: "digit_recognizer_v4_10cls_RGB.tflite"
   - [ ] packages :
@@ -68,7 +68,7 @@ We provide a graphical tool to easily configure your camera rotation, window (RO
 Paste the generated YAML into your configuration files:
 
 1.  **Crop Zones**: Paste the `globals:` section into your main config or `globals_AI_component.yaml`.
-2.  **Camera Settings**: Paste the `esp32_camera_utils:` section into your config (replacing the existing block).
+2.  **Camera Settings**: Paste the generated `window:` block into your `esp32_camera:` section (preferred), and the `esp32_camera_utils:` section into your config (replacing the existing block). Window coordinates are in `esp32_camera.resolution` pixels, not full-sensor pixels.
 
 *Note: You can also test these settings temporarily using Home Assistant Developer Tools services `esphome.[node_name]_set_camera_window` and `esphome.[node_name]_set_crop_zones`.*
 
