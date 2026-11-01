@@ -210,6 +210,7 @@ class ValueValidator : public Component {
   int get_good_values_median() const;
   void publish_diagnostics_(const char *state);
   void save_state_();
+  int last_saved_reading_{-1};  // Last value committed to flash, to write only on change
 
   void free_digit_history();
   void free_resources();

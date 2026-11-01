@@ -5,9 +5,9 @@
 #ifdef USE_ANALOG_READER
 
 #include "esphome/core/component.h"
-#include "esphome/components/light/light_state.h"
 
 #ifdef USE_FLASH_LIGHT_CONTROLLER
+#include "esphome/components/light/light_state.h"
 #include "esphome/components/flash_light_controller/flash_light_controller.h"
 #endif
 
@@ -59,8 +59,8 @@ class FlashlightCoordinator {
 
   std::function<void()> request_frame_callback_;
 #else
-  // Dummy implementation
-  void setup(Component *parent, light::LightState *legacy_light, void *controller) {}
+  // Dummy implementation when flash_light_controller is not used
+  void setup(Component *parent, void *legacy_light, void *controller) {}
   void set_timing(uint32_t pre_time, uint32_t post_time) {}
   void set_update_interval(uint32_t interval_ms) {}
   bool update_scheduling() { return false; }

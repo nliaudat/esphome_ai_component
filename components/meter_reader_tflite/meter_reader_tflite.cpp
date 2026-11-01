@@ -5,6 +5,7 @@
 #include <esp_cache.h>
 
 #include <numeric>
+#include <cmath>
 
 #ifdef USE_WEB_SERVER
 #include "esphome/components/esp32_camera_utils/preview_web_handler.h"
@@ -253,6 +254,7 @@ void MeterReaderTFLite::setup() {
     if (this->generate_preview_) {
       this->frame_state_.store(FrameState::REQUESTED);
       this->last_request_time_ = millis();
+      this->camera_coord_.request_image();
       ESP_LOGI(TAG, "Preview mode: immediate frame requested");
     }
 #endif
@@ -279,6 +281,7 @@ void MeterReaderTFLite::setup() {
   this->flashlight_coord_.set_request_frame_callback([this]() {
     this->frame_state_.store(FrameState::REQUESTED);
     this->last_request_time_ = millis();
+    this->camera_coord_.request_image();
     ESP_LOGD(TAG, "Frame requested via coordinator callback");
   });
 
@@ -566,6 +569,7 @@ void MeterReaderTFLite::trigger_low_confidence_collection(const std::string &val
     this->collection_state_ = COLLECTION_WAITING_FOR_FRAME;
     this->frame_state_.store(FrameState::REQUESTED);
     this->last_request_time_ = millis();
+    this->camera_coord_.request_image();
   });
 }
 #endif
@@ -891,12 +895,11 @@ void MeterReaderTFLite::publish_inference_result(const std::string &digit_str, f
 
 #ifdef USE_VALUE_VALIDATOR
   if (this->validation_coord_.has_validator()) {
-    if (this->value_sensor_ && !digit_str.empty()) {
-      char *end;
-      float raw_val = strtof(digit_str.c_str(), &end);
-      if (end == digit_str.c_str() + digit_str.size()) {
-        this->value_sensor_->publish_state(raw_val);
-      }
+    if (this->value_sensor_ && valid && std::isfinite(validated_val)) {
+      // Publish only readings the validator accepted, and the value it validated.
+      // The raw digit string stays visible in the inference log (see above) and in
+      // the validator's own raw reading sensor.
+      this->value_sensor_->publish_state(validated_val);
     }
     if (this->confidence_sensor_)
       this->confidence_sensor_->publish_state(avg_conf * 100.0f);
@@ -973,10 +976,10 @@ void MeterReaderTFLite::set_camera_image_format(int w, int h, const std::string 
   // Update ImageProcessor config if model is loaded
   if (this->tflite_coord_.is_model_loaded()) {
     auto spec = this->tflite_coord_.get_model_spec();
-    this->camera_coord_.update_image_processor_config(
-        spec.input_width, spec.input_height, spec.input_channels,
-        TFLiteCoordinator::to_processor_input_type(spec.input_type), spec.normalize,
-        TFLiteCoordinator::to_input_order_name(spec.input_order));
+    this->camera_coord_.update_image_processor_config(spec.input_width, spec.input_height, spec.input_channels,
+                                                      TFLiteCoordinator::to_processor_input_type(spec.input_type),
+                                                      spec.normalize,
+                                                      TFLiteCoordinator::to_input_order_name(spec.input_order));
   }
 }
 
@@ -1071,6 +1074,7 @@ void MeterReaderTFLite::capture_preview() {
   this->flashlight_coord_.capture_preview_sequence([this]() {
     this->frame_state_.store(FrameState::REQUESTED);
     this->last_request_time_ = millis();
+    this->camera_coord_.request_image();
   });
 }
 std::shared_ptr<camera::CameraImage> MeterReaderTFLite::get_preview_image() {
@@ -1221,6 +1225,7 @@ void MeterReaderTFLite::force_flash_inference() {
   this->flashlight_coord_.force_inference([this]() {
     this->frame_state_.store(FrameState::REQUESTED);
     this->last_request_time_ = millis();
+    this->camera_coord_.request_image();
   });
 }
 
@@ -1267,9 +1272,9 @@ void MeterReaderTFLite::refresh_image_processor_config(int processor_input_type)
   auto spec = this->tflite_coord_.get_model_spec();
 
   // Update Camera Coordinator first
-  this->camera_coord_.update_image_processor_config(
-      spec.input_width, spec.input_height, spec.input_channels, processor_input_type, spec.normalize,
-      TFLiteCoordinator::to_input_order_name(spec.input_order));
+  this->camera_coord_.update_image_processor_config(spec.input_width, spec.input_height, spec.input_channels,
+                                                    processor_input_type, spec.normalize,
+                                                    TFLiteCoordinator::to_input_order_name(spec.input_order));
 
   // Sync Utils if present
   if (this->esp32_camera_utils_) {

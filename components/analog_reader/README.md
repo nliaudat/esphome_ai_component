@@ -63,6 +63,9 @@ analog_reader:
   # Camera Reference
   camera_id: my_camera
 
+  # Optional: share one flash sequence with meter_reader_tflite (or another reader)
+  # flash_light_controller: my_flash_controller
+
   # Global Settings
   update_interval: 60s
   paused: false         # Start paused?
@@ -170,6 +173,27 @@ This exposes:
 - **Contrast Slider**: Fine-tune contrast (0.1 - 5.0).
 - **Update Interval**: Adjust poll rate dynamically.
 - **Algorithm Selector**: Switch between detection algorithms (Legacy, Radial Profile, Hough, Template, Auto) at runtime.
+
+### Shared Flash Cycle
+`analog_reader` and `meter_reader_tflite` can read the same camera with a single flash cycle. Point both components at the same `flash_light_controller`:
+
+```yaml
+flash_light_controller:
+  id: my_flash_controller
+  flash_light: my_light
+  flash_pre_time: 7s
+  flash_post_time: 2s
+
+meter_reader_tflite:
+  # ...
+  flash_light_controller: my_flash_controller
+
+analog_reader:
+  # ...
+  flash_light_controller: my_flash_controller
+```
+
+Use the same `update_interval` for both readers. The second reader joins the sequence started by the first one while the light is warming up (or during post-time). Make `flash_pre_time` longer than the scheduler's random start offset between the two pollers so both requests land in the same cycle.
 
 ### Tuning Guide
 1. **Crop**: Ensure your `crop_x/y/w/h` isolates **only** the dial. The center of the crop must be the center of the needle's axis.

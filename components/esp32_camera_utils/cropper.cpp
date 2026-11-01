@@ -60,7 +60,9 @@ bool Cropper::extract_to_buffer(const ImageView &view, uint8_t *dst) {
       dst_row += row_size;
     }
   }
+#ifdef DEBUG_ESP32_CAMERA_UTILS
   _dur.log_duration("extract_to_buffer");
+#endif
   return true;
 }
 

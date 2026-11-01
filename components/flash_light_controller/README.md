@@ -24,14 +24,18 @@ flash_light_controller:
   debug: false
 ```
 
-## 🔗 Usage in Meter Reader
+## 🔗 Usage in Readers
 
-This component is typically used by `meter_reader_tflite`:
+This component is used by `meter_reader_tflite` and `analog_reader`:
 
 ```yaml
 meter_reader_tflite:
   # ...
   flash_light_controller: my_flash_controller
+
+analog_reader:
+  # ...
+  flash_light_controller: my_flash_controller
 ```
 
-When the meter reader initiates a cycle, it triggers the flash controller to prepare the lighting conditions before requesting an image.
+When a reader initiates a cycle, it triggers the flash controller to prepare the lighting conditions before requesting an image. Multiple readers can share one controller: a reader that triggers during warmup joins the running sequence and captures together with the first reader. A reader that triggers during post-time captures immediately, and the post-time window is restarted so it still gets a lit frame.

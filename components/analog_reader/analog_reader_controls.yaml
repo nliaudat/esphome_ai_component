@@ -89,6 +89,9 @@ number:
       - lambda: |-
           if (id(${analog_reader_id}) != nullptr) {
             id(${analog_reader_id})->set_update_interval((uint32_t)(x * 1000));
+            // set_update_interval only stores the value; restart the poller so it takes effect
+            id(${analog_reader_id})->stop_poller();
+            id(${analog_reader_id})->start_poller();
           }
 
   # Analog Contrast

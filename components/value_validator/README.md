@@ -166,6 +166,10 @@ This makes it easy to spot when the validator is filtering readings: the raw sen
 
 When `persist_state: true`, the last valid reading is saved to flash memory. After a reboot, the validator resumes from the saved value instead of waiting for a new first reading. This prevents the risk of blindly accepting a bad first reading after power cycles.
 
+- Manually set values (`set_last_valid_reading`, e.g. from Home Assistant) are persisted immediately.
+- Changed readings are committed right away with `global_preferences->sync()` instead of waiting for `flash_write_interval`, so a reboot cannot restore an older value. Writes only happen when the value actually changes.
+- `0` is a valid saved reading (for example a brand-new meter) and is restored normally.
+
 ## Dial-Aware Correction (Analog Reader Integration)
 
 When used together with the `analog_reader` component, the value_validator can correct digit boundary transitions using the analog dial fraction. This solves the problem where TFLite digit recognition may misread a digit that is physically transitioning between two values on the meter.

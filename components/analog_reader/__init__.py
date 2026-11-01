@@ -7,6 +7,13 @@ try:
 except ImportError:
     value_validator = None
 
+try:
+    from esphome.components import flash_light_controller
+except ImportError:
+    flash_light_controller = None
+
+CONF_FLASH_LIGHT_CONTROLLER = "flash_light_controller"
+
 from esphome.const import CONF_ID
 from esphome.core import CORE
 
@@ -131,6 +138,11 @@ CONFIG_SCHEMA = cv.Schema(
         if value_validator
         else cv.string,
         cv.Required(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera),
+        cv.Optional(CONF_FLASH_LIGHT_CONTROLLER): cv.use_id(
+            flash_light_controller.FlashLightController
+        )
+        if flash_light_controller
+        else cv.string,
         cv.Optional(CONF_VALUE_SENSOR): sensor.sensor_schema(),
         cv.Required(CONF_DIALS): cv.ensure_list(DIAL_SCHEMA),
         cv.Optional(CONF_PAUSED, default=False): cv.boolean,
@@ -154,6 +166,10 @@ async def to_code(config):
 
     cam = await cg.get_variable(config[CONF_CAMERA_ID])
     cg.add(var.set_camera(cam))
+
+    if CONF_FLASH_LIGHT_CONTROLLER in config and flash_light_controller:
+        flash = await cg.get_variable(config[CONF_FLASH_LIGHT_CONTROLLER])
+        cg.add(var.set_flash_light_controller(flash))
 
     if config[CONF_PAUSED]:
         cg.add(var.set_pause_processing(True))

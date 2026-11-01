@@ -2,6 +2,8 @@
 #include "esphome/core/log.h"
 #include "esphome/core/application.h"
 
+#ifdef USE_FLASH_LIGHT_CONTROLLER
+
 namespace esphome {
 namespace analog_reader {
 
@@ -55,8 +57,12 @@ bool FlashlightCoordinator::update_scheduling() {
       });
       return true;  // We initiated, so we are "busy" in a sense, or rather we handled it.
     } else {
-      // Already running
-      ESP_LOGD(TAG, "Controller already active, skipping trigger");
+      // Already running (e.g. started by another reader): join it so this reader also gets the lit frame
+      ESP_LOGD(TAG, "Controller already active, joining running sequence");
+      this->controller_->initiate_capture_sequence([this]() {
+        if (this->request_frame_callback_)
+          this->request_frame_callback_();
+      });
       return true;
     }
   }
@@ -132,3 +138,5 @@ void FlashlightCoordinator::capture_preview_sequence(std::function<void()> frame
 
 }  // namespace analog_reader
 }  // namespace esphome
+
+#endif  // USE_FLASH_LIGHT_CONTROLLER

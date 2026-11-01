@@ -35,8 +35,8 @@ if str(COMPONENT_DIR) not in sys.path:
 
 import op_manifest  # noqa: E402
 
-# Pinned dependency - matches esp32.add_idf_component(ref="1.3.7") in __init__.py
-PACKAGE = "espressif__esp-tflite-micro_1.3.7"
+# Pinned dependency - matches esp32.add_idf_component(ref="1.4.1") in __init__.py
+PACKAGE = "espressif__esp-tflite-micro_1.4.1"
 
 # BuiltinOperator suffix -> Add* method, from methods whose body calls AddBuiltin()
 _ADD_METHOD_RE = re.compile(
@@ -162,7 +162,7 @@ def main(argv: list[str] | None = None) -> int:
         headers = find_library_headers()
         if not headers:
             print(
-                "[SKIP] esp-tflite-micro 1.3.7 header not found in the ESP-IDF "
+                "[SKIP] esp-tflite-micro 1.4.1 header not found in the ESP-IDF "
                 "managed cache (.esphome/.espressif)."
             )
             print("       Run once after a successful build, or pass --header PATH.")
@@ -195,7 +195,7 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     if not issues:
-        print("[PASS] tflm_operators.h matches esp-tflite-micro 1.3.7")
+        print("[PASS] tflm_operators.h matches esp-tflite-micro 1.4.1")
         return 0
     print(f"[FAIL] {len(issues)} mismatch(es) between the table and the library:")
     for issue in issues:

@@ -16,6 +16,14 @@ static constexpr uint32_t WINDOW_RESET_STABILIZATION_MS = 200;
 
 void CameraCoordinator::set_camera(esp32_camera::ESP32Camera *camera) { this->camera_ = camera; }
 
+void CameraCoordinator::request_image() {
+  if (!this->camera_) {
+    ESP_LOGW(TAG, "Cannot request image: camera not set");
+    return;
+  }
+  this->camera_->request_image(camera::IDLE);
+}
+
 void CameraCoordinator::set_config(int width, int height, const std::string &pixel_format) {
   this->current_width_ = width;
   this->current_height_ = height;

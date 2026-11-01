@@ -1,0 +1,16 @@
+# Normalise line endings so the lint pipeline sees the same bytes on Windows
+# and Linux (ci-custom rejects CRLF as trailing whitespace, and CRLF in a
+# git-managed file also trips reformatting tools). Git normalises to LF in the
+# index and now also checks out LF, which keeps `git status` free of the
+# "LF will be replaced by CRLF" warnings this repo used to emit.
+* text=auto eol=lf
+
+# Windows-only helpers keep their native line endings.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binaries: never touch.
+*.tflite binary
+*.jpg binary
+*.png binary

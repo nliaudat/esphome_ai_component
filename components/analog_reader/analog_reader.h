@@ -97,6 +97,11 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
 #endif
 
   void set_camera(esphome::camera::Camera *camera) { this->camera_ = camera; }
+#ifdef USE_FLASH_LIGHT_CONTROLLER
+  void set_flash_light_controller(flash_light_controller::FlashLightController *controller) {
+    this->flash_controller_ = controller;
+  }
+#endif
   void set_camera_image_format(int width, int height, const std::string &format) {
     this->img_width_ = width;
     this->img_height_ = height;
@@ -151,6 +156,9 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   ValueValidatorCoordinator validation_coord_;
 
   esphome::camera::Camera *camera_{nullptr};
+#ifdef USE_FLASH_LIGHT_CONTROLLER
+  flash_light_controller::FlashLightController *flash_controller_{nullptr};
+#endif
   int img_width_{0};
   int img_height_{0};
   std::string pixel_format_str_{"JPEG"};

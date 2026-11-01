@@ -1,0 +1,14 @@
+# ESPHome build test: analog_reader + flash_light_controller on ESP32 (Alpha)
+esphome:
+  name: test-analog-flash
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESP32_SPIRAM_SUPPORT: y
+
+psram:
+
+<<: !include common_flash.yaml

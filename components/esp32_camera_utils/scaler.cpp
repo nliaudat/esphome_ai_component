@@ -47,7 +47,9 @@ bool Scaler::scale_rgb888_to_uint8(const uint8_t *src, int src_w, int src_h, uin
       }
     }
   }
+#ifdef DEBUG_ESP32_CAMERA_UTILS
   _dur.log_duration("scale_rgb888_to_uint8");
+#endif
   return true;
 }
 
@@ -90,7 +92,9 @@ bool Scaler::scale_rgb888_to_float32(const uint8_t *src, int src_w, int src_h, u
       }
     }
   }
+#ifdef DEBUG_ESP32_CAMERA_UTILS
   _dur.log_duration("scale_rgb888_to_float32");
+#endif
   return true;
 }
 
@@ -119,7 +123,9 @@ bool Scaler::scale_nearest(const uint8_t *src, int src_w, int src_h, int src_cha
       dst_row += src_channels;
     }
   }
+#ifdef DEBUG_ESP32_CAMERA_UTILS
   _dur.log_duration("scale_nearest");
+#endif
   return true;
 }
 
@@ -129,7 +135,9 @@ bool Scaler::scale_bilinear(const uint8_t *src, int src_w, int src_h, int src_ch
   // For now, defaulting to nearest as it's much faster on S3 without SIMD.
   ScopedDuration _dur(TAG);
   bool res = scale_nearest(src, src_w, src_h, src_channels, dst, dst_w, dst_h);
+#ifdef DEBUG_ESP32_CAMERA_UTILS
   _dur.log_duration("scale_bilinear");
+#endif
   return res;
 }
 
