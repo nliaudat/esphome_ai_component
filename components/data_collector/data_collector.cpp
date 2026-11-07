@@ -28,10 +28,10 @@ void DataCollector::setup() {
 void DataCollector::dump_config() {
   ESP_LOGCONFIG(TAG, "Data Collector:");
   ESP_LOGCONFIG(TAG, "  Upload URL: %s", this->upload_url_.c_str());
-  ESP_LOGCONFIG(TAG, "  Upload Interval: %u ms", this->upload_interval_ms_);
+  ESP_LOGCONFIG(TAG, "  Upload Interval: %u ms", static_cast<unsigned>(this->upload_interval_ms_));
   ESP_LOGCONFIG(TAG, "  Upload Queue Size: %u", static_cast<unsigned>(this->upload_queue_size_));
   if (this->web_submit_switch_) {
-    ESP_LOGCONFIG(TAG, "  Web Submit Switch: %s", this->web_submit_switch_->get_name().c_str());
+    ESP_LOGCONFIG(TAG, "  Web Submit Switch: %s", LOG_STR_ARG(this->web_submit_switch_->get_log_name()));
   }
 }
 
