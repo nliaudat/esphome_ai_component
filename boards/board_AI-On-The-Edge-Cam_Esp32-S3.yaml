@@ -31,20 +31,17 @@ esphome:
   project:
     name: "Prokyber.AI-On-The-Edge-Cam"
     version: "${revision}.dev"
-  platformio_options:
-    # board_build.f_cpu: 240000000L
-    board_build.f_flash: 80000000L
-    board_build.flash_size: 16MB
-    board_build.arduino.memory_type: opi_opi
-    board_build.flash_mode: dio  # opi
-    board_build.psram_type: opi
-    board_upload.maximum_size: 16777216
-    board_build.extra_flags:
-      - -DBOARD_HAS_PSRAM
-      - -DTF_LITE_STATIC_MEMORY  # for tflite micro
-      - -DTF_LITE_DISABLE_X86_NEON  # for tflite micro
-      - -DESP_NN  # use hardware acceleration : https://github.com/espressif/esp-nn (only if using tflite)
-    board_name: AI-On-The-Edge-Cam Esp32-S3 (N16R8)  # https://www.tindie.com/products/allexok/ai-on-the-edge-cam-esp32-s3-with-poe-sd-camera/
+# No platformio_options here: this board builds with the native esp-idf toolchain, where
+# every PlatformIO option is silently ignored and emits a build warning. Each old key is
+# expressed with its native esp32:/esphome: equivalent instead:
+#   board_build.flash_size: 16MB   -> esp32.flash_size: 16MB
+#   board_build.flash_mode: dio    -> esp32.flash_mode: dio  ('opi' also needs flash_chip: mxic_opi)
+#   board_build.f_flash: 80000000L -> esp32.flash_frequency: 80MHZ
+#   board_build.psram_type: opi    -> psram.mode: octal, psram.speed: 80MHz
+#   -DBOARD_HAS_PSRAM              -> psram: (declares PSRAM to ESP-IDF)
+#   -DTF_LITE_* / -DESP_NN         -> components/tflite_micro_helper/__init__.py (all CPUs)
+#   arduino.memory_type: opi_opi   -> Arduino-only, not applicable to esp-idf
+#   board_name, maximum_size       -> PlatformIO metadata; maximum_size follows flash_size
 
 substitutions:
   # board and compilation
@@ -97,6 +94,8 @@ esp32:
   # toolchain: platformio
   variant: esp32s3
   flash_size: 16MB
+  flash_mode: dio  # board_build.flash_mode: dio (same as the esp-idf default for this board)
+  flash_frequency: 80MHZ  # board_build.f_flash: 80000000L
   cpu_frequency: 240MHZ
   framework:
     type: ${framework}
@@ -148,7 +147,7 @@ psram:
 
 light:
   - platform: esp32_rmt_led_strip
-    rgb_order: GRB
+    channel_colors: GRB  # was: rgb_order: GRB (deprecated in 2026.11)
     pin: ${flash_led_pin}
     num_leds: 4
     chipset: ws2812
@@ -178,11 +177,15 @@ light:
 # ####### Power management (wifi or ethernet)
 output:
   - platform: gpio
-    pin: ${eth_enable_pin}
+    pin:
+      number: ${eth_enable_pin}  # GPIO45
+      ignore_strapping_warning: true  # board power enable, level set by hardware
     id: ${id_prefix}_eth_power
     inverted: true
   - platform: gpio
-    pin: ${per_enable_pin}
+    pin:
+      number: ${per_enable_pin}  # GPIO46
+      ignore_strapping_warning: true  # board peripheral power enable
     id: ${id_prefix}_periph_power
     inverted: true
 

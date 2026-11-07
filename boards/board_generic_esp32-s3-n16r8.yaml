@@ -19,17 +19,14 @@ esphome:
   project:
     name: "nliaudat.meter-reader"
     version: "${revision}.dev"
-  platformio_options:
-    board_build.extra_flags:
-      - -DBOARD_HAS_PSRAM
-      - -DTF_LITE_STATIC_MEMORY  # for tflite micro
-      - -DTF_LITE_DISABLE_X86_NEON  # for tflite micro
-      - -DESP_NN  # use hardware acceleration : https://github.com/espressif/esp-nn (only if using tflite)
-    # build_flags: -DBOARD_HAS_PSRAM -DCORE_DEBUG_LEVEL=0
-    # board_build.f_cpu: 240000000L
-    board_build.arduino.memory_type: qio_opi
-    board_build.f_flash: 80000000L
-    board_build.flash_mode: qio
+# No platformio_options here: this board builds with the native esp-idf toolchain, where
+# PlatformIO options are silently ignored and emit a build warning. Each old key is
+# expressed with its native esp32:/esphome: equivalent instead:
+#   board_build.flash_mode: qio    -> esp32.flash_mode: qio
+#   board_build.f_flash: 80000000L -> esp32.flash_frequency: 80MHZ
+#   arduino.memory_type: qio_opi   -> psram.mode: octal (octal PSRAM over quad flash)
+#   extra_flags (-DBOARD_HAS_PSRAM)    -> psram: (declares PSRAM to ESP-IDF)
+#   extra_flags (-DTF_LITE_*/-DESP_NN) -> components/tflite_micro_helper/__init__.py (all CPUs)
 
 substitutions:
   # board and compilation
@@ -54,6 +51,8 @@ esp32:
   # variant: esp32s3
   cpu_frequency: 240MHZ
   flash_size: 8MB
+  flash_mode: qio  # board_build.flash_mode: qio
+  flash_frequency: 80MHZ  # board_build.f_flash: 80000000L
   framework:
     type: ${framework}
     version: recommended
@@ -115,7 +114,7 @@ psram:
 
 light:
   - platform: esp32_rmt_led_strip
-    rgb_order: GRB
+    channel_colors: GRB  # was: rgb_order: GRB (deprecated in 2026.11)
     pin: ${flash_led_pin}  # GPIO48
     num_leds: 1
     chipset: ws2812

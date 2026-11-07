@@ -22,30 +22,15 @@ esphome:
   project:
     name: "nliaudat.meter-reader"
     version: "${revision}.dev"
-  platformio_options:
-    board_build.extra_flags:
-      - -DBOARD_HAS_PSRAM
-      - -DTF_LITE_STATIC_MEMORY  # for tflite micro
-      - -DTF_LITE_DISABLE_X86_NEON  # for tflite micro
-      - -DESP_NN  # use hardware acceleration : https://github.com/espressif/esp-nn (only if using tflite)
-    # build_flags: -DBOARD_HAS_PSRAM -DCORE_DEBUG_LEVEL=0
-    # board_build.f_cpu: 240000000L
-    # board_build.f_flash: 80000000L
-    # board_build.flash_mode: qio
-    # board_build.flash_mode: dio
-    # board_build.psram_type: opi
-    # board_build.memory_type: qio_opi
-
-    # board_build.hwids: 0X303A:0x1001
-    # board_connectivity: wifi, bluetooth
-
-    # board_debug.default_tool: esp-builtin
-    # board_debug.onboard_tools: esp-builtin
-    # board_debug.openocd_target: esp32s3.cfg
-
-    # board_frameworks: arduino, espidf
-
-    # board_name: Freenove ESP32-S3 WROOM N8R8 (8MB Flash / 8MB PSRAM)
+# No platformio_options here: this board builds with the native esp-idf toolchain, where
+# PlatformIO options are silently ignored and emit a build warning. In the old block every
+# flash/PSRAM/flag key was already commented out, so none of it had any effect; what the
+# build needs is expressed natively:
+#   extra_flags (-DBOARD_HAS_PSRAM)    -> psram: (declares PSRAM to ESP-IDF)
+#   extra_flags (-DTF_LITE_*/-DESP_NN) -> components/tflite_micro_helper/__init__.py (all CPUs)
+#   psram_type / memory_type           -> psram.mode: octal, psram.speed: 80MHz
+#   board_name, build_flags, hwids, debug.* -> PlatformIO metadata, unused by esp-idf
+# Flash mode/frequency were never set for this board (dio / 80MHz = esp-idf default here).
 
 substitutions:
   # board and compilation
@@ -131,7 +116,7 @@ psram:
 
 light:
   - platform: esp32_rmt_led_strip
-    rgb_order: GRB
+    channel_colors: GRB  # was: rgb_order: GRB (deprecated in 2026.11)
     pin: ${flash_led_pin}  # GPIO48
     num_leds: 1
     chipset: ws2812

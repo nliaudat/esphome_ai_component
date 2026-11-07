@@ -6,16 +6,15 @@ esphome:
   project:
     name: "nliaudat.meter-reader"
     version: "${revision}.dev"
-  platformio_options:
-    board_build.f_cpu: 240000000L
-    board_build.f_flash: 80000000L
-    # board_build.partitions: huge_app.csv
-    board_name: M5Stack Camera PSRAM
-    board_build.extra_flags:
-      - -DBOARD_HAS_PSRAM
-      - -DTF_LITE_STATIC_MEMORY  # for tflite micro
-      - -DTF_LITE_DISABLE_X86_NEON  # for tflite micro
-      - -DESP_NN  # use hardware acceleration : https://github.com/espressif/esp-nn (only if using tflite)
+# No platformio_options here: this board builds with the native esp-idf toolchain, where
+# PlatformIO options are silently ignored and emit a build warning. Each old key is
+# expressed with its native esp32:/esphome: equivalent instead:
+#   board_build.f_cpu: 240000000L  -> esp32.cpu_frequency: 240MHZ
+#   board_build.f_flash: 80000000L -> esp32.flash_frequency: 80MHZ
+#   -DBOARD_HAS_PSRAM              -> psram: (declares PSRAM to ESP-IDF)
+#   -DTF_LITE_* / -DESP_NN         -> components/tflite_micro_helper/__init__.py (all CPUs)
+#   board_name                     -> PlatformIO metadata, unused by esp-idf
+#   #board_build.partitions: huge_app.csv -> esp32.partitions: (was already commented out)
 
 substitutions:
   board: m5stack-core-esp32
@@ -50,6 +49,8 @@ esp32:
   board: ${board}
   # toolchain: platformio
   flash_size: 4MB  # Typically 4MB, some models 16MB
+  flash_frequency: 80MHZ  # board_build.f_flash: 80000000L
+  cpu_frequency: 240MHZ
   framework:
     type: ${framework}
     version: recommended

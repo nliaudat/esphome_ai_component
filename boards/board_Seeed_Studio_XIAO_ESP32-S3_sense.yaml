@@ -18,30 +18,15 @@ esphome:
   project:
     name: "nliaudat.meter-reader"
     version: "${revision}.dev"
-  platformio_options:
-    board_build.extra_flags:
-      - -DBOARD_HAS_PSRAM
-      - -DTF_LITE_STATIC_MEMORY  # for tflite micro
-      - -DTF_LITE_DISABLE_X86_NEON  # for tflite micro
-      - -DESP_NN  # use hardware acceleration : https://github.com/espressif/esp-nn (only if using tflite)
-    # build_flags: -DBOARD_HAS_PSRAM -DCORE_DEBUG_LEVEL=0
-    # board_build.f_cpu: 240000000L
-    board_build.f_flash: 80000000L
-    board_build.flash_mode: qio
-    # board_build.flash_mode: dio
-    # board_build.psram_type: opi
-    board_build.memory_type: qio_opi
-
-    # board_build.hwids: 0X303A:0x1001
-    # board_connectivity: wifi, bluetooth
-
-    # board_debug.default_tool: esp-builtin
-    # board_debug.onboard_tools: esp-builtin
-    # board_debug.openocd_target: esp32s3.cfg
-
-    # board_frameworks: arduino, espidf
-
-    # board_name: Seeed Studio XIAO ESP32S3 Sense:
+# No platformio_options here: this board builds with the native esp-idf toolchain, where
+# PlatformIO options are silently ignored and emit a build warning. Each old key is
+# expressed with its native esp32:/esphome: equivalent instead:
+#   board_build.flash_mode: qio    -> esp32.flash_mode: qio
+#   board_build.f_flash: 80000000L -> esp32.flash_frequency: 80MHZ
+#   board_build.memory_type: qio_opi -> psram.mode: octal (octal PSRAM over quad flash)
+#   extra_flags (-DBOARD_HAS_PSRAM)    -> psram: (declares PSRAM to ESP-IDF)
+#   extra_flags (-DTF_LITE_*/-DESP_NN) -> components/tflite_micro_helper/__init__.py (all CPUs)
+#   board_name, build_flags, hwids, debug.* -> PlatformIO metadata, unused by esp-idf
 
 substitutions:
   # board and compilation
@@ -78,6 +63,8 @@ esp32:
   # variant: esp32s3
   cpu_frequency: 240MHZ
   flash_size: 8MB
+  flash_mode: qio  # board_build.flash_mode: qio
+  flash_frequency: 80MHZ  # board_build.f_flash: 80000000L
   framework:
     type: ${framework}
     version: recommended
