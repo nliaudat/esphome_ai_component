@@ -17,9 +17,7 @@ number:
     restore_value: true
     set_action:
       - lambda: |-
-          if (id(${id_prefix}_flash_controller) != nullptr) {
-            id(${id_prefix}_flash_controller)->set_flash_pre_time((uint32_t)x);
-          }
+          id(${id_prefix}_flash_controller)->set_flash_pre_time((uint32_t)x);
 
   # Flash Post-Time
   - platform: template
@@ -36,6 +34,4 @@ number:
     restore_value: true
     set_action:
       - lambda: |-
-          if (id(${id_prefix}_flash_controller) != nullptr) {
-            id(${id_prefix}_flash_controller)->set_flash_post_time((uint32_t)x);
-          }
+          id(${id_prefix}_flash_controller)->set_flash_post_time((uint32_t)x);

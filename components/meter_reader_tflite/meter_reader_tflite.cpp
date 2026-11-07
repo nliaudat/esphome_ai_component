@@ -25,7 +25,7 @@ static const char *const TAG = "meter_reader_tflite";
 class ScopedTimer {
  public:
   ScopedTimer(const char *name) : name_(name), start_(millis()) {}
-  ~ScopedTimer() { ESP_LOGD(TAG, "%s took %u ms", this->name_, millis() - this->start_); }
+  ~ScopedTimer() { ESP_LOGD(TAG, "%s took %u ms", this->name_, static_cast<unsigned>(millis() - this->start_)); }
   uint32_t start_time() const { return this->start_; }
 
  private:
@@ -216,7 +216,7 @@ void MeterReaderTFLite::setup() {
 
   // 2. Load Model
   // Load model first to ensure we can retrieve input specifications for camera configuration.
-  ESP_LOGI(TAG, "Model loading will begin in %u ms...", MODEL_LOAD_DELAY_MS);
+  ESP_LOGI(TAG, "Model loading will begin in %u ms...", static_cast<unsigned>(MODEL_LOAD_DELAY_MS));
   // Delayed to ensure WiFi logger captures these startup logs
   this->set_timeout(MODEL_LOAD_DELAY_MS, [this]() {
     ESP_LOGI(TAG, "Starting model loading...");
@@ -413,10 +413,12 @@ void MeterReaderTFLite::loop() {
   if (state == FrameState::REQUESTED && (millis() - this->last_request_time_ > this->frame_request_timeout_ms_)) {
     FrameState expected = FrameState::REQUESTED;
     if (this->frame_state_.compare_exchange_strong(expected, FrameState::IDLE)) {
-      ESP_LOGE(TAG, "Frame request timed out (%u ms)! Camera Frame Failure.", this->frame_request_timeout_ms_);
+      ESP_LOGE(TAG, "Frame request timed out (%u ms)! Camera Frame Failure.",
+               static_cast<unsigned>(this->frame_request_timeout_ms_));
       if (this->main_logs_) {
         char msg[100];
-        snprintf(msg, sizeof(msg), "CRITICAL: Camera Frame Failure (Timeout %ums)", this->frame_request_timeout_ms_);
+        snprintf(msg, sizeof(msg), "CRITICAL: Camera Frame Failure (Timeout %ums)",
+                 static_cast<unsigned>(this->frame_request_timeout_ms_));
         this->main_logs_->publish_state(msg);
       }
       // Check if we need to force reset camera or just continue
@@ -730,8 +732,9 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
   if (this->debug_timing_) {
     // Acquisition: Time from Request (last_request_time_) to Arrival (pending_frame_acquisition_time_)
     // Wait: Time from Arrival to Start of Processing (preprocess_start)
-    ESP_LOGI(TAG, "Image Acquisition took %u ms", this->pending_frame_acquisition_time_ - this->last_request_time_);
-    ESP_LOGI(TAG, "Preprocessing (Crop/Scale) took %u ms", millis() - preprocess_start);
+    ESP_LOGI(TAG, "Image Acquisition took %u ms",
+             static_cast<unsigned>(this->pending_frame_acquisition_time_ - this->last_request_time_));
+    ESP_LOGI(TAG, "Preprocessing (Crop/Scale) took %u ms", static_cast<unsigned>(millis() - preprocess_start));
   }
 #endif
 
@@ -759,7 +762,7 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
   job->start_time = start_time;
   job->request_time = this->last_request_time_;  // Pass request time for cycle calculation
 
-  ESP_LOGI(TAG, "Job prepared. Enqueuing... (Preprocessing took %u ms)", millis() - start_time);
+  ESP_LOGI(TAG, "Job prepared. Enqueuing... (Preprocessing took %u ms)", static_cast<unsigned>(millis() - start_time));
 
 // Flush data cache for any PSRAM-backed crop buffers before cross-core read.
 // Core 1 writes these buffers to PSRAM, Core 0 reads them for inference.
@@ -1033,9 +1036,11 @@ void MeterReaderTFLite::set_generate_preview(bool generate) {
     if (buf) {
       this->preview_fallback_buffer_.reset(buf);
       this->preview_fallback_buffer_size_ = PREVIEW_FALLBACK_BUFFER_SIZE;
-      ESP_LOGI(TAG, "Pre-allocated preview fallback buffer: %u bytes (PSRAM preferred)", PREVIEW_FALLBACK_BUFFER_SIZE);
+      ESP_LOGI(TAG, "Pre-allocated preview fallback buffer: %u bytes (PSRAM preferred)",
+               static_cast<unsigned>(PREVIEW_FALLBACK_BUFFER_SIZE));
     } else {
-      ESP_LOGW(TAG, "Failed to allocate preview fallback buffer (%u bytes)", PREVIEW_FALLBACK_BUFFER_SIZE);
+      ESP_LOGW(TAG, "Failed to allocate preview fallback buffer (%u bytes)",
+               static_cast<unsigned>(PREVIEW_FALLBACK_BUFFER_SIZE));
     }
   } else if (!generate && this->preview_fallback_buffer_) {
     this->preview_fallback_buffer_.reset();
@@ -1117,7 +1122,7 @@ float MeterReaderTFLite::combine_readings(const esphome::StaticVector<float, 16>
     }
 
     // E7: avoid std::string += std::to_string(digit) heap allocs in the hot path.
-    char digit_buf[8];
+    char digit_buf[12];  // a single digit plus NUL; sized for the full int range
     snprintf(digit_buf, sizeof(digit_buf), "%d", digit);
     digit_string += digit_buf;
   }
@@ -1217,7 +1222,7 @@ MeterReaderTFLite::~MeterReaderTFLite() {
 }
 
 void MeterReaderTFLite::set_update_interval(uint32_t ms) {
-  ESP_LOGI(TAG, "Setting update interval: %u ms", ms);
+  ESP_LOGI(TAG, "Setting update interval: %u ms", static_cast<unsigned>(ms));
   PollingComponent::set_update_interval(ms);
 }
 
@@ -1247,7 +1252,7 @@ void MeterReaderTFLite::print_debug_info() {
 void MeterReaderTFLite::dump_config() {
   ESP_LOGCONFIG(TAG, "Meter Reader TFLite:");
   ESP_LOGCONFIG(TAG, "  Confidence Threshold: %.2f", this->confidence_threshold_);
-  ESP_LOGCONFIG(TAG, "  Update Interval: %u ms", this->get_update_interval());
+  ESP_LOGCONFIG(TAG, "  Update Interval: %u ms", static_cast<unsigned>(this->get_update_interval()));
 
 #ifdef SUPPORT_DOUBLE_BUFFERING
   ESP_LOGCONFIG(TAG, "  Pipeline: Double Buffering (Dual Core) ENABLED");
@@ -1354,7 +1359,8 @@ void MeterReaderTFLite::inference_task(void *arg) {
       free_inference_job(job);
 
       // Send back
-      ESP_LOGD(TAG, "Inference Task: TFLite done in %u ms. Sending to output queue...", millis() - start);
+      ESP_LOGD(TAG, "Inference Task: TFLite done in %u ms. Sending to output queue...",
+               static_cast<unsigned>(millis() - start));
       InferenceResult *res_ptr = res.get();
       if (xQueueSend(self->output_queue_, &res_ptr, 100 / portTICK_PERIOD_MS) != pdTRUE) {
         // Queue push failed, likely due to main loop backpressure. Drop result to prevent blocking.
@@ -1512,7 +1518,7 @@ void MeterReaderTFLite::update_calibration(float confidence) {
     this->calibration_.best_post = this->calibration_.current_post;
     this->calibration_.best_confidence = confidence;
     snprintf(log_msg, sizeof(log_msg), "Baseline Conf: %.1f%%. Testing Pre: %u", confidence * 100.0f,
-             this->calibration_.current_pre);
+             static_cast<unsigned>(this->calibration_.current_pre));
     next_step = true;
   } else {
     // Check if worse
@@ -1525,12 +1531,13 @@ void MeterReaderTFLite::update_calibration(float confidence) {
         this->calibration_.current_pre = this->calibration_.best_pre;     // Revert
         this->calibration_.current_post = this->calibration_.start_post;  // Start Post phase
         snprintf(log_msg, sizeof(log_msg), "Pre-Phase Done. Best: %ums. Starting Post-Phase.",
-                 this->calibration_.best_pre);
+                 static_cast<unsigned>(this->calibration_.best_pre));
       } else if (this->calibration_.state == FlashCalibrationHandler::CALIBRATING_POST) {
         this->calibration_.state = FlashCalibrationHandler::FINISHED;
         this->calibration_.current_post = this->calibration_.best_post;  // Revert
-        snprintf(log_msg, sizeof(log_msg), "Calibration Done! Best: Pre=%ums, Post=%ums", this->calibration_.best_pre,
-                 this->calibration_.best_post);
+        snprintf(log_msg, sizeof(log_msg), "Calibration Done! Best: Pre=%ums, Post=%ums",
+                 static_cast<unsigned>(this->calibration_.best_pre),
+                 static_cast<unsigned>(this->calibration_.best_post));
         if (this->main_logs_)
           this->main_logs_->publish_state(log_msg);
       }
@@ -1539,11 +1546,13 @@ void MeterReaderTFLite::update_calibration(float confidence) {
       this->calibration_.best_confidence = confidence;
       if (this->calibration_.state == FlashCalibrationHandler::CALIBRATING_PRE) {
         this->calibration_.best_pre = this->calibration_.current_pre;
-        snprintf(log_msg, sizeof(log_msg), "Pre-Time %ums OK (Wait 1s...)", this->calibration_.current_pre);
+        snprintf(log_msg, sizeof(log_msg), "Pre-Time %ums OK (Wait 1s...)",
+                 static_cast<unsigned>(this->calibration_.current_pre));
         next_step = true;
       } else {
         this->calibration_.best_post = this->calibration_.current_post;
-        snprintf(log_msg, sizeof(log_msg), "Post-Time %ums OK (Wait 1s...)", this->calibration_.current_post);
+        snprintf(log_msg, sizeof(log_msg), "Post-Time %ums OK (Wait 1s...)",
+                 static_cast<unsigned>(this->calibration_.current_post));
         next_step = true;
       }
     }
@@ -1581,8 +1590,8 @@ void MeterReaderTFLite::update_calibration(float confidence) {
   } else {
     // Finished, do final logging
     char fin[100];
-    snprintf(fin, sizeof(fin), "Done. Optimal: Pre=%ums, Post=%ums", this->calibration_.best_pre,
-             this->calibration_.best_post);
+    snprintf(fin, sizeof(fin), "Done. Optimal: Pre=%ums, Post=%ums", static_cast<unsigned>(this->calibration_.best_pre),
+             static_cast<unsigned>(this->calibration_.best_post));
     if (this->main_logs_)
       this->main_logs_->publish_state(fin);
     if (this->inference_logs_)

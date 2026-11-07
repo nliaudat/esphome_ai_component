@@ -12,14 +12,10 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     turn_on_action:
       - lambda: |-
-          if (id(${id_prefix}_validator) != nullptr) {
-            id(${id_prefix}_validator)->set_allow_negative_rates(true);
-          }
+          id(${id_prefix}_validator)->set_allow_negative_rates(true);
     turn_off_action:
       - lambda: |-
-          if (id(${id_prefix}_validator) != nullptr) {
-            id(${id_prefix}_validator)->set_allow_negative_rates(false);
-          }
+          id(${id_prefix}_validator)->set_allow_negative_rates(false);
 
   # Enable Smart Validation
   - platform: template
@@ -31,14 +27,10 @@ switch:
     restore_mode: RESTORE_DEFAULT_ON
     turn_on_action:
       - lambda: |-
-          if (id(${id_prefix}_validator) != nullptr) {
-            id(${id_prefix}_validator)->set_enable_smart_validation(true);
-          }
+          id(${id_prefix}_validator)->set_enable_smart_validation(true);
     turn_off_action:
       - lambda: |-
-          if (id(${id_prefix}_validator) != nullptr) {
-            id(${id_prefix}_validator)->set_enable_smart_validation(false);
-          }
+          id(${id_prefix}_validator)->set_enable_smart_validation(false);
 
   # Strict Confidence Check
   - platform: template
@@ -50,14 +42,10 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     turn_on_action:
       - lambda: |-
-          if (id(${id_prefix}_validator) != nullptr) {
-            id(${id_prefix}_validator)->set_strict_confidence_check(true);
-          }
+          id(${id_prefix}_validator)->set_strict_confidence_check(true);
     turn_off_action:
       - lambda: |-
-          if (id(${id_prefix}_validator) != nullptr) {
-            id(${id_prefix}_validator)->set_strict_confidence_check(false);
-          }
+          id(${id_prefix}_validator)->set_strict_confidence_check(false);
 
 number:
   # Max Absolute Difference
@@ -75,9 +63,7 @@ number:
     restore_value: true
     set_action:
       - lambda: |-
-          if (id(${id_prefix}_validator) != nullptr) {
-            id(${id_prefix}_validator)->set_max_absolute_diff((int)x);
-          }
+          id(${id_prefix}_validator)->set_max_absolute_diff((int)x);
 
   # Max Rate Change (percentage)
   - platform: template
@@ -94,9 +80,7 @@ number:
     restore_value: true
     set_action:
       - lambda: |-
-          if (id(${id_prefix}_validator) != nullptr) {
-            id(${id_prefix}_validator)->set_max_rate_change(x / 100.0);  // Convert % to decimal
-          }
+          id(${id_prefix}_validator)->set_max_rate_change(x / 100.0);  // Convert % to decimal
 
   # Smart Validation Window
   - platform: template
@@ -113,9 +97,7 @@ number:
     restore_value: true
     set_action:
       - lambda: |-
-          if (id(${id_prefix}_validator) != nullptr) {
-            id(${id_prefix}_validator)->set_smart_validation_window((int)x);
-          }
+          id(${id_prefix}_validator)->set_smart_validation_window((int)x);
 
   # High Confidence Threshold
   - platform: template
@@ -132,9 +114,7 @@ number:
     restore_value: true
     set_action:
       - lambda: |-
-          if (id(${id_prefix}_validator) != nullptr) {
-            id(${id_prefix}_validator)->set_high_confidence_threshold(x / 100.0);
-          }
+          id(${id_prefix}_validator)->set_high_confidence_threshold(x / 100.0);
 
   # Per-Digit Confidence Threshold
   - platform: template
@@ -151,6 +131,4 @@ number:
     restore_value: true
     set_action:
       - lambda: |-
-          if (id(${id_prefix}_validator) != nullptr) {
-            id(${id_prefix}_validator)->set_per_digit_confidence_threshold(x / 100.0);
-          }
+          id(${id_prefix}_validator)->set_per_digit_confidence_threshold(x / 100.0);

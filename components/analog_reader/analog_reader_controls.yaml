@@ -23,14 +23,10 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     turn_on_action:
       - lambda: |-
-          if (id(${analog_reader_id}) != nullptr) {
-            id(${analog_reader_id})->set_pause_processing(true);
-          }
+          id(${analog_reader_id})->set_pause_processing(true);
     turn_off_action:
       - lambda: |-
-          if (id(${analog_reader_id}) != nullptr) {
-            id(${analog_reader_id})->set_pause_processing(false);
-          }
+          id(${analog_reader_id})->set_pause_processing(false);
 
   # Auto Contrast (Min-Max Normalization)
   - platform: template
@@ -42,14 +38,10 @@ switch:
     restore_mode: RESTORE_DEFAULT_ON
     turn_on_action:
       - lambda: |-
-          if (id(${analog_reader_id}) != nullptr) {
-            id(${analog_reader_id})->set_all_auto_contrast(true);
-          }
+          id(${analog_reader_id})->set_all_auto_contrast(true);
     turn_off_action:
       - lambda: |-
-          if (id(${analog_reader_id}) != nullptr) {
-            id(${analog_reader_id})->set_all_auto_contrast(false);
-          }
+          id(${analog_reader_id})->set_all_auto_contrast(false);
 
   # Debug Visualization
   - platform: template
@@ -61,14 +53,10 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     turn_on_action:
       - lambda: |-
-          if (id(${analog_reader_id}) != nullptr) {
-            id(${analog_reader_id})->set_debug(true);
-          }
+          id(${analog_reader_id})->set_debug(true);
     turn_off_action:
       - lambda: |-
-          if (id(${analog_reader_id}) != nullptr) {
-            id(${analog_reader_id})->set_debug(false);
-          }
+          id(${analog_reader_id})->set_debug(false);
 
 number:
   # Analog Update Interval
@@ -87,12 +75,10 @@ number:
     restore_value: true
     set_action:
       - lambda: |-
-          if (id(${analog_reader_id}) != nullptr) {
-            id(${analog_reader_id})->set_update_interval((uint32_t)(x * 1000));
-            // set_update_interval only stores the value; restart the poller so it takes effect
-            id(${analog_reader_id})->stop_poller();
-            id(${analog_reader_id})->start_poller();
-          }
+          id(${analog_reader_id})->set_update_interval((uint32_t)(x * 1000));
+          // set_update_interval only stores the value; restart the poller so it takes effect
+          id(${analog_reader_id})->stop_poller();
+          id(${analog_reader_id})->start_poller();
 
   # Analog Contrast
   - platform: template
@@ -108,9 +94,7 @@ number:
     restore_value: true
     set_action:
       - lambda: |-
-          if (id(${analog_reader_id}) != nullptr) {
-            id(${analog_reader_id})->set_all_contrast(x);
-          }
+          id(${analog_reader_id})->set_all_contrast(x);
 
 select:
   # Algorithm Selection
@@ -130,8 +114,6 @@ select:
     initial_option: "legacy"
     set_action:
       - lambda: |-
-          if (id(${analog_reader_id}) != nullptr) {
-            std::string algo = x;
-            id(${analog_reader_id})->set_all_algorithm(algo);
-            ESP_LOGI("analog_controls", "Algorithm changed to: %s", algo.c_str());
-          }
+          std::string algo = x;
+          id(${analog_reader_id})->set_all_algorithm(algo);
+          ESP_LOGI("analog_controls", "Algorithm changed to: %s", algo.c_str());

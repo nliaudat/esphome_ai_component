@@ -12,14 +12,10 @@ switch:
     restore_mode: RESTORE_DEFAULT_ON
     turn_on_action:
       - lambda: |-
-          if (id(${id_prefix}_validator) != nullptr) {
-            id(${id_prefix}_validator)->set_enable_dial_correction(true);
-          }
+          id(${id_prefix}_validator)->set_enable_dial_correction(true);
     turn_off_action:
       - lambda: |-
-          if (id(${id_prefix}_validator) != nullptr) {
-            id(${id_prefix}_validator)->set_enable_dial_correction(false);
-          }
+          id(${id_prefix}_validator)->set_enable_dial_correction(false);
 
 number:
   # Dial Correction High Threshold
@@ -37,9 +33,7 @@ number:
     restore_value: true
     set_action:
       - lambda: |-
-          if (id(${id_prefix}_validator) != nullptr) {
-            id(${id_prefix}_validator)->set_dial_correction_high_threshold(x / 100.0);
-          }
+          id(${id_prefix}_validator)->set_dial_correction_high_threshold(x / 100.0);
 
   # Dial Correction Low Threshold
   - platform: template
@@ -56,6 +50,4 @@ number:
     restore_value: true
     set_action:
       - lambda: |-
-          if (id(${id_prefix}_validator) != nullptr) {
-            id(${id_prefix}_validator)->set_dial_correction_low_threshold(x / 100.0);
-          }
+          id(${id_prefix}_validator)->set_dial_correction_low_threshold(x / 100.0);

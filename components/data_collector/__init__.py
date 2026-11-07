@@ -35,8 +35,8 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_UPLOAD_URL): cv.string,
         cv.Optional("debug", default=False): cv.boolean,
         cv.Optional(CONF_USERNAME): cv.string,
-        cv.Optional(CONF_PASSWORD): cv.string,
-        cv.Optional(CONF_API_KEY): cv.string,
+        cv.Optional(CONF_PASSWORD): cv.sensitive(cv.string),
+        cv.Optional(CONF_API_KEY): cv.sensitive(cv.string),
         cv.Optional(CONF_UPLOAD_INTERVAL, default="60s"): _validate_upload_interval,
         cv.Optional(CONF_UPLOAD_QUEUE_SIZE, default=5): cv.int_range(min=1, max=20),
         cv.Optional(CONF_WEB_SUBMIT): switch.switch_schema(

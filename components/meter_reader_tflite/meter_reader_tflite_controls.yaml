@@ -12,14 +12,10 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     turn_on_action:
       - lambda: |-
-          if (id(${id_prefix}_meter_reader) != nullptr) {
-            id(${id_prefix}_meter_reader)->set_pause_processing(true);
-          }
+          id(${id_prefix}_meter_reader)->set_pause_processing(true);
     turn_off_action:
       - lambda: |-
-          if (id(${id_prefix}_meter_reader) != nullptr) {
-            id(${id_prefix}_meter_reader)->set_pause_processing(false);
-          }
+          id(${id_prefix}_meter_reader)->set_pause_processing(false);
 
   # Setup Mode (Preview)
   - platform: template
@@ -31,14 +27,10 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     turn_on_action:
       - lambda: |-
-          if (id(${id_prefix}_meter_reader) != nullptr) {
-            id(${id_prefix}_meter_reader)->set_generate_preview(true);
-          }
+          id(${id_prefix}_meter_reader)->set_generate_preview(true);
     turn_off_action:
       - lambda: |-
-          if (id(${id_prefix}_meter_reader) != nullptr) {
-            id(${id_prefix}_meter_reader)->set_generate_preview(false);
-          }
+          id(${id_prefix}_meter_reader)->set_generate_preview(false);
 
   # # Show Crop Areas
   # - platform: template
@@ -102,12 +94,10 @@ number:
     restore_value: true
     set_action:
       - lambda: |-
-          if (id(${id_prefix}_meter_reader) != nullptr) {
-            id(${id_prefix}_meter_reader)->set_update_interval((uint32_t)(x * 1000));
-            // set_update_interval only stores the value; restart the poller so it takes effect
-            id(${id_prefix}_meter_reader)->stop_poller();
-            id(${id_prefix}_meter_reader)->start_poller();
-          }
+          id(${id_prefix}_meter_reader)->set_update_interval((uint32_t)(x * 1000));
+          // set_update_interval only stores the value; restart the poller so it takes effect
+          id(${id_prefix}_meter_reader)->stop_poller();
+          id(${id_prefix}_meter_reader)->start_poller();
 
   # Confidence Threshold (only used when no external validator is configured)
   # - platform: template
@@ -160,9 +150,7 @@ number:
     optimistic: true
     set_action:
       - lambda: |-
-          if (id(${id_prefix}_meter_reader) != nullptr) {
-            id(${id_prefix}_meter_reader)->set_last_valid_value(x);
-          }
+          id(${id_prefix}_meter_reader)->set_last_valid_value(x);
 
 button:
   # # Start Flash Calibration
@@ -241,9 +229,7 @@ text:
     max_length: 20
     set_action:
       - lambda: |-
-          if (id(${id_prefix}_meter_reader) != nullptr) {
-            id(${id_prefix}_meter_reader)->set_last_valid_value(x);
-          }
+          id(${id_prefix}_meter_reader)->set_last_valid_value(x);
 
 # API Services
 api:
