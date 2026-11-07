@@ -21,7 +21,8 @@ namespace esp32_camera_utils {
  *
  * Window coordinates are in the pixels of the esp32_camera `resolution`, not
  * the full sensor. The native API clamps them to the frame and applies the
- * per-sensor readout rules.
+ * per-sensor readout rules, so a window must fit inside `resolution`; see
+ * window_fits_frame().
  */
 class CameraWindowControl {
  public:
@@ -133,6 +134,20 @@ class CameraWindowControl {
    * sensors publish the configured resolution and only crop/scale into it.
    */
   bool window_defines_frame(esp32_camera::ESP32Camera *camera) const;
+
+  /**
+   * @brief The pixels a window is measured in: the esp32_camera `resolution`.
+   *
+   * Falls back to the given values while the sensor is not initialised yet.
+   */
+  std::pair<int, int> frame_size(int fallback_width, int fallback_height) const;
+
+  /**
+   * @brief True when the window lies inside a frame of the given size.
+   *
+   * The camera clamps a larger window, which silently changes the crop.
+   */
+  static bool window_fits_frame(const WindowConfig &config, int frame_width, int frame_height);
 
   // Sensor detection and specific implementations
   std::string get_sensor_name(sensor_t *sensor) const;

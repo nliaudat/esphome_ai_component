@@ -1,4 +1,5 @@
 import logging
+import re
 
 import esphome.codegen as cg
 from esphome.components import esp32, esp32_camera, sensor
@@ -116,6 +117,60 @@ def _get_camera_config(source, camera_id=None):
     return None
 
 
+def _frame_dimensions(camera_conf):
+    """Return the (width, height) of the camera frame, or None when unknown.
+
+    `resolution` is a validated esp32_camera enum member, so its dimensions are
+    read back from the member name (``ESP32_CAMERA_SIZE_640X480``).
+    """
+    if camera_conf is None:
+        return None
+    resolution = camera_conf.get(esp32_camera.CONF_RESOLUTION)
+    if resolution is None:
+        return None
+    match = re.search(r"(\d+)X(\d+)", str(resolution))
+    if match is None:
+        return None
+    return int(match.group(1)), int(match.group(2))
+
+
+def _check_window_fits(config):
+    """Reject a window that the frame would silently clamp.
+
+    The native esp32_camera window is measured in `resolution` pixels and is
+    clamped to the frame, so a window reaching past the frame is cropped
+    differently than configured.
+    """
+    camera_conf = _get_camera_config(fv.full_config.get(), config.get(CONF_CAMERA_ID))
+    window = config.get(CONF_WINDOW)
+    if window is None:
+        window = config.get(CONF_CAMERA_WINDOW)
+    if window is None and camera_conf is not None:
+        window = camera_conf.get(CONF_WINDOW)
+    if window is None:
+        return
+
+    frame = _frame_dimensions(camera_conf)
+    if frame is None:
+        return
+
+    frame_width, frame_height = frame
+    right = window[CONF_OFFSET_X] + window[CONF_WIDTH]
+    bottom = window[CONF_OFFSET_Y] + window[CONF_HEIGHT]
+    if right <= frame_width and bottom <= frame_height:
+        return
+
+    raise cv.Invalid(
+        f"Window at ({window[CONF_OFFSET_X]},{window[CONF_OFFSET_Y]}) sized "
+        f"{window[CONF_WIDTH]}x{window[CONF_HEIGHT]} reaches ({right},{bottom}), which "
+        f"is outside the {frame_width}x{frame_height} camera frame. Windows are "
+        f"measured in esp32_camera.resolution pixels and are clamped to the frame, "
+        f"which silently changes the crop. Raise esp32_camera.resolution to at least "
+        f"{right}x{bottom}; the full sensor frame (1600x1200 for the OV2640) keeps "
+        f"window coordinates in sensor pixels."
+    )
+
+
 def _final_validate(config):
     camera_conf = _get_camera_config(fv.full_config.get(), config.get(CONF_CAMERA_ID))
     if (
@@ -127,6 +182,8 @@ def _final_validate(config):
             "Set the camera window in esp32_camera.window, not in "
             "esp32_camera_utils; both would be applied at startup."
         )
+
+    _check_window_fits(config)
 
 
 FINAL_VALIDATE_SCHEMA = _final_validate

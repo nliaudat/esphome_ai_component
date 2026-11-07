@@ -21,6 +21,43 @@ void Esp32CameraUtils::setup() {
   }
 }
 
+void Esp32CameraUtils::loop() {
+  if (!this->has_config_ || this->window_reported_ || this->camera_ == nullptr)
+    return;
+
+  // Every component has run setup() before the first loop(), so the frame the
+  // window is measured against is known here (not in setup()).
+  this->window_reported_ = true;
+  this->report_window_frame_();
+}
+
+void Esp32CameraUtils::report_window_frame_() {
+  this->warn_if_window_clamped_(this->offset_x_, this->offset_y_, this->width_, this->height_);
+
+  const CameraWindowControl::WindowConfig window{this->offset_x_, this->offset_y_, this->width_, this->height_, true};
+  const std::pair<int, int> frame = this->window_control_.frame_size(this->camera_width_, this->camera_height_);
+  const std::pair<int, int> published = this->window_control_.update_dimensions_after_window(
+      this->camera_, window, this->camera_width_, this->camera_height_);
+  ESP_LOGI(TAG, "Camera window %d,%d %dx%d in the %dx%d frame publishes %dx%d images", window.offset_x, window.offset_y,
+           window.width, window.height, frame.first, frame.second, published.first, published.second);
+}
+
+void Esp32CameraUtils::warn_if_window_clamped_(int offset_x, int offset_y, int width, int height) {
+  const CameraWindowControl::WindowConfig window{offset_x, offset_y, width, height, true};
+  const std::pair<int, int> frame = this->window_control_.frame_size(this->camera_width_, this->camera_height_);
+  // An unknown frame size cannot be checked against.
+  if (frame.first <= 0 || frame.second <= 0)
+    return;
+  if (CameraWindowControl::window_fits_frame(window, frame.first, frame.second))
+    return;
+
+  ESP_LOGW(TAG,
+           "Camera window %d,%d %dx%d does not fit the %dx%d frame the camera reads out; the camera clamps it, "
+           "which moves the crop. Set esp32_camera.resolution to at least %dx%d (the full sensor frame keeps "
+           "window coordinates in sensor pixels).",
+           offset_x, offset_y, width, height, frame.first, frame.second, offset_x + width, offset_y + height);
+}
+
 void Esp32CameraUtils::dump_config() {
   ESP_LOGCONFIG(TAG, "ESP32 Camera Utils:");
   if (this->has_config_) {
@@ -35,6 +72,9 @@ bool Esp32CameraUtils::set_camera_window(int offset_x, int offset_y, int width, 
   bool success = this->window_control_.set_window(this->camera_, offset_x, offset_y, width, height);
 
   if (success) {
+    // The window is measured in `resolution` pixels; the camera clamps a larger one.
+    this->warn_if_window_clamped_(offset_x, offset_y, width, height);
+
     // The published frame size depends on the sensor: the OV2640 publishes the
     // window size, the other supported sensors keep the configured resolution.
     auto new_dims = this->window_control_.update_dimensions_after_window(

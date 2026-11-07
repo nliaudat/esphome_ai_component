@@ -58,6 +58,13 @@ coordinates. For example, with `resolution: 640x480`, a window of
 `offset_x: 160, offset_y: 80, width: 320, height: 240` is valid, while a
 full-sensor window such as `width: 1600` would be clamped.
 
+A window must therefore fit inside `resolution`: `offset_x + width` and
+`offset_y + height` are checked against it, and a window that reaches further is
+rejected at build time (and reported by a warning at runtime). Because a
+full-sensor window no longer fits a small `resolution`, digital zoom wants
+`camera_resolution` at the sensor's full frame (`1600x1200` for the OV2640)
+so that window numbers keep meaning sensor pixels.
+
 Supported sensors: **OV2640** (JPEG output only), **OV3660**, **OV5640**,
 **SC101IOT** and **SC030IOT**. The published frame size depends on the sensor:
 

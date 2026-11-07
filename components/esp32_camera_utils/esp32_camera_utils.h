@@ -18,6 +18,7 @@ namespace esp32_camera_utils {
 class Esp32CameraUtils : public Component {
  public:
   void setup() override;
+  void loop() override;
   void dump_config() override;
 
   void set_camera_window_config(int offset_x, int offset_y, int width, int height) {
@@ -79,12 +80,25 @@ class Esp32CameraUtils : public Component {
 #endif
 
  protected:
+  /**
+   * @brief Log the configured window against the frame and the published size.
+   *
+   * A window is measured in esp32_camera `resolution` pixels and is clamped to
+   * the frame, which silently changes the crop, so a window that does not fit
+   * is reported.
+   */
+  void report_window_frame_();
+
+  /// Warn when the camera would clamp the given window to its frame.
+  void warn_if_window_clamped_(int offset_x, int offset_y, int width, int height);
+
   int offset_x_{0};
   int offset_y_{0};
   int width_{0};
   int height_{0};
   bool has_config_{false};
-  float rotation_{0.0f};  ///< Image rotation in degrees
+  bool window_reported_{false};  ///< The window/frame diagnostic is logged once
+  float rotation_{0.0f};         ///< Image rotation in degrees
 
   int scaler_width_{0};
   int scaler_height_{0};

@@ -275,6 +275,17 @@ bool CameraWindowControl::window_defines_frame(esp32_camera::ESP32Camera *camera
   return sensor != nullptr && sensor->id.PID == OV2640_PID && sensor->pixformat == PIXFORMAT_JPEG;
 }
 
+std::pair<int, int> CameraWindowControl::frame_size(int fallback_width, int fallback_height) const {
+  return frame_dimensions(fallback_width, fallback_height);
+}
+
+bool CameraWindowControl::window_fits_frame(const WindowConfig &config, int frame_width, int frame_height) {
+  if (!config.validate())
+    return false;
+
+  return config.offset_x + config.width <= frame_width && config.offset_y + config.height <= frame_height;
+}
+
 std::pair<int, int> CameraWindowControl::update_dimensions_after_window(esp32_camera::ESP32Camera *camera,
                                                                         const WindowConfig &config, int original_width,
                                                                         int original_height) const {
