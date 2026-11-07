@@ -72,7 +72,7 @@ bool FlashlightCoordinator::update_scheduling() {
     uint32_t schedule_time = (this->update_interval_ > this->pre_time_) ? this->update_interval_ - this->pre_time_ : 0;
 
     if (schedule_time > 0 && this->parent_) {
-      ESP_LOGI(TAG, "Scheduling flash for next cycle in %u ms", schedule_time);
+      ESP_LOGI(TAG, "Scheduling flash for next cycle in %u ms", static_cast<unsigned>(schedule_time));
 
       // Use unique timeout names to avoid collisions with multiple instances
       std::string timeout_on = "flash_on_" + std::to_string(reinterpret_cast<uintptr_t>(this));

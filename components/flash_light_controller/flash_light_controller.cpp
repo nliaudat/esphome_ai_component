@@ -19,8 +19,8 @@ void FlashLightController::setup() {
   ESP_LOGCONFIG(TAG, "Setting up Flash Light Controller...");
   if (this->flash_light_) {
     ESP_LOGCONFIG(TAG, "  Flash Light: Configured");
-    ESP_LOGCONFIG(TAG, "  Pre-Time: %u ms", this->flash_pre_time_);
-    ESP_LOGCONFIG(TAG, "  Post-Time: %u ms", this->flash_post_time_);
+    ESP_LOGCONFIG(TAG, "  Pre-Time: %u ms", static_cast<unsigned>(this->flash_pre_time_));
+    ESP_LOGCONFIG(TAG, "  Post-Time: %u ms", static_cast<unsigned>(this->flash_post_time_));
   } else {
     ESP_LOGCONFIG(TAG, "  Flash Light: Not configured");
   }
@@ -65,7 +65,8 @@ void FlashLightController::initiate_capture_sequence(CaptureCallback callback) {
   this->pending_callbacks_.clear();
   this->pending_callbacks_.push_back(std::move(callback));
   if (this->debug_) {
-    ESP_LOGD(TAG, "Starting flash sequence (Pre: %u ms, Post: %u ms)", this->flash_pre_time_, this->flash_post_time_);
+    ESP_LOGD(TAG, "Starting flash sequence (Pre: %u ms, Post: %u ms)", static_cast<unsigned>(this->flash_pre_time_),
+             static_cast<unsigned>(this->flash_post_time_));
   }
 
   this->enable_flash();
@@ -73,8 +74,8 @@ void FlashLightController::initiate_capture_sequence(CaptureCallback callback) {
   // Schedule callback after pre-time (named so the sequence can be cancelled)
   this->set_timeout(TIMEOUT_CAPTURE, this->flash_pre_time_, [this]() {
     if (this->debug_) {
-      ESP_LOGD(TAG, "Flash warmup complete (%u ms elapsed), executing %u capture callback(s)", this->flash_pre_time_,
-               static_cast<unsigned>(this->pending_callbacks_.size()));
+      ESP_LOGD(TAG, "Flash warmup complete (%u ms elapsed), executing %u capture callback(s)",
+               static_cast<unsigned>(this->flash_pre_time_), static_cast<unsigned>(this->pending_callbacks_.size()));
     }
     this->captured_ = true;
     // Swap instead of moving into a local: keeps both vectors' capacity for the next cycle.
@@ -101,7 +102,7 @@ void FlashLightController::schedule_flash_off_() {
     this->captured_ = false;
     this->is_active_ = false;
     if (this->debug_) {
-      ESP_LOGD(TAG, "Flash sequence complete (Post-time %u ms finished)", this->flash_post_time_);
+      ESP_LOGD(TAG, "Flash sequence complete (Post-time %u ms finished)", static_cast<unsigned>(this->flash_post_time_));
     }
   });
 }
