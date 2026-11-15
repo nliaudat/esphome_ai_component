@@ -215,18 +215,27 @@
                             style="display: none; position: absolute; background-color: #f9f9f9; min-width: 100%; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 10;">
                             <div style="padding: 5px 10px; font-weight: bold; background: #eee;">OV2640</div>
                             <a href="#" style="color: black; padding: 8px 16px; display: block; text-decoration:none;"
-                                onclick="setSensorRes(1600, 1200, 'OV2640 (1600x1200)'); document.getElementById('resDropdown').style.display='none'; return false;">UXGA
+                                onclick="setSensorRes('ov2640', 1600, 1200, 'OV2640 (1600x1200)'); document.getElementById('resDropdown').style.display='none'; return false;">UXGA
                                 (1600x1200)</a>
                             <div style="padding: 5px 10px; font-weight: bold; background: #eee;">OV3660</div>
                             <a href="#" style="color: black; padding: 8px 16px; display: block; text-decoration:none;"
-                                onclick="setSensorRes(2048, 1536, 'OV3660 (2048x1536)'); document.getElementById('resDropdown').style.display='none'; return false;">QXGA
+                                onclick="setSensorRes('ov3660', 2048, 1536, 'OV3660 (2048x1536)'); document.getElementById('resDropdown').style.display='none'; return false;">QXGA
                                 (2048x1536)</a>
                             <div style="padding: 5px 10px; font-weight: bold; background: #eee;">OV5640</div>
                             <a href="#" style="color: black; padding: 8px 16px; display: block; text-decoration:none;"
-                                onclick="setSensorRes(2592, 1944, 'OV5640 (2592x1944)'); document.getElementById('resDropdown').style.display='none'; return false;">QSXGA
+                                onclick="setSensorRes('ov5640', 2592, 1944, 'OV5640 (2592x1944)'); document.getElementById('resDropdown').style.display='none'; return false;">QSXGA
                                 (2592x1944)</a>
+                            <div style="padding: 5px 10px; font-weight: bold; background: #eee;">SC101IOT / SC030IOT</div>
+                            <a href="#" style="color: black; padding: 8px 16px; display: block; text-decoration:none;"
+                                onclick="setSensorRes('sc101iot', 1280, 720, 'SC101IOT (1280x720)'); document.getElementById('resDropdown').style.display='none'; return false;">1280x720
+                                (no scaler)</a>
+                            <a href="#" style="color: black; padding: 8px 16px; display: block; text-decoration:none;"
+                                onclick="setSensorRes('sc030iot', 640, 480, 'SC030IOT (640x480)'); document.getElementById('resDropdown').style.display='none'; return false;">640x480
+                                (no scaler)</a>
                         </div>
                     </div>
+                    <p class="help-text" style="margin:5px 0 0;">Only the OV2640, OV3660, OV5640,
+                        SC101IOT and SC030IOT can read out a window.</p>
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 5px;">
@@ -236,7 +245,8 @@
                             onchange="generateOutput()" style="width: 70px;"></div>
                 </div>
                 <p class="help-text" style="margin-bottom: 10px;">Must match <code>esp32_camera.resolution</code>.
-                    Window coordinates are in these pixels, not the full sensor.</p>
+                    OV2640/OV3660/OV5640 count the window in these pixels; SC101IOT/SC030IOT count in
+                    whole-sensor pixels and require the window to equal the resolution.</p>
 
                 <div style="display: flex; gap: 5px; align-items: center; margin-bottom: 10px;">
                     <input type="checkbox" id="force43" onchange="state.force43 = this.checked; generateOutput()">
@@ -322,7 +332,7 @@
                     <li><strong>Draw ROI</strong>: Click and drag on the image to draw a BLUE rectangle. This is the only area that will be sent to the AI.</li>
                     <li><strong>Why?</strong>: A smaller ROI (Window) acts like a digital zoom and improves frame rate/performance.</li>
                     <li><strong>Tip</strong>: Use 'Force 4:3' if you want standard aspect ratio.</li>
-                    <li><strong>Apply</strong>: The board must be <strong>compiled</strong> with this ROI, or the crop zone can be set at runtime via a Home Assistant command.</li>
+                    <li><strong>Apply</strong>: Merge the generated <code>window:</code> block into <code>esp32_camera:</code> and compile, or call <code>esp32_camera.set_window</code> / <code>esp32_camera.reset_window</code> at runtime.</li>
                 </ol>
             </div>
         </div>
@@ -337,7 +347,7 @@
             roi: null,
             isDrawing: false,
             startPos: null,
-            sensorRes: { w: 1600, h: 1200, name: "OV2640 UXGA (1600x1200)" },
+            sensorRes: { id: "ov2640", w: 1600, h: 1200, name: "OV2640 UXGA (1600x1200)" },
             force43: false,
             importedConfig: null,
             isManualUpdate: false
@@ -355,10 +365,33 @@
         }
 
         // --- YAML Parsing (for config upload) ---
+        const RESOLUTION_NAMES = {
+            '160x120': [160, 120], 'qqvga': [160, 120],
+            '176x144': [176, 144], 'qcif': [176, 144],
+            '240x176': [240, 176], 'hqvga': [240, 176],
+            '320x240': [320, 240], 'qvga': [320, 240],
+            '400x296': [400, 296], 'cif': [400, 296],
+            '640x480': [640, 480], 'vga': [640, 480],
+            '800x600': [800, 600], 'svga': [800, 600],
+            '1024x768': [1024, 768], 'xga': [1024, 768],
+            '1280x1024': [1280, 1024], 'sxga': [1280, 1024],
+            '1600x1200': [1600, 1200], 'uxga': [1600, 1200],
+            '1920x1080': [1920, 1080], 'fhd': [1920, 1080],
+            '2048x1536': [2048, 1536], 'qxga': [2048, 1536],
+            '2560x1440': [2560, 1440], 'qhd': [2560, 1440],
+            '2560x1600': [2560, 1600], 'wqxga': [2560, 1600],
+            '2592x1944': [2592, 1944],
+            '1080x1920': [1080, 1920], 'pfhd': [1080, 1920],
+            '720x1280': [720, 1280], 'phd': [720, 1280],
+            '864x1536': [864, 1536], 'p3mp': [864, 1536],
+            '2560x1920': [2560, 1920], 'qsxga': [2560, 1920]
+        };
+
         function parseYamlText(text) {
             const lines = text.replace(/\r/g, '').split('\n');
             const sections = {
                 globals: [],
+                esp32_camera: [],
                 esp32_camera_utils: [],
                 analog_reader: []
             };
@@ -401,13 +434,26 @@
             let sensorW = null;
             let sensorH = null;
 
-            const cameraText = sections.esp32_camera_utils.join('\n');
-            const rotationMatch = cameraText.match(/(?:^|\n)\s*rotation:\s*(.+)/);
+            const cameraText = sections.esp32_camera.join('\n');
+            const utilsText = sections.esp32_camera_utils.join('\n');
+            const rotationMatch = utilsText.match(/(?:^|\n)\s*rotation:\s*(.+)/);
             if (rotationMatch) rotation = parseValue(rotationMatch[1]);
-            const resolutionMatch = cameraText.match(/(?:^|\n)\s*camera_resolution:\s*(\d+)x(\d+)\s*/);
+
+            // `esp32_camera.resolution` (window lives there now), else the meter reader's
+            // informational `camera_resolution` on esp32_camera_utils.
+            const resolutionMatch = cameraText.match(/(?:^|\n)\s*resolution:\s*['"]?([A-Za-z0-9x]+)['"]?/i)
+                || utilsText.match(/(?:^|\n)\s*camera_resolution:\s*['"]?(\d+)x(\d+)['"]?/i);
             if (resolutionMatch) {
-                sensorW = parseFloat(resolutionMatch[1]);
-                sensorH = parseFloat(resolutionMatch[2]);
+                if (resolutionMatch[2] !== undefined) {
+                    sensorW = parseFloat(resolutionMatch[1]);
+                    sensorH = parseFloat(resolutionMatch[2]);
+                } else {
+                    const named = RESOLUTION_NAMES[String(resolutionMatch[1]).toLowerCase()];
+                    if (named) {
+                        sensorW = named[0];
+                        sensorH = named[1];
+                    }
+                }
             }
 
             return { rotation, sensorW, sensorH };
@@ -423,7 +469,12 @@
             }
 
             if (parsed.sensorW && parsed.sensorH) {
-                state.sensorRes = { w: parsed.sensorW, h: parsed.sensorH, name: `${parsed.sensorW}x${parsed.sensorH}` };
+                state.sensorRes = {
+                    id: state.sensorRes.id,
+                    w: parsed.sensorW,
+                    h: parsed.sensorH,
+                    name: `${parsed.sensorW}x${parsed.sensorH}`
+                };
                 const label = document.getElementById('sensor-res-label');
                 if (label) label.textContent = state.sensorRes.name;
             }
@@ -498,8 +549,8 @@
             return div;
         }
 
-        function setSensorRes(w, h, name) {
-            state.sensorRes = { w, h, name };
+        function setSensorRes(id, w, h, name) {
+            state.sensorRes = { id, w, h, name };
             document.getElementById('sensor-res-label').textContent = name;
             generateOutput();
         }
@@ -784,45 +835,70 @@
                 final_scale_y = target_h / unscaled_out_h;
             }
 
-            let comment_w = "# multiple of 8";
-            let comment_h = "# multiple of 8";
-            if (state.rotation === 90 || state.rotation === 270) {
-                comment_w += " (Visual Height)";
-                comment_h += " (Visual Width)";
+            const sensorId = state.sensorRes.id || 'ov2640';
+            const sensorFullW = state.sensorRes.w;
+            const sensorFullH = state.sensorRes.h;
+            let sensorNotes = [];
+            let windowUnit = `esp32_camera.resolution (${camera_w}x${camera_h}) pixels`;
+
+            if (state.roi && (sensorId === 'ov2640' || sensorId === 'ov3660' || sensorId === 'ov5640')) {
+                // A window is counted in frame pixels and clamped to the frame.
+                off_x = clamp(off_x, 0, Math.max(0, camera_w - w));
+                off_y = clamp(off_y, 0, Math.max(0, camera_h - h));
             }
 
-            lines.push(`# Preferred: add this to your esp32_camera block (uncomment it).`);
-            lines.push(`# Do not set both esp32_camera.window and camera_window.`);
-            lines.push(`# Coordinates are in the camera resolution (${camera_w}x${camera_h}), not the full sensor.`);
-            if (state.roi) {
-                if (off_x + w > camera_w) lines.push(`# WARNING: ROI width exceeds camera resolution!`);
-                if (off_y + h > camera_h) lines.push(`# WARNING: ROI height exceeds camera resolution!`);
+            if (sensorId === 'ov2640') {
+                if (state.roi) {
+                    w = Math.max(16, Math.floor(w / 16) * 16);
+                    h = Math.max(8, Math.floor(h / 8) * 8);
+                    off_x = clamp(off_x, 0, Math.max(0, camera_w - w));
+                    off_y = clamp(off_y, 0, Math.max(0, camera_h - h));
+                }
+                sensorNotes.push('OV2640: pixel_format must be JPEG.');
+                sensorNotes.push('OV2640: width is rounded down to 16 and height to 8 (JPEG blocks); the published frame is the window size.');
+            } else if (sensorId === 'ov3660' || sensorId === 'ov5640') {
+                const atFullSensor = camera_w >= sensorFullW && camera_h >= sensorFullH;
+                if (state.roi && atFullSensor && (w < camera_w || h < camera_h)) {
+                    sensorNotes.push('OV3660/OV5640 only scale down: at the sensor resolution a smaller window would need upscaling and is rejected. Lower resolution (e.g. 640x480) so the window maps to more sensor pixels.');
+                }
+            } else if (sensorId === 'sc101iot' || sensorId === 'sc030iot') {
+                if (state.roi) {
+                    w = camera_w;
+                    h = camera_h;
+                    off_x = clamp(off_x, 0, Math.max(0, sensorFullW - w));
+                    off_y = clamp(off_y, 0, Math.max(0, sensorFullH - h));
+                }
+                windowUnit = `whole-sensor pixels (${sensorFullW}x${sensorFullH})`;
+                sensorNotes.push('SC101IOT/SC030IOT have no scaler: the window must equal the resolution and only pans, it cannot zoom.');
+            }
 
-                lines.push(`# window:`);
-                lines.push(`#   offset_x: ${off_x} # multiple of 4`);
-                lines.push(`#   offset_y: ${off_y} # multiple of 4`);
-                lines.push(`#   width: ${w} ${comment_w}`);
-                lines.push(`#   height: ${h} ${comment_h}`);
+            lines.push(`# --- 1. esp32_camera: native window (preferred) ---`);
+            lines.push(`# Merge these keys into your existing esp32_camera: block; a second`);
+            lines.push(`# esp32_camera: key in the same file is a YAML error.`);
+            if (state.roi) {
+                lines.push(`# Window coordinates are in ${windowUnit}.`);
+                lines.push(`esp32_camera:`);
+                lines.push(`  window:`);
+                lines.push(`    offset_x: ${off_x}`);
+                lines.push(`    offset_y: ${off_y}`);
+                lines.push(`    width: ${w}`);
+                lines.push(`    height: ${h}`);
+                sensorNotes.forEach((note) => lines.push(`  # ${note}`));
+                lines.push(``);
+                lines.push(`# Runtime alternative (Home Assistant action or lambda):`);
+                lines.push(`# - esp32_camera.set_window: {id: \${id_prefix}_espcam, offset_x: ${off_x}, offset_y: ${off_y}, width: ${w}, height: ${h}}`);
+                lines.push(`# - esp32_camera.reset_window: \${id_prefix}_espcam`);
             } else {
-                lines.push(`# # No window defined (full frame)`);
+                lines.push(`# (no window: the whole frame is read out)`);
             }
 
             lines.push(``);
+            lines.push(`# --- 2. esp32_camera_utils: rotation ---`);
             lines.push(`esp32_camera_utils:`);
             lines.push(`  id: \${id_prefix}_camera_utils`);
             lines.push(`  camera_id: \${id_prefix}_espcam`);
             lines.push(`  # debug: true`);
-
-            if (state.roi) {
-                lines.push(`  # Compatibility alias for esp32_camera.window:`);
-                lines.push(`  camera_window:`);
-                lines.push(`    offset_x: ${off_x} # multiple of 4`);
-                lines.push(`    offset_y: ${off_y} # multiple of 4`);
-                lines.push(`    width: ${w} ${comment_w}`);
-                lines.push(`    height: ${h} ${comment_h}`);
-            } else {
-                lines.push(`  # No camera_window defined (full frame)`);
-            }
+            lines.push(`  # camera_window is a deprecated alias; keep the window in esp32_camera above.`);
 
             lines.push(``);
             if (state.rotation === 0) {

@@ -231,11 +231,13 @@
                 improving frame rate and AI processing performance.
             </p>
             <ul>
-                <li>Select sensor model (OV2640, OV3660, OV5640)</li>
+                <li>Select sensor model (OV2640, OV3660, OV5640, SC101IOT, SC030IOT)</li>
                 <li>Set camera rotation (0°–270° or custom angle)</li>
                 <li>Click and drag to draw the ROI rectangle</li>
                 <li>Optionally enforce 4:3 aspect ratio</li>
                 <li>Generates a native <code>esp32_camera.window</code> YAML block</li>
+                <li>Also shows the runtime <code>set_window</code>/<code>reset_window</code> actions</li>
+                <li>Applies the per-sensor rules (OV2640 16x8 JPEG blocks, SC window = resolution, OV3660/OV5640 downscale only)</li>
             </ul>
             <a class="card-link available" href="roi.html">🔧 Open ROI Tool</a>
         </div>

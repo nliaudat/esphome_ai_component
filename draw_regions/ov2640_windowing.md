@@ -44,11 +44,24 @@ esp32_camera:
     width: <calculated>
     height: <calculated>
 ```
-The underlying `esp32_camera` driver then converts these integer values into the hexadecimal register values (`0x32`, etc.) required by the OV2640. The
-`esp32_camera_utils.camera_window` key remains available as a compatibility
-alias with the same resolution-pixel semantics.
+The underlying `esp32_camera` driver then converts these values into the crop
+registers the OV2640 needs. The former `esp32_camera_utils.camera_window` key
+still works as a deprecated compatibility alias with the same
+resolution-pixel semantics.
 
-The tool enforces **Multiples of 8** (or 4) because the OV2640's internal DSP and the ESP32's DMA engine often require data to be aligned to specific byte boundaries for efficient processing. Misalignment can result in garbled images or "green/purple" lines.
+OV2640 specifics, as implemented by the driver:
+
+*   The window readout requires **JPEG output** (`pixel_format: JPEG`); with any
+    other format the window is rejected.
+*   `width` is rounded **down** to a multiple of **16** and `height` down to a
+    multiple of **8**, because JPEG compresses whole 16x8 blocks. A window
+    smaller than one block grows to it.
+*   The published frame is the (rounded) size of the window.
+*   The crop registers themselves are programmed in multiples of 4 pixels, so
+    the offsets are aligned by the driver — the tool's values do not need to be
+    pre-aligned.
+*   A window that reaches past the edge is clamped, and changing
+    `esp32_camera.resolution` requires setting the window again.
 
 ## Driver Implementation (`esp32-camera`)
 
@@ -57,7 +70,7 @@ The [espressif/esp32-camera](https://github.com/espressif/esp32-camera) reposito
 2.  **Register Calculation**: Converts the requested `offset_x`, `offset_y`, `width`, and `height` into the specific start/end values required by `HREFST`, `HREFEND`, `VSTRT`, and `VEND`.
 3.  **Output Scaling**: Configures `HSIZE`, `VSIZE`, `XOFFL`, and `YOFFL` to define the final output resolution sent to the ESP32.
 
-This abstraction allows ESPHome users to simply define the `camera_window` in pixels, and the driver handles the complex register math and timing constraints.
+This abstraction allows ESPHome users to simply define the `window` in pixels, and the driver handles the complex register math and timing constraints.
 
 ## Datasheet Reference Details
 
