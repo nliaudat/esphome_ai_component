@@ -8,7 +8,7 @@ This document describes all debug flags, their effects, activation methods, and 
 
 | YAML Flag | Build Define | Effect | Section |
 |-----------|-------------|--------|---------|
-| `debug: true` | `DEBUG_METER_READER_TFLITE` | Verbose inference logs, model architecture dump | [1.1](#11-debug) |
+| `debug: true` | `DEBUG_METER_READER_TFLITE` | Verbose inference logs (model internals: `debug: true` on the runtime entry) | [1.1](#11-debug) |
 | `debug_image: true` | `DEBUG_METER_READER_TFLITE` | Static test image mode (loads `debug.jpg`) | [1.2](#12-debug_image) |
 | `debug_image_out_serial: true` | `DEBUG_OUT_PROCESSED_IMAGE_TO_SERIAL` | Zone bounds + first pixels to serial | [1.3](#13-debug_image_out_serial) |
 | `debug_memory: true` | `DEBUG_METER_READER_MEMORY` | Heap/PSRAM/arena/pool efficiency sensors | [1.4](#14-debug_memory) |
@@ -28,10 +28,12 @@ This document describes all debug flags, their effects, activation methods, and 
 **Build define:** `DEBUG_METER_READER_TFLITE`
 
 **Effects:**
-- `ModelHandler`: Logs operator codes found in model, input tensor dimensions, model architecture (subgraphs/tensors/operators count)
 - `TFLiteCoordinator`: Logs each inference result (value + confidence per zone)
 - `ImageProcessor`: Zone bounds, first pixels, channel order on each processed zone
 - `DebugCoordinator`: Prints full debug info on startup (model size, arena size, memory footprint)
+
+> Model-level logs (operator codes, input tensor dimensions, subgraph/tensor counts) come from
+> `tflite_micro_runtime`: set `debug: true` on the runtime entry that the meter reader references.
 
 **Example YAML:**
 ```yaml
@@ -151,9 +153,11 @@ meter_reader_tflite:
 
 ### 1.6 `DEBUG_ESP32_CAMERA_UTILS` (Build Flag)
 
-**Location:** Not settable from YAML — must be added via `board_build.extra_flags`
+**Location:** Set from YAML — `meter_reader_tflite: debug_camera: true`, or
+`esp32_camera_utils: debug: true` when using the utilities standalone.
 
-**Effect:** Enables the most verbose debug mode in `ImageProcessor`:
+Both options emit the `DEBUG_ESP32_CAMERA_UTILS` define and enable the most
+verbose debug mode in `ImageProcessor`:
 - Full pixel statistics (min, max, mean) per zone
 - ASCII art preview of zone pixels (`#` and `.` characters)
 - Float32 image analysis
@@ -161,8 +165,8 @@ meter_reader_tflite:
 
 **Activation:**
 ```yaml
-board_build.extra_flags:
-  - -DDEBUG_ESP32_CAMERA_UTILS
+meter_reader_tflite:
+  debug_camera: true
 ```
 
 **Caution:** Very verbose. Can saturate UART output at 115200 baud.
@@ -200,9 +204,14 @@ packages:
 
 ### 2.2 `show_crop_areas: true`
 
-**Status:** ❌ **Currently non-functional.** The drawing code path in `meter_reader_tflite.cpp:703-730` is guarded by `USE_CAMERA_DRAWING` but the actual `draw_rectangle()` calls are not implemented. The loop iterates over zones but only comments describe the intended behavior.
+**Status:** ✅ **Functional.** When a preview image is produced, the crop zones
+are drawn on it as light-green rectangles (`DrawingUtils::draw_rectangle`,
+compiled in with `USE_CAMERA_DRAWING`, which `esp32_camera_utils` enables by
+default through `enable_drawing: true`).
 
-**Workaround:** Use `tools/draw_regions.py` to visually calibrate crop zones from a captured image.
+**Note:** The preview is only generated when `generate_preview: true` is set (or
+during a preview request), and boxes are drawn on the RGB888 preview image — a
+JPEG fallback preview is served unmodified.
 
 ---
 
@@ -232,7 +241,11 @@ python tools/check_tflite_model.py models/digit_recognizer_v3_quantized_integer_
 
 ### 3.3 `tools/regenerate_txt_reports.py`
 
-Regenerates `.txt` companion files for all `.tflite` models. The `.txt` files contain the arena size recommendation and are parsed by `__init__.py` to auto-configure the component.
+Regenerates the optional `.txt` metadata reports for all `.tflite` models. The
+reports are **not required**: the runtime reads the input shape, operator list
+and an arena estimate from the model itself. A report only adds values the model
+cannot supply (arena recommendation, output processing, audio parameters) and is
+parsed by the runtime's `__init__.py` when present.
 
 ```bash
 python tools/regenerate_txt_reports.py --force
@@ -263,11 +276,11 @@ Performs tensor lifetime analysis and provides a refined arena size estimate.
 See [Memory Management](setup.md#memory-management) for details.
 
 **Check:**
-1. `Tensor arena: <size> bytes` — verify the arena size matches the `.txt` recommendation
+1. `Tensor arena: <size> bytes` — verify the arena size matches the runtime estimate (or the optional `.txt` recommendation)
 2. For ESP32-S3: the arena is automatically bumped by 1.5× due to 64B cache-line alignment
 3. Enable `debug_memory: true` to monitor actual arena usage after successful load
 
-**Fix:** Re-run `python tools/regenerate_txt_reports.py --force` to update arena estimates, then reflash.
+**Fix:** Set `tensor_arena_size` on the `tflite_micro_runtime` entry (the default is estimated from the model). Regenerating an optional `.txt` report with `python tools/regenerate_txt_reports.py --force` only helps when you want to pin a measured size, then reflash.
 
 ### 4.3 "Low accuracy on S3 vs ESP32"
 
@@ -301,7 +314,7 @@ See [Memory Management](setup.md#memory-management) for details.
 2. Input order matches model training (RGB vs BGR)
 3. `normalize` setting matches model expectations (0=raw uint8, 1=float32 [0,1])
 
-**Fix:** The default is uint8 with no normalization — this is correct for TFLite Micro quantized models. For float32 models, set `normalize: true` and verify `input_type: float32`.
+**Fix:** The default is uint8 with no normalization — this is correct for TFLite Micro quantized models. For float32 models, set `normalize: true` and verify `input_type: float32` on the **`tflite_micro_runtime`** entry (these options are not on `meter_reader_tflite` anymore).
 
 ---
 
@@ -331,7 +344,7 @@ meter_reader_tflite:
   debug_timing: true
   debug_image_out_serial: true
   generate_preview: true       # Requires web_server + camera_webserver.yaml
-  show_crop_areas: true        # Non-functional (drawing not implemented)
+  show_crop_areas: true        # Draw crop-zone boxes on the preview
 
 esp32_camera_utils:
   enable_drawing: true          # Required for preview

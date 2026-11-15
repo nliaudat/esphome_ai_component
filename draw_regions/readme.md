@@ -1,6 +1,6 @@
 # ESP32 Camera ROI Configuration Tool
 
-This tool addresses a specific challenge with ESP32 cameras: configuring a hardware window (ROI) when the camera is mounted at a rotation (90°, 180°, 270°). It targets the native `esp32_camera.window` API (ESPHome 2026.11.0+).
+This tool addresses a specific challenge with ESP32 cameras: configuring a hardware window (ROI) when the camera is mounted at a rotation (90°, 180°, 270°). It targets the native `esp32_camera.window` API (ESPHome 2026.11+).
 
 **Live tool:** [`roi.html`]([roi.html](https://nliaudat.github.io/esphome_ai_component/roi.html)— Open in browser to use.
 
@@ -9,7 +9,7 @@ This tool addresses a specific challenge with ESP32 cameras: configuring a hardw
 1.  **Hardware Pipeline**: The window configuration applies to the **physical sensor interface** (Raw Data) *before* any software rotation or JPEG encoding happens.
     *   If you mount your camera at 90° and want to crop the "top half" of your visible image, you are actually cropping the "left half" (or right, depending on rotation) of the physical sensor.
 2.  **Coordinate Mapping**: Humans think in "Visual Coordinates" (what they see on screen). The hardware needs unrotated frame coordinates.
-3.  **Camera Resolution**: Window coordinates are in the pixels of `esp32_camera.resolution` (e.g., 640x480), **not** the full sensor. This changed in ESPHome 2026.11.0; older releases used full-sensor coordinates.
+3.  **Camera Resolution**: Window coordinates are in the pixels of `esp32_camera.resolution` (e.g., 640x480), **not** the full sensor. This changed in ESPHome 2026.11; older releases used full-sensor coordinates.
 
 ## Logic Overview
 

@@ -1,6 +1,6 @@
 # ESP32 Camera Utils
 
-A dedicated component for advanced image processing operations on ESP32, specifically designed to prepare images for AI models. However, for the **Meter Reader** component, you should configure rotation directly in the `meter_reader_tflite` configuration.
+A dedicated component for advanced image processing operations on ESP32, specifically designed to prepare images for AI models. It is auto-loaded by `meter_reader_tflite`, and rotation for the meter reader is configured **here** (it is no longer a `meter_reader_tflite` option).
 
 ## ✨ Features
 
@@ -14,7 +14,7 @@ A dedicated component for advanced image processing operations on ESP32, specifi
 
 ## ⚙️ Configuration
 
-Requires ESPHome **2026.11.0** or later. Windowing uses the native
+Requires ESPHome **2026.11** or later. Windowing uses the native
 [`esp32_camera` window API](https://esphome.io/components/esp32_camera.html), so
 `esp32_camera_utils` no longer touches the sensor registers itself.
 

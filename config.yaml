@@ -124,10 +124,7 @@ meter_reader_tflite:
   confidence_threshold: 0.99 # Only if validator is disabled
   camera_id: ${id_prefix}_espcam
   # model: "models/dig-class100-0180-s2-q.tflite"
-  model: ${id_prefix}_tflite
-  # Legacy direct-file model (deprecated - use tflite_micro_runtime ID reference)
-  # model: "models/digit_recognizer_v23_10cls_RGB.tflite"
-  # model: "models/digit_recognizer_v4_10cls_GRAY.tflite"
+  model: ${id_prefix}_tflite   # ID of the tflite_micro_runtime entry above
 
   update_interval: 30s
 

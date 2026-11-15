@@ -33,7 +33,7 @@ When you draw a rectangle:
 1.  **`offset_x` / `offset_y`**: The top-left corner of the crop, in unrotated frame pixels.
 2.  **`width` / `height`**: The size of the crop, in unrotated frame pixels.
 
-Since ESPHome 2026.11.0 the native `esp32_camera.window` configuration takes
+Since ESPHome 2026.11 the native `esp32_camera.window` configuration takes
 these high-level values in `resolution` pixels (not full-sensor pixels):
 ```yaml
 esp32_camera:

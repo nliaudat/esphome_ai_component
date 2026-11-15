@@ -10,7 +10,7 @@
 
 This project provides a robust, modular framework for running TensorFlow Lite Micro models on ESP32 devices within the ESPHome ecosystem. While originally designed for analog/digital meter reading, it is suitable for various computer vision tasks.
 
-**New in v2.0:** The project has been refactored into modular components for better maintainability and reusability.
+**New in v2.0:** The project has been refactored into modular components for better maintainability and reusability, and the components are committed to ESPHome (see the upstream PRs [#21282–#21288](https://github.com/esphome/esphome/pulls?q=is%3Apr+author%3Anliaudat)).
 
 ### 🎯 Core Value Proposition
 **"Turn any ESP32 Camera into a privacy-first, offline AI Meter Reader for ESPHome."**
@@ -23,7 +23,7 @@ Unlike other solutions that are standalone firmwares, this is a **native ESPHome
 ### 🚀 Reusable AI Core & Technical Excellence
 Beyond just a meter reader, this project provides a robust foundation for **any** ESP32 AI project:
 
-*   **`tflite_micro_runtime`**: A standalone, reusable TFLite Micro runtime supporting **image** (single-shot) and **audio** (streaming) model types, with local/remote model fetching, CRC32 verification, and auto-detection from `.txt` reports. `meter_reader_tflite` references a runtime entry by ID; the loader/debug/op/memory/output building blocks are auto-loaded.
+*   **`tflite_micro_runtime`**: A standalone, reusable TFLite Micro runtime supporting **image** (single-shot) and **audio** (streaming) model types, with local/remote model fetching, CRC32 verification, and configuration read from the model itself (an optional `.txt` report can add metadata). `meter_reader_tflite` references a runtime entry by ID; the loader/debug/op/memory/output building blocks are auto-loaded.
 *   **Memory Safe & Optimized**: Written in modern **Safe C++**. We use `std::span`, zero-copy buffers, and `esp-nn` hardware acceleration to squeeze every drop of performance while preventing crashes and memory leaks.
 *   **Production Ready**: Designed for 24/7 operation with robust error handling and watchdog protections.
 
@@ -46,7 +46,7 @@ The repository allows you to use specific components based on your needs:
 | **[value_validator](./components/value_validator)** | Robust validation engine for meter readings. Eliminates outliers, tracks history, prevents impossible value jumps, and supports dial-aware digit correction when combined with `analog_reader`. Outputs float values when analog_reader is active. Publishes a separate `validated_value_sensor` (only on accept) while the raw value_sensor always shows raw digits. |
 | **[esp32_camera_utils](./components/esp32_camera_utils)** | Powerful image processing utilities. Handles cropping, scaling, rotation (JPEG/Raw), and format conversion using `esp_new_jpeg` library. |
 | **`tflite_micro_runtime`** | TFLite Micro runtime for **image** and **audio** models: tensor arena, op resolver, interpreter, input preprocessing and output post-processing. Declare one entry per model and reference it by ID. Fetched as an external component (see [Installation](#1-installation)). |
-| **`tflite_model_loader`** / **`tflite_model_debug`** | Auto-loaded by `tflite_micro_runtime`. The loader resolves the model source (local, `github://`, `http(s)://`), verifies it (CRC32) and parses `.txt` reports; the debug helper adds the optional model debug sensors/text. |
+| **`tflite_model_loader`** / **`tflite_model_debug`** | Auto-loaded by `tflite_micro_runtime`. The loader resolves the model source (local, `github://`, `http(s)://`), verifies it (CRC32) and parses the optional `.txt` metadata report; the debug helper adds the optional model debug sensors/text. |
 | **`tflite_model_source`** / **`tflite_op_processor`** / **`tflite_memory_handler`** / **`tflite_output_processor`** | Auto-loaded building blocks of the runtime (source resolution, operator registration/ESP-NN kernels, arena sizing, output decoding). |
 | **[tflite_micro_helper](./components/tflite_micro_helper)** | Legacy monolithic loader/runtime, still used by `micro_wake_word` (audio). `meter_reader_tflite` no longer depends on it. |
 | **[flash_light_controller](./components/flash_light_controller)** | Manages flash light timing for optimal image capture conditions. |
@@ -69,6 +69,8 @@ esphome compile config.yaml
 ```
 
 ### 1. Installation
+
+> **Minimum ESPHome version: 2026.11.**
 
 ***A detailed procedure for setting up is available in [wiki/setup page](https://github.com/nliaudat/esphome_ai_component/wiki/Setup)***
 
@@ -128,7 +130,7 @@ value_validator:
   allow_negative_rates: false
   max_absolute_diff: 300
 
-# 1. Declare the model (input shape, arena size, ... auto-detected from .txt report)
+# 1. Declare the model (input shape, arena size, ... read from the model)
 tflite_micro_runtime:
   id: my_digit_model
   model_type: image
@@ -209,7 +211,7 @@ meter_reader_tflite:
 ```
 
 > [!NOTE]
-> **Rotation behavior**: The `rotation` setting only affects the AI processing. The internal webserver and Home Assistant live view will likely remain unrotated (sideways) as the camera hardware only supports 180° flips. This is normal behavior.
+> **Rotation behavior**: The `rotation` setting lives on `esp32_camera_utils` and only affects the AI processing. The internal webserver and Home Assistant live view will likely remain unrotated (sideways) as the camera hardware only supports 180° flips. This is normal behavior.
 
 ### 3. Runtime Configuration (Home Assistant)
 
@@ -232,7 +234,7 @@ These entities normally appear under the device in Home Assistant.
 - **🎯 Multi-Zone Processing**: Process multiple regions of interest
 - **🔧 Flexible Configuration**: Support for various model types and input formats
 - **🐛 Advanced Debugging**: Real-time image analysis and model output inspection
-- **🔄 Image Rotation (Dev)**: Full support for 0°, 90°, 180°, 270° rotation on both JPEG and Raw formats (via `esp32_camera_utils`).
+- **🔄 Image Rotation**: 0°/90°/180°/270° (hardware-optimized) and arbitrary float angles on both JPEG and Raw formats (via `esp32_camera_utils`).
 
 ## 🎯 Use Cases
 
@@ -253,7 +255,7 @@ These entities normally appear under the device in Home Assistant.
 
 **❌ Model loading fails**
 - **Cause**: Tensor arena size is too small.
-- **Solution**: Increase `tensor_arena_size` on the `tflite_micro_runtime` entry (auto-detected from `.txt` report by default).
+- **Solution**: Increase `tensor_arena_size` on the `tflite_micro_runtime` entry (estimated from the model by default).
 ```yaml
 tflite_micro_runtime:
   id: my_digit_model
@@ -272,7 +274,7 @@ meter_reader_tflite:
 
 **❌ Every image produces the same reading (e.g. `88888` or `00000`)**
 - **Cause**: The ESP-NN optimized kernels shipped with `esp-nn` < 1.4.0 had correctness bugs on ESP32-S3 (3x3 conv im2col, depthwise conv, fully-connected, MEAN, softmax), which made some quantized uint8 digit models return a constant class ([issue #196](https://github.com/nliaudat/esphome_ai_component/issues/196)).
-- **Fixed**: the component now pins `espressif/esp-tflite-micro` v1.4.1 + `espressif/esp-nn` v1.4.2, and the S3 board files no longer force the ANSI C kernels. Update the component and rebuild (the sdkconfig is regenerated automatically).
+- **Fixed**: the TFLite runtime now pins `espressif/esp-tflite-micro` v1.4.1 + `espressif/esp-nn` v1.5.0 (the legacy `tflite_micro_helper` keeps v1.4.2), and the S3 board files no longer force the ANSI C kernels. Update the component and rebuild (the sdkconfig is regenerated automatically).
 - **Fallback**: if you pin an older esp-nn yourself (or want a bit-exact reference run), force the ANSI C kernels — slower, but unaffected by the S3 asm bugs:
 ```yaml
 esp32:
@@ -286,9 +288,9 @@ esp32:
 - **Cause**: Low memory or bandwidth issues.
 - **Solution**: Lower resolution or framerate in `esp32_camera`.
 
-**❌ `invalid frame` errors, or black / truncated images with `camera_window`**
-- **Cause**: The JPEG frame buffer is sized from `esp32_camera.resolution`, so a `camera_window` larger than the configured resolution cannot fit in a single frame.
-- **Solution**: Set `resolution` at least as large as the window (e.g. for a `832x624` window):
+**❌ `invalid frame` errors, or black / truncated images with a camera window**
+- **Cause**: The camera window is measured in `esp32_camera.resolution` pixels and is clamped to the frame, so a window larger than the configured resolution does not crop the way it is written.
+- **Solution**: Raise `resolution` so the window fits (e.g. for a `832x624` window), or set `resolution` to the full sensor frame when you want window numbers to keep meaning sensor pixels:
 ```yaml
 esp32_camera:
   resolution: 1024x768
@@ -296,7 +298,7 @@ esp32_camera:
 
 ### Performance Tips
 1. **Use quantized models** (int8) for better performance
-2. **ESP-NN kernels**: the optimized kernels are enabled by default and are correct with the pinned `esp-nn` v1.4.2; the ANSI C kernels are only a debugging fallback (see Troubleshooting)
+2. **ESP-NN kernels**: the optimized kernels are enabled by default and are correct with the pinned `esp-nn` v1.5.0 (`tflite_micro_runtime`) / v1.4.2 (`tflite_micro_helper`); the ANSI C kernels are only a debugging fallback (see Troubleshooting)
 3. **Use appropriate tensor_arena_size** (already calculated per model)
 
 ## 🔄 Backward Compatibility

@@ -39,7 +39,7 @@ esphome:
 #   board_build.f_flash: 80000000L -> esp32.flash_frequency: 80MHZ
 #   board_build.psram_type: opi    -> psram.mode: octal, psram.speed: 80MHz
 #   -DBOARD_HAS_PSRAM              -> psram: (declares PSRAM to ESP-IDF)
-#   -DTF_LITE_* / -DESP_NN         -> components/tflite_micro_helper/__init__.py (all CPUs)
+#   -DTF_LITE_* / -DESP_NN         -> the TFLite component codegen (all CPUs)
 #   arduino.memory_type: opi_opi   -> Arduino-only, not applicable to esp-idf
 #   board_name, maximum_size       -> PlatformIO metadata; maximum_size follows flash_size
 

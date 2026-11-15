@@ -21,11 +21,11 @@ This was reported in :ghissue:`196` on a generic ESP32-S3 N16R8 board with OV264
 Cause
 -----
 
-The issue stems from bugs in certain versions of the ``esp-nn`` library used by ESPHome's ``tflite_micro_helper`` component:
+The issue stems from bugs in certain versions of the ``esp-nn`` library used by ESPHome's ``tflite_micro_runtime`` component (the legacy ``tflite_micro_helper`` pins an older release):
 
 - Versions shipped with ESPHome 2026.10.x pin ``esp-tflite-micro 1.3.7`` and ``esp-nn 1.2.3``.
 - These versions contain known S3 assembly bugs in convolution, softmax, and other kernels that can cause incorrect or constant outputs on some boards (especially those with specific PSRAM configurations).
-- Upgrading to esp-nn 1.4.1 fixed some issues but not all; esp-nn 1.4.2 addressed further problems but the issue persists on some boards with certain models and configurations.
+- Upgrading to esp-nn 1.4.1 fixed some issues but not all; esp-nn 1.4.2 addressed further problems, and ``tflite_micro_runtime`` now pins ``esp-nn 1.5.0`` (the legacy ``tflite_micro_helper`` keeps 1.4.2). Some boards and models were still reported with the issue on older pins.
 
 The problem is board- and model-specific, which is why it has not been possible to create a universal fix. The safest approach for affected boards is to disable the optimized kernels entirely.
 
@@ -68,7 +68,7 @@ It may occur on other S3 boards depending on their PSRAM configuration, silicon 
 Current Status
 --------------
 
-- **esp-nn 1.4.2** (shipped in ESPHome 2026.11.x-dev) includes further fixes but the issue has not been confirmed resolved on every S3 board or model combination.
+- **esp-nn 1.5.0** is pinned by ``tflite_micro_runtime`` (``esp-tflite-micro`` 1.4.1); the legacy ``tflite_micro_helper`` still pins 1.4.2. The bump is :pr:`21480`. The issue has not been confirmed resolved on every S3 board or model combination.
 - The maintainer recommends keeping ``CONFIG_NN_ANSI_C: "y"`` / ``CONFIG_NN_OPTIMIZED: "n"`` in ESP32-S3 board files until a universal fix is verified across all configurations.
 
 Related
@@ -78,4 +78,4 @@ Related
 - :pr:`201` — Added ANSI C options to four S3 board files.
 - :pr:`207` — Fixed value_validator persistence issues (unrelated but relevant to S3 deployments).
 - esp-nn issue #34 / PR #43 — Upstream fixes in progress.
-- esp-nn release v1.4.2 — Latest stable version with multiple S3 kernel improvements.
+- esp-nn release v1.5.0 — Version pinned by ``tflite_micro_runtime``.

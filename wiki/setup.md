@@ -3,7 +3,7 @@
 
 ### Prerequisites
 - Python ([python.org](https://python.org))
-- Esphome (pip install esphome)
+- Esphome (pip install esphome) — **minimum version 2026.11**
 
 ### Download
 Download full repo or git clone
@@ -15,7 +15,7 @@ Download full repo or git clone
  - [ ] meter_reader_tflite :
  Start with a minimal config with no camera window (zoom)
  Copy the model you choose from ./model to the config.yaml directory
- set it's name in model: "digit_recognizer_v4_10cls_RGB.tflite"
+ Declare it in the `tflite_micro_runtime:` entry with `model: "digit_recognizer_v4_10cls_RGB.tflite"` (its ID is then referenced by `meter_reader_tflite: model: <runtime_id>`)
   - [ ] packages :
  Select the board by commenting or not the board include
 

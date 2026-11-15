@@ -3,7 +3,14 @@
 tflite_micro_helper
 ===================
 
-**Status: Active**
+**Status: Legacy** — superseded by :doc:`tflite_micro_runtime` for new projects.
+
+.. note::
+
+    ``meter_reader_tflite`` no longer uses this component; it references a
+    :doc:`tflite_micro_runtime` entry instead. The monolithic helper is kept for
+    ``micro_wake_word`` (audio models). See the migration table in
+    :doc:`tflite_micro_runtime` to convert an existing configuration.
 
 The ``tflite_micro_helper`` component is a self-contained TFLite Micro model loader
 and runtime wrapper. It handles model source resolution (local files, ``github://``
@@ -27,7 +34,7 @@ Configuration
       - id: my_digit_model
         model_type: image
         model: "models/digit_recognizer_v40_quantized_integer_quant_uint8.tflite"
-        # Optional overrides (auto-detected from .txt file):
+        # Optional overrides (from the .txt report or filename conventions):
         # input_width: 32
         # input_height: 20
         # input_channels: 3
@@ -48,15 +55,16 @@ Configuration
 Model Sources
 -------------
 
-- **Local**: Direct path to a ``.tflite`` file. Auto-detects config from companion ``.txt`` file.
+- **Local**: Direct path to a ``.tflite`` file. Configuration comes from the companion ``.txt`` report or from filename conventions.
 - **github://**: ``github://owner/repo/path/to/file[@ref]`` shorthand.
 - **http(s)://**: Download from URL (expects JSON manifest with ``model`` field).
 
 Auto-Detected Configuration (Image Models)
 ------------------------------------------
 
-When a ``.txt`` file exists alongside the ``.tflite`` file, the following are
-auto-detected:
+The legacy helper reads its configuration from a companion ``.txt`` report when one exists, otherwise from filename conventions. (The successor :doc:`tflite_micro_runtime` reads the input shape, operator list and an arena estimate from the model itself, so no report is needed there.)
+
+Values a ``.txt`` report supplies:
 
 - Input shape (width, height, channels) and data type
 - Output class count and scale factor
@@ -95,6 +103,6 @@ Dependencies
 ------------
 
 - ``tensorflow/lite/micro`` (ESPHome component)
-- ``espressif/esp-tflite-micro`` (IDF component)
-- ``espressif/esp-nn`` (IDF component)
-- ``esphome/esp-micro-speech-features`` (IDF, audio models only)
+- ``espressif/esp-tflite-micro`` 1.4.1 (IDF component)
+- ``espressif/esp-nn`` 1.4.2 (IDF component)
+- ``esphome/esp-micro-speech-features`` 1.2.3 (IDF, audio models only)

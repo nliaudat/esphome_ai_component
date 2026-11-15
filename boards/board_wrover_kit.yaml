@@ -12,7 +12,7 @@ esphome:
 #   board_build.flash_mode: qio    -> esp32.flash_mode: qio
 #   board_build.f_flash: 80000000L -> esp32.flash_frequency: 80MHZ
 #   -DBOARD_HAS_PSRAM              -> psram: (declares PSRAM to ESP-IDF)
-#   -DTF_LITE_* / -DESP_NN         -> components/tflite_micro_helper/__init__.py (all CPUs)
+#   -DTF_LITE_* / -DESP_NN         -> the TFLite component codegen (all CPUs)
 #   board_name                     -> PlatformIO metadata, unused by esp-idf
 #   #board_build.partitions: huge_app.csv -> esp32.partitions: (was already commented out)
 

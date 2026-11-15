@@ -27,7 +27,7 @@ esphome:
 # flash/PSRAM/flag key was already commented out, so none of it had any effect; what the
 # build needs is expressed natively:
 #   extra_flags (-DBOARD_HAS_PSRAM)    -> psram: (declares PSRAM to ESP-IDF)
-#   extra_flags (-DTF_LITE_*/-DESP_NN) -> components/tflite_micro_helper/__init__.py (all CPUs)
+#   extra_flags (-DTF_LITE_*/-DESP_NN) -> the TFLite component codegen (all CPUs)
 #   psram_type / memory_type           -> psram.mode: octal, psram.speed: 80MHz
 #   board_name, build_flags, hwids, debug.* -> PlatformIO metadata, unused by esp-idf
 # Flash mode/frequency were never set for this board (dio / 80MHz = esp-idf default here).

@@ -1,17 +1,21 @@
 # TFLite Micro Helper Component
 
+> **Status: Legacy.** New projects should use **`tflite_micro_runtime`** as the model runtime: it is the split-component successor of this helper and is what `meter_reader_tflite` depends on. See [`tflite_micro_runtime`](../../docs/tflite_micro_runtime.rst) and the migration table in the [`meter_reader_tflite` README](../meter_reader_tflite/README.md#migration-from-tflite_micro_helper).
+>
+> This component is kept for **`micro_wake_word`** (audio models), which still pins `esp-tflite-micro` 1.4.1 + `esp-nn` 1.4.2.
+
 **`tflite_micro_helper`** is a self-contained TFLite Micro model loader and runtime wrapper for ESPHome. It handles model source resolution, config auto-detection, CRC32 verification, tensor arena management, and ESP-NN hardware acceleration — supporting both **image** (single-shot) and **audio** (streaming) model types.
 
 ## 🚀 Overview
 
-Instead of each consumer component (`meter_reader_tflite`, `micro_wake_word`) reimplementing model loading and configuration, `tflite_micro_helper` becomes the **single source of truth** for all TFLite model management:
+Instead of each consumer component (`micro_wake_word`, and previously `meter_reader_tflite`) reimplementing model loading and configuration, `tflite_micro_helper` becomes the **single source of truth** for TFLite model management:
 
 ```yaml
 tflite_micro_helper:
   - id: my_digit_model
     model_type: image
     model: "models/digit_recognizer_v40.tflite"
-    # All config auto-detected from .txt report
+    # Config from .txt report or filename conventions (both optional)
 
   - id: my_wake_word
     model_type: audio
@@ -21,15 +25,15 @@ tflite_micro_helper:
 Consumer components reference models by ID:
 
 ```yaml
-meter_reader_tflite:
-  model: my_digit_model          # ← ID reference to tflite_micro_helper entry
-
+# Audio models are consumed by micro_wake_word through `tflite_model:`
 micro_wake_word:
   models:
     - tflite_model: my_wake_word # ← ID reference via tflite_model:
       wake_word: "okay nabu"
       trained_languages: ["en"]
 ```
+
+> `meter_reader_tflite` no longer references `tflite_micro_helper` entries; it takes a `tflite_micro_runtime` ID. Use the helper only for `micro_wake_word`.
 
 ## 🎯 Model Types
 
@@ -46,9 +50,11 @@ micro_wake_word:
 | **github://** | Shorthand URL | `model: "github://owner/repo/path/file.tflite[@ref]"` |
 | **http(s)://** | JSON manifest URL | `model: "https://example.com/models/my_model.json"` |
 
-### Auto-Detection from `.txt` Files
+### Auto-Detection (`.txt` report optional)
 
-When a `.txt` report file exists alongside the `.tflite` file, the following are auto-detected:
+The legacy helper reads its configuration from a companion `.txt` report when one exists, otherwise from filename conventions. The successor `tflite_micro_runtime` reads the input shape, operator list and an arena estimate from the model itself, so a report is not needed there.
+
+Values a `.txt` report supplies:
 
 - **Input shape**: width, height, channels, data type (`uint8`/`float32`)
 - **Output class count**: determines `scale_factor` (10cls → 1.0, 100cls → 10.0)
@@ -57,7 +63,7 @@ When a `.txt` report file exists alongside the `.tflite` file, the following are
 - **Operator count**: for `MAX_OPERATORS` build flag
 - **Hybrid quantization**: detected and rejected with a clear error
 
-**No `.txt` file?** Fallback to filename heuristics (`_GRAY`, `_RGB`, `_BGR`, `_10cls`, `_100cls`).
+**No `.txt` file?** The helper falls back to filename heuristics (`_GRAY`, `_RGB`, `_BGR`, `_10cls`, `_100cls`); a report is still recommended here for non-standard models.
 
 ## ⚙️ Configuration
 
@@ -139,17 +145,19 @@ tflite_micro_helper:
 
 ## 🔗 Integration with Consumer Components
 
-### meter_reader_tflite (Image)
+### meter_reader_tflite (Image) — migrated
+
+`meter_reader_tflite` now uses `tflite_micro_runtime`; the equivalent block is:
 
 ```yaml
-tflite_micro_helper:
-  - id: my_digit_model
-    model_type: image
-    model: "digit_recognizer_v40.tflite"
+tflite_micro_runtime:
+  id: my_digit_model
+  model_type: image
+  model: "digit_recognizer_v40.tflite"
 
 meter_reader_tflite:
   id: my_meter
-  model: my_digit_model          # ← ID reference
+  model: my_digit_model          # ← ID reference to the runtime entry
   camera_id: my_camera
   update_interval: 60s
   confidence_threshold: 0.85
@@ -327,13 +335,7 @@ class MyClassifier : public Component {
 
 ## 🔄 Backward Compatibility
 
-The `meter_reader_tflite` component still supports the legacy `model: "file.tflite"` syntax for migration purposes. When used, a deprecation warning is printed:
-
-```
-WARNING: Deprecated model configuration in meter_reader_tflite.
-  The 'model: "<file>.tflite"' syntax is deprecated.
-  Please move model configuration to the tflite_micro_helper section instead.
-```
+`meter_reader_tflite` no longer accepts the legacy `model: "file.tflite"` syntax: `model:` must reference a `tflite_micro_runtime` entry. Configurations still using the direct-file form have to move the model into a `tflite_micro_runtime` entry — see the migration table in the [`meter_reader_tflite` README](../meter_reader_tflite/README.md#migration-from-tflite_micro_helper).
 
 ## 📄 License
 

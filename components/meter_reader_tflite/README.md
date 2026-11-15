@@ -4,7 +4,9 @@
 
 Model configuration is handled by the **`tflite_micro_runtime`** component. You declare the model once in a `tflite_micro_runtime` entry and reference it by ID from `meter_reader_tflite`.
 
-> **Note:** `model:` is a required **ID reference**. The old `model: "file.tflite"` string syntax has been removed — see [Migration from `tflite_micro_helper`](#-migration-from-tflite_micro_helper) below.
+> **Note:** `model:` is a required **ID reference**. The old `model: "file.tflite"` string syntax has been removed — see [Migration from `tflite_micro_helper`](#migration-from-tflite_micro_helper) below.
+
+> **Requires ESPHome 2026.11 or later.**
 
 ## ⚙️ Configuration
 
@@ -16,7 +18,7 @@ tflite_micro_runtime:
   id: my_digit_model
   model_type: image
   model: "models/digit_recognizer_v40_quantized_integer_quant_uint8.tflite"
-  # Input shape / arena size auto-detected from the .txt report
+  # Input shape / arena size read from the model (optional .txt report for extra metadata)
   # Optional overrides:
   # tensor_arena_size: "110KB"
   # input_width: 32
@@ -88,7 +90,7 @@ esp32_camera_utils:
   id: my_camera_utils
   camera_id: my_camera
   enable_rotation: true
-  rotation: "90" # Options: "0", "90", "180", "270"
+  rotation: 90.0 # clockwise degrees; 0/90/180/270 are hardware-optimized, other values use software rotation
 ```
 
 > [!IMPORTANT]
@@ -96,6 +98,59 @@ esp32_camera_utils:
 > *   The `rotation` setting **ONLY affects the AI Meter Reader**. The AI will now "see" the image rotated.
 > *   The **Live Camera View** in Home Assistant (Hassio) comes directly from the camera hardware/webserver, which typically **does NOT support 90-degree rotation** (only 180 flip/mirror).
 > *   **Result**: Your HA view will remain sideways, but the AI should now correctly read the digits because it is processing the rotated version internally.
+
+### Camera Window (digital zoom)
+
+Windowing is configured on `esp32_camera` with the native `window:` key, not in `meter_reader_tflite`. Keep `camera_resolution` in sync with `esp32_camera.resolution` so the component parses the frames with the right dimensions:
+
+```yaml
+esp32_camera:
+  id: my_camera
+  resolution: 640x480
+  window:
+    offset_x: 160
+    offset_y: 80
+    width: 320
+    height: 240
+
+meter_reader_tflite:
+  camera_resolution: 640x480   # must match esp32_camera.resolution
+```
+
+Coordinates are in `resolution` pixels (not full-sensor pixels) and the window must fit inside the resolution. See [`esp32_camera_utils`](../esp32_camera_utils/README.md) for the per-sensor rules.
+
+## ⚙️ Configuration Reference
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `model` | ID | *required* | ID of the `tflite_micro_runtime` entry |
+| `camera_id` | ID | *required on ESP32* | ID of the `esp32_camera` |
+| `validator` | ID | — | `value_validator` instance |
+| `confidence_threshold` | float 0–1 | `0.85` | Minimum confidence to publish |
+| `update_interval` | time | `60s` | Polling interval |
+| `camera_resolution` | string | `640x480` | Must match `esp32_camera.resolution` |
+| `frame_request_timeout` | ms | `15000` | Camera frame request timeout |
+| `flash_light_controller` | ID | — | Flash control around each capture |
+| `data_collector` | ID | — | Upload uncertain images |
+| `collect_low_confidence` | bool | `true` | Feed low-confidence readings to the collector |
+| `collect_min_global_confidence` | float 0–1 | `0.90` | Collector: global confidence floor |
+| `collect_min_digit_confidence` | float 0–1 | `0.90` | Collector: per-digit confidence floor |
+| `crop_zones_global` | ID | — | `globals` holding the crop-zone JSON |
+| `value_sensor` / `confidence_sensor` | ID | — | Publish reading / confidence |
+| `inference_logs` / `main_logs` | ID | — | Text sensors receiving logs |
+| `generate_preview` | bool | `false` | Serve `/preview` with crop areas drawn |
+| `show_crop_areas` | bool | `true` | Draw crop areas on the preview |
+| `enable_flash_calibration` | bool | `false` | Enable flash calibration mode |
+| `start_flash_calibration_button` | ID | — | Button that starts a flash calibration |
+| `unload_button` / `reload_button` | ID | — | Buttons that unload / reload the model |
+| `debug` | bool | `false` | Verbose component logging |
+| `debug_image` | bool | `false` | Run inference on the bundled static image |
+| `debug_image_out_serial` | bool | `false` | Dump the processed image to serial |
+| `debug_camera` | bool | `false` | Verbose `esp32_camera_utils` logging |
+| `debug_timing` | bool | `false` | Timing breakdowns |
+| `debug_memory` | bool | `false` | Memory logging + diagnostic sensors |
+
+> **Removed options:** `tensor_arena_size`, `input_type`, `input_channels`, `input_width`, `input_height`, `output_processing`, `scale_factor`, `input_order`, `normalize`, `invert` and `rotation` no longer exist on `meter_reader_tflite`. Model options belong to `tflite_micro_runtime`; rotation belongs to `esp32_camera_utils`.
 
 
 ## 📡 Sensor Configuration
