@@ -118,7 +118,7 @@ esphome_ai_component/
 - `meter_reader_tflite`: **Active** (v2.0+)
 - `value_validator`: **Active**
 - `esp32_camera_utils`: **Active**
-- `tflite_micro_runtime`: **Active** (external component series; replaces the monolithic `tflite_micro_helper`)
+- `tflite_micro_runtime`: **Active** (external component series). The monolithic `tflite_micro_helper` was removed: image models use the runtime, and `micro_wake_word` is the upstream self-contained component.
 - `flash_light_controller`: **Active**
 - `data_collector`: **Active**
 - `ssocr_reader`: **Alpha**

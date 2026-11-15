@@ -1,5 +1,5 @@
 # ESPHome build test: micro_wake_word (common)
-# Audio model via ID reference to tflite_micro_helper entry.
+# Upstream component: wake word model resolved from the official manifest name.
 
 external_components:
   - source:
@@ -7,7 +7,6 @@ external_components:
       path: ../../../components
     components:
       - micro_wake_word
-      - tflite_micro_helper
 
 # Minimal I2S audio config for build validation
 # Pins are provided per-platform via substitutions in test.<platform>.yaml.
@@ -27,9 +26,7 @@ microphone:
 micro_wake_word:
   id: test_mww
   models:
-    - tflite_model: test_tflite
-      wake_word: "Test"
-      trained_languages: ["en"]
+    - model: okay_nabu
       probability_cutoff: 0.5
       sliding_window_size: 10
   on_wake_word_detected:
@@ -37,12 +34,3 @@ micro_wake_word:
       - lambda: |-
           ESP_LOGD("test_mww", "Detected: %s", wake_word.c_str());
   stop_after_detection: true
-
-tflite_micro_helper:
-  - id: test_tflite
-    model_type: audio
-    model: https://github.com/esphome/micro-wake-word-models/raw/main/models/v2/okay_nabu.json
-    probability_cutoff: 0.5
-    sliding_window_size: 10
-    features_step_size: 20
-    feature_count: 40

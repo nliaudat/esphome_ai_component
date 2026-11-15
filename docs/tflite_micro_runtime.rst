@@ -230,6 +230,8 @@ consumer syntax is unchanged: it still references a model entry by ID.
       model_type: image
       model: "digit_recognizer.tflite"
 
-``tflite_micro_helper`` is still in this repository as a **legacy** component
-used by ``micro_wake_word`` (audio), which pins esp-tflite-micro 1.4.1 and
-esp-nn 1.4.2.
+``tflite_micro_helper`` was removed from this repository in the split-component
+migration: image models use :doc:`tflite_micro_runtime` and audio models use the
+upstream ``micro_wake_word`` component, which manages its own interpreter. The
+old page in :doc:`tflite_micro_helper` keeps the former configuration and the
+migration examples.

@@ -78,7 +78,7 @@ tflite_micro_runtime:
   model: "digit_recognizer.tflite"
 ```
 
-> `tflite_micro_helper` still exists for `micro_wake_word` (audio); `meter_reader_tflite` no longer depends on it.
+> `tflite_micro_helper` was removed from this repository. `micro_wake_word` now uses the upstream self-contained component; `meter_reader_tflite` uses `tflite_micro_runtime`.
 
 ### Image Rotation
 

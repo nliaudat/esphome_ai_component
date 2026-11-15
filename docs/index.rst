@@ -61,7 +61,9 @@ auto-loads the other six.
       - source: github://pr#21288
         components: [tflite_micro_runtime]
 
-``tflite_micro_helper`` is legacy and only needed for ``micro_wake_word``.
+``tflite_micro_helper`` has been **removed**; its page documents the old
+component and the migration path. ``micro_wake_word`` is now the upstream
+self-contained component (no local runtime dependency).
 
 License
 -------

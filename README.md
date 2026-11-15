@@ -48,7 +48,7 @@ The repository allows you to use specific components based on your needs:
 | **`tflite_micro_runtime`** | TFLite Micro runtime for **image** and **audio** models: tensor arena, op resolver, interpreter, input preprocessing and output post-processing. Declare one entry per model and reference it by ID. Fetched as an external component (see [Installation](#1-installation)). |
 | **`tflite_model_loader`** / **`tflite_model_debug`** | Auto-loaded by `tflite_micro_runtime`. The loader resolves the model source (local, `github://`, `http(s)://`), verifies it (CRC32) and parses the optional `.txt` metadata report; the debug helper adds the optional model debug sensors/text. |
 | **`tflite_model_source`** / **`tflite_op_processor`** / **`tflite_memory_handler`** / **`tflite_output_processor`** | Auto-loaded building blocks of the runtime (source resolution, operator registration/ESP-NN kernels, arena sizing, output decoding). |
-| **[tflite_micro_helper](./components/tflite_micro_helper)** | Legacy monolithic loader/runtime, still used by `micro_wake_word` (audio). `meter_reader_tflite` no longer depends on it. |
+| **`tflite_micro_helper`** (removed) | Legacy monolithic loader/runtime, deleted in v2.x. Image models now use `tflite_micro_runtime`; `micro_wake_word` is the upstream self-contained component. Kept as [documentation](./docs/tflite_micro_helper.rst) only. |
 | **[flash_light_controller](./components/flash_light_controller)** | Manages flash light timing for optimal image capture conditions. |
 | **[data_collector](./components/data_collector)** | **Active Learning** tool. Automatically collects "hard" images (low confidence) and uploads them to a server for training set improvement. |
 
@@ -274,7 +274,7 @@ meter_reader_tflite:
 
 **❌ Every image produces the same reading (e.g. `88888` or `00000`)**
 - **Cause**: The ESP-NN optimized kernels shipped with `esp-nn` < 1.4.0 had correctness bugs on ESP32-S3 (3x3 conv im2col, depthwise conv, fully-connected, MEAN, softmax), which made some quantized uint8 digit models return a constant class ([issue #196](https://github.com/nliaudat/esphome_ai_component/issues/196)).
-- **Fixed**: the TFLite runtime now pins `espressif/esp-tflite-micro` v1.4.1 + `espressif/esp-nn` v1.5.0 (the legacy `tflite_micro_helper` keeps v1.4.2), and the S3 board files no longer force the ANSI C kernels. Update the component and rebuild (the sdkconfig is regenerated automatically).
+- **Fixed**: the TFLite runtime now pins `espressif/esp-tflite-micro` v1.4.1 + `espressif/esp-nn` v1.5.0 (upstream `micro_wake_word` pins the same), and the S3 board files no longer force the ANSI C kernels. Update the component and rebuild (the sdkconfig is regenerated automatically).
 - **Fallback**: if you pin an older esp-nn yourself (or want a bit-exact reference run), force the ANSI C kernels — slower, but unaffected by the S3 asm bugs:
 ```yaml
 esp32:
@@ -298,7 +298,7 @@ esp32_camera:
 
 ### Performance Tips
 1. **Use quantized models** (int8) for better performance
-2. **ESP-NN kernels**: the optimized kernels are enabled by default and are correct with the pinned `esp-nn` v1.5.0 (`tflite_micro_runtime`) / v1.4.2 (`tflite_micro_helper`); the ANSI C kernels are only a debugging fallback (see Troubleshooting)
+2. **ESP-NN kernels**: the optimized kernels are enabled by default and are correct with the pinned `esp-nn` v1.5.0 (`tflite_micro_runtime` and `micro_wake_word`); the ANSI C kernels are only a debugging fallback (see Troubleshooting)
 3. **Use appropriate tensor_arena_size** (already calculated per model)
 
 ## 🔄 Backward Compatibility

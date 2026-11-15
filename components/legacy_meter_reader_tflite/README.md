@@ -30,5 +30,5 @@ legacy_meter_reader_tflite:
 We strongly recommend migrating to the new modular system:
 
 1. Change `legacy_meter_reader_tflite` to `meter_reader_tflite` in `external_components`.
-2. Add the dependency components (`esp32_camera_utils`, `tflite_micro_helper`, `flash_light_controller`).
+2. Add the dependency components (`esp32_camera_utils`, `flash_light_controller`).
 3. Rename the configuration block from `legacy_meter_reader_tflite:` to `meter_reader_tflite:`.

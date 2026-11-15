@@ -1,108 +1,183 @@
 .. SPDX-License-Identifier: Apache-2.0 OR MIT
 
-tflite_micro_helper
-===================
+tflite_micro_helper (removed)
+=============================
 
-**Status: Legacy** — superseded by :doc:`tflite_micro_runtime` for new projects.
+**Status: Removed.** The component no longer exists in this repository (the
+``components/tflite_micro_helper`` directory was deleted). This page keeps its
+documentation for existing configurations and links the migration path.
 
-.. note::
+For the replacement, see :doc:`tflite_micro_runtime`. Once the split components
+are merged, their reference documentation lives on `esphome.io
+<https://esphome.io/components/>`_, and ``micro_wake_word`` is documented there
+as a standard ESPHome component.
 
-    ``meter_reader_tflite`` no longer uses this component; it references a
-    :doc:`tflite_micro_runtime` entry instead. The monolithic helper is kept for
-    ``micro_wake_word`` (audio models). See the migration table in
-    :doc:`tflite_micro_runtime` to convert an existing configuration.
+What replaced it
+----------------
 
-The ``tflite_micro_helper`` component is a self-contained TFLite Micro model loader
-and runtime wrapper. It handles model source resolution (local files, ``github://``
-shorthand, ``http(s)://`` URLs), model config auto-detection from ``.txt`` files,
-CRC32 verification, tensor arena management, PROGMEM array creation, and
-ESP-NN optimizations.
+.. list-table::
+    :header-rows: 1
 
-Supports two model types:
+    * - Was
+      - Now
+    * - ``tflite_micro_helper:`` for image models
+      - :doc:`tflite_micro_runtime` (one entry per model, referenced by ID from
+        ``meter_reader_tflite: model:``)
+    * - ``tflite_micro_helper:`` for audio models with ``micro_wake_word``
+      - Upstream ESPHome ``micro_wake_word`` (self-contained: model manifests,
+        arena, op resolver, streaming inference)
+    * - Model loading, CRC32, arena, resolver, output processing
+      - ``tflite_micro_runtime`` + its auto-loaded split components
+        (``tflite_model_source``, ``tflite_model_loader``,
+        ``tflite_memory_handler``, ``tflite_op_processor``,
+        ``tflite_output_processor``, ``tflite_model_debug``)
 
-- **image**: Single-shot inference models (4D tensors ``[1, H, W, C]``)
-- **audio**: Streaming inference models (3D tensors ``[1, stride, features]``)
-  with ``MicroResourceVariables`` for persistent state
+The original README is preserved in git history (last revision:
+``git show 7cc6c1a:components/tflite_micro_helper/README.md``).
 
-Configuration
--------------
+What it did
+-----------
+
+``tflite_micro_helper`` was the monolithic TFLite Micro model loader and runtime
+wrapper used before the split-component series. It handled:
+
+- model source resolution: local files, ``github://`` shorthand, ``http(s)://``
+  URLs (JSON manifests),
+- model metadata auto-detection from a companion ``.txt`` report (optional) or
+  filename conventions,
+- CRC32 verification of the model data,
+- tensor arena management (PSRAM-aware) and PROGMEM model arrays,
+- operator table registration and ESP-NN hardware acceleration,
+- two model types:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Type
+      - Shape
+      - Use case
+      - Inference mode
+    * - **image**
+      - ``[1, H, W, C]`` (4D)
+      - Digit recognition, classification, object detection
+      - Single-shot per image
+    * - **audio**
+      - ``[1, stride, features]`` (3D)
+      - Wake word detection, VAD
+      - Streaming with ``MicroResourceVariables``
+
+Former configuration
+--------------------
 
 .. code-block:: yaml
 
-    # Image model (single-shot inference)
     tflite_micro_helper:
       - id: my_digit_model
         model_type: image
-        model: "models/digit_recognizer_v40_quantized_integer_quant_uint8.tflite"
-        # Optional overrides (from the .txt report or filename conventions):
+        model: "models/digit_recognizer_v40.tflite"
+        # image overrides (auto-detected from the model/.txt report):
+        # input_type: "uint8"
+        # input_channels: 3
         # input_width: 32
         # input_height: 20
-        # input_channels: 3
         # tensor_arena_size: "110KB"
 
-    # Audio model (streaming inference)
       - id: my_wake_word
         model_type: audio
-        model: "models/wake_word_model.tflite"
+        model: "github://esphome/micro-wake-word-models/models/v2/okay_nabu.json"
         probability_cutoff: 0.7
         sliding_window_size: 10
 
-    # Remote model via github:// shorthand
-      - id: remote_model
-        model_type: image
-        model: "github://owner/repo/path/to/model.tflite"
+Consumer components referenced a model by ID: ``meter_reader_tflite: model:
+my_digit_model`` and ``micro_wake_word: models: - tflite_model: my_wake_word``.
 
-Model Sources
+Configuration variables (former)
+--------------------------------
+
+**Common:** ``id`` (required), ``model_type`` (``image``/``audio``, required),
+``model`` (required: path, git shorthand or URL), ``tensor_arena_size``
+(optional, e.g. ``"110KB"``), ``debug`` (optional).
+
+**Image overrides:** ``input_type`` (``uint8``/``float32``), ``input_channels``
+(1-4), ``input_width``/``input_height`` (8-512), ``output_processing``,
+``scale_factor`` (0.1-100.0), ``input_order`` (``RGB``/``BGR``/``GRAY``),
+``normalize``, ``invert``.
+
+**Audio overrides:** ``probability_cutoff`` (0-1), ``sliding_window_size``,
+``features_step_size`` (0-30 ms), ``feature_count`` (10-80).
+
+Model sources
 -------------
 
-- **Local**: Direct path to a ``.tflite`` file. Configuration comes from the companion ``.txt`` report or from filename conventions.
-- **github://**: ``github://owner/repo/path/to/file[@ref]`` shorthand.
-- **http(s)://**: Download from URL (expects JSON manifest with ``model`` field).
+- **Local**: path to a ``.tflite`` file; a companion ``.txt`` report is
+  optional.
+- **git**: ``github://owner/repo/path/file.tflite[@ref]`` (``gitlab://`` and
+  ``codeberg://`` work the same way).
+- **HTTP(S)**: a ``.tflite`` URL, or a JSON manifest URL with a ``model``
+  field pointing at the model file.
 
-Auto-Detected Configuration (Image Models)
-------------------------------------------
+Migration examples
+------------------
 
-The legacy helper reads its configuration from a companion ``.txt`` report when one exists, otherwise from filename conventions. (The successor :doc:`tflite_micro_runtime` reads the input shape, operator list and an arena estimate from the model itself, so no report is needed there.)
+Image model, before::
 
-Values a ``.txt`` report supplies:
+    tflite_micro_helper:
+      - id: my_digit_model
+        model_type: image
+        model: "digit_recognizer.tflite"
 
-- Input shape (width, height, channels) and data type
-- Output class count and scale factor
-- Tensor arena size from peak analysis
-- Output processing method (``direct_class`` if SOFTMAX present, else ``softmax``)
-- Hybrid quantization detection (rejected with clear error)
+    meter_reader_tflite:
+      model: my_digit_model
 
-Configuration Variables
------------------------
+after::
 
-**Common:**
-- **id** (*Required*, :ref:`config-id`): The ID of this component.
-- **model_type** (*Required*): ``"image"`` or ``"audio"``.
-- **model** (*Required*): Model source path or URL.
-- **tensor_arena_size** (*Optional*): Override tensor arena size (e.g. ``"110KB"``).
-- **debug** (*Optional*, boolean): Enable debug logging.
+    tflite_micro_runtime:
+      id: my_digit_model
+      model_type: image
+      model: "digit_recognizer.tflite"
 
-**Image model overrides (optional, override auto-detection):**
-- **input_type**: ``"uint8"`` (default) or ``"float32"``.
-- **input_channels**: 1-4 (default: 3).
-- **input_width**: 8-512 (default: 32).
-- **input_height**: 8-512 (default: 20).
-- **output_processing**: ``"direct_class"``, ``"softmax"``, etc.
-- **scale_factor**: 0.1-100.0 (default: 1.0).
-- **input_order**: ``"RGB"``, ``"BGR"``, ``"GRAY"``.
-- **normalize**: Boolean.
-- **invert**: Boolean.
+    meter_reader_tflite:
+      model: my_digit_model
 
-**Audio model config (optional, override auto-detection):**
-- **probability_cutoff**: 0.0-1.0.
-- **sliding_window_size**: Positive integer.
-- **features_step_size**: 0-30 (ms).
-- **feature_count**: 10-80.
+Audio model, before::
 
-Dependencies
-------------
+    tflite_micro_helper:
+      - id: my_wake_word
+        model_type: audio
+        model: okay_nabu
 
-- ``tensorflow/lite/micro`` (ESPHome component)
-- ``espressif/esp-tflite-micro`` 1.4.1 (IDF component)
-- ``espressif/esp-nn`` 1.4.2 (IDF component)
-- ``esphome/esp-micro-speech-features`` 1.2.3 (IDF, audio models only)
+    micro_wake_word:
+      models:
+        - tflite_model: my_wake_word
+
+after (upstream ``micro_wake_word``; the model carries its own metadata)::
+
+    micro_wake_word:
+      models:
+        - model: okay_nabu
+
+C++ integration (former)
+------------------------
+
+Components that wanted the helper used it as an externally owned runtime::
+
+    #include "esphome/components/tflite_micro_helper/tflite_micro_helper.h"
+
+    void set_tflite(tflite_micro_helper::TFLiteMicroHelper *tflite) {
+      this->tflite_ = tflite;
+    }
+
+    tflite_micro_helper::TFLiteMicroHelper *tflite_;
+
+The equivalent type is now
+``tflite_micro_runtime::TFLiteMicroHelper`` (see
+``esphome/components/tflite_micro_runtime/tflite_micro_runtime.h``), and audio
+consumers such as ``micro_wake_word`` own their streaming interpreter directly.
+
+Dependencies (former)
+---------------------
+
+- ``espressif/esp-tflite-micro`` 1.4.1
+- ``espressif/esp-nn`` 1.4.2 (the split series and upstream ``micro_wake_word``
+  now pin 1.5.0)
+- ``esphome/esp-micro-speech-features`` 1.2.3 (audio models only)

@@ -352,9 +352,6 @@ def highlight(s):
 @lint_re_check(
     r"^#define\s+([a-zA-Z0-9_]+)\s+(0b[10]+|0x[0-9a-fA-F]+|\d+)\s*?(?:\/\/.*?)?$",
     include=cpp_include,
-    exclude=[
-        "components/tflite_micro_helper/model_handler.h",
-    ],
 )
 def lint_no_defines(fname, match):
     """Reject #define for integer constants (use constexpr instead)."""
@@ -677,8 +674,6 @@ def lint_log_multiline_continuation(fname, content):
         "components/esp32_camera_utils/crop_zone_handler.h",
         "components/esp32_camera_utils/debug_utils.h",
         "components/esp32_camera_utils/rotator.h",
-        "components/tflite_micro_helper/debug_utils.h",
-        "components/tflite_micro_helper/op_resolver.h",
         "components/binary_sensor/binary_sensor.h",
         "components/button/button.h",
         "components/climate/climate.h",
@@ -723,11 +718,6 @@ def lint_log_in_header(fname, line, col, content):
 
 @lint_content_check(
     include=["*.h"],
-    exclude=[
-        # X-macro file - included multiple times with different macro definitions.
-        # Adding #pragma once would break the X-macro include pattern.
-        "components/tflite_micro_helper/tflm_operators.h",
-    ],
 )
 def lint_pragma_once(fname, content):
     """Require #pragma once in header files."""
@@ -865,8 +855,6 @@ def lint_relative_py_import(fname: Path, line, col, content):
     include=["components/*.h", "components/*.cpp", "components/*.tcc"],
     exclude=[
         "components/http_request/httplib.h",
-        # X-macro file - included with TFLM_OP macro defined. No namespace possible.
-        "components/tflite_micro_helper/tflm_operators.h",
         # Empty placeholder file
         "components/esp32_camera_utils/rotator.cpp",
     ],

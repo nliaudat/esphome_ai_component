@@ -3,9 +3,15 @@
 #ifdef USE_ESP32
 
 #include "preprocessor_settings.h"
+#include "model_data.h"
 
+#include "esphome/core/helpers.h"
 #include "esphome/core/preferences.h"
-#include "esphome/components/tflite_micro_helper/model_handler.h"
+
+#include <memory>
+#include <tensorflow/lite/core/c/common.h>
+#include <tensorflow/lite/micro/micro_interpreter.h>
+#include <tensorflow/lite/micro/micro_mutable_op_resolver.h>
 
 namespace esphome::micro_wake_word {
 
@@ -14,23 +20,29 @@ static const uint32_t STREAMING_MODEL_VARIABLE_ARENA_SIZE = 1024;
 
 struct DetectionEvent {
   std::string *wake_word;
+  const std::string *id{nullptr};
   bool detected;
   bool partially_detection;  // Set if the most recent probability exceed the threshold, but the sliding window average
                              // hasn't yet
   uint8_t max_probability;
   uint8_t average_probability;
+  uint8_t probability_cutoff{0};
   bool blocked_by_vad = false;
 };
 
 class StreamingModel {
  public:
+  // Runtime models are heap owned and destroyed while the device is running, so freeing the arenas cannot
+  // depend on the owner calling unload_model() first. unload_model() is not virtual and is safe to repeat.
+  virtual ~StreamingModel() { this->unload_model(); }
+
   virtual void log_model_config() = 0;
   virtual DetectionEvent determine_detected() = 0;
 
   // Performs inference on the given features.
   //  - If the model is enabled but not loaded, it will load it
   //  - If the model is disabled but loaded, it will unload it
-  // Returns true if sucessful or false if there is an error
+  // Returns true if successful or false if there is an error
   bool perform_streaming_inference(const int8_t features[PREPROCESSOR_FEATURE_SIZE]);
 
   /// @brief Sets all recent_streaming_probabilities to 0 and resets the ignore window count
@@ -48,6 +60,9 @@ class StreamingModel {
   /// @brief Return true if the model is enabled.
   bool is_enabled() const { return this->enabled_; }
 
+  /// @brief Return true if the model has usable data. A model without it can never be loaded or run.
+  bool has_model_data() const { return this->model_start_ != nullptr; }
+
   bool get_unprocessed_probability_status() const { return this->unprocessed_probability_status_; }
 
   // Quantized probability cutoffs mapping 0.0 - 1.0 to 0 - 255
@@ -56,23 +71,17 @@ class StreamingModel {
   void set_probability_cutoff(uint8_t probability_cutoff) { this->probability_cutoff_ = probability_cutoff; }
 
  protected:
-  /// @brief Allocates memory (MRV, tensor arena) and delegates loading to ModelHandler
+  /// @brief Allocates tensor and variable arenas and sets up the model interpreter
   /// @return True if successful, false otherwise
   bool load_model_();
-
   /// @brief Probes the actual required tensor arena size by trial allocation.
-  /// Tries the manifest size first, then 1.5x, then 2x if that fails.
-  /// Uses a local temporary op resolver (does not use model_handler_'s resolver).
+  /// Tries the manifest size first, then 2x if that fails.
   /// @return The required arena size rounded up to 16-byte alignment, or 0 on failure.
   size_t probe_arena_size_();
+  /// @brief Returns true if successfully registered the streaming model's TensorFlow operations
+  bool register_streaming_ops_(tflite::MicroMutableOpResolver<20> &op_resolver);
 
-  /// @brief Registration helper for probe - registers streaming ops into a local resolver.
-  /// Does NOT modify any member state.
-  static bool register_probe_ops_(tflite::MicroMutableOpResolver<20> &op_resolver);
-
-  // Model lifecycle delegated to tflite_micro_helper::ModelHandler
-  tflite_micro_helper::ModelHandler model_handler_;
-  tflite_micro_helper::ModelConfig model_config_;
+  tflite::MicroMutableOpResolver<20> streaming_op_resolver_;
 
   bool loaded_{false};
   bool enabled_{true};
@@ -89,30 +98,51 @@ class StreamingModel {
   size_t tensor_arena_size_;
   std::vector<uint8_t> recent_streaming_probabilities_;
 
-  const uint8_t *model_start_;
-
-  // Owned by StreamingModel for streaming-specific lifecycle (MRV, variable arena)
+  const uint8_t *model_start_{nullptr};
+#ifdef USE_MICRO_WAKE_WORD_INTERNAL_RAM
+  size_t model_size_{0};
+  RAMUniquePtr<uint8_t[]> model_copy_;
+#endif
   uint8_t *tensor_arena_{nullptr};
   uint8_t *var_arena_{nullptr};
+  std::unique_ptr<tflite::MicroInterpreter> interpreter_;
   tflite::MicroResourceVariables *mrv_{nullptr};
   tflite::MicroAllocator *ma_{nullptr};
 };
 
 class WakeWordModel final : public StreamingModel {
  public:
-  /// @brief Constructs a wake word model object
+  /// @brief Constructs a wake word model object with compile-time model data
   /// @param id (std::string) identifier for this model
   /// @param model_start (const uint8_t *) pointer to the start of the model's TFLite FlatBuffer
-  /// @param default_probability_cutoff (uint8_t) probability cutoff for acceping the wake word has been said
+  /// @param model_size (size_t) size of the compiled-in model data
+  /// @param default_probability_cutoff (uint8_t) probability cutoff for accepting the wake word has been said
   /// @param sliding_window_average_size (size_t) the length of the sliding window computing the mean rolling
   ///                                    probability
   /// @param wake_word (std::string) Friendly name of the wake word
   /// @param tensor_arena_size (size_t) Size in bytes for allocating the tensor arena
   /// @param default_enabled (bool) If true, it will be enabled by default on first boot
   /// @param internal_only (bool) If true, the model will not be exposed to HomeAssistant as an available model
-  WakeWordModel(const std::string &id, const uint8_t *model_start, uint8_t default_probability_cutoff,
-                size_t sliding_window_average_size, const std::string &wake_word, size_t tensor_arena_size,
-                bool default_enabled, bool internal_only);
+  WakeWordModel(const std::string &id, const uint8_t *model_start, size_t model_size,
+                uint8_t default_probability_cutoff, size_t sliding_window_average_size, const std::string &wake_word,
+                size_t tensor_arena_size, bool default_enabled, bool internal_only);
+
+  /// @brief Constructs a wake word model object with a runtime-downloaded model
+  /// @param id (std::string) identifier for this model
+  /// @param model_data (std::shared_ptr<ModelData>) owning handle to the downloaded model buffer; must be valid
+  /// @param default_probability_cutoff (uint8_t) probability cutoff for accepting the wake word has been said
+  /// @param sliding_window_average_size (size_t) the length of the sliding window computing the mean rolling
+  ///                                    probability
+  /// @param wake_word (std::string) Friendly name of the wake word
+  /// @param trained_languages (std::vector<std::string>) Languages the model was trained on
+  /// @param tensor_arena_size (size_t) Size in bytes for allocating the tensor arena
+  WakeWordModel(const std::string &id, std::shared_ptr<ModelData> model_data, uint8_t default_probability_cutoff,
+                size_t sliding_window_average_size, const std::string &wake_word,
+                std::vector<std::string> trained_languages, size_t tensor_arena_size);
+
+  // model_data_ is a member of this class, so it is destroyed before ~StreamingModel() runs. Unload here, while
+  // the buffer is still alive, so the interpreter is never torn down over freed model data.
+  ~WakeWordModel() override { this->unload_model(); }
 
   void log_model_config() override;
 
@@ -136,6 +166,10 @@ class WakeWordModel final : public StreamingModel {
   bool get_internal_only() { return this->internal_only_; }
 
  protected:
+  // Kept for runtime-downloaded models so the model buffer stays alive for the model's lifetime.
+  // Null for compiled-in models (their data lives in flash).
+  std::shared_ptr<ModelData> model_data_;
+
   std::string id_;
   std::string wake_word_;
   std::vector<std::string> trained_languages_;
@@ -147,8 +181,8 @@ class WakeWordModel final : public StreamingModel {
 
 class VADModel final : public StreamingModel {
  public:
-  VADModel(const uint8_t *model_start, uint8_t default_probability_cutoff, size_t sliding_window_size,
-           size_t tensor_arena_size);
+  VADModel(const uint8_t *model_start, size_t model_size, uint8_t default_probability_cutoff,
+           size_t sliding_window_size, size_t tensor_arena_size);
 
   void log_model_config() override;
 
@@ -160,4 +194,4 @@ class VADModel final : public StreamingModel {
 
 }  // namespace esphome::micro_wake_word
 
-#endif  // USE_ESP32
+#endif

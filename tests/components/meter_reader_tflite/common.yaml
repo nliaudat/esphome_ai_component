@@ -1,8 +1,7 @@
 # ESPHome build test: meter_reader_tflite (common)
 # Split-component pattern: the model is declared ONCE in a `tflite_micro_runtime:`
 # entry and referenced by ID from `meter_reader_tflite:`.
-# Model is fetched over HTTP at compile time (no local model file required),
-# matching the previous tflite_micro_helper test approach.
+# Model is fetched over HTTP at compile time (no local model file required).
 
 external_components:
   # Project components, compiled from the repo sources.

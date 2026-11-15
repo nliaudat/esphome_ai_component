@@ -21,7 +21,6 @@ BOARD_KEYS = [
 ]
 
 TARGETS = {
-    "tflite_micro_helper": ["debug"],
     "esp32_camera_utils": [
         "debug",
         "debug_memory",
@@ -47,7 +46,6 @@ TARGETS = {
 # Facultative components - can be randomly enabled/disabled
 FACULTATIVE_COMPONENTS = [
     "meter_reader_tflite",
-    "tflite_micro_helper",
     "esp32_camera_utils",
     "flash_light_controller",
     "value_validator",
@@ -57,7 +55,6 @@ FACULTATIVE_COMPONENTS = [
 # Component dependencies - if a component is enabled, these must also be enabled
 COMPONENT_DEPENDENCIES = {
     "meter_reader_tflite": [
-        "tflite_micro_helper",
         "esp32_camera_utils",
         "flash_light_controller",
         "value_validator",

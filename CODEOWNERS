@@ -7,7 +7,6 @@
 /components/meter_reader_tflite/   @nliaudat
 /components/value_validator/       @nliaudat
 /components/esp32_camera_utils/    @nliaudat
-/components/tflite_micro_helper/   @nliaudat
 /components/flash_light_controller/ @nliaudat
 /components/data_collector/        @nliaudat
 
