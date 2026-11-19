@@ -46,8 +46,9 @@ Requirements
 
 - ESPHome **2026.11** or later.
 - ESP32 target (the component is ``only_on_esp32``).
-- The model buffer is emitted with 16-byte alignment, which needs the
-  ``align`` parameter of ``progmem_array()`` (upstream :pr:`22620`).
+- The model buffer is emitted with 16-byte alignment. ESPHome 2026.12 uses the
+  ``align`` parameter of ``progmem_array()`` (upstream :pr:`22620`) for this; on
+  2026.11 the component emits the equivalent ``alignas(16)`` declaration.
 
 Installation
 ------------
