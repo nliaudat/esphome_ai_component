@@ -1900,7 +1900,25 @@ void ImageProcessor::arrange_channels(uint8_t *output, uint8_t r, uint8_t g, uin
 bool ImageProcessor::apply_software_rotation(const uint8_t *input, uint8_t *output, int width, int height,
                                              int bytes_per_pixel, float rotation_deg, int &out_w, int &out_h) {
 #ifdef USE_CAMERA_ROTATOR
-  // Delegate to modular Rotator
+  // Delegate to modular Rotator. perform_rotation() takes the output dimensions as
+  // inputs (it only uses them for indexing), so derive them here and publish them
+  // through the out parameters. This mirrors the non-rotator fallback below.
+  float rot = std::fmod(rotation_deg, 360.0f);
+  if (rot < 0.0f)
+    rot += 360.0f;
+  if (std::abs(rot - 90.0f) < 0.1f || std::abs(rot - 270.0f) < 0.1f) {
+    out_w = height;
+    out_h = width;
+  } else if (std::abs(rot - 180.0f) < 0.1f || rot < 0.1f || rot > 359.9f) {
+    out_w = width;
+    out_h = height;
+  } else {
+    const float rads = rot * static_cast<float>(M_PI) / 180.0f;
+    const float abs_c = std::abs(std::cos(rads));
+    const float abs_s = std::abs(std::sin(rads));
+    out_w = static_cast<int>(width * abs_c + height * abs_s);
+    out_h = static_cast<int>(width * abs_s + height * abs_c);
+  }
   return Rotator::perform_rotation(input, output, width, height, bytes_per_pixel, rotation_deg, out_w, out_h);
 #else
   // Sanity check to prevent infinite loop
@@ -2044,14 +2062,15 @@ void ImageProcessor::debug_log_image_stats(const uint8_t *data, size_t size, con
 
   float mean = static_cast<float>(sum) / size;
 
-  ESP_LOGD(TAG, "DEBUG %s: size=%zu, min=%u, max=%u, mean=%.1f, zeros=%d/%zu (%.1f%%)", stage, size, min_val, max_val,
-           mean, zero_count, size, (zero_count * 100.0f) / size);
+  ESP_LOGD(TAG, "DEBUG %s: size=%zu, min=%u, max=%u, mean=%.1f, zeros=%d/%zu (%.1f%%)", stage, size,
+           static_cast<unsigned>(min_val), static_cast<unsigned>(max_val), mean, zero_count, size,
+           (zero_count * 100.0f) / size);
 
   ESP_LOGD(TAG, "DEBUG %s first 10 values:", stage);
   char buf[64];  // Sufficient for 10 * 4 chars ("255 ")
   size_t offset = 0;
   for (int i = 0; i < std::min(10, static_cast<int>(size)); i++) {
-    int w = snprintf(buf + offset, sizeof(buf) - offset, "%u ", data[i]);
+    int w = snprintf(buf + offset, sizeof(buf) - offset, "%u ", static_cast<unsigned>(data[i]));
     if (w < 0 || static_cast<size_t>(w) >= sizeof(buf) - offset)
       break;
     offset += w;
@@ -2120,7 +2139,7 @@ void ImageProcessor::debug_analyze_processed_zone(const uint8_t *data, int width
     for (int y = 0; y < height; y++) {
       for (int x = 0; x < width; x++) {
         int pos = (y * width + x) * channels;
-        ESP_LOGI(TAG, "  Pixel[%d,%d] ch0=%u", x, y, data[pos]);
+        ESP_LOGI(TAG, "  Pixel[%d,%d] ch0=%u", x, y, static_cast<unsigned>(data[pos]));
       }
     }
   }
