@@ -21,7 +21,9 @@ DEPENDENCIES = ["esp32_camera"]
 AUTO_LOAD = ["esp32_camera_utils"]
 
 analog_gauge_reader_ns = cg.esphome_ns.namespace("analog_gauge_reader")
-AnalogGaugeReader = analog_gauge_reader_ns.class_("AnalogGaugeReader", cg.PollingComponent)
+AnalogGaugeReader = analog_gauge_reader_ns.class_(
+    "AnalogGaugeReader", cg.PollingComponent
+)
 
 CONF_CAMERA_ID = "camera_id"
 CONF_DIALS = "dials"
@@ -84,7 +86,9 @@ DIAL_SCHEMA = cv.Schema(
                     "PROCESS_CHANNEL_GRAYSCALE"
                 ),
                 CONF_CHANNEL_RED: analog_gauge_reader_ns.enum("PROCESS_CHANNEL_RED"),
-                CONF_CHANNEL_GREEN: analog_gauge_reader_ns.enum("PROCESS_CHANNEL_GREEN"),
+                CONF_CHANNEL_GREEN: analog_gauge_reader_ns.enum(
+                    "PROCESS_CHANNEL_GREEN"
+                ),
                 CONF_CHANNEL_BLUE: analog_gauge_reader_ns.enum("PROCESS_CHANNEL_BLUE"),
             }
         ),

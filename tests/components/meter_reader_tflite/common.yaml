@@ -38,16 +38,6 @@ external_components:
 value_validator:
   id: test_validator
 
-# `esp32_camera_utils` AUTO_LOADs the core `globals` component (its
-# crop_zone_handler.h includes globals_component.h). On the current dev branch
-# an auto-loaded MULTI_CONF component still has to contain at least one entry,
-# so declare a harmless global here.
-globals:
-  - id: test_crop_zones
-    type: std::string
-    restore_value: false
-    initial_value: '""'
-
 tflite_micro_runtime:
   id: test_digit_model
   model_type: image

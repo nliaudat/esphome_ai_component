@@ -40,13 +40,18 @@ except ImportError:
 CODEOWNERS = ["@nl"]
 if CORE.target_platform == "esp32":
     DEPENDENCIES = ["esp32", "tflite_micro_runtime"]
-    AUTO_LOAD = ["esp32_camera_utils", "sensor"]
+    # meter_reader_tflite.h includes sensor, text_sensor, button and light
+    # headers directly, so each has to be compiled for this component's
+    # translation units regardless of which optional features the user configures.
+    # (`globals` is only needed when `crop_zones_global` is used; it is referenced
+    # through an ID, so the user's own globals entry loads it.)
+    AUTO_LOAD = ["esp32_camera_utils", "sensor", "text_sensor", "button", "light"]
     # flash_light_controller and data_collector are optional; not added to DEPENDENCIES here
 else:
     # On host, we mock utils and remove esp32 check. The TFLite runtime only
     # validates on ESP32 (cv.only_on_esp32), so it cannot be a dependency here.
     DEPENDENCIES = []
-    AUTO_LOAD = ["sensor"]
+    AUTO_LOAD = ["sensor", "text_sensor", "button", "light"]
 
 CONF_CAMERA_ID = "camera_id"
 CONF_CONFIDENCE_THRESHOLD = "confidence_threshold"
@@ -344,6 +349,7 @@ async def to_code(config):
 
     # Handle crop zones (either global or local)
     if CONF_CROP_ZONES in config:
+        cg.add_define("USE_METER_READER_CROP_ZONES_GLOBAL")
         crop_global = await cg.get_variable(config[CONF_CROP_ZONES])
         cg.add(var.set_crop_zones_global(crop_global))
 

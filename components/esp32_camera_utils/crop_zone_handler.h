@@ -1,7 +1,6 @@
 #pragma once
 
 #include "esphome/core/component.h"
-#include "esphome/components/globals/globals_component.h"
 #include <vector>
 #include <string>
 #include <functional>
@@ -26,55 +25,21 @@ class CropZoneHandler {
   void set_default_zone(int width, int height);
   void set_debug_zones();
 
-  // Global variable management
-  void set_crop_zones_global(globals::GlobalsComponent<std::string> *global_var) {
-    crop_zones_global_ = global_var;
-    if (crop_zones_global_) {
-      last_global_value_ = crop_zones_global_->value();
-      // Apply immediately on startup
-      std::string val = crop_zones_global_->value();
-      if (!val.empty() && val != "[]") {
-        parse_zones(val);
-      }
-    }
-  }
+  // Backing storage for the runtime-editable crop zones. Callers may pass a
+  // `globals` string (via its `value()` reference) or any other std::string that
+  // outlives this handler.
+  void set_crop_zones_global(std::string *global_var);
 
-  globals::GlobalsComponent<std::string> *get_crop_zones_global() const { return crop_zones_global_; }
+  std::string *get_crop_zones_global() const { return crop_zones_global_; }
 
   // Update global variable with new zones
-  void update_global_zones(const std::string &zones_json) {
-    if (crop_zones_global_) {
-      crop_zones_global_->value() = zones_json;
-      last_global_value_ = zones_json;
-      ESP_LOGI(TAG, "Updated global crop zones variable");
-    }
-  }
+  void update_global_zones(const std::string &zones_json);
 
   // Check if global variable has changed
-  bool has_global_zones_changed() {
-    if (!crop_zones_global_)
-      return false;
-
-    std::string current_global = crop_zones_global_->value();
-    if (current_global != last_global_value_) {
-      last_global_value_ = current_global;
-      return true;
-    }
-    return false;
-  }
+  bool has_global_zones_changed();
 
   // Apply zones from global variable
-  void apply_global_zones() {
-    if (crop_zones_global_) {
-      std::string zones_value = crop_zones_global_->value();
-      if (!zones_value.empty() && zones_value != "[]") {
-        parse_zones(zones_value);
-        ESP_LOGI(TAG, "Applied crop zones from global variable: %s", zones_value.c_str());
-      } else {
-        ESP_LOGD(TAG, "Global crop zones variable is empty");
-      }
-    }
-  }
+  void apply_global_zones();
 
   // Method to update zones from any source (text sensor, API, etc.)
   void update_zones(const std::string &zones_json) {
@@ -93,7 +58,7 @@ class CropZoneHandler {
 
  private:
   static const char *const TAG;
-  globals::GlobalsComponent<std::string> *crop_zones_global_{nullptr};
+  std::string *crop_zones_global_{nullptr};
   std::string last_global_value_;
 
  protected:

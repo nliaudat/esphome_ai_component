@@ -1,4 +1,10 @@
 #include "meter_reader_tflite.h"
+// Only present when the user wired `crop_zones_global` to a globals entry; that
+// entry is what loads the `globals` component (it is MULTI_CONF, so it cannot be
+// auto-loaded without forcing every user to declare one).
+#ifdef USE_METER_READER_CROP_ZONES_GLOBAL
+#include "esphome/components/globals/globals_component.h"
+#endif
 #include "esphome/core/application.h"
 
 #include <esp_heap_caps.h>
@@ -972,6 +978,14 @@ void MeterReaderTFLite::publish_inference_result(const std::string &digit_str, f
 void MeterReaderTFLite::set_crop_zones(const std::string &zones_json) {
   this->crop_zone_handler_.update_zones(zones_json);
 }
+
+#ifdef USE_METER_READER_CROP_ZONES_GLOBAL
+void MeterReaderTFLite::set_crop_zones_global(globals::GlobalsComponent<std::string> *global_var) {
+  // The handler only needs the backing string, not the component, so passing its
+  // value() reference keeps esp32_camera_utils free of any globals dependency.
+  this->crop_zone_handler_.set_crop_zones_global(global_var == nullptr ? nullptr : &global_var->value());
+}
+#endif
 
 // Config Delegators
 void MeterReaderTFLite::set_camera_image_format(int w, int h, const std::string &fmt) {

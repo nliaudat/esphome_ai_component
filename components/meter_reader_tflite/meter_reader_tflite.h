@@ -7,8 +7,15 @@
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/button/button.h"
 #include "esphome/components/light/light_state.h"
-#include "esphome/components/globals/globals_component.h"
 #include "esphome/core/helpers.h"
+
+// Forward-declared rather than included: `globals` is MULTI_CONF, so auto-loading
+// it would make every user declare a `globals:` entry. This header only takes a
+// pointer to GlobalsComponent; set_crop_zones_global() dereferences it in the .cpp,
+// which includes the real header.
+namespace esphome::globals {
+template<typename T> class GlobalsComponent;
+}
 
 // Coordinators
 #include "tflite_coordinator.h"
@@ -94,9 +101,9 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 #endif
 
   void set_crop_zones(const std::string &zones_json);
-  void set_crop_zones_global(globals::GlobalsComponent<std::string> *global_var) {
-    this->crop_zone_handler_.set_crop_zones_global(global_var);
-  }
+#ifdef USE_METER_READER_CROP_ZONES_GLOBAL
+  void set_crop_zones_global(globals::GlobalsComponent<std::string> *global_var);
+#endif
 
   void set_camera_image_format(int width, int height, const std::string &pixel_format);  // -> CameraCoord & TFLite
   void set_camera(camera::Camera *camera);                                               // -> CameraCoord

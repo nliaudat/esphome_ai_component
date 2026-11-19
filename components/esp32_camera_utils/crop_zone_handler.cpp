@@ -9,6 +9,47 @@ namespace esp32_camera_utils {
 
 const char *const CropZoneHandler::TAG = "CropZoneHandler";
 
+void CropZoneHandler::set_crop_zones_global(std::string *global_var) {
+  crop_zones_global_ = global_var;
+  if (crop_zones_global_) {
+    last_global_value_ = *crop_zones_global_;
+    // Apply immediately on startup
+    if (!crop_zones_global_->empty() && *crop_zones_global_ != "[]") {
+      parse_zones(*crop_zones_global_);
+    }
+  }
+}
+
+void CropZoneHandler::update_global_zones(const std::string &zones_json) {
+  if (crop_zones_global_) {
+    *crop_zones_global_ = zones_json;
+    last_global_value_ = zones_json;
+    ESP_LOGI(TAG, "Updated global crop zones variable");
+  }
+}
+
+bool CropZoneHandler::has_global_zones_changed() {
+  if (!crop_zones_global_)
+    return false;
+
+  if (*crop_zones_global_ != last_global_value_) {
+    last_global_value_ = *crop_zones_global_;
+    return true;
+  }
+  return false;
+}
+
+void CropZoneHandler::apply_global_zones() {
+  if (crop_zones_global_) {
+    if (!crop_zones_global_->empty() && *crop_zones_global_ != "[]") {
+      parse_zones(*crop_zones_global_);
+      ESP_LOGI(TAG, "Applied crop zones from global variable: %s", crop_zones_global_->c_str());
+    } else {
+      ESP_LOGD(TAG, "Global crop zones variable is empty");
+    }
+  }
+}
+
 void CropZoneHandler::parse_zones(const std::string &zones_json) {
   ScopedDuration _dur(TAG);
   ESP_LOGD(TAG, "Parsing crop zones JSON: %s", zones_json.c_str());
