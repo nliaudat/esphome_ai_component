@@ -41,5 +41,8 @@ Configuration Variables
 Dependencies
 ------------
 
-- ``esp32_camera`` (required)
+- ``esp32_camera`` (required), configured to deliver JPEG frames: either
+  ``pixel_format: JPEG`` (the default) or any other ``pixel_format`` combined
+  with a non-zero ``jpeg_quality``, which makes ``esp32_camera`` convert frames
+  to JPEG. Other combinations are rejected at config time.
 - ``esp32_camera_utils`` (auto-loaded)

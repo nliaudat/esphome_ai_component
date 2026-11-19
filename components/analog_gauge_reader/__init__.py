@@ -14,8 +14,9 @@ except ImportError:
 
 CONF_FLASH_LIGHT_CONTROLLER = "flash_light_controller"
 
-from esphome.const import CONF_ID
-from esphome.core import CORE
+from esphome.const import CONF_ID, CONF_RESOLUTION
+import esphome.final_validate as fv
+from esphome.types import ConfigType
 
 DEPENDENCIES = ["esp32_camera"]
 AUTO_LOAD = ["esp32_camera_utils"]
@@ -155,6 +156,66 @@ CONFIG_SCHEMA = cv.Schema(
     }
 ).extend(cv.polling_component_schema("60s"))
 
+# Camera frame size and delivered format, resolved in final_validate where the
+# referenced camera's own configuration is valid and known, and read back by
+# to_code. Stored on the config rather than re-derived, so codegen never has to
+# guess from substitutions.
+_KEY_CAMERA_FRAME = "_analog_gauge_camera_frame"
+
+
+def _resolution_dimensions(resolution: object) -> tuple[int, int]:
+    """Map an esp32_camera resolution to its pixel dimensions.
+
+    The numeric names in ``esp32_camera.FRAME_SIZES`` carry the pixel size; the
+    aliases (QQVGA, VGA, ...) map to the same frame size.
+    """
+    name = str(resolution).upper()
+    parts = name.split("X")
+    if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+        return int(parts[0]), int(parts[1])
+
+    try:
+        frame_size = esp32_camera.FRAME_SIZES[name]
+    except KeyError:
+        raise cv.Invalid(f"Unknown camera resolution {resolution}") from None
+    for numeric_name, candidate in esp32_camera.FRAME_SIZES.items():
+        parts = numeric_name.split("X")
+        # The enum values are codegen mock objects, one per attribute access, so
+        # they are compared rendered rather than by identity.
+        if len(parts) == 2 and parts[0].isdigit() and str(candidate) == str(frame_size):
+            return int(parts[0]), int(parts[1])
+    raise cv.Invalid(f"Unknown camera resolution {resolution}")
+
+
+def _final_validate(config: ConfigType) -> ConfigType:
+    """Resolve the frame size and delivered format from the referenced camera."""
+    camera = fv.get_declaring_config(config[CONF_CAMERA_ID])
+    width, height = _resolution_dimensions(camera[CONF_RESOLUTION])
+
+    pixel_format = str(camera.get(esp32_camera.CONF_PIXEL_FORMAT, "JPEG"))
+    # esp32_camera converts every non-JPEG frame to JPEG when jpeg_quality is
+    # non-zero (USE_ESP32_CAMERA_JPEG_CONVERSION), so the listener receives JPEG
+    # in that case even though the sensor does not.
+    jpeg_quality = camera.get(esp32_camera.CONF_JPEG_QUALITY, 0)
+    delivered = "JPEG" if pixel_format == "JPEG" or jpeg_quality != 0 else pixel_format
+
+    # The needle detection runs on decoded 8-bit pixels; this component only
+    # implements the JPEG decode path, so reject raw frames at config time rather
+    # than silently doing nothing at runtime.
+    if delivered != "JPEG":
+        raise cv.Invalid(
+            f"analog_gauge_reader needs JPEG frames, but the referenced camera "
+            f"delivers {delivered}. Set pixel_format: JPEG, or set a jpeg_quality "
+            f"so the camera converts the frame to JPEG.",
+            path=[CONF_CAMERA_ID],
+        )
+
+    config[_KEY_CAMERA_FRAME] = (width, height, delivered)
+    return config
+
+
+FINAL_VALIDATE_SCHEMA = _final_validate
+
 
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
@@ -256,13 +317,7 @@ async def to_code(config):
 
         cg.add(var.add_dial(s))
 
-    # Get camera resolution from substitutions
-    width, height = 640, 480  # Defaults
-    substitutions = CORE.config.get("substitutions", {})
-    if substitutions.get("camera_resolution"):
-        res = substitutions["camera_resolution"]
-        if "x" in res:
-            width, height = map(int, res.split("x"))
-
-    pixel_format = substitutions.get("camera_pixel_format", "RGB888")
+    # Frame size and delivered format resolved in _final_validate from the
+    # referenced camera's configuration.
+    width, height, pixel_format = config[_KEY_CAMERA_FRAME]
     cg.add(var.set_camera_image_format(width, height, pixel_format))

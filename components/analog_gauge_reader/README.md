@@ -52,6 +52,13 @@ The latest version (v2) introduces significant enhancements:
 ### Basic Usage
 The component allows you to define multiple dials. Each dial detects its needle angle and contributes to a total value.
 
+> [!NOTE]
+> The referenced camera must deliver **JPEG** frames. This is the default
+> (`pixel_format: JPEG`). A camera configured with another `pixel_format` also
+> works as long as `jpeg_quality` is non-zero, because `esp32_camera` then
+> converts each frame to JPEG before handing it to listeners. Any other
+> combination is rejected at config time with an explicit error.
+
 ```yaml
 value_validator:
   id: ${id_prefix}_validator
