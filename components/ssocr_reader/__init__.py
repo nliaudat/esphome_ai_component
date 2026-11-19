@@ -15,8 +15,7 @@ CONF_CAMERA_ID = "camera_id"
 DEPENDENCIES = ["esp32_camera"]
 # sensor: publishes value/confidence sensors via sensor.sensor_schema().
 # light: flashlight_coordinator.h unconditionally includes light_state.h.
-# globals: transitively required by esp32_camera_utils' crop_zone_handler.h include.
-AUTO_LOAD = ["esp32_camera_utils", "sensor", "light", "globals"]
+AUTO_LOAD = ["esp32_camera_utils", "sensor", "light"]
 
 ssocr_reader_ns = cg.esphome_ns.namespace("ssocr_reader")
 SSOCRReader = ssocr_reader_ns.class_("SSOCRReader", cg.PollingComponent)
