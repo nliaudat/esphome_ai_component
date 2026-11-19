@@ -5,6 +5,9 @@ from esphome.const import CONF_ID
 from esphome.core import CORE
 
 DEPENDENCIES = ["esp32_camera"]
+# data_collector.h includes switch/switch.h directly and offers a web_submit switch,
+# so the switch component has to be compiled regardless of whether one is configured.
+AUTO_LOAD = ["switch"]
 
 data_collector_ns = cg.esphome_ns.namespace("data_collector")
 DataCollector = data_collector_ns.class_("DataCollector", cg.Component)
