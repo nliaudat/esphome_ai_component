@@ -68,7 +68,7 @@ bool FlashlightCoordinator::update_scheduling() {
     uint32_t schedule_time = (this->update_interval_ > this->pre_time_) ? this->update_interval_ - this->pre_time_ : 0;
 
     if (schedule_time > 0 && this->parent_) {
-      ESP_LOGI(TAG, "Scheduling flash for next cycle in %u ms", schedule_time);
+      ESP_LOGI(TAG, "Scheduling flash for next cycle in %" PRIu32 " ms", schedule_time);
 
       App.scheduler.set_timeout(this->parent_, "flash_on", schedule_time, [this]() {
         this->enable_flash();

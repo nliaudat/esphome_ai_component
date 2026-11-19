@@ -131,7 +131,7 @@ void AnalogGaugeReader::setup() {
   // Pre-allocate buffers to prevent heap fragmentation later
   if (this->pixel_format_str_ == "JPEG") {
     size_t free_psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
-    ESP_LOGI(TAG, "Available PSRAM: %u bytes", static_cast<uint32_t>(free_psram));
+    ESP_LOGI(TAG, "Available PSRAM: %zu bytes", free_psram);
 
     this->requires_color_ = false;
     for (const auto &dial : this->dials_) {
@@ -174,8 +174,8 @@ void AnalogGaugeReader::setup() {
       ESP_LOGI(TAG, "Selected GRAYSCALE format for persistent buffer (Low PSRAM Mode)");
     }
 
-    ESP_LOGI(TAG, "Allocating persistent buffer: %u bytes (%dx%d)",
-             static_cast<uint32_t>(this->persistent_buffer_size_), this->img_width_, this->img_height_);
+    ESP_LOGI(TAG, "Allocating persistent buffer: %zu bytes (%dx%d)", this->persistent_buffer_size_, this->img_width_,
+             this->img_height_);
     this->persistent_buffer_.reset(
         static_cast<uint8_t *>(heap_caps_malloc(this->persistent_buffer_size_, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)));
 
@@ -261,7 +261,7 @@ void AnalogGaugeReader::setup() {
 void AnalogGaugeReader::dump_config() {
   ESP_LOGCONFIG(TAG, "Analog Gauge Reader:");
   ESP_LOGCONFIG(TAG, "  Debug: %s", this->debug_ ? "YES" : "NO");
-  ESP_LOGCONFIG(TAG, "  Update Interval: %u ms", this->get_update_interval());
+  ESP_LOGCONFIG(TAG, "  Update Interval: %" PRIu32 " ms", this->get_update_interval());
   ESP_LOGCONFIG(TAG, "  Stacked Digits: %s", this->stacked_digits_ ? "YES" : "NO");
   for (const auto &dial : this->dials_) {
     ESP_LOGCONFIG(TAG, "  Dial '%s': Scale=%.3f, Crop=[%d,%d,%d,%d], AutoContrast=%s, Contrast=%.2f, Deadzone=%.1fpx",
@@ -409,7 +409,7 @@ void AnalogGaugeReader::process_image_from_buffer(const uint8_t *data, size_t le
   // Track time
   uint32_t start_time = micros();
 
-  ESP_LOGD(TAG, "Process Image From Buffer Start. Len: %zu, Free Heap: %u", len,
+  ESP_LOGD(TAG, "Process Image From Buffer Start. Len: %zu, Free Heap: %" PRIu32, len,
            static_cast<uint32_t>(esp_get_free_heap_size()));
 
   if (data == nullptr || len == 0) {
@@ -639,8 +639,8 @@ void AnalogGaugeReader::process_image_from_buffer(const uint8_t *data, size_t le
     if (display_angle >= 360.0f)
       display_angle -= 360.0f;
 
-    ESP_LOGD(TAG, "Dial %s: Angle=%.1f (North), Val=%.2f, Conf=%.2f, Time=%u us", dial.id.c_str(), display_angle, val,
-             confidence, dur_algo);
+    ESP_LOGD(TAG, "Dial %s: Angle=%.1f (North), Val=%.2f, Conf=%.2f, Time=%" PRIu32 " us", dial.id.c_str(), display_angle,
+             val, confidence, dur_algo);
 
     if (dial.angle_sensor)
       dial.angle_sensor->publish_state(display_angle);

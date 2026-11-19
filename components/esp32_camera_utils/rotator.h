@@ -16,7 +16,7 @@ namespace esp32_camera_utils {
 class ScopedTimer {
  public:
   explicit ScopedTimer(const char *name) : name_(name), start_(esphome::millis()) {}
-  ~ScopedTimer() { ESP_LOGD("rotator", "%s took %ums", name_, esphome::millis() - start_); }
+  ~ScopedTimer() { ESP_LOGD("rotator", "%s took %" PRIu32 "ms", name_, esphome::millis() - start_); }
   uint32_t start_time() const { return start_; }
 
  private:

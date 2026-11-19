@@ -58,7 +58,7 @@ void PreviewWebHandler::handleRequest(web_server_idf::AsyncWebServerRequest *req
     web_server_idf::AsyncWebServerResponse *response =
         request->beginResponse(200, "image/jpeg", (const uint8_t *) buf, len);
     request->send(response);
-    ESP_LOGI(TAG, "Serving existing JPEG preview (%u bytes)", len);
+    ESP_LOGI(TAG, "Serving existing JPEG preview (%zu bytes)", len);
     return;
   }
 
@@ -71,7 +71,7 @@ void PreviewWebHandler::handleRequest(web_server_idf::AsyncWebServerRequest *req
   size_t free_internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
   size_t free_spiram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
 
-  ESP_LOGI(TAG, "Preview Debug: Image %dx%d fmt=%d | Heap: Free=%u, Int=%u, SPI=%u", image->get_width(),
+  ESP_LOGI(TAG, "Preview Debug: Image %dx%d fmt=%d | Heap: Free=%zu, Int=%zu, SPI=%zu", image->get_width(),
            image->get_height(), image->get_format(), free_heap, free_internal, free_spiram);
 
   // Use fmt2jpg from esp coversion lib
@@ -97,7 +97,7 @@ void PreviewWebHandler::handleRequest(web_server_idf::AsyncWebServerRequest *req
       request->beginResponse(200, "image/jpeg", (const uint8_t *) jpeg_buf, jpeg_len);
   request->send(response);
 
-  ESP_LOGD(TAG, "Serving converted JPEG preview (%u bytes)", jpeg_len);
+  ESP_LOGD(TAG, "Serving converted JPEG preview (%zu bytes)", jpeg_len);
 }
 
 }  // namespace esp32_camera_utils
