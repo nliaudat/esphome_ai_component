@@ -76,12 +76,12 @@ esphome_ai_component/
 │   ├── DEPENDS ON: esp32_camera_utils
 │   └── OPTIONAL: value_validator
 │
-├── analog_reader/                # NO AI - Analog dial/gauge (alpha)
+├── analog_gauge_reader/                # NO AI - Analog dial/gauge (alpha)
 │   ├── DEPENDS ON: esp32_camera_utils
 │   └── OPTIONAL: value_validator
 │
 ├── value_validator/              # SHARED - Reading validation engine
-│   ├── USED BY: meter_reader_tflite, ssocr_reader, analog_reader
+│   ├── USED BY: meter_reader_tflite, ssocr_reader, analog_gauge_reader
 │   └── DEPENDS ON: None (standalone)
 │
 ├── esp32_camera_utils/           # SHARED - Image processing core
@@ -122,7 +122,7 @@ esphome_ai_component/
 - `flash_light_controller`: **Active**
 - `data_collector`: **Active**
 - `ssocr_reader`: **Alpha**
-- `analog_reader`: **Alpha**
+- `analog_gauge_reader`: **Alpha**
 - `legacy_meter_reader_tflite`: **Frozen**
 
 ---

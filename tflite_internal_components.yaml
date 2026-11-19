@@ -33,7 +33,7 @@
     - flash_light_controller
     - value_validator
     - data_collector
-    - analog_reader
+    - analog_gauge_reader
     - ssocr_reader
 
 # 2. Split TFLite components from their PR heads (upstream esphome/esphome).

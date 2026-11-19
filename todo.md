@@ -23,10 +23,10 @@ Savings: You completely eliminate the JPEG Decoding step, which is computational
 
 ### implement dial-aware digit correction in value_validator
 - Added `float validate_reading()` overload with dial correction
-- Added `set_dial_fraction()` for analog_reader integration
-- All code guarded by `#ifdef USE_ANALOG_READER`
+- Added `set_dial_fraction()` for analog_gauge_reader integration
+- All code guarded by `#ifdef USE_ANALOG_GAUGE_READER`
 - New config: `enable_dial_correction`, `dial_correction_high_threshold`, `dial_correction_low_threshold`
-- analog_reader feeds summed dial fraction to validator each frame
+- analog_gauge_reader feeds summed dial fraction to validator each frame
 - float output = corrected_int + dial_fraction
 
 ### raw/validated publishing split

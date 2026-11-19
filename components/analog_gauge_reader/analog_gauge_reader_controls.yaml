@@ -1,5 +1,5 @@
-# Analog Reader Controls for Home Assistant
-# Exposes analog_reader parameters for runtime configuration
+# Analog Gauge Reader Controls for Home Assistant
+# Exposes analog_gauge_reader parameters for runtime configuration
 
 # Sync on_boot removed to match meter_reader_tflite behavior
 # Controls will start with their initial/restored values but won't force-update the component
@@ -7,10 +7,10 @@
 #
 # Requires substitutions:
 #   id_prefix: prefix for entity IDs (e.g. "hotwater")
-#   analog_reader_id: ID of the analog_reader component (default: ${id_prefix}_analog_reader)
+#   analog_gauge_reader_id: ID of the analog_gauge_reader component (default: ${id_prefix}_analog_gauge_reader)
 
 substitutions:
-  analog_reader_id: ${id_prefix}_analog_reader
+  analog_gauge_reader_id: ${id_prefix}_analog_gauge_reader
 
 switch:
   # Pause Analog Processing
@@ -23,10 +23,10 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     turn_on_action:
       - lambda: |-
-          id(${analog_reader_id})->set_pause_processing(true);
+          id(${analog_gauge_reader_id})->set_pause_processing(true);
     turn_off_action:
       - lambda: |-
-          id(${analog_reader_id})->set_pause_processing(false);
+          id(${analog_gauge_reader_id})->set_pause_processing(false);
 
   # Auto Contrast (Min-Max Normalization)
   - platform: template
@@ -38,10 +38,10 @@ switch:
     restore_mode: RESTORE_DEFAULT_ON
     turn_on_action:
       - lambda: |-
-          id(${analog_reader_id})->set_all_auto_contrast(true);
+          id(${analog_gauge_reader_id})->set_all_auto_contrast(true);
     turn_off_action:
       - lambda: |-
-          id(${analog_reader_id})->set_all_auto_contrast(false);
+          id(${analog_gauge_reader_id})->set_all_auto_contrast(false);
 
   # Debug Visualization
   - platform: template
@@ -53,10 +53,10 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     turn_on_action:
       - lambda: |-
-          id(${analog_reader_id})->set_debug(true);
+          id(${analog_gauge_reader_id})->set_debug(true);
     turn_off_action:
       - lambda: |-
-          id(${analog_reader_id})->set_debug(false);
+          id(${analog_gauge_reader_id})->set_debug(false);
 
 number:
   # Analog Update Interval
@@ -75,10 +75,10 @@ number:
     restore_value: true
     set_action:
       - lambda: |-
-          id(${analog_reader_id})->set_update_interval((uint32_t)(x * 1000));
+          id(${analog_gauge_reader_id})->set_update_interval((uint32_t)(x * 1000));
           // set_update_interval only stores the value; restart the poller so it takes effect
-          id(${analog_reader_id})->stop_poller();
-          id(${analog_reader_id})->start_poller();
+          id(${analog_gauge_reader_id})->stop_poller();
+          id(${analog_gauge_reader_id})->start_poller();
 
   # Analog Contrast
   - platform: template
@@ -94,7 +94,7 @@ number:
     restore_value: true
     set_action:
       - lambda: |-
-          id(${analog_reader_id})->set_all_contrast(x);
+          id(${analog_gauge_reader_id})->set_all_contrast(x);
 
 select:
   # Algorithm Selection
@@ -115,5 +115,5 @@ select:
     set_action:
       - lambda: |-
           std::string algo = x;
-          id(${analog_reader_id})->set_all_algorithm(algo);
+          id(${analog_gauge_reader_id})->set_all_algorithm(algo);
           ESP_LOGI("analog_controls", "Algorithm changed to: %s", algo.c_str());

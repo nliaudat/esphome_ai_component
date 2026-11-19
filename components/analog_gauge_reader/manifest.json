@@ -1,5 +1,5 @@
 {
-  "name": "analog_reader",
+  "name": "analog_gauge_reader",
   "version": "2.0.0",
   "build_system": "cmake"
 }

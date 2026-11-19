@@ -1,7 +1,7 @@
 // Multi-algorithm needle detection implementations
-// This file contains preprocessing and detection algorithms for analog_reader
+// This file contains preprocessing and detection algorithms for analog_gauge_reader
 
-#include "analog_reader.h"
+#include "analog_gauge_reader.h"
 #include <algorithm>
 #include <cmath>
 #include <cfloat>
@@ -10,13 +10,13 @@
 #include <esp_heap_caps.h>
 
 namespace esphome {
-namespace analog_reader {
+namespace analog_gauge_reader {
 
 static const char *const TAG = "multi_algorithm";
 
 // PREPROCESSING FUNCTIONS
 
-void AnalogReader::preprocess_image(const uint8_t *img, int w, int h, int cx, int cy, int radius,
+void AnalogGaugeReader::preprocess_image(const uint8_t *img, int w, int h, int cx, int cy, int radius,
                                     NeedleType needle_type, std::vector<uint8_t> &output) {
   // Safe Resize Logic
   size_t required_size = w * h;
@@ -31,7 +31,7 @@ void AnalogReader::preprocess_image(const uint8_t *img, int w, int h, int cx, in
         // However, overhead might be higher. This is a best-effort check.
         size_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
         if (largest_block < required_size) {
-          ESP_LOGE(TAG, "CRITICAL: Not enough memory to resize %s. Need %u, Largest Free %u", name, required_size,
+          ESP_LOGE(TAG, "CRITICAL: Not enough memory to resize %s. Need %zu, Largest Free %zu", name, required_size,
                    largest_block);
           return false;
         }
@@ -76,7 +76,7 @@ void AnalogReader::preprocess_image(const uint8_t *img, int w, int h, int cx, in
   }
 }
 
-void AnalogReader::apply_clahe(uint8_t *img, int w, int h, int tile_size) {
+void AnalogGaugeReader::apply_clahe(uint8_t *img, int w, int h, int tile_size) {
   // Simple tiled histogram equalization
   // Pre-allocate scratch arrays outside the loop to avoid per-tile heap allocations
   std::vector<int> hist(256);
@@ -113,15 +113,15 @@ void AnalogReader::apply_clahe(uint8_t *img, int w, int h, int tile_size) {
   }
 }
 
-void AnalogReader::remove_background(uint8_t *img, int w, int h, int cx, int cy, int radius) {
+void AnalogGaugeReader::remove_background(uint8_t *img, int w, int h, int cx, int cy, int radius) {
   // Calculate average background intensity in outer annular region (80-100% radius)
   float bg_sum = 0;
   int bg_count = 0;
 
   for (int deg = 0; deg < 360; deg += 5) {
     // Use LUT
-    float r_cos = AnalogReader::cos_lut_[deg];
-    float r_sin = AnalogReader::sin_lut_[deg];
+    float r_cos = AnalogGaugeReader::cos_lut_[deg];
+    float r_sin = AnalogGaugeReader::sin_lut_[deg];
 
     for (int r = static_cast<int>(radius * 0.8f); r < radius; r++) {
       int px = cx + static_cast<int>(r * r_cos);
@@ -143,7 +143,7 @@ void AnalogReader::remove_background(uint8_t *img, int w, int h, int cx, int cy,
   }
 }
 
-void AnalogReader::median_filter_3x3(uint8_t *img, int w, int h) {
+void AnalogGaugeReader::median_filter_3x3(uint8_t *img, int w, int h) {
   if (img == nullptr || w < 3 || h < 3) {
     return;
   }
@@ -218,7 +218,7 @@ static void dilate_in_place(uint8_t *img, int w, int h, int k, uint8_t *temp_buf
   }
 }
 
-void AnalogReader::apply_tophat(uint8_t *img, int w, int h, int kernel_size, std::vector<uint8_t> &scratch,
+void AnalogGaugeReader::apply_tophat(uint8_t *img, int w, int h, int kernel_size, std::vector<uint8_t> &scratch,
                                 std::vector<uint8_t> &scratch2, NeedleType needle_type) {
   if (scratch.size() != static_cast<size_t>(w * h))
     scratch.resize(w * h);
@@ -267,7 +267,7 @@ void AnalogReader::apply_tophat(uint8_t *img, int w, int h, int kernel_size, std
 
 // DETECTION ALGORITHMS
 
-AnalogReader::DetectionResult AnalogReader::detect_radial_profile(const uint8_t *img, int w, int h,
+AnalogGaugeReader::DetectionResult AnalogGaugeReader::detect_radial_profile(const uint8_t *img, int w, int h,
                                                                   const DialConfig &dial) {
   int cx = w / 2;
   int cy = h / 2;
@@ -290,8 +290,8 @@ AnalogReader::DetectionResult AnalogReader::detect_radial_profile(const uint8_t 
   const int MAX_GAP = 5;
 
   for (int deg = 0; deg < 360; deg++) {
-    float dx = AnalogReader::cos_lut_[deg];
-    float dy = AnalogReader::sin_lut_[deg];
+    float dx = AnalogGaugeReader::cos_lut_[deg];
+    float dy = AnalogGaugeReader::sin_lut_[deg];
 
     float score = 0.0f;
     int gap_count = 0;
@@ -400,7 +400,7 @@ AnalogReader::DetectionResult AnalogReader::detect_radial_profile(const uint8_t 
   return {best_angle, confidence, "radial_profile"};
 }
 
-AnalogReader::DetectionResult AnalogReader::detect_hough_transform(const uint8_t *img, int w, int h,
+AnalogGaugeReader::DetectionResult AnalogGaugeReader::detect_hough_transform(const uint8_t *img, int w, int h,
                                                                    const DialConfig &dial) {
   int cx = w / 2;
   int cy = h / 2;
@@ -507,7 +507,7 @@ AnalogReader::DetectionResult AnalogReader::detect_hough_transform(const uint8_t
   return {static_cast<float>(best_angle_idx), confidence, "hough_transform"};
 }
 
-AnalogReader::DetectionResult AnalogReader::detect_template_match(const uint8_t *img, int w, int h,
+AnalogGaugeReader::DetectionResult AnalogGaugeReader::detect_template_match(const uint8_t *img, int w, int h,
                                                                   const DialConfig &dial) {
   int cx = w / 2;
   int cy = h / 2;
@@ -520,8 +520,8 @@ AnalogReader::DetectionResult AnalogReader::detect_template_match(const uint8_t 
 
   for (int deg = 0; deg < 360; deg += COARSE_STEP) {
     // Use LUT
-    float dx = AnalogReader::cos_lut_[deg];
-    float dy = AnalogReader::sin_lut_[deg];
+    float dx = AnalogGaugeReader::cos_lut_[deg];
+    float dy = AnalogGaugeReader::sin_lut_[deg];
 
     float score = 0.0f;
     int count = 0;
@@ -569,8 +569,8 @@ AnalogReader::DetectionResult AnalogReader::detect_template_match(const uint8_t 
     if (lut_angle >= 360)
       lut_angle -= 360;
 
-    float dx = AnalogReader::cos_lut_[lut_angle];
-    float dy = AnalogReader::sin_lut_[lut_angle];
+    float dx = AnalogGaugeReader::cos_lut_[lut_angle];
+    float dy = AnalogGaugeReader::sin_lut_[lut_angle];
 
     float score = 0.0f;
     int count = 0;
@@ -607,7 +607,7 @@ AnalogReader::DetectionResult AnalogReader::detect_template_match(const uint8_t 
   return {refined_angle, confidence, "template_match"};
 }
 
-AnalogReader::DetectionResult AnalogReader::detect_legacy(const uint8_t *img, int w, int h, const DialConfig &dial) {
+AnalogGaugeReader::DetectionResult AnalogGaugeReader::detect_legacy(const uint8_t *img, int w, int h, const DialConfig &dial) {
   int cx = w / 2;
   int cy = h / 2;
   int radius = std::min(cx, cy) - 2;
@@ -708,5 +708,5 @@ AnalogReader::DetectionResult AnalogReader::detect_legacy(const uint8_t *img, in
   return {best_angle, confidence, "legacy"};
 }
 
-}  // namespace analog_reader
+}  // namespace analog_gauge_reader
 }  // namespace esphome

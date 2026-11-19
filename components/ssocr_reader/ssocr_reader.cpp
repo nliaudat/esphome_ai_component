@@ -29,7 +29,7 @@ void SSOCRReader::setup() {
   // B2: runtime crop-bounds guard (defensive; schema-level validation in
   // __init__.py already rejects out-of-range values against the substitutions-
   // resolved camera resolution). Guards against invalid state from codegen or
-  // future non-schema callers -- mirrors the analog_reader guard pattern.
+  // future non-schema callers -- mirrors the analog_gauge_reader guard pattern.
   if (this->img_width_ > 0 && this->crop_x_ > this->img_width_)
     this->crop_x_ = this->img_width_;
   if (this->img_height_ > 0 && this->crop_y_ > this->img_height_)

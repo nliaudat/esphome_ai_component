@@ -320,10 +320,10 @@ bool ValueValidator::validate_reading(int new_reading, float confidence, int &va
 }
 
 // ---------------------------------------------------------------------------
-// Dial-Aware Correction (USE_ANALOG_READER)
+// Dial-Aware Correction (USE_ANALOG_GAUGE_READER)
 // ---------------------------------------------------------------------------
 
-#ifdef USE_ANALOG_READER
+#ifdef USE_ANALOG_GAUGE_READER
 
 /**
  * @brief Subtract 1 from an integer.
@@ -489,7 +489,7 @@ bool ValueValidator::validate_reading(std::span<const float> digits, std::span<c
     return false;
   }
 
-#ifdef USE_ANALOG_READER
+#ifdef USE_ANALOG_GAUGE_READER
   float current_fraction = this->dial_fraction_;
   int corrected_val = filtered_val;
   if (this->has_dial_fraction_) {
@@ -523,7 +523,7 @@ bool ValueValidator::validate_reading(std::span<const float> digits, std::span<c
   bool final_valid = this->validate_reading(corrected_val, avg_conf, validated_reading);
 
   if (final_valid && this->validated_value_sensor_) {
-#ifdef USE_ANALOG_READER
+#ifdef USE_ANALOG_GAUGE_READER
     float float_result = static_cast<float>(validated_reading) + current_fraction;
     if (this->debug_) {
       ESP_LOGD(TAG, "Float result: %d + %.4f = %.4f", validated_reading, current_fraction, float_result);
@@ -1145,7 +1145,7 @@ void ValueValidator::dump_config() {
   ESP_LOGCONFIG(TAG, "  Small Negative Tolerance: %d", this->config_.small_negative_tolerance);
   ESP_LOGCONFIG(TAG, "  Persist State: %s", YESNO(this->config_.persist_state));
   ESP_LOGCONFIG(TAG, "  Max History Size: %d bytes", static_cast<int>(this->config_.max_history_size_bytes));
-#ifdef USE_ANALOG_READER
+#ifdef USE_ANALOG_GAUGE_READER
   ESP_LOGCONFIG(TAG, "  Dial Correction: %s", YESNO(this->config_.enable_dial_correction));
   if (this->config_.enable_dial_correction) {
     ESP_LOGCONFIG(TAG, "  Dial Corr High Thresh: %.2f", this->config_.dial_correction_high_threshold);

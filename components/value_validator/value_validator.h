@@ -87,7 +87,7 @@ class ValueValidator : public Component {
     int small_negative_tolerance{5};              // Allow negative changes up to this many units
     bool persist_state{false};                    // Persist last_valid_reading_ across reboots
 
-    // Dial-aware correction (used when analog_reader provides dial fraction)
+    // Dial-aware correction (used when analog_gauge_reader provides dial fraction)
     bool enable_dial_correction{true};
     float dial_correction_high_threshold{0.80f};  // Above this fraction -> subtract 1 from integer reading
     float dial_correction_low_threshold{0.20f};   // Below this fraction -> keep integer as-is (digit is solid)
@@ -143,8 +143,8 @@ class ValueValidator : public Component {
   void set_last_valid_reading(const std::string &value);
   bool is_hallucination_pattern(std::span<const float> digits) const;
 
-#ifdef USE_ANALOG_READER
-  // Dial fraction input from analog_reader
+#ifdef USE_ANALOG_GAUGE_READER
+  // Dial fraction input from analog_gauge_reader
   void set_dial_fraction(float fraction);
   void clear_dial_fraction();
 #endif
@@ -190,7 +190,7 @@ class ValueValidator : public Component {
   size_t last_good_values_head_{0};
   size_t last_good_values_count_{0};
 
-#ifdef USE_ANALOG_READER
+#ifdef USE_ANALOG_GAUGE_READER
   // Dial correction state
   bool has_dial_fraction_{false};
   float dial_fraction_{0.0f};  // Fractional part of summed dials [0.0, 1.0)

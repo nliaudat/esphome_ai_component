@@ -76,7 +76,7 @@ class FlashLightController : public Component {
   uint32_t flash_pre_time_{5000};
   uint32_t flash_post_time_{2000};
   std::atomic<bool> is_active_{false};
-  // Readers that joined the running sequence (e.g. meter_reader_tflite and analog_reader share one flash cycle).
+  // Readers that joined the running sequence (e.g. meter_reader_tflite and analog_gauge_reader share one flash cycle).
   // Both vectors keep their capacity between cycles: this runs on memory-constrained ESP32 targets.
   std::vector<CaptureCallback> pending_callbacks_;
   std::vector<CaptureCallback> executing_callbacks_;

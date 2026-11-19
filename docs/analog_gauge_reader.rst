@@ -1,18 +1,18 @@
 .. SPDX-License-Identifier: Apache-2.0 OR MIT
 
-analog_reader
-=============
+analog_gauge_reader
+===================
 
 **Status: Alpha** (experimental, API may change)
 
-The ``analog_reader`` component reads analog dial/gauge positions using radial intensity sum or other algorithms. It reads pointer positions without requiring AI models.
+The ``analog_gauge_reader`` component reads analog dial/gauge positions using radial intensity sum or other algorithms. It reads pointer positions without requiring AI models.
 
 Configuration
 -------------
 
 .. code-block:: yaml
 
-    analog_reader:
+    analog_gauge_reader:
       id: my_analog
       camera_id: my_camera
       validator: my_validator

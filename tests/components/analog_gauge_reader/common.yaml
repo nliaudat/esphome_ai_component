@@ -1,4 +1,4 @@
-# ESPHome build test: analog_reader common config (Alpha)
+# ESPHome build test: analog_gauge_reader common config (Alpha)
 # Baseline build without optional dependencies (no flash_light_controller).
 # See common_flash.yaml for the flash-enabled variant.
 logger:
@@ -8,7 +8,7 @@ external_components:
   - source:
       type: local
       path: ../../../components
-    components: [analog_reader, esp32_camera_utils]
+    components: [analog_gauge_reader, esp32_camera_utils]
 
 esp32_camera:
   id: test_camera
@@ -27,10 +27,20 @@ esp32_camera:
   resolution: 640x480
   pixel_format: JPEG
 
+# `esp32_camera_utils` AUTO_LOADs the core `globals` component (its
+# crop_zone_handler.h includes globals_component.h). On the current dev branch
+# an auto-loaded MULTI_CONF component still has to contain at least one entry,
+# so declare a harmless global here.
+globals:
+  - id: test_crop_zones
+    type: std::string
+    restore_value: false
+    initial_value: '""'
+
 esp32_camera_utils:
   id: test_camera_utils
 
-analog_reader:
+analog_gauge_reader:
   id: test_analog
   camera_id: test_camera
   update_interval: 60s

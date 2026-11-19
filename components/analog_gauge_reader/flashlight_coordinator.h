@@ -2,7 +2,7 @@
 
 #include "esphome/core/defines.h"
 
-#ifdef USE_ANALOG_READER
+#ifdef USE_ANALOG_GAUGE_READER
 
 #include "esphome/core/component.h"
 
@@ -15,7 +15,7 @@
 #include <functional>
 
 namespace esphome {
-namespace analog_reader {
+namespace analog_gauge_reader {
 
 class FlashlightCoordinator {
  public:
@@ -74,7 +74,7 @@ class FlashlightCoordinator {
 #endif
 };
 
-}  // namespace analog_reader
+}  // namespace analog_gauge_reader
 }  // namespace esphome
 
-#endif  // USE_ANALOG_READER
+#endif  // USE_ANALOG_GAUGE_READER

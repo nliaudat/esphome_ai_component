@@ -54,9 +54,9 @@ ota:
     # on_begin:
       # then:
         # - lambda: |-
-            # ESP_LOGI("ota", "Preparing for OTA: Pausing AI & Analog Reader...");
+            # ESP_LOGI("ota", "Preparing for OTA: Pausing AI & Analog Gauge Reader...");
             # // id(${id_prefix}_meter_reader).set_pause_processing(true);
-            # id(${id_prefix}_analog_reader).set_pause_processing(true);
+            # id(${id_prefix}_analog_gauge_reader).set_pause_processing(true);
             # // Ensure flash is off
             # id(${id_prefix}_flash_controller).disable_flash();
 
@@ -207,7 +207,7 @@ packages:
   # - !include components/flash_light_controller/flash_light_controller_controls.yaml
   - !include components/esp32_camera_utils/esp32_camera_utils_controls.yaml
   # - !include data_collector_controls.yaml
-  # - !include components/analog_reader/analog_reader_controls.yaml
+  # - !include components/analog_gauge_reader/analog_gauge_reader_controls.yaml
 
   # camera configs
   - !include camera_options.yaml

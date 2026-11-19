@@ -20,8 +20,8 @@ from esphome.core import CORE
 DEPENDENCIES = ["esp32_camera"]
 AUTO_LOAD = ["esp32_camera_utils"]
 
-analog_reader_ns = cg.esphome_ns.namespace("analog_reader")
-AnalogReader = analog_reader_ns.class_("AnalogReader", cg.PollingComponent)
+analog_gauge_reader_ns = cg.esphome_ns.namespace("analog_gauge_reader")
+AnalogGaugeReader = analog_gauge_reader_ns.class_("AnalogGaugeReader", cg.PollingComponent)
 
 CONF_CAMERA_ID = "camera_id"
 CONF_DIALS = "dials"
@@ -74,18 +74,18 @@ DIAL_SCHEMA = cv.Schema(
         cv.Required(CONF_ID): cv.string,  # String ID for logs
         cv.Optional(CONF_NEEDLE_TYPE, default=CONF_TYPE_DARK): cv.enum(
             {
-                CONF_TYPE_DARK: analog_reader_ns.enum("NEEDLE_TYPE_DARK"),
-                CONF_TYPE_LIGHT: analog_reader_ns.enum("NEEDLE_TYPE_LIGHT"),
+                CONF_TYPE_DARK: analog_gauge_reader_ns.enum("NEEDLE_TYPE_DARK"),
+                CONF_TYPE_LIGHT: analog_gauge_reader_ns.enum("NEEDLE_TYPE_LIGHT"),
             }
         ),
         cv.Optional(CONF_PROCESS_CHANNEL, default=CONF_CHANNEL_GRAYSCALE): cv.enum(
             {
-                CONF_CHANNEL_GRAYSCALE: analog_reader_ns.enum(
+                CONF_CHANNEL_GRAYSCALE: analog_gauge_reader_ns.enum(
                     "PROCESS_CHANNEL_GRAYSCALE"
                 ),
-                CONF_CHANNEL_RED: analog_reader_ns.enum("PROCESS_CHANNEL_RED"),
-                CONF_CHANNEL_GREEN: analog_reader_ns.enum("PROCESS_CHANNEL_GREEN"),
-                CONF_CHANNEL_BLUE: analog_reader_ns.enum("PROCESS_CHANNEL_BLUE"),
+                CONF_CHANNEL_RED: analog_gauge_reader_ns.enum("PROCESS_CHANNEL_RED"),
+                CONF_CHANNEL_GREEN: analog_gauge_reader_ns.enum("PROCESS_CHANNEL_GREEN"),
+                CONF_CHANNEL_BLUE: analog_gauge_reader_ns.enum("PROCESS_CHANNEL_BLUE"),
             }
         ),
         cv.Optional(CONF_ALGORITHM, default=CONF_ALGO_RADIAL): cv.one_of(
@@ -133,7 +133,7 @@ DIAL_SCHEMA = cv.Schema(
 
 CONFIG_SCHEMA = cv.Schema(
     {
-        cv.GenerateID(): cv.declare_id(AnalogReader),
+        cv.GenerateID(): cv.declare_id(AnalogGaugeReader),
         cv.Optional(CONF_VALIDATOR): cv.use_id(value_validator.ValueValidator)
         if value_validator
         else cv.string,
@@ -157,7 +157,7 @@ async def to_code(config):
 
     await cg.register_component(var, config)
 
-    cg.add_define("USE_ANALOG_READER")
+    cg.add_define("USE_ANALOG_GAUGE_READER")
 
     # Validator
     if CONF_VALIDATOR in config:
@@ -194,7 +194,7 @@ async def to_code(config):
         # cg.StructInitializer
 
         s = cg.StructInitializer(
-            analog_reader_ns.struct("DialConfig"),
+            analog_gauge_reader_ns.struct("DialConfig"),
             ("id", dial[CONF_ID]),
             ("needle_type", dial[CONF_NEEDLE_TYPE]),
             ("algorithm", dial[CONF_ALGORITHM]),

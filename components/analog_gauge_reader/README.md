@@ -1,4 +1,4 @@
-# Analog Reader Component (Alpha)
+# Analog Gauge Reader Component (Alpha)
 
 > [!WARNING]
 > **ALPHA STAGE SOFTWARE**
@@ -9,7 +9,7 @@ This component provides a lightweight, non-AI solution for reading analog gauges
 ## 🚀 Performance Gains vs AI
 Using this component instead of an AI model (`meter_reader_tflite`) offers significant advantages for standard analog dials:
 
-| Metric | AI Model (TFLite) | Analog Reader (CV) | Gain |
+| Metric | AI Model (TFLite) | Analog Gauge Reader (CV) | Gain |
 | :--- | :--- | :--- | :--- |
 | **RAM Usage** | ~150KB (Tensor Arena) | ~16KB (Image Buffer) | **~10x Less** |
 | **Flash Size** | 50KB - 100KB (Model) | < 4KB (Code) | **~25x Smaller** |
@@ -58,7 +58,7 @@ value_validator:
   allow_negative_rates: true  # Analog gauges can go both ways
   max_rate_change: 0.25
 
-analog_reader:
+analog_gauge_reader:
   id: analog_main
   # Camera Reference
   camera_id: my_camera
@@ -164,7 +164,7 @@ To easily adjust settings (Pause, Contrast, Update Interval) from Home Assistant
 
 ```yaml
 packages:
-  analog_controls: !include analog_reader_controls.yaml
+  analog_controls: !include analog_gauge_reader_controls.yaml
 ```
 
 This exposes:
@@ -175,7 +175,7 @@ This exposes:
 - **Algorithm Selector**: Switch between detection algorithms (Legacy, Radial Profile, Hough, Template, Auto) at runtime.
 
 ### Shared Flash Cycle
-`analog_reader` and `meter_reader_tflite` can read the same camera with a single flash cycle. Point both components at the same `flash_light_controller`:
+`analog_gauge_reader` and `meter_reader_tflite` can read the same camera with a single flash cycle. Point both components at the same `flash_light_controller`:
 
 ```yaml
 flash_light_controller:
@@ -188,7 +188,7 @@ meter_reader_tflite:
   # ...
   flash_light_controller: my_flash_controller
 
-analog_reader:
+analog_gauge_reader:
   # ...
   flash_light_controller: my_flash_controller
 ```

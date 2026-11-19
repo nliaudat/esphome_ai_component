@@ -1,4 +1,4 @@
-# ESPHome build test: analog_reader on ESP32-S3 (Alpha)
+# ESPHome build test: analog_gauge_reader on ESP32-S3 (Alpha)
 esphome:
   name: test-analog-s3
 

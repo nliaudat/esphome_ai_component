@@ -9,12 +9,12 @@ The `value_validator` component provides robust validation and filtering of mete
 - **Smart Validation**: Analyzes recent reading patterns to adapt validation thresholds
 - **Self-Correction**: Automatically recovers from stuck readings after consecutive high-confidence rejections
 - **Per-Digit Confidence**: Validates individual digit confidence for multi-digit readings
-- **Dial-Aware Correction**: Uses analog dial fraction to correct digit boundary transitions when combined with `analog_reader`
+- **Dial-Aware Correction**: Uses analog dial fraction to correct digit boundary transitions when combined with `analog_gauge_reader`
 - **History Tracking**: Maintains reading history with configurable memory limits
 - **PSRAM Optimized**: Efficiently manages memory for ESP32 devices
 - **Multiple Instances**: Support for multiple validator configurations for different readers
 - **Optional Usage**: Can be omitted if validation is not required
-- **Float Output**: When `USE_ANALOG_READER` is enabled, outputs float values combining validated integer digits with dial fractional precision
+- **Float Output**: When `USE_ANALOG_GAUGE_READER` is enabled, outputs float values combining validated integer digits with dial fractional precision
 
 ## Configuration Parameters
 
@@ -102,7 +102,7 @@ meter_reader_tflite:
 ```
 
 ### SSOCR Reader (Optional Validator)
-The validator is optional provided the component supports it (e.g., `ssocr_reader`, `analog_reader`).
+The validator is optional provided the component supports it (e.g., `ssocr_reader`, `analog_gauge_reader`).
 
 ```yaml
 ssocr_reader:
@@ -122,7 +122,7 @@ meter_reader_tflite:
   validator: digital_validator
   # ...
 
-analog_reader:
+analog_gauge_reader:
   validator: analog_validator
   # ...
 ```
@@ -146,7 +146,7 @@ Optional sensors that expose the validator's internal state to Home Assistant:
 - **rejection_count_sensor**: Current count of consecutive rejected readings (0 during normal operation)
 - **raw_reading_sensor**: The raw value from the model before any validation
 - **validator_state_sensor**: Text state — one of `initializing`, `normal`, `rejecting`, `stuck`
-- **validated_value_sensor**: The validated float reading (with dial fraction when analog_reader is active). **Only published on accepted readings** — if the reading is rejected, this sensor's value does not change. This allows comparing the raw `value_sensor` (always updated) against the validated value to debug validation issues.
+- **validated_value_sensor**: The validated float reading (with dial fraction when analog_gauge_reader is active). **Only published on accepted readings** — if the reading is rejected, this sensor's value does not change. This allows comparing the raw `value_sensor` (always updated) against the validated value to debug validation issues.
 
 These enable HA automations (e.g., notify when rejection count exceeds a threshold) and make debugging stuck episodes possible without reading ESP logs.
 
@@ -170,13 +170,13 @@ When `persist_state: true`, the last valid reading is saved to flash memory. Aft
 - Changed readings are committed right away with `global_preferences->sync()` instead of waiting for `flash_write_interval`, so a reboot cannot restore an older value. Writes only happen when the value actually changes.
 - `0` is a valid saved reading (for example a brand-new meter) and is restored normally.
 
-## Dial-Aware Correction (Analog Reader Integration)
+## Dial-Aware Correction (Analog Gauge Reader Integration)
 
-When used together with the `analog_reader` component, the value_validator can correct digit boundary transitions using the analog dial fraction. This solves the problem where TFLite digit recognition may misread a digit that is physically transitioning between two values on the meter.
+When used together with the `analog_gauge_reader` component, the value_validator can correct digit boundary transitions using the analog dial fraction. This solves the problem where TFLite digit recognition may misread a digit that is physically transitioning between two values on the meter.
 
 ### How It Works
 
-1. **analog_reader** reads multiple dials (e.g. scale=1.0, scale=0.1, scale=0.01) and sums them: `summed_dial_value = Σ(dial_val[i] × scale[i])`
+1. **analog_gauge_reader** reads multiple dials (e.g. scale=1.0, scale=0.1, scale=0.01) and sums them: `summed_dial_value = Σ(dial_val[i] × scale[i])`
 2. The **fractional part** of the summed value (`fmodf(summed_dial_value, 1.0)`) is fed to the validator
 3. **meter_reader_tflite** reads the digit wheels and calls `validate_reading()` with the float overload
 4. The validator applies correction:
@@ -198,7 +198,7 @@ meter_reader_tflite:
   validator: combined_validator
   # ... digit zones ...
 
-analog_reader:
+analog_gauge_reader:
   validator: combined_validator          # Same validator instance!
   dials:
     - id: dial_1
@@ -209,11 +209,11 @@ analog_reader:
       scale: 0.01                        # Hundredths digit
 ```
 
-> **Important**: Both `meter_reader_tflite` and `analog_reader` must reference the **same** `value_validator` instance. The analog_reader feeds the dial fraction, and the meter_reader_tflite reads digits — the validator combines both into a single validated float.
+> **Important**: Both `meter_reader_tflite` and `analog_gauge_reader` must reference the **same** `value_validator` instance. The analog_gauge_reader feeds the dial fraction, and the meter_reader_tflite reads digits — the validator combines both into a single validated float.
 
 ### Guard Macros
 
-All dial-aware correction logic is guarded by `#ifdef USE_ANALOG_READER`. When `analog_reader` is not included in the project, the validator behaves exactly as before (integer output only). No code size or performance impact.
+All dial-aware correction logic is guarded by `#ifdef USE_ANALOG_GAUGE_READER`. When `analog_gauge_reader` is not included in the project, the validator behaves exactly as before (integer output only). No code size or performance impact.
 
 ## Runtime Control
 

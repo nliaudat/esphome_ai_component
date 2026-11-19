@@ -5,7 +5,7 @@
 #ifdef USE_FLASH_LIGHT_CONTROLLER
 
 namespace esphome {
-namespace analog_reader {
+namespace analog_gauge_reader {
 
 static const char *const TAG = "flashlight_coordinator";
 
@@ -136,7 +136,7 @@ void FlashlightCoordinator::capture_preview_sequence(std::function<void()> frame
   }
 }
 
-}  // namespace analog_reader
+}  // namespace analog_gauge_reader
 }  // namespace esphome
 
 #endif  // USE_FLASH_LIGHT_CONTROLLER

@@ -2,7 +2,7 @@
 
 #include "esphome/core/defines.h"
 
-#ifdef USE_ANALOG_READER
+#ifdef USE_ANALOG_GAUGE_READER
 
 #include "esphome/core/component.h"
 
@@ -11,7 +11,7 @@
 #endif
 
 namespace esphome {
-namespace analog_reader {
+namespace analog_gauge_reader {
 
 class ValueValidatorCoordinator {
  public:
@@ -67,7 +67,7 @@ class ValueValidatorCoordinator {
 #endif
 };
 
-}  // namespace analog_reader
+}  // namespace analog_gauge_reader
 }  // namespace esphome
 
-#endif  // USE_ANALOG_READER
+#endif  // USE_ANALOG_GAUGE_READER

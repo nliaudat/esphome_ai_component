@@ -5,7 +5,7 @@ value_validator
 
 **Status: Active**
 
-The ``value_validator`` component provides reading validation for meter readers. It eliminates outliers, tracks reading history, prevents impossible value jumps, and supports dial-aware digit correction when combined with ``analog_reader``.
+The ``value_validator`` component provides reading validation for meter readers. It eliminates outliers, tracks reading history, prevents impossible value jumps, and supports dial-aware digit correction when combined with ``analog_gauge_reader``.
 
 Configuration
 -------------

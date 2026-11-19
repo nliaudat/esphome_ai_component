@@ -13,13 +13,13 @@
 
 #include "esphome/core/defines.h"
 
-#ifdef USE_ANALOG_READER
+#ifdef USE_ANALOG_GAUGE_READER
 
 namespace esphome {
 namespace esp32_camera_utils {
 class ImageProcessor;
 }
-namespace analog_reader {
+namespace analog_gauge_reader {
 
 // Exported constants for algorithm implementations
 extern const float kScanStartRadius;
@@ -81,9 +81,9 @@ struct DialReading {
   float value;
 };
 
-class AnalogReader : public PollingComponent, public esphome::camera::CameraListener {
+class AnalogGaugeReader : public PollingComponent, public esphome::camera::CameraListener {
  public:
-  ~AnalogReader();
+  ~AnalogGaugeReader();
   void setup() override;
   void update() override;
   void loop() override;
@@ -221,7 +221,7 @@ class AnalogReader : public PollingComponent, public esphome::camera::CameraList
   void debug_angle_calculation(float image_angle, const DialConfig &dial);
 };
 
-}  // namespace analog_reader
+}  // namespace analog_gauge_reader
 }  // namespace esphome
 
-#endif  // USE_ANALOG_READER
+#endif  // USE_ANALOG_GAUGE_READER

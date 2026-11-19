@@ -1,4 +1,4 @@
-#include "analog_reader.h"
+#include "analog_gauge_reader.h"
 #include "esphome/core/log.h"
 #include "esphome/core/application.h"
 #include <cmath>
@@ -11,9 +11,9 @@
 #include <esp_jpeg_dec.h>  // Required for local decoding
 
 namespace esphome {
-namespace analog_reader {
+namespace analog_gauge_reader {
 
-static const char *const TAG = "analog_reader";
+static const char *const TAG = "analog_gauge_reader";
 
 // Use existing JpegDecoderDeleter from image_processor.h (avoids redundant local struct)
 using JpegDecoderDeleter = esphome::esp32_camera_utils::ImageProcessor::JpegDecoderDeleter;
@@ -95,14 +95,14 @@ extern const float kEdgeWeight = 0.3f;            // Weight for edge gradient (3
 static const float kDecimalPrecision = 10000.0f;  // 4 decimal places (10^4)
 
 // Define static storage
-float AnalogReader::sin_lut_[360];
-float AnalogReader::cos_lut_[360];
+float AnalogGaugeReader::sin_lut_[360];
+float AnalogGaugeReader::cos_lut_[360];
 static bool s_luts_initialized = false;
 
-AnalogReader::~AnalogReader() { this->persistent_buffer_.reset(); }
+AnalogGaugeReader::~AnalogGaugeReader() { this->persistent_buffer_.reset(); }
 
-void AnalogReader::setup() {
-  ESP_LOGCONFIG(TAG, "Setting up Analog Reader...");
+void AnalogGaugeReader::setup() {
+  ESP_LOGCONFIG(TAG, "Setting up Analog Gauge Reader...");
 
   // Register Listener
   if (this->camera_) {
@@ -197,8 +197,8 @@ void AnalogReader::setup() {
   if (!s_luts_initialized) {
     for (int i = 0; i < 360; i++) {
       float rad = i * static_cast<float>(M_PI) / 180.0f;
-      AnalogReader::sin_lut_[i] = std::sin(rad);
-      AnalogReader::cos_lut_[i] = std::cos(rad);
+      AnalogGaugeReader::sin_lut_[i] = std::sin(rad);
+      AnalogGaugeReader::cos_lut_[i] = std::cos(rad);
     }
     s_luts_initialized = true;
     ESP_LOGD(TAG, "Trigonometric LUTs initialized");
@@ -258,8 +258,8 @@ void AnalogReader::setup() {
   this->readings_.reserve(this->dials_.size());
 }
 
-void AnalogReader::dump_config() {
-  ESP_LOGCONFIG(TAG, "Analog Reader:");
+void AnalogGaugeReader::dump_config() {
+  ESP_LOGCONFIG(TAG, "Analog Gauge Reader:");
   ESP_LOGCONFIG(TAG, "  Debug: %s", this->debug_ ? "YES" : "NO");
   ESP_LOGCONFIG(TAG, "  Update Interval: %u ms", this->get_update_interval());
   ESP_LOGCONFIG(TAG, "  Stacked Digits: %s", this->stacked_digits_ ? "YES" : "NO");
@@ -270,7 +270,7 @@ void AnalogReader::dump_config() {
   }
 }
 
-void AnalogReader::update() {
+void AnalogGaugeReader::update() {
   if (this->debug_)
     ESP_LOGD(TAG, "Update triggered (Interval cycle)");
 
@@ -290,7 +290,7 @@ void AnalogReader::update() {
   }
 }
 
-void AnalogReader::on_camera_image(const std::shared_ptr<esphome::camera::CameraImage> &image) {
+void AnalogGaugeReader::on_camera_image(const std::shared_ptr<esphome::camera::CameraImage> &image) {
   std::lock_guard<std::mutex> lock(this->frame_mutex_);
   if (this->paused_)
     return;
@@ -300,7 +300,7 @@ void AnalogReader::on_camera_image(const std::shared_ptr<esphome::camera::Camera
   }
 }
 
-void AnalogReader::loop() {
+void AnalogGaugeReader::loop() {
   std::shared_ptr<esphome::camera::CameraImage> frame;
   {
     std::lock_guard<std::mutex> lock(this->frame_mutex_);
@@ -386,7 +386,7 @@ class DecodedImage : public esphome::camera::CameraImage {
   size_t get_width() const { return this->width_; }
   size_t get_height() const { return this->height_; }
 
-  ~DecodedImage() { ESP_LOGV("analog_reader", "Destroying DecodedImage (Buffer released)"); }
+  ~DecodedImage() { ESP_LOGV("analog_gauge_reader", "Destroying DecodedImage (Buffer released)"); }
 
  private:
   esphome::esp32_camera_utils::ImageProcessor::JpegBufferPtr data_;
@@ -395,21 +395,21 @@ class DecodedImage : public esphome::camera::CameraImage {
   size_t size_;
 };
 
-void AnalogReader::process_image(std::shared_ptr<esphome::camera::CameraImage> image) {
+void AnalogGaugeReader::process_image(std::shared_ptr<esphome::camera::CameraImage> image) {
   if (image) {
     this->process_image_from_buffer(image->get_data_buffer(), image->get_data_length());
   }
 }
 
-// Main-task only (see persistent_buffer_ invariant in analog_reader.h).
-void AnalogReader::process_image_from_buffer(const uint8_t *data, size_t len) {
+// Main-task only (see persistent_buffer_ invariant in analog_gauge_reader.h).
+void AnalogGaugeReader::process_image_from_buffer(const uint8_t *data, size_t len) {
   if (this->camera_ == nullptr || this->dials_.empty())
     return;
 
   // Track time
   uint32_t start_time = micros();
 
-  ESP_LOGD(TAG, "Process Image From Buffer Start. Len: %u, Free Heap: %u", len,
+  ESP_LOGD(TAG, "Process Image From Buffer Start. Len: %zu, Free Heap: %u", len,
            static_cast<uint32_t>(esp_get_free_heap_size()));
 
   if (data == nullptr || len == 0) {
@@ -831,7 +831,7 @@ void AnalogReader::process_image_from_buffer(const uint8_t *data, size_t len) {
   this->validation_coord_.set_dial_fraction(total_value);
 }
 
-AnalogReader::DetectionResult AnalogReader::find_needle_angle(const uint8_t *img, int w, int h,
+AnalogGaugeReader::DetectionResult AnalogGaugeReader::find_needle_angle(const uint8_t *img, int w, int h,
                                                               const DialConfig &dial) {
   int cx = w / 2;
   int cy = h / 2;
@@ -919,7 +919,7 @@ AnalogReader::DetectionResult AnalogReader::find_needle_angle(const uint8_t *img
   return selected_result;
 }
 
-float AnalogReader::angle_to_value(float image_angle, const DialConfig &dial) {
+float AnalogGaugeReader::angle_to_value(float image_angle, const DialConfig &dial) {
   // Image: 0 deg = East (3 o'clock), clockwise
   // Dial: 0 deg = North (12 o'clock), clockwise
 
@@ -987,7 +987,7 @@ float AnalogReader::angle_to_value(float image_angle, const DialConfig &dial) {
   return dial.min_value + fraction * (dial.max_value - dial.min_value);
 }
 
-void AnalogReader::debug_angle_calculation(float image_angle, const DialConfig &dial) {
+void AnalogGaugeReader::debug_angle_calculation(float image_angle, const DialConfig &dial) {
   ESP_LOGD(TAG, "=== DEBUG ANGLE CONVERSION for %s ===", dial.id.c_str());
   ESP_LOGD(TAG, "Input image angle: %.1f deg (0 deg=East, clockwise)", image_angle);
 
@@ -1023,7 +1023,7 @@ void AnalogReader::debug_angle_calculation(float image_angle, const DialConfig &
   ESP_LOGD(TAG, "=====================================");
 }
 
-void AnalogReader::debug_dial_image(const uint8_t *img, int w, int h, float detected_angle) {
+void AnalogGaugeReader::debug_dial_image(const uint8_t *img, int w, int h, float detected_angle) {
   // Create ASCII visualization of the dial with needle
   const int grid_w = 40;
   const int grid_h = 40;
@@ -1125,7 +1125,7 @@ void AnalogReader::debug_dial_image(const uint8_t *img, int w, int h, float dete
   }
 }
 
-void AnalogReader::set_dial_range(const std::string &dial_id, float min_val, float max_val) {
+void AnalogGaugeReader::set_dial_range(const std::string &dial_id, float min_val, float max_val) {
   for (auto &dial : this->dials_) {
     if (dial.id == dial_id) {
       dial.min_value = min_val;
@@ -1137,7 +1137,7 @@ void AnalogReader::set_dial_range(const std::string &dial_id, float min_val, flo
   ESP_LOGW(TAG, "Dial '%s' not found for set_dial_range", dial_id.c_str());
 }
 
-void AnalogReader::set_dial_angle(const std::string &dial_id, float min_deg, float max_deg) {
+void AnalogGaugeReader::set_dial_angle(const std::string &dial_id, float min_deg, float max_deg) {
   for (auto &dial : this->dials_) {
     if (dial.id == dial_id) {
       dial.min_angle = min_deg;
@@ -1149,5 +1149,5 @@ void AnalogReader::set_dial_angle(const std::string &dial_id, float min_deg, flo
   ESP_LOGW(TAG, "Dial '%s' not found for set_dial_angle", dial_id.c_str());
 }
 
-}  // namespace analog_reader
+}  // namespace analog_gauge_reader
 }  // namespace esphome
