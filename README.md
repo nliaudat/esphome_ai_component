@@ -37,7 +37,7 @@ The repository allows you to use specific components based on your needs:
 |-----------|-------------|
 | **[meter_reader_tflite](./components/meter_reader_tflite)** | AI-powered meter reader using TensorFlow Lite models. Orchestrates capture, inference, and reporting for digital meters. |
 | **[ssocr_reader](./components/ssocr_reader)** | (Alpha dev !) Seven-segment OCR reader using SSOCR algorithm. Reads digital displays without AI models. |
-| **[analog_gauge_reader](./components/analog_gauge_reader)** | (Alpha dev!) Analog dial/gauge reader using radial intensity sum algorithm. Reads pointer positions without AI. |
+| **[analog_gauge_reader](./components/analog_gauge_reader)** | Analog dial/gauge reader using radial intensity sum algorithm. Reads pointer positions without AI. |
 
 ### Supporting Components
 
