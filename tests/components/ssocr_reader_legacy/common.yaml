@@ -1,4 +1,4 @@
-# ESPHome build test: ssocr_reader common config (Alpha)
+# ESPHome build test: ssocr_reader_legacy common config (Alpha)
 logger:
   level: DEBUG
 
@@ -6,7 +6,7 @@ external_components:
   - source:
       type: local
       path: ../../../components
-    components: [ssocr_reader, esp32_camera_utils, flash_light_controller]
+    components: [ssocr_reader_legacy, esp32_camera_utils, flash_light_controller]
 
 esp32_camera:
   id: test_camera
@@ -28,7 +28,7 @@ esp32_camera:
 esp32_camera_utils:
   id: test_camera_utils
 
-ssocr_reader:
+ssocr_reader_legacy:
   id: test_ssocr
   camera_id: test_camera
   update_interval: 5s

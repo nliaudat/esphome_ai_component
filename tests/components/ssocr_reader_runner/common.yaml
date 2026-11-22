@@ -1,0 +1,65 @@
+# ESPHome build test: ssocr_reader_runner
+#
+# The runner is local; it consumes the upstream `camera_decoder` (PR 22767) and
+# `seven_segment_ocr` (PR 22999) components from their PR heads.
+
+esphome:
+  name: test-ssocr-runner
+
+external_components:
+  - source:
+      type: local
+      path: ../../../components
+    components:
+      - ssocr_reader_runner
+      - value_validator
+      - flash_light_controller
+  # `camera` carries decoder.h in this PR, so it is requested alongside the decoder.
+  - source: github://pr#22767
+    components: [camera, camera_decoder]
+    refresh: 1d
+  - source: github://pr#22999
+    components: [seven_segment_ocr]
+    refresh: 1d
+
+logger:
+  level: DEBUG
+
+esp32_camera:
+  id: test_camera
+  name: Test Camera
+  external_clock:
+    pin: GPIO0
+    frequency: 20MHz
+  i2c_pins:
+    sda: GPIO26
+    scl: GPIO27
+  data_pins: [GPIO5, GPIO18, GPIO19, GPIO21, GPIO36, GPIO39, GPIO34, GPIO35]
+  vsync_pin: GPIO25
+  href_pin: GPIO23
+  pixel_clock_pin: GPIO22
+  power_down_pin: GPIO32
+  resolution: 640x480
+  pixel_format: JPEG
+
+camera_decoder:
+  id: test_decoder
+  output_type: GRAYSCALE
+
+value_validator:
+  id: test_validator
+
+ssocr_reader_runner:
+  id: test_ssocr
+  camera_id: test_camera
+  decoder_id: test_decoder
+  validator: test_validator
+  crop_x: 8
+  crop_y: 16
+  crop_w: 160
+  crop_h: 40
+  digit_count: 6
+  value:
+    name: "SSOCR value"
+  confidence:
+    name: "SSOCR confidence"

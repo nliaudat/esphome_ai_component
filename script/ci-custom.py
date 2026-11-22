@@ -578,7 +578,7 @@ def lint_no_sprintf(fname, match):
         # Debug logging uses to_string for sensor values
         "components/meter_reader_tflite/flashlight_coordinator.cpp",
         "components/meter_reader_tflite/meter_reader_tflite.cpp",
-        "components/ssocr_reader/ssocr_reader.cpp",
+        "components/ssocr_reader_legacy/ssocr_reader.cpp",
         "components/value_validator/value_validator.cpp",
     ],
 )

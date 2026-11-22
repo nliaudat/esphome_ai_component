@@ -1,18 +1,20 @@
 .. SPDX-License-Identifier: Apache-2.0 OR MIT
 
-ssocr_reader
-============
+ssocr_reader_legacy
+===================
 
-**Status: Alpha** (experimental, API may change)
+**Status: Legacy** (superseded by :doc:`ssocr_reader_runner`)
 
-The ``ssocr_reader`` component provides seven-segment OCR reading using the SSOCR algorithm. It reads digital displays without requiring AI models.
+The ``ssocr_reader_legacy`` component is the original seven-segment OCR reader: it bundles the SSOCR algorithm and JPEG decoding through ``esp32_camera_utils`` in one component.
+
+It is kept for existing configurations. New configurations should use :doc:`ssocr_reader_runner`, which builds on the upstream ``camera_decoder`` and ``seven_segment_ocr`` components.
 
 Configuration
 -------------
 
 .. code-block:: yaml
 
-    ssocr_reader:
+    ssocr_reader_legacy:
       id: my_ssocr
       camera_id: my_camera
       validator: my_validator

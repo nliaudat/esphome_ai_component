@@ -1,5 +1,5 @@
 {
-  "name": "ssocr_reader",
+  "name": "ssocr_reader_legacy",
   "version": "2.0.0",
   "build_system": "cmake"
 }

@@ -36,7 +36,8 @@ The repository allows you to use specific components based on your needs:
 | Component | Description |
 |-----------|-------------|
 | **[meter_reader_tflite](./components/meter_reader_tflite)** | AI-powered meter reader using TensorFlow Lite models. Orchestrates capture, inference, and reporting for digital meters. |
-| **[ssocr_reader](./components/ssocr_reader)** | (Alpha dev !) Seven-segment OCR reader using SSOCR algorithm. Reads digital displays without AI models. |
+| **[ssocr_reader_runner](./components/ssocr_reader_runner)** | Seven-segment OCR reader on the upstream `camera_decoder` + `seven_segment_ocr`, with `value_validator` and `flash_light_controller` support. Reads digital displays without AI. |
+| **[ssocr_reader_legacy](./components/ssocr_reader_legacy)** | The original self-contained SSOCR reader (bundled algorithm and `esp32_camera_utils` decoding). Kept for existing configurations. |
 | **[analog_gauge_reader_runner](./components/analog_gauge_reader_runner)** | Analog dial/gauge reader on the upstream `camera_decoder` + `gauge_needle_detector`, with `value_validator` and `flash_light_controller` support. Reads pointer positions without AI. |
 | **[analog_gauge_reader_legacy](./components/analog_gauge_reader_legacy)** | The original self-contained reader (bundled algorithms and `esp32_camera_utils` decoding). Kept for existing configurations. |
 
@@ -86,7 +87,7 @@ external_components:
     components:
       # Choose the reader type you need:
       - meter_reader_tflite   # AI-powered digit recognition
-      # - ssocr_reader        # Seven-segment OCR (no AI)
+      # - ssocr_reader_runner # Seven-segment OCR (no AI)
       # - analog_gauge_reader_runner  # Analog gauge/dial reader (no AI)
 
       # Supporting components:
@@ -159,9 +160,10 @@ value_validator:
   allow_negative_rates: false
   max_absolute_diff: 50
 
-ssocr_reader:
+ssocr_reader_runner:
   id: my_ssocr
   camera_id: my_camera
+  decoder_id: my_decoder
   validator: my_validator
   update_interval: 60s
   threshold_level: 128

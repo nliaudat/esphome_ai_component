@@ -12,8 +12,8 @@ external_components:
   - source:
       type: local
       path: components
-    #components: [meter_reader_tflite, esp32_camera_utils, flash_light_controller] #, ssocr_reader]
-    components: [ssocr_reader, esp32_camera_utils, flash_light_controller, value_validator]
+    #components: [meter_reader_tflite, esp32_camera_utils, flash_light_controller] #, ssocr_reader_legacy]
+    components: [ssocr_reader_legacy, esp32_camera_utils, flash_light_controller, value_validator]
 
 ############## General configuration
 
@@ -187,7 +187,7 @@ value_validator:
   # strict_confidence_check: false       # Require all digits meet threshold (default: false)
   # max_history_size: 50kB               # Max history memory usage (default: 50kB)
 
-ssocr_reader: #seven segment reader (dev) / do not if using meter_reader_tflite
+ssocr_reader_legacy: #seven segment reader (dev) / do not if using meter_reader_tflite
   id: ${id_prefix}_ssocr_main
   update_interval: 60s
   camera_id: ${id_prefix}_espcam

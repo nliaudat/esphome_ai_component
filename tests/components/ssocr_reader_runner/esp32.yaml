@@ -1,0 +1,14 @@
+# ESPHome build test: ssocr_reader_runner on ESP32
+esphome:
+  name: test-ssocr-runner
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESP32_SPIRAM_SUPPORT: y
+
+psram:
+
+<<: !include common.yaml

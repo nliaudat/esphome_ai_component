@@ -1,0 +1,33 @@
+# ESPHome build test: ssocr_reader_runner with flash_light_controller
+<<: !include common.yaml
+
+output:
+  - platform: gpio
+    id: test_light_output
+    pin: GPIO2
+
+light:
+  - platform: binary
+    id: test_light
+    output: test_light_output
+
+flash_light_controller:
+  id: test_flash
+  flash_light: test_light
+
+# The runner block is repeated because YAML merges whole keys, not nested ones.
+ssocr_reader_runner:
+  id: test_ssocr
+  camera_id: test_camera
+  decoder_id: test_decoder
+  validator: test_validator
+  flash_light_controller: test_flash
+  crop_x: 8
+  crop_y: 16
+  crop_w: 160
+  crop_h: 40
+  digit_count: 6
+  value:
+    name: "SSOCR value"
+  confidence:
+    name: "SSOCR confidence"

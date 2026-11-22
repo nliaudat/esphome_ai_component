@@ -34,7 +34,7 @@
     - value_validator
     - data_collector
     - analog_gauge_reader_legacy
-    - ssocr_reader
+    - ssocr_reader_legacy
 
 # 2. Split TFLite components from their PR heads (upstream esphome/esphome).
 - source: github://pr#21282

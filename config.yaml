@@ -172,7 +172,7 @@ meter_reader_tflite:
   unload_button: ${id_prefix}_unload_btn
   reload_button: ${id_prefix}_reload_btn
 
-# ssocr_reader: #seven segment reader (dev) / do not if using meter_reader_tflite
+# ssocr_reader_legacy: #seven segment reader (dev) / do not if using meter_reader_tflite
 #   id: ${id_prefix}_ssocr_main
 #   update_interval: 60s
 #   threshold_level: 128

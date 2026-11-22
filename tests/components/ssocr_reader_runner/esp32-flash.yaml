@@ -1,6 +1,6 @@
-# ESPHome build test: ssocr_reader on ESP32 (Alpha)
+# ESPHome build test: ssocr_reader_runner + flash on ESP32
 esphome:
-  name: test-ssocr
+  name: test-ssocr-runner-flash
 
 esp32:
   board: esp32dev
@@ -11,4 +11,4 @@ esp32:
 
 psram:
 
-<<: !include common.yaml
+<<: !include common_flash.yaml

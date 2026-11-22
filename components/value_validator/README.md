@@ -102,10 +102,10 @@ meter_reader_tflite:
 ```
 
 ### SSOCR Reader (Optional Validator)
-The validator is optional provided the component supports it (e.g., `ssocr_reader`, `analog_gauge_reader_legacy`).
+The validator is optional provided the component supports it (e.g., `ssocr_reader_runner` (or the legacy readers)).
 
 ```yaml
-ssocr_reader:
+ssocr_reader_runner:
   # validator: my_validator # Optional: Comment out if not needed
   # ... other config
 ```

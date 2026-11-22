@@ -72,7 +72,11 @@ esphome_ai_component/
 │   ├── DEPENDS ON: tflite_micro_runtime, esp32_camera_utils
 │   └── OPTIONAL: value_validator, flash_light_controller, data_collector
 │
-├── ssocr_reader/                 # NO AI - Seven-segment OCR (alpha)
+├── ssocr_reader_runner/          # NO AI - Seven-segment OCR on camera_decoder + seven_segment_ocr
+│   ├── DEPENDS ON: camera_decoder, seven_segment_ocr
+│   └── OPTIONAL: value_validator, flash_light_controller
+│
+├── ssocr_reader_legacy/          # NO AI - Seven-segment OCR (self-contained, superseded)
 │   ├── DEPENDS ON: esp32_camera_utils
 │   └── OPTIONAL: value_validator
 │
@@ -85,7 +89,7 @@ esphome_ai_component/
 │   └── OPTIONAL: value_validator
 │
 ├── value_validator/              # SHARED - Reading validation engine
-│   ├── USED BY: meter_reader_tflite, ssocr_reader, analog_gauge_reader_runner, analog_gauge_reader_legacy
+│   ├── USED BY: meter_reader_tflite, ssocr_reader_runner, ssocr_reader_legacy, analog_gauge_reader_runner, analog_gauge_reader_legacy
 │   └── DEPENDS ON: None (standalone)
 │
 ├── esp32_camera_utils/           # SHARED - Image processing core
@@ -125,7 +129,8 @@ esphome_ai_component/
 - `tflite_micro_runtime`: **Active** (external component series). The monolithic `tflite_micro_helper` was removed: image models use the runtime, and `micro_wake_word` is the upstream self-contained component.
 - `flash_light_controller`: **Active**
 - `data_collector`: **Active**
-- `ssocr_reader`: **Alpha**
+- `ssocr_reader_runner`: **Alpha** (uses the upstream `camera_decoder` + `seven_segment_ocr`)
+- `ssocr_reader_legacy`: **Legacy** (superseded by the runner)
 - `analog_gauge_reader_runner`: **Alpha** (uses the upstream `camera_decoder` + `gauge_needle_detector`)
 - `analog_gauge_reader_legacy`: **Legacy** (superseded by the runner)
 - `legacy_meter_reader_tflite`: **Frozen**

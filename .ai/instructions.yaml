@@ -30,9 +30,14 @@ components:
     description: "AI PRIMARY --- Digit recognition with TFLite"
     depends: [tflite_micro_runtime, esp32_camera_utils]
     optional: [value_validator, flash_light_controller, data_collector]
-  ssocr_reader:
+  ssocr_reader_runner:
     status: alpha
-    description: "NO AI --- Seven-segment OCR"
+    description: "NO AI --- Seven-segment OCR on camera_decoder + seven_segment_ocr"
+    depends: [camera_decoder, seven_segment_ocr]
+    optional: [value_validator, flash_light_controller]
+  ssocr_reader_legacy:
+    status: legacy
+    description: "NO AI --- Seven-segment OCR (self-contained, superseded by the runner)"
     depends: [esp32_camera_utils]
     optional: [value_validator]
   analog_gauge_reader_runner:
@@ -51,7 +56,8 @@ components:
     used_by:
       [
         meter_reader_tflite,
-        ssocr_reader,
+        ssocr_reader_runner,
+      ssocr_reader_legacy,
         analog_gauge_reader_legacy,
         analog_gauge_reader_runner,
       ]

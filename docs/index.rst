@@ -18,7 +18,8 @@ This project provides a modular framework for running TensorFlow Lite Micro mode
     esp32_camera_utils
     flash_light_controller
     data_collector
-    ssocr_reader
+    ssocr_reader_runner
+    ssocr_reader_legacy
     analog_gauge_reader_runner
     analog_gauge_reader_legacy
     esp_nn_s3_kernels

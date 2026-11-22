@@ -1,4 +1,4 @@
-# ESPHome build test: ssocr_reader on ESP32-S3 (Alpha)
+# ESPHome build test: ssocr_reader_legacy on ESP32-S3 (Alpha)
 esphome:
   name: test-ssocr-s3
 
