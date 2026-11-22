@@ -22,9 +22,8 @@ Configuration
 
     # 1. Declare the model once (input shape/arena size read from the model)
     tflite_micro_runtime:
-      id: my_digit_model
-      model_type: image
-      model: "models/digit_recognizer_v40_quantized_integer_quant_uint8.tflite"
+      - id: my_digit_model
+        model: "models/digit_recognizer_v40_quantized_integer_quant_uint8.tflite"
       # debug: true                 # verbose model logging
       # tensor_arena_size: "110KB"  # override the estimate
 

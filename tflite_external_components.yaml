@@ -43,6 +43,9 @@
 - source: github://pr#21287
   components: [tflite_model_debug]
   refresh: always
+- source: github://pr#23037
+  components: [tflite_model_io]
+  refresh: always
 - source: github://pr#21288
   components: [tflite_micro_runtime]
   refresh: always

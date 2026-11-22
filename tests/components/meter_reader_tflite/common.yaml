@@ -34,13 +34,15 @@ external_components:
   - source: github://pr#21288
     components: [tflite_micro_runtime]
     refresh: always
+  - source: github://pr#23037
+    components: [tflite_model_io]
+    refresh: always
 
 value_validator:
   id: test_validator
 
 tflite_micro_runtime:
   id: test_digit_model
-  model_type: image
   model: "https://raw.githubusercontent.com/nliaudat/esphome_ai_component/refs/heads/main/models/digit_recognizer_v3_quantized_integer_quant_uint8.tflite"
   # `debug: true` exercises the auto-loaded `tflite_model_debug` component
   # (runtime-gated, no `USE_TFLITE_MODEL_DEBUG` define involved).

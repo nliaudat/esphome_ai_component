@@ -82,7 +82,6 @@ api:
 
 tflite_micro_runtime:
   - id: ${id_prefix}_digit_model
-    model_type: image
     model: "models/digit_recognizer_v24_quantized_integer_quant_uint8.tflite"
     debug: false
 

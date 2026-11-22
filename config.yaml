@@ -80,7 +80,6 @@ globals:
 
 tflite_micro_runtime:
   id: ${id_prefix}_tflite
-  model_type: image
   model: "models/digit_recognizer_v23_10cls_RGB.tflite"
   debug: true
 

@@ -134,7 +134,6 @@ value_validator:
 # 1. Declare the model (input shape, arena size, ... read from the model)
 tflite_micro_runtime:
   id: my_digit_model
-  model_type: image
   model: "models/digit_recognizer.tflite"   # local path, github://... or http(s)://...
 
 # 2. Reference the model by ID from the consumer component
@@ -261,7 +260,6 @@ These entities normally appear under the device in Home Assistant.
 ```yaml
 tflite_micro_runtime:
   id: my_digit_model
-  model_type: image
   model: "models/digit_recognizer.tflite"
   tensor_arena_size: "768KB"
 ```

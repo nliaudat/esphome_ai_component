@@ -86,13 +86,11 @@ Configuration
     tflite_micro_runtime:
       # Image model (single-shot inference)
       - id: my_digit_model
-        model_type: image
         model: "models/digit_recognizer_v40_quantized_integer_quant_uint8.tflite"
         debug: false
 
       # Audio model (streaming inference)
       - id: my_wake_word
-        model_type: audio
         model: "github://esphome/micro-wake-word-models/models/v2/okay_nabu.json"
         probability_cutoff: 0.7
         sliding_window_size: 10
@@ -139,7 +137,6 @@ Configuration variables
 **Common**
 
 - **id** (*Required*): ID of this runtime entry.
-- **model_type** (*Required*): ``image`` or ``audio``.
 - **model** (*Required*): Model source (see `Model sources`_).
 - **tensor_arena_size** (*Optional*): Tensor arena size, e.g. ``"110KB"``.
   Range 8 KB–2000 KB. For image models it defaults to an estimate computed from
@@ -147,6 +144,14 @@ Configuration variables
   ``.txt`` report or the C++ defaults.
 - **debug** (*Optional*, boolean): Enable verbose model logging. Defaults to
   ``false``.
+
+.. note::
+
+    The ``model_type`` option and the per-kind input/output pipelines (image,
+    audio, detection, segmentation, pose, tabular, text) are being added by the
+    model-kind components of the series (PRs #23109-#23115). At the current PR
+    heads the runtime is task-agnostic: the consumer fills the input buffer and
+    reads the output tensor itself, so a runtime entry only needs ``model``.
 
 **Image models**
 
@@ -227,9 +232,8 @@ consumer syntax is unchanged: it still references a model entry by ID.
 
     # After
     tflite_micro_runtime:
-      id: my_digit_model
-      model_type: image
-      model: "digit_recognizer.tflite"
+      - id: my_digit_model
+        model: "digit_recognizer.tflite"
 
 ``tflite_micro_helper`` was removed from this repository in the split-component
 migration: image models use :doc:`tflite_micro_runtime` and audio models use the
