@@ -1,0 +1,38 @@
+# ESPHome build test: esp32_camera window warning (PR 22768).
+# The window reaches past the configured 640x480 frame on purpose.
+esphome:
+  name: test-camera-window
+
+external_components:
+  - source:
+      type: local
+      path: ../../../components
+    components: [camera]
+  - source: github://pr#22768
+    components: [esp32_camera]
+    refresh: 1d
+
+logger:
+  level: DEBUG
+
+esp32_camera:
+  id: test_camera
+  name: Test Camera
+  external_clock:
+    pin: GPIO0
+    frequency: 20MHz
+  i2c_pins:
+    sda: GPIO26
+    scl: GPIO27
+  data_pins: [GPIO5, GPIO18, GPIO19, GPIO21, GPIO36, GPIO39, GPIO34, GPIO35]
+  vsync_pin: GPIO25
+  href_pin: GPIO23
+  pixel_clock_pin: GPIO22
+  power_down_pin: GPIO32
+  resolution: 640x480
+  pixel_format: JPEG
+  window:
+    offset_x: 100
+    offset_y: 100
+    width: 600
+    height: 400

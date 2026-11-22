@@ -54,24 +54,24 @@ Configuration Variables
   ``output_type`` must be ``RGB888`` or ``GRAYSCALE``; a colour dial needs
   ``RGB888``.
 - **dials** (*Required*): List of dial configurations. Each dial has:
-  - **id** (*Required*): String identifier for logs and sensor entries.
-  - **scale** (*Optional*): Weight in the summed value. Default: ``1.0``.
-  - **crop_x** / **crop_y** / **crop_w** / **crop_h** (*Optional*): Crop of the
-    frame, in pixels. Defaults: ``0``/``0``/``64``/``64``.
-  - **min_value** / **max_value** (*Optional*): Value range. Defaults: ``0``/``10``.
-  - **min_angle** / **max_angle** / **angle_offset** / **clockwise**
-    (*Optional*): Angle mapping, in degrees.
-  - **needle_type** (*Optional*): ``DARK`` (default) or ``LIGHT``.
-  - **algorithm** (*Optional*): ``radial_profile`` (default), ``legacy``,
-    ``hough_transform``, ``template_match`` or ``auto``.
-  - **process_channel** (*Optional*): ``GRAYSCALE`` (default), ``RED``,
-    ``GREEN`` or ``BLUE``. Mutually exclusive with ``target_color``.
-  - **target_color** / **color_tolerance** (*Optional*): Detect a coloured needle.
-  - **min_scan_radius** / **max_scan_radius** / **deadzone_diameter**
-    (*Optional*): Detector scan window and ignored centre circle.
-  - **auto_contrast** / **contrast** (*Optional*): Crop normalisation.
-  - **calibration** (*Optional*): List of ``raw``/``mapped`` pairs.
-  - **value** / **angle** / **confidence** (*Optional*): Per-dial sensors.
+    - **id** (*Required*): String identifier for logs and sensor entries.
+    - **scale** (*Optional*): Weight in the summed value. Default: ``1.0``.
+    - **crop_x** / **crop_y** / **crop_w** / **crop_h** (*Optional*): Crop of the
+      frame, in pixels. Defaults: ``0``/``0``/``64``/``64``.
+    - **min_value** / **max_value** (*Optional*): Value range. Defaults: ``0``/``10``.
+    - **min_angle** / **max_angle** / **angle_offset** / **clockwise**
+      (*Optional*): Angle mapping, in degrees.
+    - **needle_type** (*Optional*): ``DARK`` (default) or ``LIGHT``.
+    - **algorithm** (*Optional*): ``radial_profile`` (default), ``legacy``,
+      ``hough_transform``, ``template_match`` or ``auto``.
+    - **process_channel** (*Optional*): ``GRAYSCALE`` (default), ``RED``,
+      ``GREEN`` or ``BLUE``. Mutually exclusive with ``target_color``.
+    - **target_color** / **color_tolerance** (*Optional*): Detect a coloured needle.
+    - **min_scan_radius** / **max_scan_radius** / **deadzone_diameter**
+      (*Optional*): Detector scan window and ignored centre circle.
+    - **auto_contrast** / **contrast** (*Optional*): Crop normalisation.
+    - **calibration** (*Optional*): List of ``raw``/``mapped`` pairs.
+    - **value** / **angle** / **confidence** (*Optional*): Per-dial sensors.
 - **value_sensor** (*Optional*): The combined value sensor.
 - **validator** (*Optional*): The ID of a ``value_validator`` component. The
   runner feeds it the summed dial fraction for digit-boundary correction.

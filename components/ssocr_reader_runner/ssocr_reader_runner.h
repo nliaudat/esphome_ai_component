@@ -30,6 +30,10 @@ class SSOCRReaderRunner final : public PollingComponent, public esphome::camera:
   SSOCRReaderRunner(esphome::camera::Camera *camera, esphome::camera::Decoder *decoder, int frame_width,
                     int frame_height, uint8_t *crop)
       : camera_(camera), decoder_(decoder), img_width_(frame_width), img_height_(frame_height), crop_(crop) {}
+  ~SSOCRReaderRunner() {
+    if (this->owns_crop_)
+      free(this->crop_);
+  }
 
   void setup() override;
   void update() override;
@@ -76,6 +80,7 @@ class SSOCRReaderRunner final : public PollingComponent, public esphome::camera:
   int img_width_{0};
   int img_height_{0};
   uint8_t *crop_{nullptr};
+  bool owns_crop_{false};
   seven_segment_ocr::SevenSegmentOCR ocr_;
   int crop_x_{0};
   int crop_y_{0};

@@ -14,9 +14,10 @@ external_components:
       - ssocr_reader_runner
       - value_validator
       - flash_light_controller
-  # `camera` carries decoder.h in this PR, so it is requested alongside the decoder.
+      - camera
+  # `camera` comes from the local union overlay; this PR supplies the decoder.
   - source: github://pr#22767
-    components: [camera, camera_decoder]
+    components: [camera_decoder]
     refresh: 1d
   - source: github://pr#22999
     components: [seven_segment_ocr]

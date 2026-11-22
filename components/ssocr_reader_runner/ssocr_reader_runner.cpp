@@ -4,7 +4,12 @@
 #include "esphome/core/log.h"
 
 #include <cinttypes>
+#include <cstdlib>
 #include <cstring>
+
+#ifdef USE_ESP32
+#include <esp_heap_caps.h>
+#endif
 
 namespace esphome {
 namespace ssocr_reader_runner {
@@ -12,7 +17,24 @@ namespace ssocr_reader_runner {
 static const char *const TAG = "ssocr_reader_runner";
 
 void SSOCRReaderRunner::setup() {
-  if (this->crop_ == nullptr || !this->ocr_.reserve(this->crop_w_)) {
+  // Without a code-generated buffer the crop is allocated here (PSRAM first).
+  if (this->crop_ == nullptr) {
+    const size_t size = static_cast<size_t>(this->crop_w_) * static_cast<size_t>(this->crop_h_);
+#ifdef USE_ESP32
+    this->crop_ = static_cast<uint8_t *>(heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+    if (this->crop_ == nullptr)
+      this->crop_ = static_cast<uint8_t *>(malloc(size));
+#else
+    this->crop_ = static_cast<uint8_t *>(malloc(size));
+#endif
+    if (this->crop_ == nullptr) {
+      ESP_LOGE(TAG, "Could not allocate the %zu-byte crop buffer", size);
+      this->mark_failed();
+      return;
+    }
+    this->owns_crop_ = true;
+  }
+  if (!this->ocr_.reserve(this->crop_w_)) {
     ESP_LOGE(TAG, "Could not allocate the OCR buffers");
     this->mark_failed();
     return;

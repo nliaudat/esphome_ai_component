@@ -152,17 +152,20 @@ async def to_code(config: ConfigType) -> None:
     cam = await cg.get_variable(config[CONF_CAMERA_ID])
     decoder = await cg.get_variable(config[CONF_DECODER_ID])
     frame_width, frame_height = config[_KEY_CAMERA_FRAME]
-    # PSRAM placement for the crop buffer arrived with the kind-pipeline work;
-    # on 2026.11 the same buffer lands in internal RAM instead.
-    crop_kwargs = {}
-    if "psram" in inspect.signature(cg.static_buffer).parameters:
-        crop_kwargs["psram"] = True
-    crop = cg.static_buffer(
-        config[CONF_ID],
-        cg.uint8,
-        config[CONF_CROP_W] * config[CONF_CROP_H],
-        **crop_kwargs,
-    )
+    # A code-generated buffer is preferable, but not every ESPHome version has
+    # `static_buffer`; when it is missing the component allocates the crop itself.
+    if hasattr(cg, "static_buffer"):
+        crop_kwargs = {}
+        if "psram" in inspect.signature(cg.static_buffer).parameters:
+            crop_kwargs["psram"] = True
+        crop = cg.static_buffer(
+            config[CONF_ID],
+            cg.uint8,
+            config[CONF_CROP_W] * config[CONF_CROP_H],
+            **crop_kwargs,
+        )
+    else:
+        crop = cg.nullptr
     var = cg.new_Pvariable(
         config[CONF_ID], cam, decoder, frame_width, frame_height, crop
     )

@@ -1,0 +1,112 @@
+# ESPHome build test: every camera-layer component together.
+#
+# Proves the local union `camera` component (dev core + camera_decoder +
+# camera_image additions) supports all of them in one build:
+#   - camera_image            (PR 22766, needs COMPONENT_REQUESTER)
+#   - camera_decoder          (PR 22767, needs PIXEL_FORMAT_RGB888/CBYCRY)
+#   - analog_gauge_reader_runner
+#   - ssocr_reader_runner
+esphome:
+  name: test-camera-integration
+
+external_components:
+  - source:
+      type: local
+      path: ../../../components
+    components:
+      - camera
+      - analog_gauge_reader_runner
+      - ssocr_reader_runner
+      - value_validator
+      - flash_light_controller
+  - source: github://pr#22767
+    components: [camera_decoder]
+    refresh: 1d
+  - source: github://pr#22766
+    components: [camera_image]
+    refresh: 1d
+  - source: github://pr#22985
+    components: [gauge_needle_detector]
+    refresh: 1d
+  - source: github://pr#22999
+    components: [seven_segment_ocr]
+    refresh: 1d
+
+logger:
+  level: DEBUG
+
+esp32_camera:
+  id: test_camera
+  name: Test Camera
+  external_clock:
+    pin: GPIO0
+    frequency: 20MHz
+  i2c_id: camera_i2c
+  data_pins: [GPIO5, GPIO18, GPIO19, GPIO21, GPIO36, GPIO39, GPIO34, GPIO35]
+  vsync_pin: GPIO25
+  href_pin: GPIO23
+  pixel_clock_pin: GPIO22
+  power_down_pin: GPIO32
+  resolution: 640x480
+  pixel_format: JPEG
+
+# One decoder shared by the two readers; each decode completes before the next.
+camera_decoder:
+  id: shared_decoder
+  output_type: GRAYSCALE
+
+value_validator:
+  id: shared_validator
+
+analog_gauge_reader_runner:
+  id: gauge_reader
+  camera_id: test_camera
+  decoder_id: shared_decoder
+  validator: shared_validator
+  dials:
+    - id: dial_1
+      crop_x: 0
+      crop_y: 0
+      crop_w: 64
+      crop_h: 64
+      min_value: 0
+      max_value: 10
+
+ssocr_reader_runner:
+  id: ssocr
+  camera_id: test_camera
+  decoder_id: shared_decoder
+  validator: shared_validator
+  crop_x: 8
+  crop_y: 16
+  crop_w: 160
+  crop_h: 40
+  digit_count: 6
+  value:
+    name: "SSOCR value"
+  confidence:
+    name: "SSOCR confidence"
+
+i2c:
+  - id: camera_i2c
+    sda: GPIO26
+    scl: GPIO27
+  - id: display_i2c
+    sda: GPIO12
+    scl: GPIO13
+
+display:
+  - platform: ssd1306_i2c
+    i2c_id: display_i2c
+    id: test_display
+    model: SSD1306_128X64
+    address: 0x3C
+
+image:
+  - platform: camera_image
+    id: camera_preview
+    camera_id: test_camera
+    format: JPEG
+    type: RGB565
+    resize: 320x240
+    update_interval: 1s

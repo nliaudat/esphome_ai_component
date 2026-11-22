@@ -61,8 +61,10 @@ frame is logged and the sensors keep their last state.
 
 - `digit_count` is limited to 7: the value sensor is a float, which represents
   integers exactly only up to 2^24.
-- `crop_w * crop_h` is a code-generated static buffer. On ESPHome 2026.11 it
-  lands in internal RAM; later versions place it in PSRAM (feature-detected).
+- `crop_w * crop_h` is a code-generated static buffer when the ESPHome version
+  provides `cg.static_buffer` (in PSRAM where supported); on versions without
+  it, including the current dev tree, the component allocates the crop in
+  `setup()` (PSRAM first, then internal RAM) and frees it on destruction.
 - Keep the crop tight — a large crop costs RAM and can include neighbouring
   digits, which makes the run count disagree with `digit_count`.
 
