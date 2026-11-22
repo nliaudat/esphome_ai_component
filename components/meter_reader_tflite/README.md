@@ -13,16 +13,13 @@ Model configuration is handled by the **`tflite_micro_runtime`** component. You 
 ### Recommended Setup (tflite_micro_runtime)
 
 ```yaml
-# 1. Declare the model in tflite_micro_runtime
+# 1. Declare the model in tflite_micro_runtime (MULTI_CONF: a list)
 tflite_micro_runtime:
-  id: my_digit_model
-  model_type: image
-  model: "models/digit_recognizer_v40_quantized_integer_quant_uint8.tflite"
-  # Input shape / arena size read from the model (optional .txt report for extra metadata)
-  # Optional overrides:
-  # tensor_arena_size: "110KB"
-  # input_width: 32
-  # input_height: 20
+  - id: my_digit_model
+    model: "models/digit_recognizer_v40_quantized_integer_quant_uint8.tflite"
+    # Input shape / arena size read from the model (optional .txt report for extra metadata)
+    # Optional overrides:
+    # tensor_arena_size: "110KB"
 
 # 2. Reference the model by ID in meter_reader_tflite
 meter_reader_tflite:
@@ -51,7 +48,17 @@ meter_reader_tflite:
   data_collector: my_collector
 ```
 
-> Model parameters (input type/shape/channels, `tensor_arena_size`, `scale_factor`, `output_processing`, `normalize`, `invert`, and the audio keys) belong to the `tflite_micro_runtime` entry, not to `meter_reader_tflite`. Image rotation is configured on `esp32_camera_utils` (see below).
+> `meter_reader_tflite` is a **consumer-driven** runtime user: it fills the input
+> tensor itself. Model parameters it needs in code (`input_order`, `normalize`)
+> are options on `meter_reader_tflite`; the rest (`tensor_arena_size`, `debug`)
+> belong to the runtime entry. Image rotation is configured on
+> `esp32_camera_utils` (see below).
+>
+> The alternative is a **kind entry**: `tflite_image:` (or detection,
+> segmentation, pose, tabular, text, audio) is the YAML key, auto-loads
+> `tflite_micro_runtime` and supplies the input pipeline and output decoder. A
+> `meter_reader_tflite` can reference such an entry by ID, but it would not use
+> that pipeline, so the plain runtime entry above is the right choice here.
 
 ### Migration from `tflite_micro_helper`
 
@@ -59,7 +66,7 @@ The monolithic `tflite_micro_helper` entry has been replaced by the split TFLite
 
 | Before | After |
 |--------|-------|
-| `tflite_micro_helper:` (list entry) | `tflite_micro_runtime:` (entry, `id:` required) |
+| `tflite_micro_helper:` (list entry) | `tflite_micro_runtime:` (MULTI_CONF list) |
 | `meter_reader_tflite: model: "file.tflite"` | `meter_reader_tflite: model: <runtime entry id>` |
 | `debug: true` on the model entry | `debug: true` on the `tflite_micro_runtime` entry (auto-loads `tflite_model_debug`) |
 | `tensor_arena_size` on the model entry | unchanged: still on the `tflite_micro_runtime` entry |
@@ -73,9 +80,8 @@ tflite_micro_helper:
 
 # After (tflite_micro_runtime) — `meter_reader_tflite: model: my_digit_model` is unchanged
 tflite_micro_runtime:
-  id: my_digit_model
-  model_type: image
-  model: "digit_recognizer.tflite"
+  - id: my_digit_model
+    model: "digit_recognizer.tflite"
 ```
 
 > `tflite_micro_helper` was removed from this repository. `micro_wake_word` now uses the upstream self-contained component; `meter_reader_tflite` uses `tflite_micro_runtime`.
@@ -129,6 +135,8 @@ Coordinates are in `resolution` pixels (not full-sensor pixels) and the window m
 | `confidence_threshold` | float 0–1 | `0.85` | Minimum confidence to publish |
 | `update_interval` | time | `60s` | Polling interval |
 | `camera_resolution` | string | `640x480` | Must match `esp32_camera.resolution` |
+| `input_order` | `RGB` / `BGR` / `GRAY` | derived | Channel order; defaults to `GRAY` for one input channel, `RGB` for three |
+| `normalize` | bool | `false` | Scale float inputs to 0–1 |
 | `frame_request_timeout` | ms | `15000` | Camera frame request timeout |
 | `flash_light_controller` | ID | — | Flash control around each capture |
 | `data_collector` | ID | — | Upload uncertain images |
@@ -150,7 +158,7 @@ Coordinates are in `resolution` pixels (not full-sensor pixels) and the window m
 | `debug_timing` | bool | `false` | Timing breakdowns |
 | `debug_memory` | bool | `false` | Memory logging + diagnostic sensors |
 
-> **Removed options:** `tensor_arena_size`, `input_type`, `input_channels`, `input_width`, `input_height`, `output_processing`, `scale_factor`, `input_order`, `normalize`, `invert` and `rotation` no longer exist on `meter_reader_tflite`. Model options belong to `tflite_micro_runtime`; rotation belongs to `esp32_camera_utils`.
+> **Removed options:** `tensor_arena_size`, `input_type`, `input_channels`, `input_width`, `input_height`, `output_processing`, `scale_factor`, `invert` and `rotation` no longer exist on `meter_reader_tflite`. Those belong to the runtime kind pipeline (`tflite_image:`) or `esp32_camera_utils`; `input_order` and `normalize` are accepted here because this component does its own preprocessing.
 
 
 ## 📡 Sensor Configuration

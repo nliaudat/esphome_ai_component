@@ -41,6 +41,11 @@ Configuration
       camera_id: my_camera
       validator: my_validator
       confidence_threshold: 0.85
+      # A consumer-driven runtime entry states these itself; the kind pipelines
+      # own them otherwise. Defaults: GRAY for one channel, RGB for three,
+      # normalize false.
+      # input_order: RGB
+      # normalize: false
       update_interval: 60s
 
       flash_light_controller: my_flash

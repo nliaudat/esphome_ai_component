@@ -47,8 +47,9 @@ class TFLiteCoordinator {
   // -- Enum mapping for esp32_camera_utils ---------------------------
   /// @brief Map the runtime's input type onto esp32_camera_utils::ImageProcessorInputType.
   static int to_processor_input_type(tflite_micro_runtime::InputType input_type);
-  /// @brief Map the runtime's channel order onto ImageProcessorConfig::input_order.
-  static std::string to_input_order_name(tflite_micro_runtime::InputOrder input_order);
+  /// @brief ImageProcessorConfig::input_order for a model input.
+  /// The runtime no longer describes channel order, so the caller states it.
+  static std::string to_input_order_name(int input_channels);
 
   // -- Accessors (delegate to the referenced TFLiteMicroHelper) ------
   int get_input_width() const {

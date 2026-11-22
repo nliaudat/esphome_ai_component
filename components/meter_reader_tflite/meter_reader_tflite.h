@@ -112,6 +112,11 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   sensor::Sensor *get_confidence_sensor() const { return confidence_sensor_; }
 
   void set_rotation(float rotation) { this->rotation_ = rotation; }  // Storage, passed to TFLite late
+  // The kind pipelines own channel order and normalization; a consumer-driven
+  // runtime entry states them here. Empty input_order means "derive from the
+  // model's input_channels" (GRAY for 1, RGB otherwise).
+  void set_input_order(const std::string &order) { this->input_order_ = order; }
+  void set_normalize(bool normalize) { this->normalize_ = normalize; }
 
   void set_generate_preview(bool generate);
   void set_show_crop_areas(bool show) { this->show_crop_areas_ = show; }
@@ -247,6 +252,8 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   uint32_t frame_request_timeout_ms_{15000};
   float high_confidence_threshold_{0.90f};
   float rotation_{0.0f};
+  std::string input_order_{};
+  bool normalize_{false};
   bool generate_preview_{false};
   bool show_crop_areas_{true};
   bool debug_{false};

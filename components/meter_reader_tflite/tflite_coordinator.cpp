@@ -19,16 +19,9 @@ int TFLiteCoordinator::to_processor_input_type(tflite_micro_runtime::InputType i
   }
 }
 
-std::string TFLiteCoordinator::to_input_order_name(tflite_micro_runtime::InputOrder input_order) {
-  switch (input_order) {
-    case tflite_micro_runtime::InputOrder::INPUT_ORDER_BGR:
-      return "BGR";
-    case tflite_micro_runtime::InputOrder::INPUT_ORDER_GRAY:
-      return "GRAY";
-    case tflite_micro_runtime::InputOrder::INPUT_ORDER_RGB:
-    default:
-      return "RGB";
-  }
+std::string TFLiteCoordinator::to_input_order_name(int input_channels) {
+  // A single-channel model reads luma; a three-channel model defaults to RGB.
+  return input_channels == 1 ? "GRAY" : "RGB";
 }
 
 bool TFLiteCoordinator::load_model() {

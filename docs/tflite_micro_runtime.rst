@@ -147,13 +147,33 @@ Configuration variables
 
 .. note::
 
-    The ``model_type`` option and the per-kind input/output pipelines (image,
-    audio, detection, segmentation, pose, tabular, text) are being added by the
-    model-kind components of the series (PRs #23109-#23115). At the current PR
-    heads the runtime is task-agnostic: the consumer fills the input buffer and
-    reads the output tensor itself, so a runtime entry only needs ``model``.
+    There are two ways to declare a model, and no ``model_type`` option:
+
+    * **Kind entry (recommended for new work).** The kind component is the
+      configuration key: ``tflite_image``, ``tflite_detection``,
+      ``tflite_segmentation``, ``tflite_pose``, ``tflite_tabular``,
+      ``tflite_text`` or ``tflite_audio``. It auto-loads
+      ``tflite_micro_runtime`` in the background, calls ``declare_model()`` and
+      attaches its input pipeline and output decoder. Do not add a
+      ``tflite_micro_runtime`` entry for the same model.
+    * **Plain runtime entry.** ``tflite_micro_runtime`` on its own stays valid
+      for a consumer that fills the input tensor itself: this repository's
+      ``meter_reader_tflite`` and the upstream ``micro_wake_word``. The
+      consumer reads ``input_tensor()`` / ``output_tensor()`` or calls
+      ``run_inference_on_buffer()``.
+
+.. code-block:: yaml
+
+    # Kind entry: the input pipeline and output decoder come with it.
+    tflite_image:
+      - id: my_digit_model
+        model: "models/digit_recognizer_v40_quantized_integer_quant_uint8.tflite"
+        input_order: RGB
+        normalize: false
 
 **Image models**
+
+These keys belong to the ``tflite_image`` kind entry, not to the runtime.
 
 - **input_type** (*Optional*): ``uint8`` or ``float32``. Taken from the model's
   input tensor.

@@ -993,10 +993,11 @@ void MeterReaderTFLite::set_camera_image_format(int w, int h, const std::string 
   // Update ImageProcessor config if model is loaded
   if (this->tflite_coord_.is_model_loaded()) {
     auto spec = this->tflite_coord_.get_model_spec();
+    const std::string input_order =
+        this->input_order_.empty() ? TFLiteCoordinator::to_input_order_name(spec.input_channels) : this->input_order_;
     this->camera_coord_.update_image_processor_config(spec.input_width, spec.input_height, spec.input_channels,
                                                       TFLiteCoordinator::to_processor_input_type(spec.input_type),
-                                                      spec.normalize,
-                                                      TFLiteCoordinator::to_input_order_name(spec.input_order));
+                                                      this->normalize_, input_order);
   }
 }
 
@@ -1289,11 +1290,15 @@ void MeterReaderTFLite::dump_config() {
 // Consolidated ImageProcessorConfig refresh -- replaces 4+ copies of the same logic
 void MeterReaderTFLite::refresh_image_processor_config(int processor_input_type) {
   auto spec = this->tflite_coord_.get_model_spec();
+  // The runtime no longer carries the model's channel order or normalization:
+  // the kind pipelines own them. A consumer-driven model states them itself,
+  // falling back to luma for a single-channel input and RGB otherwise.
+  const std::string input_order =
+      this->input_order_.empty() ? TFLiteCoordinator::to_input_order_name(spec.input_channels) : this->input_order_;
 
   // Update Camera Coordinator first
   this->camera_coord_.update_image_processor_config(spec.input_width, spec.input_height, spec.input_channels,
-                                                    processor_input_type, spec.normalize,
-                                                    TFLiteCoordinator::to_input_order_name(spec.input_order));
+                                                    processor_input_type, this->normalize_, input_order);
 
   // Sync Utils if present
   if (this->esp32_camera_utils_) {
@@ -1313,8 +1318,8 @@ void MeterReaderTFLite::refresh_image_processor_config(int processor_input_type)
     config.model_channels = spec.input_channels;
     config.rotation = this->rotation_;
     config.input_type = static_cast<esp32_camera_utils::ImageProcessorInputType>(processor_input_type);
-    config.normalize = spec.normalize;
-    config.input_order = TFLiteCoordinator::to_input_order_name(spec.input_order);
+    config.normalize = this->normalize_;
+    config.input_order = input_order;
 
     this->esp32_camera_utils_->reinitialize_image_processor(config);
   }

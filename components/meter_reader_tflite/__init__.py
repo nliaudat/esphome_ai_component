@@ -75,6 +75,8 @@ CONF_CROP_ZONES = "crop_zones_global"
 
 CONF_CAMERA_WINDOW = "camera_window"
 CONF_CAMERA_RESOLUTION = "camera_resolution"
+CONF_INPUT_ORDER = "input_order"
+CONF_NORMALIZE = "normalize"
 
 CONF_FRAME_REQUEST_TIMEOUT = "frame_request_timeout"
 CONF_UNLOAD_BUTTON = "unload_button"
@@ -169,6 +171,10 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional("total_inference_time_sensor"): cv.use_id(sensor.Sensor),
         cv.Optional("capture_to_publish_time_sensor"): cv.use_id(sensor.Sensor),
         cv.Optional("debug_timing", default=False): cv.boolean,
+        # The kind pipelines own these now; a consumer-driven runtime entry
+        # states them here. Omitted input_order follows the model's channels.
+        cv.Optional(CONF_INPUT_ORDER): cv.one_of("RGB", "BGR", "GRAY", upper=True),
+        cv.Optional(CONF_NORMALIZE, default=False): cv.boolean,
     }
 ).extend(cv.polling_component_schema("60s"))
 
@@ -202,6 +208,11 @@ async def to_code(config):
         # On host, we don't set a real camera object.
 
     cg.add(var.set_confidence_threshold(config[CONF_CONFIDENCE_THRESHOLD]))
+
+    if CONF_INPUT_ORDER in config:
+        cg.add(var.set_input_order(config[CONF_INPUT_ORDER]))
+    if config[CONF_NORMALIZE]:
+        cg.add(var.set_normalize(True))
 
     # The model itself is loaded, validated and post-processed by the referenced
     # tflite_micro_runtime instance (MULTI_CONF, one entry per model).
