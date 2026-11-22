@@ -1,6 +1,6 @@
-# ESPHome build test: analog_gauge_reader + flash_light_controller on ESP32 (Alpha)
+# ESPHome build test: analog_gauge_reader_runner + flash on ESP32
 esphome:
-  name: test-analog-flash
+  name: test-gauge-runner-flash
 
 esp32:
   board: esp32dev

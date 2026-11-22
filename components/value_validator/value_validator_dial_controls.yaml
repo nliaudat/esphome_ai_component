@@ -1,5 +1,5 @@
 # Value Validator Dial Correction Controls
-# Only include this when analog_gauge_reader is used alongside value_validator
+# Only include this when analog_gauge_reader_legacy is used alongside value_validator
 
 switch:
   # Enable Dial Correction

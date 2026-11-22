@@ -1,18 +1,25 @@
 .. SPDX-License-Identifier: Apache-2.0 OR MIT
 
-analog_gauge_reader
-===================
+analog_gauge_reader_legacy
+==========================
 
-**Status: Alpha** (experimental, API may change)
+**Status: Legacy** (superseded by :doc:`analog_gauge_reader_runner`)
 
-The ``analog_gauge_reader`` component reads analog dial/gauge positions using radial intensity sum or other algorithms. It reads pointer positions without requiring AI models.
+The ``analog_gauge_reader_legacy`` component is the original reader: it bundles
+the needle algorithms, JPEG decoding/cropping through ``esp32_camera_utils``,
+and the optional ``value_validator`` and ``flash_light_controller`` integration
+in one component.
+
+It is kept for existing configurations. New configurations should use
+:doc:`analog_gauge_reader_runner`, which builds on the upstream
+``camera_decoder`` and ``gauge_needle_detector`` components.
 
 Configuration
 -------------
 
 .. code-block:: yaml
 
-    analog_gauge_reader:
+    analog_gauge_reader_legacy:
       id: my_analog
       camera_id: my_camera
       validator: my_validator

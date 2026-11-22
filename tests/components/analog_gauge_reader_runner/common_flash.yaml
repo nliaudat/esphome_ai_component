@@ -1,0 +1,41 @@
+# ESPHome build test: analog_gauge_reader_runner with flash_light_controller
+<<: !include common.yaml
+
+output:
+  - platform: gpio
+    id: test_light_output
+    pin: GPIO2
+
+light:
+  - platform: binary
+    id: test_light
+    output: test_light_output
+
+flash_light_controller:
+  id: test_flash
+  flash_light: test_light
+
+# The runner block is repeated because YAML merges whole keys, not nested ones.
+analog_gauge_reader_runner:
+  id: test_gauge
+  camera_id: test_camera
+  decoder_id: test_decoder
+  validator: test_validator
+  flash_light_controller: test_flash
+  value_sensor:
+    name: "Gauge total"
+  dials:
+    - id: dial1
+      crop_x: 0
+      crop_y: 0
+      crop_w: 64
+      crop_h: 64
+      scale: 0.1
+      min_value: 0
+      max_value: 100
+      value:
+        name: "Dial 1"
+      angle:
+        name: "Dial 1 angle"
+      confidence:
+        name: "Dial 1 confidence"

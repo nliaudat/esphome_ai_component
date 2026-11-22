@@ -19,7 +19,8 @@ This project provides a modular framework for running TensorFlow Lite Micro mode
     flash_light_controller
     data_collector
     ssocr_reader
-    analog_gauge_reader
+    analog_gauge_reader_runner
+    analog_gauge_reader_legacy
     esp_nn_s3_kernels
 
 Installation

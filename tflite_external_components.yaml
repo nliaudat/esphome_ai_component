@@ -21,7 +21,7 @@
     - esp32_camera_utils
     - flash_light_controller
     - value_validator
-    - analog_gauge_reader
+    - analog_gauge_reader_legacy
     - data_collector
 
 # 2. Split TFLite components from their PR heads.

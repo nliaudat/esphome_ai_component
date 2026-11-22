@@ -26,14 +26,14 @@ flash_light_controller:
 
 ## 🔗 Usage in Readers
 
-This component is used by `meter_reader_tflite` and `analog_gauge_reader`:
+This component is used by `meter_reader_tflite` and `analog_gauge_reader_legacy`:
 
 ```yaml
 meter_reader_tflite:
   # ...
   flash_light_controller: my_flash_controller
 
-analog_gauge_reader:
+analog_gauge_reader_legacy:
   # ...
   flash_light_controller: my_flash_controller
 ```

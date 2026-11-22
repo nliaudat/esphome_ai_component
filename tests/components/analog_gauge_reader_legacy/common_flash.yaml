@@ -1,11 +1,11 @@
-# ESPHome build test: analog_gauge_reader with the optional flash_light_controller dependency (Alpha)
+# ESPHome build test: analog_gauge_reader_legacy with the optional flash_light_controller dependency (Alpha)
 <<: !include common.yaml
 
 external_components:
   - source:
       type: local
       path: ../../../components
-    components: [analog_gauge_reader, esp32_camera_utils, flash_light_controller]
+    components: [analog_gauge_reader_legacy, esp32_camera_utils, flash_light_controller]
 
 output:
   - platform: gpio
@@ -21,7 +21,7 @@ flash_light_controller:
   id: test_flash
   flash_light: test_light
 
-analog_gauge_reader:
+analog_gauge_reader_legacy:
   id: test_analog
   camera_id: test_camera
   flash_light_controller: test_flash

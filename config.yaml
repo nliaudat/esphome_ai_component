@@ -207,7 +207,7 @@ packages:
   # - !include components/flash_light_controller/flash_light_controller_controls.yaml
   - !include components/esp32_camera_utils/esp32_camera_utils_controls.yaml
   # - !include data_collector_controls.yaml
-  # - !include components/analog_gauge_reader/analog_gauge_reader_controls.yaml
+  # - !include components/analog_gauge_reader_legacy/analog_gauge_reader_controls.yaml
 
   # camera configs
   - !include camera_options.yaml

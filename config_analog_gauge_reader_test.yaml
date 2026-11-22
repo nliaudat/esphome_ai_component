@@ -280,7 +280,7 @@ value_validator:
   # strict_confidence_check: false       # Require all digits meet threshold (default: false)
   # max_history_size: 50kB               # Max history memory usage (default: 50kB)
 
-analog_gauge_reader: # DEV !
+analog_gauge_reader_legacy: # DEV !
   id: ${id_prefix}_analog_gauge_reader
   camera_id: ${id_prefix}_espcam
   flash_light_controller: ${id_prefix}_flash_controller
@@ -417,7 +417,7 @@ packages:
   - !include components/value_validator/value_validator_dial_controls.yaml
   - !include components/flash_light_controller/flash_light_controller_controls.yaml
   - !include components/esp32_camera_utils/esp32_camera_utils_controls.yaml
-  - !include components/analog_gauge_reader/analog_gauge_reader_controls.yaml
+  - !include components/analog_gauge_reader_legacy/analog_gauge_reader_controls.yaml
   # camera configs
   - !include camera_options.yaml
   - !include esp32_camera.yaml

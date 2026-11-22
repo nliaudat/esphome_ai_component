@@ -1,4 +1,4 @@
-# ESPHome build test: analog_gauge_reader + flash_light_controller on ESP32-S3 (Alpha)
+# ESPHome build test: analog_gauge_reader_legacy + flash_light_controller on ESP32-S3 (Alpha)
 esphome:
   name: test-analog-s3-flash
 

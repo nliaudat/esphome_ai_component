@@ -240,7 +240,7 @@ packages:
   - !include components/value_validator/value_validator_controls.yaml
   - !include components/flash_light_controller/flash_light_controller_controls.yaml
   - !include components/esp32_camera_utils/esp32_camera_utils_controls.yaml
-  # - !include components/analog_gauge_reader/analog_gauge_reader_controls.yaml
+  # - !include components/analog_gauge_reader_legacy/analog_gauge_reader_controls.yaml
   - !include camera_options.yaml
   - !include esp32_camera.yaml
   # - !include camera_webserver.yaml

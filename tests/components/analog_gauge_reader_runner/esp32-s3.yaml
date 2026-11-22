@@ -1,6 +1,6 @@
-# ESPHome build test: analog_gauge_reader on ESP32-S3 (Alpha)
+# ESPHome build test: analog_gauge_reader_runner on ESP32-S3
 esphome:
-  name: test-analog-s3
+  name: test-gauge-runner-s3
 
 esp32:
   board: esp32-s3-devkitc-1

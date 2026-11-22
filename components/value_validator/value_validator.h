@@ -143,7 +143,7 @@ class ValueValidator : public Component {
   void set_last_valid_reading(const std::string &value);
   bool is_hallucination_pattern(std::span<const float> digits) const;
 
-#ifdef USE_ANALOG_GAUGE_READER
+#if defined(USE_ANALOG_GAUGE_READER) || defined(USE_ANALOG_GAUGE_READER_RUNNER)
   // Dial fraction input from analog_gauge_reader
   void set_dial_fraction(float fraction);
   void clear_dial_fraction();
@@ -190,7 +190,7 @@ class ValueValidator : public Component {
   size_t last_good_values_head_{0};
   size_t last_good_values_count_{0};
 
-#ifdef USE_ANALOG_GAUGE_READER
+#if defined(USE_ANALOG_GAUGE_READER) || defined(USE_ANALOG_GAUGE_READER_RUNNER)
   // Dial correction state
   bool has_dial_fraction_{false};
   float dial_fraction_{0.0f};  // Fractional part of summed dials [0.0, 1.0)

@@ -35,15 +35,26 @@ components:
     description: "NO AI --- Seven-segment OCR"
     depends: [esp32_camera_utils]
     optional: [value_validator]
-  analog_gauge_reader:
+  analog_gauge_reader_runner:
     status: alpha
-    description: "NO AI --- Analog dial/gauge"
+    description: "NO AI --- Analog dial/gauge on camera_decoder + gauge_needle_detector"
+    depends: [camera_decoder, gauge_needle_detector]
+    optional: [value_validator, flash_light_controller]
+  analog_gauge_reader_legacy:
+    status: legacy
+    description: "NO AI --- Analog dial/gauge (self-contained, superseded by the runner)"
     depends: [esp32_camera_utils]
     optional: [value_validator]
   value_validator:
     status: active
     description: "SHARED --- Reading validation engine"
-    used_by: [meter_reader_tflite, ssocr_reader, analog_gauge_reader]
+    used_by:
+      [
+        meter_reader_tflite,
+        ssocr_reader,
+        analog_gauge_reader_legacy,
+        analog_gauge_reader_runner,
+      ]
   esp32_camera_utils:
     status: active
     description: "SHARED --- Image processing core"

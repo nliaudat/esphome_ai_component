@@ -1,0 +1,73 @@
+# ESPHome build test: analog_gauge_reader_runner
+#
+# The runner is local; it consumes the upstream `camera_decoder` (PR 22767) and
+# `gauge_needle_detector` (PR 22985) components from their PR heads.
+
+esphome:
+  name: test-gauge-runner
+
+external_components:
+  - source:
+      type: local
+      path: ../../../components
+    components:
+      - analog_gauge_reader_runner
+      - value_validator
+      - flash_light_controller
+  # `camera` carries decoder.h in this PR, so it is requested alongside the decoder.
+  - source: github://pr#22767
+    components: [camera, camera_decoder]
+    refresh: 1d
+  - source: github://pr#22985
+    components: [gauge_needle_detector]
+    refresh: 1d
+
+logger:
+  level: DEBUG
+
+esp32_camera:
+  id: test_camera
+  name: Test Camera
+  external_clock:
+    pin: GPIO0
+    frequency: 20MHz
+  i2c_pins:
+    sda: GPIO26
+    scl: GPIO27
+  data_pins: [GPIO5, GPIO18, GPIO19, GPIO21, GPIO36, GPIO39, GPIO34, GPIO35]
+  vsync_pin: GPIO25
+  href_pin: GPIO23
+  pixel_clock_pin: GPIO22
+  power_down_pin: GPIO32
+  resolution: 640x480
+  pixel_format: JPEG
+
+camera_decoder:
+  id: test_decoder
+  output_type: GRAYSCALE
+
+value_validator:
+  id: test_validator
+
+analog_gauge_reader_runner:
+  id: test_gauge
+  camera_id: test_camera
+  decoder_id: test_decoder
+  validator: test_validator
+  value_sensor:
+    name: "Gauge total"
+  dials:
+    - id: dial1
+      crop_x: 0
+      crop_y: 0
+      crop_w: 64
+      crop_h: 64
+      scale: 0.1
+      min_value: 0
+      max_value: 100
+      value:
+        name: "Dial 1"
+      angle:
+        name: "Dial 1 angle"
+      confidence:
+        name: "Dial 1 confidence"

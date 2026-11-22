@@ -37,13 +37,14 @@ The repository allows you to use specific components based on your needs:
 |-----------|-------------|
 | **[meter_reader_tflite](./components/meter_reader_tflite)** | AI-powered meter reader using TensorFlow Lite models. Orchestrates capture, inference, and reporting for digital meters. |
 | **[ssocr_reader](./components/ssocr_reader)** | (Alpha dev !) Seven-segment OCR reader using SSOCR algorithm. Reads digital displays without AI models. |
-| **[analog_gauge_reader](./components/analog_gauge_reader)** | Analog dial/gauge reader using radial intensity sum algorithm. Reads pointer positions without AI. |
+| **[analog_gauge_reader_runner](./components/analog_gauge_reader_runner)** | Analog dial/gauge reader on the upstream `camera_decoder` + `gauge_needle_detector`, with `value_validator` and `flash_light_controller` support. Reads pointer positions without AI. |
+| **[analog_gauge_reader_legacy](./components/analog_gauge_reader_legacy)** | The original self-contained reader (bundled algorithms and `esp32_camera_utils` decoding). Kept for existing configurations. |
 
 ### Supporting Components
 
 | Component | Description |
 |-----------|-------------|
-| **[value_validator](./components/value_validator)** | Robust validation engine for meter readings. Eliminates outliers, tracks history, prevents impossible value jumps, and supports dial-aware digit correction when combined with `analog_gauge_reader`. Outputs float values when analog_gauge_reader is active. Publishes a separate `validated_value_sensor` (only on accept) while the raw value_sensor always shows raw digits. |
+| **[value_validator](./components/value_validator)** | Robust validation engine for meter readings. Eliminates outliers, tracks history, prevents impossible value jumps, and supports dial-aware digit correction when combined with `analog_gauge_reader_runner` (or the legacy reader). Outputs float values when either reader is active. Publishes a separate `validated_value_sensor` (only on accept) while the raw value_sensor always shows raw digits. |
 | **[esp32_camera_utils](./components/esp32_camera_utils)** | Powerful image processing utilities. Handles cropping, scaling, rotation (JPEG/Raw), and format conversion using `esp_new_jpeg` library. |
 | **`tflite_micro_runtime`** | TFLite Micro runtime for **image** and **audio** models: tensor arena, op resolver, interpreter, input preprocessing and output post-processing. Declare one entry per model and reference it by ID. Fetched as an external component (see [Installation](#1-installation)). |
 | **`tflite_model_loader`** / **`tflite_model_debug`** | Auto-loaded by `tflite_micro_runtime`. The loader resolves the model source (local, `github://`, `http(s)://`), verifies it (CRC32) and parses the optional `.txt` metadata report; the debug helper adds the optional model debug sensors/text. |
@@ -86,7 +87,7 @@ external_components:
       # Choose the reader type you need:
       - meter_reader_tflite   # AI-powered digit recognition
       # - ssocr_reader        # Seven-segment OCR (no AI)
-      # - analog_gauge_reader       # Analog gauge/dial reader (no AI)
+      # - analog_gauge_reader_runner  # Analog gauge/dial reader (no AI)
 
       # Supporting components:
       - value_validator       # Validation engine (recommended)
@@ -176,9 +177,10 @@ value_validator:
   allow_negative_rates: true  # Analog gauges can go both ways
   max_rate_change: 0.25
 
-analog_gauge_reader:
+analog_gauge_reader_runner:
   id: my_analog
   camera_id: my_camera
+  decoder_id: my_decoder
   validator: my_validator
   update_interval: 60s
   dials:
