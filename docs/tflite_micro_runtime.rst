@@ -152,10 +152,15 @@ Configuration variables
     * **Kind entry (recommended for new work).** The kind component is the
       configuration key: ``tflite_image``, ``tflite_detection``,
       ``tflite_segmentation``, ``tflite_pose``, ``tflite_tabular``,
-      ``tflite_text`` or ``tflite_audio``. It auto-loads
+      ``tflite_text``, ``tflite_audio`` or ``tflite_camera``. It auto-loads
       ``tflite_micro_runtime`` in the background, calls ``declare_model()`` and
       attaches its input pipeline and output decoder. Do not add a
       ``tflite_micro_runtime`` entry for the same model.
+    * ``tflite_camera`` is the camera variant: it listens to an
+      ``esp32_camera``, decodes each JPEG through ``camera_decoder``, scales the
+      whole frame into the model input and fires ``on_result``. It runs one
+      model on one frame; it is not a multi-crop reader. For several dials out
+      of one frame, use ``meter_reader_tflite`` with zone crops.
     * **Plain runtime entry.** ``tflite_micro_runtime`` on its own stays valid
       for a consumer that fills the input tensor itself: this repository's
       ``meter_reader_tflite`` and the upstream ``micro_wake_word``. The

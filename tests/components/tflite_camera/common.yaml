@@ -1,0 +1,80 @@
+# ESPHome build test: tflite_camera (PR 23211).
+#
+# A whole camera frame is decoded through camera_decoder, scaled by the
+# tflite_image pipeline and classified by the runtime. The local union camera
+# component provides the RGB888 format the decoder produces.
+esphome:
+  name: test-tflite-camera
+
+external_components:
+  - source:
+      type: local
+      path: ../../../components
+    components: [camera]
+  - source: github://pr#22767
+    components: [camera_decoder]
+    refresh: 1d
+  - source: github://pr#21282
+    components: [tflite_model_source]
+    refresh: 1d
+  - source: github://pr#21283
+    components: [tflite_op_processor]
+    refresh: 1d
+  - source: github://pr#21284
+    components: [tflite_memory_handler]
+    refresh: 1d
+  - source: github://pr#21285
+    components: [tflite_output_processor]
+    refresh: 1d
+  - source: github://pr#21286
+    components: [tflite_model_loader]
+    refresh: 1d
+  - source: github://pr#21287
+    components: [tflite_model_debug]
+    refresh: 1d
+  - source: github://pr#21288
+    components: [tflite_micro_runtime]
+    refresh: 1d
+  - source: github://pr#23037
+    components: [tflite_model_io]
+    refresh: 1d
+  - source: github://pr#23109
+    components: [tflite_image]
+    refresh: 1d
+  - source: github://pr#23211
+    components: [tflite_camera]
+    refresh: 1d
+
+logger:
+  level: DEBUG
+
+esp32_camera:
+  id: test_camera
+  name: Test Camera
+  external_clock:
+    pin: GPIO0
+    frequency: 20MHz
+  i2c_pins:
+    sda: GPIO26
+    scl: GPIO27
+  data_pins: [GPIO5, GPIO18, GPIO19, GPIO21, GPIO36, GPIO39, GPIO34, GPIO35]
+  vsync_pin: GPIO25
+  href_pin: GPIO23
+  pixel_clock_pin: GPIO22
+  power_down_pin: GPIO32
+  resolution: 640x480
+  pixel_format: JPEG
+
+tflite_camera:
+  - id: test_camera_model
+    camera_id: test_camera
+    model: "https://raw.githubusercontent.com/nliaudat/esphome_ai_component/refs/heads/main/models/digit_recognizer_v24_quantized_integer_quant_uint8.tflite"
+    input_width: 32
+    input_height: 20
+    input_channels: 3
+    frame_width: 640
+    frame_height: 480
+    rotation: 0
+    min_interval: 1s
+    on_result:
+      - logger.log: "inference finished"

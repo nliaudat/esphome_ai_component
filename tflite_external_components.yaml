@@ -6,8 +6,10 @@
 # Two groups:
 #   1. Project-only components, compiled from ./components in this repo.
 #   2. The split TFLite components, fetched from their PR heads on GitHub. One
-#      entry per PR because a single `source` carries a single ref; the seven
-#      components live in PRs #21282-#21288.
+#      entry per PR because a single `source` carries a single ref. The library
+#      set is #21282-#21288 plus #23037 (tflite_model_io); the model-kind
+#      components (#23109-#23115) and the camera runner (#23211) are only
+#      needed by a config that uses them.
 #
 # Delete .esphome/external_components to force a re-fetch before `refresh`
 # expires.

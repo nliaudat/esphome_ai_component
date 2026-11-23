@@ -12,12 +12,15 @@
 #   - tflite_external_components.yaml : same layout, documented for the shared
 #     include used by the shipped configs
 #
-# TFLite layout on this branch (the split series #21282-#21288):
+# TFLite layout on this branch (the split series #21282-#21288 plus #23037):
 #   - meter_reader_tflite is a consumer only; the model is declared once in a
 #     `tflite_micro_runtime:` entry and referenced by ID (`model: <runtime_id>`).
-#   - tflite_micro_runtime auto-loads the other six components, but those are
-#     still only published as PR heads, so each needs its own `source` entry
-#     (one ref per source).
+#   - tflite_micro_runtime auto-loads the other library components, but those
+#     are still only published as PR heads, so each needs its own `source`
+#     entry (one ref per source).
+#   - A standalone model uses a kind entry instead (`tflite_image:`,
+#     `tflite_detection:`, ..., or `tflite_camera:` for camera frames); the
+#     kind auto-loads the runtime and there is no runtime entry for it.
 #   - tflite_micro_helper (the monolithic predecessor) was removed: image models
 #     use tflite_micro_runtime above, and micro_wake_word is the upstream
 #     self-contained component. Do not load two TFLite runtimes in one build,
