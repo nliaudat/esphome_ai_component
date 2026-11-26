@@ -7,9 +7,10 @@
 #   1. Project-only components, compiled from ./components in this repo.
 #   2. The split TFLite components, fetched from their PR heads on GitHub. One
 #      entry per PR because a single `source` carries a single ref. The library
-#      set is #21282-#21288 plus #23037 (tflite_model_io); the model-kind
-#      components (#23109-#23115) and the camera runner (#23211) are only
-#      needed by a config that uses them.
+#      set is #21282-#21287 plus #23037 (tflite_model_io); #23267 carries
+#      tflite_micro_runtime, its results layer stacked on the #21288 core. The
+#      model-kind components (#23109-#23115) and the camera runner (#23211) are
+#      only needed by a config that uses them.
 #
 # Delete .esphome/external_components to force a re-fetch before `refresh`
 # expires.
@@ -48,6 +49,6 @@
 - source: github://pr#23037
   components: [tflite_model_io]
   refresh: always
-- source: github://pr#21288
+- source: github://pr#23267
   components: [tflite_micro_runtime]
   refresh: always

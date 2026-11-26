@@ -12,7 +12,8 @@
 #   - tflite_external_components.yaml : same layout, documented for the shared
 #     include used by the shipped configs
 #
-# TFLite layout on this branch (the split series #21282-#21288 plus #23037):
+# TFLite layout on this branch (the split series #21282-#21287 plus #23037, with
+# #23267 carrying the tflite_micro_runtime core of #21288 and its results layer):
 #   - meter_reader_tflite is a consumer only; the model is declared once in a
 #     `tflite_micro_runtime:` entry and referenced by ID (`model: <runtime_id>`).
 #   - tflite_micro_runtime auto-loads the other library components, but those
@@ -61,6 +62,6 @@
 - source: github://pr#23037
   components: [tflite_model_io]
   refresh: always
-- source: github://pr#21288
+- source: github://pr#23267
   components: [tflite_micro_runtime]
   refresh: always
