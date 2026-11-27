@@ -133,7 +133,12 @@ class AnalogGaugeReader : public PollingComponent, public esphome::camera::Camer
   // neighbour carry-correction instead of a weighted sum of raw needle values.
   void set_stacked_digits(bool enabled) { this->stacked_digits_ = enabled; }
 
-  void add_dial(DialConfig config) { this->dials_.push_back(config); }
+  void add_dial(DialConfig config) {
+    // A colour distance map is dark where the colour matches, whatever the needle's brightness.
+    if (config.use_color)
+      config.needle_type = NEEDLE_TYPE_DARK;
+    this->dials_.push_back(config);
+  }
 
   void set_dial_range(const std::string &dial_id, float min_val, float max_val);
   void set_dial_angle(const std::string &dial_id, float min_deg, float max_deg);

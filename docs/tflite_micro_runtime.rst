@@ -4,7 +4,7 @@ tflite_micro_runtime
 ====================
 
 **Status: Active** — split-component series (upstream PRs
-:pr:`21282`–:pr:`21288`).
+:pr:`21282`–:pr:`21288`, :pr:`23037` and :pr:`23267`).
 
 The ``tflite_micro_runtime`` component owns everything about a TFLite Micro
 model: source resolution, loading, CRC32 verification, the tensor arena, the
@@ -17,8 +17,8 @@ post-processing. It supports two model types:
 The component is ``MULTI_CONF``: declare one entry per model and reference it by
 ID from a consumer such as ``meter_reader_tflite``.
 
-The runtime is split into seven cooperating components. Only
-``tflite_micro_runtime`` is configured by the user; the other six are loaded
+The runtime is split into eight cooperating components. Only
+``tflite_micro_runtime`` is configured by the user; the other seven are loaded
 automatically:
 
 .. list-table::
@@ -30,6 +30,8 @@ automatically:
       - Runtime entry point: arena, interpreter, preprocessing, post-processing
     * - ``tflite_model_source``
       - Model source resolution (local, ``github://``, ``http(s)://``), metadata parsing
+    * - ``tflite_model_io``
+      - Model file reader library
     * - ``tflite_op_processor``
       - Operator table, resolver sizing, ESP-NN kernel registration
     * - ``tflite_memory_handler``
@@ -53,8 +55,9 @@ Requirements
 Installation
 ------------
 
-One ``source`` carries a single ref, so the seven components are listed one per
-PR head while the series is unmerged:
+One ``source`` carries a single ref, so the eight components are listed one per
+PR head while the series is unmerged. :pr:`23267` is the :pr:`21288` runtime core
+plus its results layer (``on_result``), so it supplies ``tflite_micro_runtime``:
 
 .. code-block:: yaml
 
@@ -71,10 +74,12 @@ PR head while the series is unmerged:
         components: [tflite_model_loader]
       - source: github://pr#21287
         components: [tflite_model_debug]
-      - source: github://pr#21288
+      - source: github://pr#23037
+        components: [tflite_model_io]
+      - source: github://pr#23267
         components: [tflite_micro_runtime]
 
-``tflite_micro_runtime`` auto-loads the other six, so only the last entry is
+``tflite_micro_runtime`` auto-loads the other seven, so none of these entries is
 needed once the components ship inside ESPHome.
 
 Configuration

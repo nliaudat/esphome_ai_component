@@ -10,7 +10,7 @@
 
 This project provides a robust, modular framework for running TensorFlow Lite Micro models on ESP32 devices within the ESPHome ecosystem. While originally designed for analog/digital meter reading, it is suitable for various computer vision tasks.
 
-**New in v2.0:** The project has been refactored into modular components for better maintainability and reusability, and the components are committed to ESPHome (see the upstream PRs [#21282–#21288](https://github.com/esphome/esphome/pulls?q=is%3Apr+author%3Anliaudat)).
+**New in v2.0:** The project has been refactored into modular components for better maintainability and reusability, and the components are committed to ESPHome (see the upstream PRs [#21282–#21288, #23037 and #23267](https://github.com/esphome/esphome/pulls?q=is%3Apr+author%3Anliaudat)).
 
 ### 🎯 Core Value Proposition
 **"Turn any ESP32 Camera into a privacy-first, offline AI Meter Reader for ESPHome."**
@@ -49,7 +49,7 @@ The repository allows you to use specific components based on your needs:
 | **[esp32_camera_utils](./components/esp32_camera_utils)** | Powerful image processing utilities. Handles cropping, scaling, rotation (JPEG/Raw), and format conversion using `esp_new_jpeg` library. |
 | **`tflite_micro_runtime`** | TFLite Micro runtime for **image** and **audio** models: tensor arena, op resolver, interpreter, input preprocessing and output post-processing. Declare one entry per model and reference it by ID. Fetched as an external component (see [Installation](#1-installation)). |
 | **`tflite_model_loader`** / **`tflite_model_debug`** | Auto-loaded by `tflite_micro_runtime`. The loader resolves the model source (local, `github://`, `http(s)://`), verifies it (CRC32) and parses the optional `.txt` metadata report; the debug helper adds the optional model debug sensors/text. |
-| **`tflite_model_source`** / **`tflite_op_processor`** / **`tflite_memory_handler`** / **`tflite_output_processor`** | Auto-loaded building blocks of the runtime (source resolution, operator registration/ESP-NN kernels, arena sizing, output decoding). |
+| **`tflite_model_source`** / **`tflite_model_io`** / **`tflite_op_processor`** / **`tflite_memory_handler`** / **`tflite_output_processor`** | Auto-loaded building blocks of the runtime (source resolution, model file reading, operator registration/ESP-NN kernels, arena sizing, output decoding). |
 | **`tflite_micro_helper`** (removed) | Legacy monolithic loader/runtime, deleted in v2.x. Image models now use `tflite_micro_runtime`; `micro_wake_word` is the upstream self-contained component. Kept as [documentation](./docs/tflite_micro_helper.rst) only. |
 | **[flash_light_controller](./components/flash_light_controller)** | Manages flash light timing for optimal image capture conditions. |
 | **[data_collector](./components/data_collector)** | **Active Learning** tool. Automatically collects "hard" images (low confidence) and uploads them to a server for training set improvement. |
@@ -83,7 +83,7 @@ external_components:
   - source:
       type: git
       url: https://github.com/nliaudat/esphome_ai_component
-      ref: main
+      ref: next
     components:
       # Choose the reader type you need:
       - meter_reader_tflite   # AI-powered digit recognition
@@ -110,7 +110,10 @@ external_components:
     components: [tflite_model_loader]
   - source: github://pr#21287
     components: [tflite_model_debug]
-  - source: github://pr#21288
+  - source: github://pr#23037
+    components: [tflite_model_io]
+  # PR 23267 is the PR 21288 runtime core plus its results layer.
+  - source: github://pr#23267
     components: [tflite_micro_runtime]   # Required for meter_reader_tflite
 ```
 

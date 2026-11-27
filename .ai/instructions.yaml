@@ -68,7 +68,7 @@ components:
   tflite_micro_runtime:
     status: active
     description: "SHARED --- TFLite runtime wrapper (split series: runtime + model_loader + model_debug)"
-    source: "external component, esphome PR series #21282-#21288"
+    source: "external component, esphome PRs #21282-#21287, #23037, #23267"
     used_by: [meter_reader_tflite]
     note: "Model declared once in the runtime YAML entry; consumers reference it by ID"
   flash_light_controller:
@@ -397,7 +397,7 @@ testing:
     - "Test minimal + full-feature configs"
     - "Test with and without optional dependencies"
     - "Split TFLite fixtures: model declared ONCE in a tflite_micro_runtime: entry, referenced by ID from meter_reader_tflite: model: <runtime_id>"
-    - "Split TFLite fixtures: fetch the 7 split components from github://pr#21282..#21288 (one source per ref) + project components from ../../../components (type: local)"
+    - "Split TFLite fixtures: fetch the 8 split components from github://pr#21282..#21287, #23037 (tflite_model_io) and #23267 (tflite_micro_runtime = #21288 core + results layer), one source per ref, + project components from ../../../components (type: local)"
     - "Split TFLite fixtures MUST declare a globals: entry --- esp32_camera_utils AUTO_LOADs globals, and an auto-loaded MULTI_CONF component needs >=1 entry or validation fails with 'type' is a required option for [globals]"
     - "esphome config on a fixture re-fetches the PR heads (~1 min): run it foreground and poll the redirected log"
   lint_runner:

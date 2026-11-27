@@ -31,7 +31,7 @@ external_components:
   - source: github://pr#21287
     components: [tflite_model_debug]
     refresh: always
-  - source: github://pr#21288
+  - source: github://pr#23267
     components: [tflite_micro_runtime]
     refresh: always
   - source: github://pr#23037

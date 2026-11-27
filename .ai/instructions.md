@@ -99,7 +99,7 @@ esphome_ai_component/
 ├── tflite_micro_runtime/         # SHARED - TFLite runtime wrapper (split series)
 │   ├── USED BY: meter_reader_tflite ONLY
 │   ├── DEPENDS ON: tflite_model_loader, tflite_model_debug (auto-loaded sub-components)
-│   └── SOURCE: external component, fetched from esphome PR series #21282-#21288
+│   └── SOURCE: external component, fetched from esphome PRs #21282-#21287, #23037, #23267
 │
 ├── flash_light_controller/      # SHARED - Illumination timing
 │   ├── USED BY: meter_reader_tflite
@@ -849,9 +849,11 @@ enables the grouped test runner to merge common configs.
 **Split TFLite components in fixtures (as of the split-series migration):**
 - `common.yaml` declares the model ONCE in a `tflite_micro_runtime:` entry and
   `meter_reader_tflite: model: <runtime_id>` references it by ID.
-- The seven split components are fetched from their PR heads (`github://pr#21282`
-  … `github://pr#21288`, one `source` per ref) and the project components from
-  `../../../components` (`type: local`).
+- The eight split components are fetched from their PR heads (`github://pr#21282`
+  … `github://pr#21287`, `pr#23037` for `tflite_model_io` and `pr#23267` for
+  `tflite_micro_runtime`, which is the `#21288` core plus its results layer; one
+  `source` per ref) and the project components from `../../../components`
+  (`type: local`).
 - A `globals:` entry is required in the fixture: `esp32_camera_utils` AUTO_LOADs
   the core `globals` component, and an auto-loaded MULTI_CONF component still has
   to contain at least one entry, otherwise validation fails with

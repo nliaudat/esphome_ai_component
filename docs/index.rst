@@ -5,7 +5,7 @@ ESPHome AI Components
 
 This project provides a modular framework for running TensorFlow Lite Micro models and computer vision algorithms on ESP32 devices within the ESPHome ecosystem.
 
-**New in v2.0:** The project has been refactored into modular components for better maintainability and reusability, and the components are committed to ESPHome (upstream PRs :pr:`21282`–:pr:`21288`).
+**New in v2.0:** The project has been refactored into modular components for better maintainability and reusability, and the components are committed to ESPHome (upstream PRs :pr:`21282`–:pr:`21288`, :pr:`23037` and :pr:`23267`).
 
 .. toctree::
     :maxdepth: 2
@@ -30,9 +30,9 @@ Installation
 
 Requires ESPHome **2026.11** or later.
 
-The TFLite stack is split into seven components that are still shipped as
+The TFLite stack is split into eight components that are still shipped as
 upstream PR heads, so each one needs its own ``source`` entry. The runtime
-auto-loads the other six.
+auto-loads the other seven.
 
 .. code-block:: yaml
 
@@ -61,7 +61,10 @@ auto-loads the other six.
         components: [tflite_model_loader]
       - source: github://pr#21287
         components: [tflite_model_debug]
-      - source: github://pr#21288
+      - source: github://pr#23037
+        components: [tflite_model_io]
+      # PR 23267 is the PR 21288 runtime core plus its results layer
+      - source: github://pr#23267
         components: [tflite_micro_runtime]
 
 ``tflite_micro_helper`` has been **removed**; its page documents the old

@@ -271,7 +271,9 @@ void AnalogGaugeReaderRunner::process_image_from_buffer(const uint8_t *data, siz
 
     gauge_needle_detector::DetectorConfig detector_config;
     detector_config.id = dial.id.c_str();
-    detector_config.needle_type = dial.needle_type;
+    // A colour distance map is dark where the colour matches, whatever the needle's brightness.
+    detector_config.needle_type =
+        dial.target_color != NO_TARGET_COLOR ? gauge_needle_detector::NEEDLE_TYPE_DARK : dial.needle_type;
     detector_config.algorithm = dial.algorithm;
     detector_config.min_scan_radius = dial.min_scan_radius;
     detector_config.max_scan_radius = dial.max_scan_radius;

@@ -32,7 +32,7 @@ external_components:
   - source: github://pr#21287
     components: [tflite_model_debug]
     refresh: 1d
-  - source: github://pr#21288
+  - source: github://pr#23267
     components: [tflite_micro_runtime]
     refresh: 1d
   - source: github://pr#23037
@@ -69,11 +69,9 @@ tflite_camera:
   - id: test_camera_model
     camera_id: test_camera
     model: "https://raw.githubusercontent.com/nliaudat/esphome_ai_component/refs/heads/main/models/digit_recognizer_v24_quantized_integer_quant_uint8.tflite"
-    input_width: 32
-    input_height: 20
+    input_width: 20
+    input_height: 32
     input_channels: 3
-    frame_width: 640
-    frame_height: 480
     rotation: 0
     min_interval: 1s
     on_result:
