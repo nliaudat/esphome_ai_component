@@ -8,6 +8,7 @@
       # ref: main
     # components: [legacy_meter_reader_tflite]
 
+# The upstream gauge reader and its dependencies are added under `packages:`.
 external_components: !include tflite_external_components.yaml
 
 ############## General configuration
@@ -36,6 +37,8 @@ substitutions:
   camera_pixel_format: JPEG # (cropping implementation is faster with RGB888 format) | Displays: RGB565, RGB888 | Cameras: YUV422, YUV420, RAW | Efficiency: Grayscale, YUV420, JPEG
   # camera_pixel_format: GRAYSCALE
   camera_resolution: 640x480 #800x600 #640x480 #https://esphome.io/components/esp32_camera.html
+  camera_width: "640" # must match camera_resolution
+  camera_height: "480"
   # camera_jpeg_quality: 10 # From 10 (best) to 63 (worst). | Must be 0 if non JPEG
   camera_jpeg_quality: 10
   camera_max_framerate: 1fps
@@ -279,13 +282,28 @@ value_validator:
   # strict_confidence_check: false       # Require all digits meet threshold (default: false)
   # max_history_size: 50kB               # Max history memory usage (default: 50kB)
 
-analog_gauge_reader_legacy: # DEV !
+# Analog dials read by the upstream analog_gauge_reader (esphome/esphome#22989).
+# The value, angle and confidence sensors are under `sensor:` at the end of this file.
+camera_decoder:
+  id: ${id_prefix}_gauge_decoder
+  output_type: RGB888 # required by the dials using target_color
+  width: ${camera_width} # reserve the output buffer at boot
+  height: ${camera_height}
+
+# Flash for the frames the gauge reader requests. The meter reader requests idle
+# frames, which skip these triggers and keep using flash_light_controller.
+# Home Assistant snapshots trigger them too.
+esp32_camera:
+  capture_delay: 3s # maximum allowed by esp32_camera
+  on_capture_start:
+    - light.turn_on: ${id_prefix}_flash
+  on_capture_end:
+    - light.turn_off: ${id_prefix}_flash
+
+analog_gauge_reader:
   id: ${id_prefix}_analog_gauge_reader
   camera_id: ${id_prefix}_espcam
-  flash_light_controller: ${id_prefix}_flash_controller
-  validator: ${id_prefix}_validator
-  value_sensor:
-    name: "Analog Total"
+  decoder_id: ${id_prefix}_gauge_decoder
   debug: true
   update_interval: 60s
   dials:
@@ -374,18 +392,6 @@ analog_gauge_reader_legacy: # DEV !
       target_color: 16711680
       color_tolerance: 0
 
-      # New Per-Dial Sensors
-      angle:
-        name: "Dial 1 Angle"
-        filters:
-          - sliding_window_moving_average:
-              window_size: 5
-              send_every: 1
-      value:
-        name: "Dial 1 Value"
-      confidence:
-        name: "Dial 1 Confidence"
-
       # Internal Calibration (Raw Angle -> Corrected Value)
       calibration:
         - raw: 0.0
@@ -399,6 +405,18 @@ analog_gauge_reader_legacy: # DEV !
   # port: 80
 
 packages:
+  # Upstream gauge reader, fetched from the PR heads until they are merged
+  - external_components:
+      - source: github://pr#22767
+        components: [camera, camera_decoder]
+        refresh: always
+      - source: github://pr#22985
+        components: [gauge_needle_detector]
+        refresh: always
+      - source: github://pr#22989
+        components: [analog_gauge_reader]
+        refresh: always
+
   # Board Configuration (Mutually Exclusive)
   # - !include boards/board_freenove_esp32-s3-n8r8.yaml
   # - !include boards/board_Seeed_Studio_XIAO_ESP32-S3_sense.yaml
@@ -416,7 +434,6 @@ packages:
   - !include components/value_validator/value_validator_dial_controls.yaml
   - !include components/flash_light_controller/flash_light_controller_controls.yaml
   - !include components/esp32_camera_utils/esp32_camera_utils_controls.yaml
-  - !include components/analog_gauge_reader_legacy/analog_gauge_reader_controls.yaml
   # camera configs
   - !include camera_options.yaml
   - !include esp32_camera.yaml
@@ -436,7 +453,70 @@ packages:
 debug:
   update_interval: 60s
 
+switch:
+  - platform: template
+    name: "Pause Analog Processing"
+    id: ${id_prefix}_pause_analog_processing
+    icon: "mdi:pause"
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - lambda: id(${id_prefix}_analog_gauge_reader).set_pause_processing(true);
+    turn_off_action:
+      - lambda: id(${id_prefix}_analog_gauge_reader).set_pause_processing(false);
+
+  - platform: template
+    name: "Analog Debug Mode"
+    id: ${id_prefix}_analog_debug
+    icon: "mdi:bug"
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - lambda: id(${id_prefix}_analog_gauge_reader).set_debug(true);
+    turn_off_action:
+      - lambda: id(${id_prefix}_analog_gauge_reader).set_debug(false);
+
+number:
+  - platform: template
+    name: "Analog Update Interval"
+    id: ${id_prefix}_analog_update_interval
+    icon: "mdi:timer"
+    min_value: 1
+    max_value: 300
+    step: 1
+    unit_of_measurement: "s"
+    mode: box
+    initial_value: 60
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          id(${id_prefix}_analog_gauge_reader).set_update_interval((uint32_t) (x * 1000));
+          // set_update_interval only stores the value; restart the poller so it takes effect
+          id(${id_prefix}_analog_gauge_reader).stop_poller();
+          id(${id_prefix}_analog_gauge_reader).start_poller();
+
 sensor:
+  - platform: analog_gauge_reader
+    analog_gauge_reader_id: ${id_prefix}_analog_gauge_reader
+    value:
+      name: "Analog Total"
+    dials:
+      - dial: dial_4
+        angle:
+          name: "Dial 1 Angle"
+          filters:
+            - sliding_window_moving_average:
+                window_size: 5
+                send_every: 1
+        value:
+          name: "Dial 1 Value"
+        confidence:
+          name: "Dial 1 Confidence"
+
   - platform: debug
     free:
       name: "Heap Free"

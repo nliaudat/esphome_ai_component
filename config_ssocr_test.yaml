@@ -12,8 +12,17 @@ external_components:
   - source:
       type: local
       path: components
-    #components: [meter_reader_tflite, esp32_camera_utils, flash_light_controller] #, ssocr_reader_legacy]
-    components: [ssocr_reader_legacy, esp32_camera_utils, flash_light_controller, value_validator]
+    components: [esp32_camera_utils, flash_light_controller]
+  # Upstream seven-segment reader, fetched from the PR heads until they are merged
+  - source: github://pr#22767
+    components: [camera, camera_decoder]
+    refresh: always
+  - source: github://pr#22999
+    components: [seven_segment_ocr]
+    refresh: always
+  - source: github://pr#23000
+    components: [ssocr_reader]
+    refresh: always
 
 ############## General configuration
 
@@ -41,6 +50,8 @@ substitutions:
   camera_pixel_format: JPEG # (cropping implementation is faster with RGB888 format) | Displays: RGB565, RGB888 | Cameras: YUV422, YUV420, RAW | Efficiency: Grayscale, YUV420, JPEG
   # camera_pixel_format: GRAYSCALE
   camera_resolution: 640x480 #800x600 #640x480 #https://esphome.io/components/esp32_camera.html
+  camera_width: "640" # must match camera_resolution
+  camera_height: "480"
   # camera_jpeg_quality: 10 # From 10 (best) to 63 (worst). | Must be 0 if non JPEG
   camera_jpeg_quality: 10
   camera_max_framerate: 1fps
@@ -174,51 +185,33 @@ flash_light_controller:
 #   unload_button: ${id_prefix}_unload_btn
 #   reload_button: ${id_prefix}_reload_btn
 
-value_validator:
-  id: ${id_prefix}_validator
-  allow_negative_rates: false
-  max_absolute_diff: 300
-  # All available parameters (with defaults):
-  # max_rate_change: 0.15                # Max rate change as percentage (default: 15%)
-  # enable_smart_validation: true        # Enable adaptive validation (default: true)
-  # smart_validation_window: 5           # Window size for pattern analysis (default: 5)
-  # high_confidence_threshold: 0.90      # Threshold for high confidence (default: 90%)
-  # per_digit_confidence_threshold: 0.85 # Min confidence per digit (default: 85%)
-  # strict_confidence_check: false       # Require all digits meet threshold (default: false)
-  # max_history_size: 50kB               # Max history memory usage (default: 50kB)
+# Seven-segment display read by the upstream ssocr_reader (esphome/esphome#23000)
+camera_decoder:
+  id: ${id_prefix}_ssocr_decoder
+  output_type: GRAYSCALE # least RAM
+  width: ${camera_width} # reserve the output buffer at boot
+  height: ${camera_height}
 
-ssocr_reader_legacy: #seven segment reader (dev) / do not if using meter_reader_tflite
+ssocr_reader:
   id: ${id_prefix}_ssocr_main
-  update_interval: 60s
   camera_id: ${id_prefix}_espcam
-  validator: ${id_prefix}_validator
+  decoder_id: ${id_prefix}_ssocr_decoder
+  update_interval: 60s
   threshold_level: 128
-  digit_count: 8
+  digit_count: 7 # 1 to 7
   # Adjust crop to focus EXACTLY on the digits
   crop_x: 0
   crop_y: 0
   crop_w: 320
   crop_h: 240
-  value:
-    name: "SSOCR Value"
 
-# analog_gauge_reader: # DEV !
-#   id: analog_main
-#   camera_id: ${id_prefix}_espcam
-#   value_sensor:
-#     name: "Analog Total"
-#   dials:
-#     - id: dial_1
-#       scale: 1.0
-#       crop_x: 0
-#       crop_y: 0
-#       crop_w: 100
-#       crop_h: 100
-#       min_angle: 0
-#       max_angle: 360
-#       angle_offset: 0 # 0=North, 90=East
-#       min_value: 0
-#       max_value: 10
+# To light the display while the reader's frame is captured:
+# esp32_camera:
+#   capture_delay: 3s # maximum allowed by esp32_camera
+#   on_capture_start:
+#     - light.turn_on: ${id_prefix}_flash
+#   on_capture_end:
+#     - light.turn_off: ${id_prefix}_flash
 
 # web_server: # needed if generate_preview: true
   # port: 80
@@ -237,7 +230,6 @@ packages:
 
   # Component-specific controls (uncomment to disable individual controls)
   # - !include components/meter_reader_tflite/meter_reader_tflite_controls.yaml
-  - !include components/value_validator/value_validator_controls.yaml
   - !include components/flash_light_controller/flash_light_controller_controls.yaml
   - !include components/esp32_camera_utils/esp32_camera_utils_controls.yaml
   # - !include components/analog_gauge_reader_legacy/analog_gauge_reader_controls.yaml
@@ -260,6 +252,13 @@ debug:
   update_interval: 60s
 
 sensor:
+  - platform: ssocr_reader
+    ssocr_reader_id: ${id_prefix}_ssocr_main
+    value:
+      name: "SSOCR Value"
+    confidence:
+      name: "SSOCR Confidence"
+
   - platform: debug
     free:
       name: "Heap Free"
