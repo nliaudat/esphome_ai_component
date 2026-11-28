@@ -125,6 +125,30 @@ meter_reader_tflite:
 
 Coordinates are in `resolution` pixels (not full-sensor pixels) and the window must fit inside the resolution. See [`esp32_camera_utils`](../esp32_camera_utils/README.md) for the per-sensor rules.
 
+## 📷 Camera decoder (optional)
+
+By default the component decodes JPEG frames itself. With `decoder_id` it uses a
+[`camera_decoder`](https://github.com/esphome/esphome/pull/22767) instead, whose
+output buffer can be reserved once at boot rather than allocated for every frame.
+
+```yaml
+external_components:
+  - source: github://pr#22767
+    components: [camera, camera_decoder]
+
+camera_decoder:
+  id: meter_decoder
+  output_type: RGB888 # required
+  width: 640 # largest expected frame
+  height: 480
+
+meter_reader_tflite:
+  decoder_id: meter_decoder
+```
+
+Keep the decoder's `rotation` at 0 and set rotation in `esp32_camera_utils`.
+A 90, 180 or 270 degree rotation and the preview still use the built-in decode.
+
 ## ⚙️ Configuration Reference
 
 | Option | Type | Default | Description |

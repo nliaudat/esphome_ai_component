@@ -18,6 +18,7 @@ from esphome.const import (
     CONF_UNIT_OF_MEASUREMENT,
 )
 from esphome.core import CORE
+import esphome.final_validate as fv
 
 try:
     from esphome.components import value_validator
@@ -26,6 +27,15 @@ except ImportError:
 
 from esphome.components import esp32_camera, globals, tflite_micro_runtime
 from esphome.cpp_generator import RawExpression
+
+# camera.Decoder only exists once the camera component of esphome/esphome#22767
+# (or its merged version) is loaded.
+try:
+    from esphome.components import camera
+
+    CameraDecoder = getattr(camera, "Decoder", None)
+except ImportError:
+    CameraDecoder = None
 
 try:
     from esphome.components import flash_light_controller
@@ -54,6 +64,7 @@ else:
     AUTO_LOAD = ["sensor", "text_sensor", "button", "light"]
 
 CONF_CAMERA_ID = "camera_id"
+CONF_DECODER_ID = "decoder_id"
 CONF_CONFIDENCE_THRESHOLD = "confidence_threshold"
 CONF_DEBUG = "debug"
 CONF_DEBUG_IMAGE = "debug_image"
@@ -101,6 +112,11 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_CAMERA_ID): cv.use_id(esp32_camera.ESP32Camera)
         if CORE.target_platform == "esp32"
         else cv.string,
+        cv.Optional(CONF_DECODER_ID): cv.use_id(CameraDecoder)
+        if CameraDecoder
+        else cv.invalid(
+            "decoder_id needs the camera and camera_decoder components of esphome/esphome#22767."
+        ),
         cv.Optional(CONF_CONFIDENCE_THRESHOLD, default=0.85): cv.float_range(
             min=0.0, max=1.0
         ),
@@ -177,6 +193,30 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_NORMALIZE, default=False): cv.boolean,
     }
 ).extend(cv.polling_component_schema("60s"))
+
+
+def _final_validate(config):
+    """Check that the referenced decoder delivers what the image pipeline reads."""
+    if CONF_DECODER_ID not in config:
+        return config
+    decoder = fv.get_declaring_config(config[CONF_DECODER_ID])
+    output_type = decoder.get("output_type")
+    output_type = str(getattr(output_type, "enum_value", output_type))
+    if not output_type.endswith("PIXEL_FORMAT_RGB888"):
+        raise cv.Invalid(
+            "meter_reader_tflite needs a decoder with output_type: RGB888",
+            path=[CONF_DECODER_ID],
+        )
+    if decoder.get("rotation", 0) != 0:
+        raise cv.Invalid(
+            "Leave the decoder's rotation at 0 and set the rotation in "
+            "esp32_camera_utils, which the crop zones follow",
+            path=[CONF_DECODER_ID],
+        )
+    return config
+
+
+FINAL_VALIDATE_SCHEMA = _final_validate
 
 
 async def to_code(config):
@@ -363,6 +403,12 @@ async def to_code(config):
         cg.add_define("USE_METER_READER_CROP_ZONES_GLOBAL")
         crop_global = await cg.get_variable(config[CONF_CROP_ZONES])
         cg.add(var.set_crop_zones_global(crop_global))
+
+    # Decode frames with a camera_decoder instead of the built-in decode (optional)
+    if CONF_DECODER_ID in config:
+        cg.add_define("USE_ESP32_CAMERA_UTILS_DECODER")
+        decoder = await cg.get_variable(config[CONF_DECODER_ID])
+        cg.add(var.set_decoder(decoder))
 
     # Set flash light controller if configured (optional)
     if CONF_FLASH_LIGHT_CONTROLLER in config:

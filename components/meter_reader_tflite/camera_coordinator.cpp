@@ -150,6 +150,9 @@ void CameraCoordinator::update_image_processor_config(int model_width, int model
   config.normalize = normalize;
   config.input_order = input_order;
   config.cache_preview_image = this->enable_preview_;
+#ifdef USE_ESP32_CAMERA_UTILS_DECODER
+  config.decoder = this->decoder_;
+#endif
 
   this->image_processor_ = std::make_unique<esp32_camera_utils::ImageProcessor>(config);
   if (this->debug_) {

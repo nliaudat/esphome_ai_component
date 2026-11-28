@@ -30,6 +30,10 @@
 #include "buffer_pool.h"
 #include "esp_heap_caps.h"
 
+#ifdef USE_ESP32_CAMERA_UTILS_DECODER
+#include "esphome/components/camera/decoder.h"
+#endif
+
 namespace esphome {
 namespace esp32_camera_utils {
 
@@ -64,6 +68,11 @@ struct ImageProcessorConfig {
   int cropper_offset_y{0};
 
   bool cache_preview_image{false};  // Optimization: Only cache master image if needed for preview
+
+#ifdef USE_ESP32_CAMERA_UTILS_DECODER
+  /// Optional RGB888 decoder without rotation; nullptr uses the built-in JPEG decode.
+  camera::Decoder *decoder{nullptr};
+#endif
 
   bool validate() const {
     return camera_width > 0 && camera_height > 0 && !pixel_format.empty() && model_width > 0 && model_height > 0 &&
@@ -340,8 +349,10 @@ class ImageProcessor {
   };
 
   struct JpegBufferDeleter {
+    /// False for a buffer borrowed from an external decoder.
+    bool owned{true};
     void operator()(uint8_t *buf) const {
-      if (buf) {
+      if (buf && owned) {
         jpeg_free_align(buf);
       }
     }
@@ -353,6 +364,10 @@ class ImageProcessor {
   [[nodiscard]] static JpegBufferPtr decode_jpeg(const uint8_t *data, size_t len, int *width, int *height,
                                                  jpeg_pixel_format_t output_format = JPEG_PIXEL_FORMAT_RGB888,
                                                  jpeg_rotate_t rotate = JPEG_ROTATE_0D);
+
+  // Decodes one camera frame to RGB888, through the configured decoder when it can
+  [[nodiscard]] JpegBufferPtr decode_frame_(const uint8_t *data, size_t len, int *width, int *height,
+                                            jpeg_rotate_t rotate);
 
   // Allocates a buffer suitable for JPEG operations (16-byte aligned)
   [[nodiscard]] static JpegBufferPtr allocate_jpeg_buffer(size_t size);

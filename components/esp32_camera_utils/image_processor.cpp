@@ -305,6 +305,32 @@ ImageProcessor::JpegBufferPtr ImageProcessor::decode_jpeg(const uint8_t *data, s
   return out_buf;
 }
 
+ImageProcessor::JpegBufferPtr ImageProcessor::decode_frame_(const uint8_t *data, size_t len, int *width, int *height,
+                                                            jpeg_rotate_t rotate) {
+#ifdef USE_ESP32_CAMERA_UTILS_DECODER
+  // The external decoder has a fixed configuration, so a frame that needs the
+  // decode-time rotation still goes through decode_jpeg().
+  if (this->config_.decoder != nullptr && rotate == JPEG_ROTATE_0D) {
+    camera::CameraImageSpec spec{};
+    camera::DecoderError error = this->config_.decoder->decode(data, len, &spec);
+    if (error != camera::DECODER_ERROR_SUCCESS) {
+      ESP_LOGE(TAG, "camera_decoder failed: %s", camera::to_string(error));
+      return nullptr;
+    }
+    camera::Buffer *output = this->config_.decoder->get_output_buffer();
+    if (output == nullptr || spec.format != camera::PIXEL_FORMAT_RGB888) {
+      ESP_LOGE(TAG, "camera_decoder returned no RGB888 frame");
+      return nullptr;
+    }
+    *width = spec.width;
+    *height = spec.height;
+    // Borrowed until the next decode; processing_mutex_ is held for that long.
+    return JpegBufferPtr(output->get_data_buffer(), JpegBufferDeleter{false});
+  }
+#endif
+  return decode_jpeg(data, len, width, height, JPEG_PIXEL_FORMAT_RGB888, rotate);
+}
+
 #ifdef USE_CAMERA_ROTATOR
 std::shared_ptr<camera::CameraImage> ImageProcessor::generate_rotated_preview(
     std::shared_ptr<camera::CameraImage> source, float rotation, int width, int height) {
@@ -675,7 +701,7 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(s
 
     // 2. Decode (with optional rotation)
     int dec_w = 0, dec_h = 0;
-    master_decoded_buffer = decode_jpeg(jpeg_data, jpeg_size, &dec_w, &dec_h, decode_format, hw_rotation);
+    master_decoded_buffer = this->decode_frame_(jpeg_data, jpeg_size, &dec_w, &dec_h, hw_rotation);
 
     if (!master_decoded_buffer) {
       ESP_LOGE(TAG, "CRITICAL: Image Decoding Failed (Master Buffer). Check heap/format.");
@@ -728,7 +754,8 @@ std::vector<ImageProcessor::ProcessResult> ImageProcessor::split_image_in_zone(s
 
         if (rot_success) {
           // Replace master buffer with rotated version
-          master_decoded_buffer.reset(raw_rot);
+          // Assign, not reset(): the new buffer is owned even when the old one was borrowed.
+          master_decoded_buffer = JpegBufferPtr(raw_rot);
           master_width = rot_w;
           master_height = rot_h;
         } else {
@@ -1050,7 +1077,7 @@ bool ImageProcessor::process_jpeg_zone_to_buffer(std::shared_ptr<camera::CameraI
   bool software_rotation_needed = false;
   jpeg_rotate_t hw_rotation = normalize_rotation(this->config_.rotation, software_rotation_needed);
 
-  JpegBufferPtr full_image_buf = decode_jpeg(jpeg_data, jpeg_size, &dec_w, &dec_h, decode_format, hw_rotation);
+  JpegBufferPtr full_image_buf = this->decode_frame_(jpeg_data, jpeg_size, &dec_w, &dec_h, hw_rotation);
 
   if (!full_image_buf) {
     this->stats_.jpeg_decoding_errors++;

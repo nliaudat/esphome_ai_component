@@ -107,6 +107,9 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
 
   void set_camera_image_format(int width, int height, const std::string &pixel_format);  // -> CameraCoord & TFLite
   void set_camera(camera::Camera *camera);                                               // -> CameraCoord
+#ifdef USE_ESP32_CAMERA_UTILS_DECODER
+  void set_decoder(camera::Decoder *decoder) { this->camera_coord_.set_decoder(decoder); }
+#endif
 
   sensor::Sensor *get_value_sensor() const { return value_sensor_; }
   sensor::Sensor *get_confidence_sensor() const { return confidence_sensor_; }

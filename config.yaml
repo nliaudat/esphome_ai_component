@@ -9,6 +9,8 @@ external_components: !include tflite_external_components.yaml
 
 substitutions:
   camera_resolution: 640x480
+  camera_width: "640" # must match camera_resolution
+  camera_height: "480"
   camera_pixel_format: "JPEG"
 
   name: esp-cam-freenove #no special caracters
@@ -90,6 +92,14 @@ esp32_camera_utils:
 
   # debug_memory: true
 
+# JPEG decoder of the new camera components (esphome/esphome#22767), added under
+# `packages:`. Remove it and `decoder_id` below to use the built-in decode.
+camera_decoder:
+  id: ${id_prefix}_decoder
+  output_type: RGB888
+  width: ${camera_width} # reserve the output buffer at boot
+  height: ${camera_height}
+
 # optional : flash light at taking image
 # flash_light_controller:
   # id: ${id_prefix}_flash_controller
@@ -122,6 +132,7 @@ meter_reader_tflite:
   # validator: ${id_prefix}_validator
   confidence_threshold: 0.99 # Only if validator is disabled
   camera_id: ${id_prefix}_espcam
+  decoder_id: ${id_prefix}_decoder
   # model: "models/dig-class100-0180-s2-q.tflite"
   model: ${id_prefix}_tflite   # ID of the tflite_micro_runtime entry above
 
@@ -189,6 +200,12 @@ meter_reader_tflite:
   # port: 80
 
 packages:
+  # New camera components, fetched from the PR head until they are merged
+  - external_components:
+      - source: github://pr#22767
+        components: [camera, camera_decoder]
+        refresh: always
+
   # Board Configuration (Mutually Exclusive)
   - !include boards/board_freenove_esp32-s3-n8r8.yaml
   # - !include boards/board_Seeed_Studio_XIAO_ESP32-S3_sense.yaml

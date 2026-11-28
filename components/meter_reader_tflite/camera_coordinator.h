@@ -22,6 +22,9 @@ class CameraCoordinator {
   void set_camera(esp32_camera::ESP32Camera *camera);
   void set_config(int width, int height, const std::string &pixel_format);
   void set_rotation(float rot) { this->rotation_ = rot; }
+#ifdef USE_ESP32_CAMERA_UTILS_DECODER
+  void set_decoder(camera::Decoder *decoder) { this->decoder_ = decoder; }
+#endif
 
   void unload();
 
@@ -82,6 +85,9 @@ class CameraCoordinator {
   std::unique_ptr<esp32_camera_utils::ImageProcessor> image_processor_;
 
   float rotation_{0.0f};
+#ifdef USE_ESP32_CAMERA_UTILS_DECODER
+  camera::Decoder *decoder_{nullptr};
+#endif
 
   // Reverted names to match .cpp implementation
   int current_width_{0};
