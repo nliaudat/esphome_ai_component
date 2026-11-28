@@ -100,6 +100,34 @@ camera_decoder:
   width: ${camera_width} # reserve the output buffer at boot
   height: ${camera_height}
 
+# Test of tflite_camera (esphome/esphome#23211): a model on the whole camera frame,
+# with its own decoder. The digit model only exercises the pipeline here; its
+# answer for a full frame is not a meter reading.
+tflite_camera:
+  - id: ${id_prefix}_camera_model
+    camera_id: ${id_prefix}_espcam
+    model: "models/digit_recognizer_v24_quantized_integer_quant_uint8.tflite"
+    decoder_id: ${id_prefix}_camera_result
+    min_interval: 60s
+    on_result:
+      - sensor.template.publish:
+          id: ${id_prefix}_tflite_camera_class
+          state: !lambda return id(${id_prefix}_camera_result).result().value;
+      - sensor.template.publish:
+          id: ${id_prefix}_tflite_camera_confidence
+          state: !lambda return id(${id_prefix}_camera_result).result().confidence;
+
+sensor:
+  - platform: template
+    id: ${id_prefix}_tflite_camera_class
+    name: "TFLite Camera Class"
+    entity_category: diagnostic
+  - platform: template
+    id: ${id_prefix}_tflite_camera_confidence
+    name: "TFLite Camera Confidence"
+    accuracy_decimals: 3
+    entity_category: diagnostic
+
 # optional : flash light at taking image
 # flash_light_controller:
   # id: ${id_prefix}_flash_controller
@@ -133,6 +161,7 @@ meter_reader_tflite:
   confidence_threshold: 0.99 # Only if validator is disabled
   camera_id: ${id_prefix}_espcam
   decoder_id: ${id_prefix}_decoder
+  background_inference: true # the runtime runs one model at a time
   # model: "models/dig-class100-0180-s2-q.tflite"
   model: ${id_prefix}_tflite   # ID of the tflite_micro_runtime entry above
 
@@ -204,6 +233,12 @@ packages:
   - external_components:
       - source: github://pr#22767
         components: [camera, camera_decoder]
+        refresh: always
+      - source: github://pr#23109
+        components: [tflite_image]
+        refresh: always
+      - source: github://pr#23211
+        components: [tflite_camera]
         refresh: always
 
   # Board Configuration (Mutually Exclusive)

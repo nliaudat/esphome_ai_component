@@ -149,6 +149,18 @@ meter_reader_tflite:
 Keep the decoder's `rotation` at 0 and set rotation in `esp32_camera_utils`.
 A 90, 180 or 270 degree rotation and the preview still use the built-in decode.
 
+## 🔀 Running other models
+
+On a dual-core chip the meter reader runs inference in its own task, so another
+model (`tflite_camera`, `tflite_image`, ...) can start while it runs. ESP-NN does
+not allow two invocations at once; `tflite_micro_runtime` serializes them since
+[esphome/esphome#23267](https://github.com/esphome/esphome/pull/23267) commit
+`65d53dfdae`, and a model on the main loop then waits for the running one.
+`micro_wake_word` has its own interpreter and is not covered.
+
+Set `background_inference: false` to run inference on the main loop instead, for
+example with an older runtime.
+
 ## ⚙️ Configuration Reference
 
 | Option | Type | Default | Description |

@@ -65,6 +65,7 @@ else:
 
 CONF_CAMERA_ID = "camera_id"
 CONF_DECODER_ID = "decoder_id"
+CONF_BACKGROUND_INFERENCE = "background_inference"
 CONF_CONFIDENCE_THRESHOLD = "confidence_threshold"
 CONF_DEBUG = "debug"
 CONF_DEBUG_IMAGE = "debug_image"
@@ -117,6 +118,7 @@ CONFIG_SCHEMA = cv.Schema(
         else cv.invalid(
             "decoder_id needs the camera and camera_decoder components of esphome/esphome#22767."
         ),
+        cv.Optional(CONF_BACKGROUND_INFERENCE, default=True): cv.boolean,
         cv.Optional(CONF_CONFIDENCE_THRESHOLD, default=0.85): cv.float_range(
             min=0.0, max=1.0
         ),
@@ -403,6 +405,9 @@ async def to_code(config):
         cg.add_define("USE_METER_READER_CROP_ZONES_GLOBAL")
         crop_global = await cg.get_variable(config[CONF_CROP_ZONES])
         cg.add(var.set_crop_zones_global(crop_global))
+
+    if not config[CONF_BACKGROUND_INFERENCE]:
+        cg.add_define("METER_READER_TFLITE_FOREGROUND_INFERENCE")
 
     # Decode frames with a camera_decoder instead of the built-in decode (optional)
     if CONF_DECODER_ID in config:

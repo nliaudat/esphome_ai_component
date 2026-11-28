@@ -48,8 +48,12 @@ struct FreeDeleter {
   void operator()(uint8_t *p) const { free(p); }
 };
 
+// The configuration options, including the one that turns the inference task off
+#include "esphome/core/defines.h"
+
 // Check for Dual Core capability
-#if !defined(CONFIG_FREERTOS_UNICORE) && (portNUM_PROCESSORS > 1)
+#if !defined(CONFIG_FREERTOS_UNICORE) && (portNUM_PROCESSORS > 1) && \
+    !defined(METER_READER_TFLITE_FOREGROUND_INFERENCE)
 #define SUPPORT_DOUBLE_BUFFERING
 #endif
 
@@ -58,8 +62,6 @@ struct FreeDeleter {
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #endif
-
-#include "esphome/core/defines.h"
 
 #ifdef USE_METER_READER_TFLITE
 

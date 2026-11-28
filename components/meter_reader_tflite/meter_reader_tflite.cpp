@@ -1327,8 +1327,10 @@ void MeterReaderTFLite::refresh_image_processor_config(int processor_input_type)
 
 }  // namespace meter_reader_tflite
 }  // namespace esphome
-#ifdef SUPPORT_DOUBLE_BUFFERING
+// The definitions below are outside the namespace in every build, not only with the task
 using namespace esphome::meter_reader_tflite;
+
+#ifdef SUPPORT_DOUBLE_BUFFERING
 
 void MeterReaderTFLite::inference_task(void *arg) {
   auto *self = static_cast<MeterReaderTFLite *>(arg);
