@@ -43,11 +43,6 @@ template<typename T> class GlobalsComponent;
 #include <atomic>
 #include <mutex>
 
-// FreeDeleter for PSRAM/internal RAM buffers (shared with value_validator pattern)
-struct FreeDeleter {
-  void operator()(uint8_t *p) const { free(p); }
-};
-
 // The configuration options, including the one that turns the inference task off
 #include "esphome/core/defines.h"
 
@@ -266,9 +261,12 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   bool window_active_{false};
   bool enable_flash_calibration_{false};
 
-  // Preview fallback buffer -- pre-allocated in PSRAM (preferred) to avoid heap alloc in loop()
-  std::unique_ptr<uint8_t[], FreeDeleter> preview_fallback_buffer_;
-  size_t preview_fallback_buffer_size_{0};
+  // Unload and reload run over several loop iterations; this rejects a request
+  // that arrives while the previous one is unfinished. LOADING until the first load.
+  enum class ResourceState : uint8_t { LOADING, LOADED, UNLOADING, UNLOADED };
+  ResourceState resource_state_{ResourceState::LOADING};
+  /// Release the resources once the inference task has exited; retries until then.
+  void finish_unload_();
 
 // Data Collection
 #ifdef USE_DATA_COLLECTOR
@@ -391,11 +389,14 @@ class MeterReaderTFLite : public PollingComponent, public camera::CameraImageRea
   static void inference_task(void *arg);
 
   // Sync state for safe unloading
-  std::atomic<bool> is_inferencing_{false};
   std::atomic<bool> task_running_{false};
+  /// Set by the task as its last use of this object, right before it deletes itself.
+  std::atomic<bool> task_exited_{false};
 
   void start_inference_pipeline();
-  void stop_inference_pipeline();
+  /// Ask the task to stop and release the queues once it has. False while it is
+  /// still running: it is never force-deleted, because it may hold model locks.
+  bool try_stop_inference_pipeline_();
 
 #endif
 };

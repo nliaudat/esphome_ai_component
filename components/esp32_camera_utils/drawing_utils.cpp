@@ -18,7 +18,12 @@ void DrawingUtils::draw_pixel(uint8_t *buffer, int x, int y, int w, int h, int c
 
   int index = (y * w + x) * channels;
 
-  if (channels == 2) {
+  if (channels == 1) {
+    // Grayscale: the colour's luminance
+    uint8_t r, g, b;
+    rgb565_to_rgb888(color, r, g, b);
+    buffer[index] = static_cast<uint8_t>((r * 77 + g * 150 + b * 29) >> 8);
+  } else if (channels == 2) {
     // RGB565
     buffer[index] = static_cast<uint8_t>(color & 0xFF);  // Low byte
     buffer[index + 1] =

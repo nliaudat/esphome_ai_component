@@ -191,6 +191,19 @@ static void free_inference_result(InferenceResult *res) {
   delete res;
 }
 
+// Only called while no inference task exists, so no job or result is in use.
+static void allocate_inference_pools() {
+  INFERENCE_POOL_SIZE.store(calculate_optimal_pool_size());
+  ESP_LOGI(TAG, "Auto-configured inference pool size: %zu entries", INFERENCE_POOL_SIZE.load());
+
+  std::lock_guard<std::mutex> lock(pool_mutex);
+  // make_unique value-initializes, so every "used" flag starts false.
+  inference_job_pool = std::make_unique<InferenceJob[]>(INFERENCE_POOL_SIZE.load());
+  inference_result_pool = std::make_unique<InferenceResult[]>(INFERENCE_POOL_SIZE.load());
+  inference_job_used = std::make_unique<bool[]>(INFERENCE_POOL_SIZE.load());
+  inference_result_used = std::make_unique<bool[]>(INFERENCE_POOL_SIZE.load());
+}
+
 #endif
 
 // Named constants for better readability (compile-time only)
@@ -204,9 +217,6 @@ static constexpr uint32_t CALIBRATION_STEP_PRE_MS = 100;
 static constexpr uint32_t CALIBRATION_START_POST_MS = 500;
 static constexpr uint32_t CALIBRATION_END_POST_MS = 100;
 static constexpr uint32_t CALIBRATION_STEP_POST_MS = 100;
-
-// Maximum preview JPEG size for pre-allocated fallback buffer
-static constexpr uint32_t PREVIEW_FALLBACK_BUFFER_SIZE = 256 * 1024;  // 256 KB
 
 void MeterReaderTFLite::setup() {
   ESP_LOGI(TAG, "Setting up Meter Reader TFLite (Refactored)...");
@@ -249,6 +259,7 @@ void MeterReaderTFLite::setup() {
     // The runtime's InputType enum is mapped onto ImageProcessorInputType here.
     int processor_input_type = TFLiteCoordinator::to_processor_input_type(spec.input_type);
     this->refresh_image_processor_config(processor_input_type);
+    this->resource_state_ = ResourceState::LOADED;
 
 // Setup Web Server Preview
 #ifdef USE_WEB_SERVER
@@ -294,20 +305,7 @@ void MeterReaderTFLite::setup() {
 #ifdef SUPPORT_DOUBLE_BUFFERING
 
   // 6. Setup Inference Object Pools
-  INFERENCE_POOL_SIZE.store(calculate_optimal_pool_size());
-  ESP_LOGI(TAG, "Auto-configured inference pool size: %zu entries", INFERENCE_POOL_SIZE.load());
-
-  // Allocate pools
-  inference_job_pool = std::make_unique<InferenceJob[]>(INFERENCE_POOL_SIZE.load());
-  inference_result_pool = std::make_unique<InferenceResult[]>(INFERENCE_POOL_SIZE.load());
-  inference_job_used = std::make_unique<bool[]>(INFERENCE_POOL_SIZE.load());
-  inference_result_used = std::make_unique<bool[]>(INFERENCE_POOL_SIZE.load());
-
-  // Initialize used flags
-  for (size_t i = 0; i < INFERENCE_POOL_SIZE.load(); ++i) {
-    inference_job_used[i] = false;
-    inference_result_used[i] = false;
-  }
+  allocate_inference_pools();
 
   // 7. Setup Double Buffering Pipeline
   this->start_inference_pipeline();
@@ -618,8 +616,8 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
   ScopedTimer timer("Total Processing");
   uint32_t start_time = timer.start_time();
 
-  if (!this->tflite_coord_.is_model_loaded()) {
-    ESP_LOGW(TAG, "Skipping frame - Model not loaded yet");
+  if (!this->tflite_coord_.is_model_loaded() || this->resource_state_ == ResourceState::UNLOADING) {
+    ESP_LOGW(TAG, "Skipping frame - Model not loaded");
     return;
   }
 
@@ -677,20 +675,19 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
       // Draw crop zones on the preview image for debugging visualization.
       if (this->show_crop_areas_) {
         auto draw_zones = this->crop_zone_handler_.get_zones();
-        if (preview->get_data_buffer()) {
-          uint8_t *buf = preview->get_data_buffer();
-
-          // Calculate dimensions based on current camera config and rotation
-          int w = this->camera_coord_.get_width();
-          int h = this->camera_coord_.get_height();
-          if (std::abs(this->rotation_ - 90.0f) < 0.1f || std::abs(this->rotation_ - 270.0f) < 0.1f) {
-            std::swap(w, h);
-          }
-
-          auto spec = this->tflite_coord_.get_model_spec();
-          // Preview image is RGB888 (3 channels) from ImageProcessor
-          int channels = 3;
-
+        // The processor only caches RotatedPreviewImage. Its size and format are
+        // those of the processed frame: rotated, windowed or grayscale.
+        auto *image = static_cast<esp32_camera_utils::RotatedPreviewImage *>(preview.get());
+        const int w = image->get_width();
+        const int h = image->get_height();
+        int channels = 0;
+        if (image->get_format() == PIXFORMAT_GRAYSCALE) {
+          channels = 1;
+        } else if (image->get_format() == PIXFORMAT_RGB888) {
+          channels = 3;
+        }
+        uint8_t *buf = image->get_data_buffer();
+        if (buf != nullptr && channels != 0 && image->get_data_length() >= static_cast<size_t>(w) * h * channels) {
 #ifdef USE_CAMERA_DRAWING
           for (const auto &zone : draw_zones) {
             int zone_w = zone.x2 - zone.x1;
@@ -708,26 +705,23 @@ void MeterReaderTFLite::process_full_image(std::shared_ptr<camera::CameraImage> 
       // Copy the raw frame's JPEG data so /preview serves it directly.
       size_t len = frame->get_data_length();
 
-      // Use pre-allocated buffer if it's large enough, otherwise allocate (with RAII)
-      uint8_t *copy_dst = nullptr;
-      bool from_prealloc = false;
-      if (this->preview_fallback_buffer_ && len <= this->preview_fallback_buffer_size_) {
-        copy_dst = this->preview_fallback_buffer_.get();
-        from_prealloc = true;
-      } else {
+      // The cached image owns its copy: the web server may still be reading the previous one.
+      bool is_spiram = true;
+      uint8_t *copy_dst = static_cast<uint8_t *>(heap_caps_malloc(len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+      if (copy_dst == nullptr) {
+        is_spiram = false;
         copy_dst = static_cast<uint8_t *>(heap_caps_malloc(len, MALLOC_CAP_8BIT));
       }
-      if (copy_dst) {
+      if (copy_dst != nullptr) {
         memcpy(copy_dst, frame->get_data_buffer(), len);
-        bool is_spiram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM) > 0;
+        // Neither jpeg-aligned nor pooled, so it is released with heap_caps_free().
         esp32_camera_utils::ImageProcessor::UniqueBufferPtr tracked_buf(
-            new esp32_camera_utils::ImageProcessor::TrackedBuffer(copy_dst, is_spiram, !from_prealloc, false, len));
+            new esp32_camera_utils::ImageProcessor::TrackedBuffer(copy_dst, is_spiram, false, false, len));
         auto cached = std::make_shared<esp32_camera_utils::RotatedPreviewImage>(
             std::move(tracked_buf), len, this->camera_coord_.get_width(), this->camera_coord_.get_height(),
             PIXFORMAT_JPEG);
         this->update_preview_image(cached);
-        ESP_LOGD(TAG, "Preview: cached raw frame fallback (%u bytes, spiram=%s, prealloc=%s)", len,
-                 is_spiram ? "yes" : "no", from_prealloc ? "yes" : "no");
+        ESP_LOGD(TAG, "Preview: cached raw frame fallback (%zu bytes, spiram=%s)", len, is_spiram ? "yes" : "no");
       }
     }
     if (this->request_preview_.load())
@@ -1039,30 +1033,6 @@ void MeterReaderTFLite::set_generate_preview(bool generate) {
   // Update Coordinator to enable/disable image caching dynamically
   this->camera_coord_.set_enable_preview(generate);
 
-  // Pre-allocate preview fallback buffer if needed (avoids heap alloc in loop())
-  if (generate && !this->preview_fallback_buffer_) {
-    // Prefer PSRAM for large buffers to preserve internal SRAM
-    uint8_t *buf =
-        static_cast<uint8_t *>(heap_caps_malloc(PREVIEW_FALLBACK_BUFFER_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
-    if (!buf) {
-      // Fallback to internal RAM if PSRAM not available
-      buf = static_cast<uint8_t *>(malloc(PREVIEW_FALLBACK_BUFFER_SIZE));
-    }
-    if (buf) {
-      this->preview_fallback_buffer_.reset(buf);
-      this->preview_fallback_buffer_size_ = PREVIEW_FALLBACK_BUFFER_SIZE;
-      ESP_LOGI(TAG, "Pre-allocated preview fallback buffer: %u bytes (PSRAM preferred)",
-               static_cast<unsigned>(PREVIEW_FALLBACK_BUFFER_SIZE));
-    } else {
-      ESP_LOGW(TAG, "Failed to allocate preview fallback buffer (%u bytes)",
-               static_cast<unsigned>(PREVIEW_FALLBACK_BUFFER_SIZE));
-    }
-  } else if (!generate && this->preview_fallback_buffer_) {
-    this->preview_fallback_buffer_.reset();
-    this->preview_fallback_buffer_size_ = 0;
-    ESP_LOGI(TAG, "Freed preview fallback buffer");
-  }
-
   // Refresh ImageProcessor config if model is loaded (uses consolidated helper)
   if (this->tflite_coord_.is_model_loaded()) {
     auto spec = this->tflite_coord_.get_model_spec();
@@ -1232,7 +1202,8 @@ bool MeterReaderTFLite::set_camera_window(int offset_x, int offset_y, int width,
 // Destructor
 MeterReaderTFLite::~MeterReaderTFLite() {
 #ifdef SUPPORT_DOUBLE_BUFFERING
-  this->stop_inference_pipeline();
+  while (!this->try_stop_inference_pipeline_())
+    vTaskDelay(pdMS_TO_TICKS(10));
 #endif
 }
 
@@ -1338,10 +1309,6 @@ void MeterReaderTFLite::inference_task(void *arg) {
 
   while (self->task_running_.load()) {
     // Idle until a job arrives (or shutdown is signalled via a poison pill).
-    // is_inferencing_ is only true during actual inference so
-    // stop_inference_pipeline() can distinguish "waiting for a job" (safe to
-    // cleanly stop) from "mid-inference" (pool slots + job owned on this stack).
-    self->is_inferencing_ = false;
     job = nullptr;
 
     // Use timeout to allow periodic checking of task_running_
@@ -1353,14 +1320,11 @@ void MeterReaderTFLite::inference_task(void *arg) {
         break;
       }
 
-      self->is_inferencing_ = true;
-
       ESP_LOGD(TAG, "Inference Task: Job received. Starting TFLite...");
       uint32_t start = millis();
 
       // Invoke TFLite (Thread-Safe because only this task calls it)
       auto tflite_results = self->tflite_coord_.run_inference(job->crops);
-      self->is_inferencing_ = false;
 
       InferenceResultPtr res = allocate_inference_result();
       res->inference_time = millis() - start;
@@ -1390,11 +1354,10 @@ void MeterReaderTFLite::inference_task(void *arg) {
         res.release();  // Ownership transferred to queue consumer
       }
       job = nullptr;
-    } else {
-      self->is_inferencing_ = false;
     }
   }
   ESP_LOGI(TAG, "Inference task stopping...");
+  self->task_exited_.store(true);
   vTaskDelete(nullptr);
 }
 
@@ -1414,6 +1377,7 @@ void MeterReaderTFLite::start_inference_pipeline() {
     return;
   }
 
+  this->task_exited_ = false;
   this->task_running_ = true;
   BaseType_t res = xTaskCreatePinnedToCore(MeterReaderTFLite::inference_task, "inference_task",
                                            16384,  // Stack size
@@ -1434,36 +1398,19 @@ void MeterReaderTFLite::start_inference_pipeline() {
   ESP_LOGI(TAG, "Double Buffering active on Core 0");
 }
 
-void MeterReaderTFLite::stop_inference_pipeline() {
+bool MeterReaderTFLite::try_stop_inference_pipeline_() {
   if (!this->inference_task_handle_)
-    return;
+    return true;
 
-  ESP_LOGI(TAG, "Stopping Inference Pipeline...");
-  this->task_running_ = false;
-
-  // Poison pill: a nullptr InferenceJob* wakes a blocked inference task and tells
-  // it to exit cleanly via vTaskDelete(nullptr). Stack destructors (InferenceResultPtr,
-  // InferenceJob*) run, releasing pool slots instead of leaking them.
-  InferenceJob *poison = nullptr;
-  xQueueSend(this->input_queue_, &poison, 0);
-
-  // Wait for the task to exit via the poison-pill path (clean, no pool-slot leak).
-  // Give it 3 seconds to finish a possibly in-flight inference and observe the pill.
-  uint32_t start = millis();
-  while (eTaskGetState(this->inference_task_handle_) != eDeleted) {
-    if (millis() - start > 3000) {
-      // Last resort: force-delete. This only happens if the task is stuck mid-inference
-      // (e.g. extreme PSRAM fragmentation stalling heap_caps_aligned_alloc for >3s).
-      ESP_LOGW(TAG, "Timeout (3s) waiting for inference task to exit. Force deleting.");
-      if (this->is_inferencing_.load()) {
-        ESP_LOGE(TAG, "Task force-deleted mid-inference -- pool slots and job owned on its stack "
-                      "ARE LEAKED (repeated unload/reload may exhaust the pool)");
-      }
-      vTaskDelete(this->inference_task_handle_);
-      break;
-    }
-    vTaskDelay(pdMS_TO_TICKS(10));
+  if (this->task_running_.exchange(false)) {
+    ESP_LOGI(TAG, "Stopping Inference Pipeline...");
+    // Poison pill: a nullptr InferenceJob* wakes a blocked inference task. When
+    // the queue is full instead, the task sees task_running_ after its job.
+    InferenceJob *poison = nullptr;
+    xQueueSend(this->input_queue_, &poison, 0);
   }
+  if (!this->task_exited_.load())
+    return false;
   this->inference_task_handle_ = nullptr;
 
   // Drain input queue to free InferenceJob pointers
@@ -1486,6 +1433,7 @@ void MeterReaderTFLite::stop_inference_pipeline() {
   this->output_queue_ = nullptr;
 
   ESP_LOGI(TAG, "Inference Pipeline Stopped");
+  return true;
 }
 
 #endif
@@ -1623,7 +1571,13 @@ void MeterReaderTFLite::update_calibration(float confidence) {
 }
 
 void MeterReaderTFLite::unload_resources() {
+  if (this->resource_state_ != ResourceState::LOADED) {
+    ESP_LOGW(TAG, "Unload ignored: resources are %s",
+             this->resource_state_ == ResourceState::UNLOADED ? "already unloaded" : "still loading or unloading");
+    return;
+  }
   ESP_LOGI(TAG, "Unloading MeterReaderTFLite resources...");
+  this->resource_state_ = ResourceState::UNLOADING;
 
   // 1. Pause processing
   this->pause_processing_.store(true);
@@ -1631,8 +1585,16 @@ void MeterReaderTFLite::unload_resources() {
   // 2. Stop Flashlight (stop timers/sequences)
   this->flashlight_coord_.disable_flash();
 
+  this->finish_unload_();
+}
+
+void MeterReaderTFLite::finish_unload_() {
 #ifdef SUPPORT_DOUBLE_BUFFERING
-  this->stop_inference_pipeline();
+  // A running inference owns the model and its locks; come back when it is done.
+  if (!this->try_stop_inference_pipeline_()) {
+    this->set_timeout("finish_unload", 100, [this]() { this->finish_unload_(); });
+    return;
+  }
 #endif
 
   // 3. Unload TFLite Model & Arena
@@ -1648,6 +1610,7 @@ void MeterReaderTFLite::unload_resources() {
   inference_job_used.reset();
   inference_result_used.reset();
 #endif
+  this->resource_state_ = ResourceState::UNLOADED;
 
   // 6. Force Heap Collection/Debug
   ESP_LOGI(TAG, "Resources unloaded. Heap status:");
@@ -1657,29 +1620,18 @@ void MeterReaderTFLite::unload_resources() {
 }
 
 void MeterReaderTFLite::reload_resources() {
-  ESP_LOGI(TAG, "Reloading MeterReaderTFLite resources...");
-
-#ifdef SUPPORT_DOUBLE_BUFFERING
-  // 1. Re-allocate Pools
-  INFERENCE_POOL_SIZE.store(calculate_optimal_pool_size());
-  inference_job_pool = std::make_unique<InferenceJob[]>(INFERENCE_POOL_SIZE.load());
-  inference_result_pool = std::make_unique<InferenceResult[]>(INFERENCE_POOL_SIZE.load());
-  inference_job_used = std::make_unique<bool[]>(INFERENCE_POOL_SIZE.load());
-  inference_result_used = std::make_unique<bool[]>(INFERENCE_POOL_SIZE.load());
-
-  for (size_t i = 0; i < INFERENCE_POOL_SIZE.load(); ++i) {
-    inference_job_used[i] = false;
-    inference_result_used[i] = false;
+  if (this->resource_state_ != ResourceState::UNLOADED) {
+    ESP_LOGW(TAG, "Reload ignored: unload the resources first");
+    return;
   }
+  ESP_LOGI(TAG, "Reloading MeterReaderTFLite resources...");
+  this->resource_state_ = ResourceState::LOADING;
 
-  this->start_inference_pipeline();
-#endif
-
-  // 2. Reload Model & Config
   // Use timeout to schedule on main loop tick to avoid stack issues/recursion
   this->set_timeout(100, [this]() {
     if (!this->tflite_coord_.load_model()) {
       ESP_LOGE(TAG, "Failed to reload model!");
+      this->resource_state_ = ResourceState::UNLOADED;
       return;
     }
 
@@ -1688,7 +1640,13 @@ void MeterReaderTFLite::reload_resources() {
     int processor_input_type = TFLiteCoordinator::to_processor_input_type(spec.input_type);
     this->refresh_image_processor_config(processor_input_type);
 
+#ifdef SUPPORT_DOUBLE_BUFFERING
+    allocate_inference_pools();
+    this->start_inference_pipeline();
+#endif
+
     // Resume processing
+    this->resource_state_ = ResourceState::LOADED;
     this->pause_processing_.store(false);
     ESP_LOGI(TAG, "Resources reloaded and processing resumed.");
   });
